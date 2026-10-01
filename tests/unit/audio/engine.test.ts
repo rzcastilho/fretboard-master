@@ -322,3 +322,29 @@ describe('engine E12: mute and volume are gain automation only', () => {
     expect(mute.gain.value === 0 || mute.gain.calls.some((c) => c.args[0] === 0)).toBe(true);
   });
 });
+
+describe('engine gain checks (US3)', () => {
+  it('volume 80 → gain 0.64; volume 0 → silent gain', async () => {
+    const { port, engine } = setup();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    const volume = port.gains[0] as unknown as FakeGain;
+    expect(volume.gain.value).toBeCloseTo(0.64, 10);
+    engine.setVolume(0);
+    expect(volume.gain.calls.filter((c) => c.method === 'setTargetAtTime').at(-1)?.args[0]).toBe(0);
+  });
+
+  it('mute applies to an already sounding note by ramping, not stopping (10 ms, τ 3 ms)', async () => {
+    const { port, engine } = setup();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    const mute = port.gains[1] as unknown as FakeGain;
+    engine.setMuted(true);
+    const call = mute.gain.calls.find((c) => c.method === 'setTargetAtTime');
+    expect(call?.args[0]).toBe(0);
+    expect(call?.args[2]).toBeCloseTo(0.003, 6);
+    expect((port.sources[0] as unknown as FakeSource).stopCalls).toEqual([]);
+  });
+});

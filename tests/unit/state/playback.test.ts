@@ -131,3 +131,53 @@ describe('playback.setMuted / setVolume (US2)', () => {
     expect(playback.volume).toBe(0);
   });
 });
+
+describe('sound control state (US3)', () => {
+  it('muting keeps volume; unmuting restores it', () => {
+    resetPlaybackForTests(deps().deps);
+    playback.setVolume(60);
+    playback.setMuted(true);
+    expect(playback.volume).toBe(60);
+    expect(playback.muted).toBe(true);
+    playback.setMuted(false);
+    expect(playback.volume).toBe(60);
+    expect(playback.muted).toBe(false);
+  });
+
+  it('snaps volume to steps of 5 and clamps to 0–100', () => {
+    resetPlaybackForTests(deps().deps);
+    playback.setVolume(43);
+    expect(playback.volume).toBe(45);
+    playback.setVolume(250);
+    expect(playback.volume).toBe(100);
+    playback.setVolume(-8);
+    expect(playback.volume).toBe(0);
+  });
+
+  it('volume 0 does not set muted', () => {
+    resetPlaybackForTests(deps().deps);
+    playback.setVolume(0);
+    expect(playback.volume).toBe(0);
+    expect(playback.muted).toBe(false);
+    expect(playback.controlState).toBe('on');
+  });
+
+  it('maps controlState on / muted', () => {
+    resetPlaybackForTests(deps().deps);
+    expect(playback.controlState).toBe('on');
+    playback.setMuted(true);
+    expect(playback.controlState).toBe('muted');
+  });
+
+  it('setMuted and setVolume unlock the engine', () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.setMuted(true);
+    expect(d.createContext).toHaveBeenCalledTimes(1);
+    expect(playback.availability).toBe('on');
+    const e = deps();
+    resetPlaybackForTests(e.deps);
+    playback.setVolume(30);
+    expect(e.createContext).toHaveBeenCalledTimes(1);
+  });
+});

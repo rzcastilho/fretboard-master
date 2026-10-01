@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
+  import SoundControl from './SoundControl.svelte';
   import { screenTitle } from './screens';
   import { TOOLS } from './tools';
   import ToolCard from './ToolCard.svelte';
@@ -16,6 +17,7 @@
   <h1 tabindex="-1">{m.app_name()}</h1>
   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- /about route (typed by resolve) lands in US3 -->
   <a class="about" href="/about">{m.nav_about()}</a>
+  <SoundControl />
 </header>
 
 <main>

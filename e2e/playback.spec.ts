@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { readAudioLog } from './support/helpers';
+import { expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
 
 const cellAt = (page: Page, string: number, fret: number) =>
   page.locator(`.cell[data-string="${string}"][data-fret="${fret}"]`);
@@ -76,10 +76,8 @@ test.describe('pulse feedback (US2)', () => {
     await expect(page.locator('.marker.pulse')).toHaveCount(0);
   });
 
-  // The mute control is built in Phase 5 (US3); until it exists this case cannot click it.
-  // Mute-with-pulse is covered at unit level by engine E5 and state/playback tests (T031/T032).
-  test.fixme('still pulses after muting (US2-2)', async ({ page }) => {
-    await page.getByRole('button', { name: /mute/i }).click();
+  test('still pulses after muting (US2-2)', async ({ page }) => {
+    await page.getByRole('button', { name: 'Mute sound' }).click();
     await openString6(page).click();
     await expect(page.locator('.marker.pulse')).toHaveCount(1);
   });
@@ -103,5 +101,82 @@ test.describe('pulse feedback (US2)', () => {
     await expect(marker).toHaveClass(/highlighted/);
     await page.clock.runFor(1500);
     await expect(page.locator('.marker[data-key="6:0"]')).toHaveCount(0);
+  });
+});
+
+test.describe('sound control (US3)', () => {
+  test('mute then click logs a silent step and still pulses', async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await page.getByRole('button', { name: 'Mute sound' }).click();
+    await cellAt(page, 6, 0).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(1);
+    const step = (await stepEntries(page))[0];
+    if (step?.type !== 'step') throw new Error('no step entry');
+    expect(step.gain).toBe(0);
+    await expect(page.locator('.marker.pulse')).toHaveCount(1);
+  });
+
+  test('settings last for the session only (US3-4)', async ({ page }) => {
+    await page.goto('/notes');
+    await page.getByRole('button', { name: 'Sound settings' }).click();
+    await page.getByRole('slider', { name: 'Volume' }).fill('40');
+    await page.getByRole('button', { name: 'Mute sound' }).click();
+    await expect(page.getByRole('button', { name: 'Mute sound' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Mute sound' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await page.getByRole('button', { name: 'Sound settings' }).click();
+    await expect(page.getByRole('slider', { name: 'Volume' })).toHaveValue('80');
+  });
+
+  for (const path of ['/', '/about', '/notes', '/triads']) {
+    test(`control is present with 44×44 targets and no page scroll on ${path}`, async ({
+      page
+    }) => {
+      await page.goto(path);
+      const group = page.getByRole('group', { name: 'Sound' });
+      await expect(group).toBeVisible();
+      for (const name of ['Mute sound', 'Sound settings']) {
+        const box = await group.getByRole('button', { name }).boundingBox();
+        expect(box?.width).toBeGreaterThanOrEqual(44);
+        expect(box?.height).toBeGreaterThanOrEqual(44);
+      }
+      await expectNoHorizontalScroll(page);
+    });
+  }
+
+  test('axe: zero violations with the panel open (SC-009)', async ({ page }) => {
+    await page.goto('/notes');
+    await page.getByRole('button', { name: 'Sound settings' }).click();
+    await expect(page.getByRole('slider', { name: 'Volume' })).toBeVisible();
+    await runAxe(page);
+  });
+
+  test('keyboard: Escape closes the panel and focuses the settings button', async ({ page }) => {
+    await page.goto('/about');
+    const settings = page.getByRole('button', { name: 'Sound settings' });
+    await settings.focus();
+    await page.keyboard.press('Enter');
+    await expect(settings).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect(settings).toHaveAttribute('aria-expanded', 'false');
+    await expect(settings).toBeFocused();
+  });
+
+  test('grayscale: on / muted states are distinguishable without color', async ({ page }) => {
+    await page.goto('/about');
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.addStyleTag({ content: 'html { filter: grayscale(1); }' });
+    const group = page.getByRole('group', { name: 'Sound' });
+    await expect(group).toHaveScreenshot('sound-control-on.png');
+    await page.getByRole('button', { name: 'Mute sound' }).click();
+    await expect(group).toHaveScreenshot('sound-control-muted.png');
   });
 });

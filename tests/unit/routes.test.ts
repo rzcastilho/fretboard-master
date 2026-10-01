@@ -1,5 +1,5 @@
 import { createRawSnippet } from 'svelte';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type NavCallback = (nav: { type: string }) => void;
@@ -74,7 +74,9 @@ describe('pages', () => {
     vi.useFakeTimers();
     const spy = vi.spyOn(history, 'replaceState');
     render(UnknownPage);
-    expect(screen.getByRole('status').textContent).toContain('We could not find that page');
+    expect(within(screen.getByRole('main')).getByRole('status').textContent).toContain(
+      'We could not find that page'
+    );
     await vi.runAllTimersAsync();
     const home = new URL('/', location.href).href;
     expect(spy).toHaveBeenCalledWith(

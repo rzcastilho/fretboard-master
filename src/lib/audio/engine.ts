@@ -214,7 +214,7 @@ export function createPlaybackEngine(
         frequencies: step.pitches.map(frequencyOf),
         when,
         contextTime: port.currentTime,
-        gain: volumeToGain(volume),
+        gain: muted ? 0 : volumeToGain(volume),
         scheduledAtMs: performance.now()
       });
     }

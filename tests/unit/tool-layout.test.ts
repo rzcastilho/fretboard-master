@@ -11,6 +11,12 @@ describe('ToolLayout', () => {
     expect(banner.getAttribute('aria-label')).toBe('Application bar');
   });
 
+  it('puts the sound control in the application bar', () => {
+    render(ToolLayout, { tool: 'notes' });
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('group', { name: 'Sound' })).toBeTruthy();
+  });
+
   it('renders the fretboard in zone C and placeholders in the other zones', () => {
     render(ToolLayout, { tool: 'notes' });
     const fretboard = screen.getByRole('region', { name: 'Fretboard' });
