@@ -48,6 +48,20 @@ describe('check-no-fault-hook', () => {
     expect(r.status).toBe(1);
   });
 
+  it('fails when the output contains __fmAudioFault', () => {
+    const r = spawnSync('node', [script, fixture('globalThis.__fmAudioFault = "context"')], {
+      encoding: 'utf8'
+    });
+    expect(r.status).toBe(1);
+  });
+
+  it('fails when the output contains __fmAudioLog', () => {
+    const r = spawnSync('node', [script, fixture('globalThis.__fmAudioLog = []')], {
+      encoding: 'utf8'
+    });
+    expect(r.status).toBe(1);
+  });
+
   it('passes on a clean directory', () => {
     const r = spawnSync('node', [script, fixture('console.log("hi")')], { encoding: 'utf8' });
     expect(r.status).toBe(0);

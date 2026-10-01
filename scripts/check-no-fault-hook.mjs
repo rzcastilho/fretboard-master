@@ -2,7 +2,14 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dir = process.argv[2] ?? 'build';
-const needles = ['__fmFault', 'Injected fault', '__fmFretboardFixture', '__fmFretboardEvents'];
+const needles = [
+  '__fmFault',
+  'Injected fault',
+  '__fmFretboardFixture',
+  '__fmFretboardEvents',
+  '__fmAudioFault',
+  '__fmAudioLog'
+];
 const hits = [];
 
 function walk(current) {

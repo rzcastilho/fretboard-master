@@ -82,7 +82,8 @@ export default tseslint.config(
             '$app/*',
             '$lib/paraglide/*',
             '$lib/fretboard/*',
-            '$lib/notation/*'
+            '$lib/notation/*',
+            '$lib/audio/engine'
           ]
         }
       ],
@@ -100,7 +101,16 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: ['svelte', 'svelte/*', '$app/*', '$lib/fretboard/*', '$lib/instrument/*'] }
+        {
+          patterns: [
+            'svelte',
+            'svelte/*',
+            '$app/*',
+            '$lib/fretboard/*',
+            '$lib/instrument/*',
+            '$lib/audio/engine'
+          ]
+        }
       ],
       'no-restricted-globals': [
         'error',
@@ -112,10 +122,45 @@ export default tseslint.config(
     }
   },
   {
+    // Playback contract §4: audio is pure Web Audio/DSP; only state/playback owns the engine.
+    files: ['src/lib/audio/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            'svelte',
+            'svelte/*',
+            '$app/*',
+            '$lib/paraglide/*',
+            '$lib/fretboard/*',
+            '$lib/state/*',
+            '$lib/shell/*',
+            '$lib/prefs/*'
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['src/lib/fretboard/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['$lib/audio/*', '$lib/state/*'] }]
+    }
+  },
+  {
+    // Only the playback state module may import the engine (contract §4).
+    files: ['src/lib/state/**', 'src/lib/prefs/**'],
+    ignores: ['src/lib/state/playback.svelte.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['$lib/audio/engine'] }]
+    }
+  },
+  {
     // Shell and routes must not compute theory; go through instrument/fretboard.
     files: ['src/lib/shell/**', 'src/routes/**'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['$lib/theory/*'] }]
+      'no-restricted-imports': ['error', { patterns: ['$lib/theory/*', '$lib/audio/engine'] }]
     }
   }
 );

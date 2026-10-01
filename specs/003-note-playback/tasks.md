@@ -28,11 +28,11 @@
 
 **Purpose**: Lint boundaries, catalog, tokens, and test-build globals that every story needs.
 
-- [ ] T001 Edit `eslint.config.js`: add import boundaries from contracts/playback-api.md §4 (audio ↛ svelte/`$app/*`/`$lib/paraglide/*`/fretboard/state/shell/prefs; fretboard ↛ `$lib/audio/*` and `$lib/state/*`; only `src/lib/state/playback.svelte.ts` may import `$lib/audio/engine`). Verify by temporarily adding `import 'svelte'` to a scratch file under `src/lib/audio/` and confirming `pnpm lint` fails, then remove it.
-- [ ] T002 [P] Edit `messages/en.json`: add the 14 keys from contracts/sound-control-ui.md §5 exactly (`sound_group_label`, `sound_mute`, `sound_unavailable_label`, `sound_state_on`, `sound_state_muted`, `sound_state_unavailable`, `sound_settings`, `sound_volume`, `sound_volume_value` with `{value}` placeholder, `sound_help_title`, `sound_help_silent_mode`, `sound_help_app_volume`, `sound_unavailable_notice`, `playback_stop`).
-- [ ] T003 [P] Edit `src/lib/styles/tokens.css`: add `--pulse-scale` (1.25), `--pulse-opacity-peak`, `--sound-panel-width`, `--icon-size`; extend the existing `prefers-contrast: more` block with a stronger sound-panel border using the existing border-token pattern.
-- [ ] T004 [P] Edit `src/app.d.ts`: declare `var __fmAudioFault: 'context' | 'synth' | undefined` and `var __fmAudioLog: AudioLogEntry[] | undefined` (shape in data-model.md §8; import the type from `$lib/audio/types`).
-- [ ] T005 [P] Edit `scripts/check-no-fault-hook.mjs`: add needles `__fmAudioFault` and `__fmAudioLog`; extend `tests/unit/no-fault-hook.test.ts` so a build dir containing either string fails the check.
+- [X] T001 Edit `eslint.config.js`: add import boundaries from contracts/playback-api.md §4 (audio ↛ svelte/`$app/*`/`$lib/paraglide/*`/fretboard/state/shell/prefs; fretboard ↛ `$lib/audio/*` and `$lib/state/*`; only `src/lib/state/playback.svelte.ts` may import `$lib/audio/engine`). Verify by temporarily adding `import 'svelte'` to a scratch file under `src/lib/audio/` and confirming `pnpm lint` fails, then remove it.
+- [X] T002 [P] Edit `messages/en.json`: add the 14 keys from contracts/sound-control-ui.md §5 exactly (`sound_group_label`, `sound_mute`, `sound_unavailable_label`, `sound_state_on`, `sound_state_muted`, `sound_state_unavailable`, `sound_settings`, `sound_volume`, `sound_volume_value` with `{value}` placeholder, `sound_help_title`, `sound_help_silent_mode`, `sound_help_app_volume`, `sound_unavailable_notice`, `playback_stop`).
+- [X] T003 [P] Edit `src/lib/styles/tokens.css`: add `--pulse-scale` (1.25), `--pulse-opacity-peak`, `--sound-panel-width`, `--icon-size`; extend the existing `prefers-contrast: more` block with a stronger sound-panel border using the existing border-token pattern.
+- [X] T004 [P] Edit `src/app.d.ts`: declare `var __fmAudioFault: 'context' | 'synth' | undefined` and `var __fmAudioLog: AudioLogEntry[] | undefined` (shape in data-model.md §8; import the type from `$lib/audio/types`).
+- [X] T005 [P] Edit `scripts/check-no-fault-hook.mjs`: add needles `__fmAudioFault` and `__fmAudioLog`; extend `tests/unit/no-fault-hook.test.ts` so a build dir containing either string fails the check.
 
 ---
 
