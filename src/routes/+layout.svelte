@@ -1,5 +1,6 @@
 <script lang="ts">
   import { afterNavigate } from '$app/navigation';
+  import PlaybackHost from '$lib/shell/PlaybackHost.svelte';
   import ShellFailure from '$lib/shell/ShellFailure.svelte';
   import { recordFailure } from '$lib/shell/failure';
   import '$lib/styles/tokens.css';
@@ -14,6 +15,7 @@
   });
 </script>
 
+<PlaybackHost />
 <svelte:boundary onerror={(error) => recordFailure(null, error)}>
   {@render children()}
   {#snippet failed(_error, reset)}

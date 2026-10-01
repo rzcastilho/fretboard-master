@@ -7,6 +7,17 @@ function hann(n: number, len: number): number {
   return 0.5 - 0.5 * Math.cos((2 * Math.PI * n) / (len - 1));
 }
 
+const hannCache = new Map<number, Float64Array>();
+function hannWindow(len: number): Float64Array {
+  let w = hannCache.get(len);
+  if (!w) {
+    w = new Float64Array(len);
+    for (let n = 0; n < len; n++) w[n] = hann(n, len);
+    hannCache.set(len, w);
+  }
+  return w;
+}
+
 function zoomDftPower(
   x: Float32Array,
   start: number,
@@ -15,14 +26,27 @@ function zoomDftPower(
   sr: number
 ): number {
   const w = (2 * Math.PI * freq) / sr;
+  const window = hannWindow(len);
+  // Direct DFT bin at an arbitrary frequency (zoom DFT), Hann windowed.
+  // Rotating phasor with periodic renormalisation instead of cos/sin per sample.
+  const stepRe = Math.cos(w);
+  const stepIm = -Math.sin(w);
+  let pr = 1;
+  let pi = 0;
   let re = 0;
   let im = 0;
-  // Direct DFT bin at an arbitrary frequency (zoom DFT), Hann windowed.
   for (let n = 0; n < len; n++) {
-    const v = x[start + n] * hann(n, len);
-    const ph = w * n;
-    re += v * Math.cos(ph);
-    im -= v * Math.sin(ph);
+    const v = x[start + n] * window[n];
+    re += v * pr;
+    im += v * pi;
+    const nr = pr * stepRe - pi * stepIm;
+    pi = pr * stepIm + pi * stepRe;
+    pr = nr;
+    if ((n & 1023) === 1023) {
+      const mag = Math.hypot(pr, pi);
+      pr /= mag;
+      pi /= mag;
+    }
   }
   return re * re + im * im;
 }

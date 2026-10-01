@@ -17,6 +17,13 @@ export interface TimeMark {
   readonly endMs: number;
 }
 
+/** A note sounding at a position; structurally the fretboard's `Pulse` (audio may not import fretboard). */
+export interface PulseEvent {
+  readonly id: number;
+  readonly position: Position;
+  readonly durationMs: number;
+}
+
 export interface PlannedStep {
   readonly onsetMs: number;
   readonly durationMs: number;

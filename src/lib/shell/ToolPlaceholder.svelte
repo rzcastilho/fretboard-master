@@ -3,12 +3,13 @@
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
   import { fixtureModel } from '$lib/fretboard/fixtures';
   import type { DisplayModel } from '$lib/fretboard/types';
-  import { STANDARD_GUITAR, type Position } from '$lib/instrument/instrument';
+  import { STANDARD_GUITAR, type Instrument, type Position } from '$lib/instrument/instrument';
+  import { playback } from '$lib/state/playback.svelte';
   import { onMount } from 'svelte';
   import { maybeFault } from './fault';
   import type { ToolId } from './tools';
 
-  let { tool }: { tool: ToolId } = $props();
+  let { tool, instrument = STANDARD_GUITAR }: { tool: ToolId; instrument?: Instrument } = $props();
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
   const guard = () => maybeFault(tool);
@@ -22,6 +23,7 @@
 
   // Test-only hook: log activations for e2e assertions (dead code in production).
   function onactivate(p: Position) {
+    playback.note(p, instrument);
     if (__FM_FAULT_INJECTION__) (globalThis.__fmFretboardEvents ??= []).push({ ...p });
   }
 </script>
@@ -32,7 +34,7 @@
 </section>
 <section class="c" aria-labelledby="zone-c">
   <h2 id="zone-c">{m.zone_fretboard()}</h2>
-  <Fretboard instrument={STANDARD_GUITAR} {model} {onactivate} />
+  <Fretboard {instrument} {model} {onactivate} />
 </section>
 <section class="d" aria-labelledby="zone-d">
   <h2 id="zone-d">{m.zone_context_panel()}</h2>
