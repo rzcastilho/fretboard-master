@@ -24,6 +24,9 @@ declare global {
   it (Playwright `addInitScript`); no URL, storage, or message can.
 - `__fmAudioLog` is written by the engine for `unlock`, `step`, `stop`, and `unavailable` events.
   It is never read by app code. Entries contain numbers and enum strings only.
+- Each `step` entry carries `scheduledAtMs` (`performance.now()` right after the step's last
+  `source.start(when)`), so `e2e/perf.spec.ts` can measure tap → sound scheduled against the
+  activation event's `timeStamp` under 4× CPU throttling (constitution VI budget gate).
 
 ## Examples (Playwright)
 

@@ -161,7 +161,9 @@ Invariants (tested offline at 44 100 and 48 000 Hz, A1–E6):
 ```ts
 type AudioLogEntry =
   | { type: 'unlock'; state: AudioContextState }
-  | { type: 'step'; requestId: number; kind: 'note' | 'chord' | 'sequence'; pitches: number[]; frequencies: number[]; when: number; contextTime: number; gain: number }
+  | { type: 'step'; requestId: number; kind: 'note' | 'chord' | 'sequence'; pitches: number[]; frequencies: number[]; when: number; contextTime: number; gain: number; scheduledAtMs: number }
   | { type: 'stop'; requestId: number; reason: 'interrupt' | 'stop' | 'hidden' | 'navigate' | 'instrument' }
   | { type: 'unavailable'; cause: 'context' | 'resume' | 'synth' };
 ```
+
+`scheduledAtMs` is `performance.now()` read right after the step's last `source.start(when)` call. It lets the CI perf gate (`e2e/perf.spec.ts`) measure tap → sound scheduled against the activation event's `timeStamp` (constitution VI).

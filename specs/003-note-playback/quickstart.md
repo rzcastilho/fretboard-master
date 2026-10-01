@@ -64,7 +64,7 @@ New `e2e/playback.spec.ts` (phone 360, phone-touch 320, desktop). It reads the a
 | Scenario | Expected |
 |---|---|
 | Load `/notes`, scroll the board, navigate to `/triads` and back | `__fmAudioLog` empty: no `unlock` entry (US1-4, FR-002) |
-| First action: click "E, string 6, open" | Log: `unlock` then `step` with `pitches: [40]`, frequency ≈ 82.41. The marker gets `.pulse` for 1.5 s (US1-1, SC-002, US2-1) |
+| First action: click "E, string 6, open" | Log: `unlock` then `step` with `pitches: [40]`, frequency ≈ 82.41. The marker gets `.pulse`; with Playwright `page.clock` installed before load, `page.clock.runFor(1500)` removes it (no wall-clock wait; exact duration is unit-tested on the fake `TimerClock`) (US1-1, SC-002, US2-1) |
 | Keyboard: focus the grid, move to string 5 fret 3, press Enter | `step` with pitch 48 (C3) (US1-2, keyboard parity) |
 | Three rapid clicks on different positions | Two `stop` entries with `reason: 'interrupt'`. One `.pulse` at the end (US4-1, SC-004) |
 | Mute, then click a position | `step` logged with `gain: 0` path. The pulse is still shown (US2-2, US3-2) |
@@ -88,7 +88,7 @@ the control renders in its default state and does nothing.
 pnpm build
 node scripts/check-bundle-size.mjs build    # initial JS ≤ 80 KB gzip (expect +5–7 KB, R-10)
 node scripts/check-no-fault-hook.mjs build  # no __fmAudioFault / __fmAudioLog in production
-pnpm lhci                                   # Lighthouse mobile ≥ 90; perf.spec.ts tool open ≤ 300 ms
+pnpm lhci                                   # Lighthouse mobile ≥ 90; perf.spec.ts tool open ≤ 300 ms, tap → sound ≤ 100 ms (4× CPU)
 ```
 
 Expected: all pass. SC-007: time-to-interactive on `/notes` does not regress versus `main`

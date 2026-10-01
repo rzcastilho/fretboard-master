@@ -80,7 +80,7 @@
 - [ ] T025 [US1] Edit `src/lib/shell/ToolPlaceholder.svelte`: call `playback.note(position, instrument)` from the fretboard `onactivate` (pointer and keyboard). Keep the model unchanged. Depends on T024.
 - [ ] T026 [P] [US1] Create `src/lib/shell/PlaybackHost.svelte`: on mount call `playback.preload()` inside `requestIdleCallback` with `setTimeout(0)` fallback (no `AudioContext` creation, no effect on interactivity; FR-017, SC-007). Create `tests/unit/playback-host.test.ts` (first part): preload is scheduled idle after mount and creates no context.
 - [ ] T027 [US1] Edit `src/routes/+layout.svelte`: mount `<PlaybackHost/>`. Depends on T026.
-- [ ] T028 [US1] Run the US1 unit suites and `e2e/playback.spec.ts` US1 cases (`pnpm build:test`, `pnpm test:e2e -g playback`); add the test-build log hooks to the engine now so the e2e can read them: under `__FM_FAULT_INJECTION__`, append `unlock` and `step` entries (numbers and enum strings only; `__fmAudioLog` created on first write, never read by app code) in `src/lib/audio/engine.ts`.
+- [ ] T028 [US1] Run the US1 unit suites and `e2e/playback.spec.ts` US1 cases (`pnpm build:test`, `pnpm test:e2e -g playback`); add the test-build log hooks to the engine now so the e2e can read them: under `__FM_FAULT_INJECTION__`, append `unlock` and `step` entries (`step` includes `scheduledAtMs = performance.now()` read right after the step's last `source.start`, data-model.md §8; numbers and enum strings only; `__fmAudioLog` created on first write, never read by app code) in `src/lib/audio/engine.ts`.
 
 **Checkpoint**: Tapping a position sounds the correct pitch. MVP audio works.
 
@@ -90,7 +90,7 @@
 
 **Goal**: Each sounding position pulses once from its onset mark to its end mark on the board, with sound on, muted, or unavailable; reduced motion shows a plain `highlighted` state; a position without a marker gets a transient neutral marker.
 
-**Independent Test**: Tap a position: the marker gets `.pulse` for 1.5 s. Mute and tap: still pulses. Reduced motion: highlighted with `getAnimations().length === 0`. Empty position: a transient neutral highlighted marker appears and is removed at the end mark.
+**Independent Test**: Tap a position: the marker gets `.pulse`, removed at the 1.5 s end mark (duration checked on the fake clock in unit tests; e2e advances Playwright `page.clock`). Mute and tap: still pulses. Reduced motion: highlighted with `getAnimations().length === 0`. Empty position: a transient neutral highlighted marker appears and is removed at the end mark.
 
 ### Tests for User Story 2 ⚠️
 
@@ -98,7 +98,7 @@
 - [ ] T030 [P] [US2] Extend `tests/unit/fretboard/fretboard.test.ts`: the `pulses` prop draws `.pulse` markers keyed by `pulse.id` (re-sounding the same position with a new id re-creates the element); `--pulse-duration` equals `durationMs` ms; cell accessible names and the text description are identical with and without pulses (no live-region change); transient marker for an empty position; under reduced motion the stylesheet declares `animation: none` for `.marker.pulse .shape` (FR-008).
 - [ ] T031 [P] [US2] Extend `tests/unit/audio/engine.test.ts` (E5): `onPulseStart` fires at `onsetMs` and `onPulseEnd` at `endMs` on the fake clock for a note (1500 ms); pulses fire when the engine is muted, when the context is unavailable, and when the note was dropped; one pulse per onset; ids strictly increase.
 - [ ] T032 [P] [US2] Extend `tests/unit/state/playback.test.ts`: `playback.pulses` gains a pulse at onset and loses it at the end mark via the fake clock, including when muted (US2-1, US2-2).
-- [ ] T033 [P] [US2] Extend `e2e/playback.spec.ts`: after a click the marker has `.pulse` for about 1.5 s then none; after muting, clicking still shows `.pulse` (US2-2); `emulateMedia({ reducedMotion: 'reduce' })` then click → the marker is highlighted and `getAnimations().length === 0` (US2-3); clicking an empty position shows a transient neutral marker that disappears (US2-4).
+- [ ] T033 [P] [US2] Extend `e2e/playback.spec.ts` (no wall-clock waits for pulse timing; constitution IV): install Playwright `page.clock` before `page.goto` in these cases; after a click the marker has `.pulse`, then `page.clock.runFor(1500)` → no `.pulse` (exact onset/end timing is covered by T031/T032 on the fake `TimerClock`); after muting, clicking still shows `.pulse` (US2-2); `emulateMedia({ reducedMotion: 'reduce' })` then click → the marker is highlighted and `getAnimations().length === 0` (US2-3); clicking an empty position shows a transient neutral marker that is gone after `page.clock.runFor(1500)` (US2-4).
 
 ### Implementation for User Story 2
 
@@ -220,8 +220,9 @@
 - [ ] T076 [P] Reconcile the file list in `specs/003-note-playback/plan.md` (Project Structure) with the files actually created; docs only, no behavior change.
 - [ ] T077 Run all static gates: `pnpm lint`, `pnpm format:check`, `pnpm check` (zero warnings). Fix any boundary violation instead of loosening the rule.
 - [ ] T078 Run `pnpm test:unit --coverage`: theory ≥ 95 % lines and branches, overall ≥ 80 %. Add missing unit tests where coverage falls short (e.g. `src/lib/audio/engine.ts` error branches).
-- [ ] T079 Run `pnpm build:test && pnpm test:e2e` on phone 360, phone-touch 320, desktop, and firefox/webkit smoke; confirm `e2e/continuity.spec.ts`, `e2e/version-skew.spec.ts`, `e2e/nojs.spec.ts`, `e2e/perf.spec.ts` stay green (zero requests after load; control renders default state without JS).
+- [ ] T079 Run `pnpm build:test && pnpm test:e2e` on phone 360, phone-touch 320, desktop, and firefox/webkit smoke; confirm `e2e/continuity.spec.ts`, `e2e/version-skew.spec.ts`, `e2e/nojs.spec.ts`, `e2e/perf.spec.ts` (including the T082 tap-to-sound gate) stay green (zero requests after load; control renders default state without JS).
 - [ ] T080 Run production hygiene (quickstart §5): `pnpm build`, `node scripts/check-bundle-size.mjs build` (initial JS ≤ 80 KB gzip, expect +5–7 KB), `node scripts/check-no-fault-hook.mjs build`, `pnpm lhci` (Lighthouse mobile ≥ 90). Do not raise any budget.
+- [ ] T082 Extend `e2e/perf.spec.ts` (Chromium only, same CDP `Emulation.setCPUThrottlingRate` rate 4 as the navigation test): add `describe('tap-to-sound latency (constitution VI)')` that loads `/notes`, makes one unlocking tap (excluded), then for ≥ 5 taps on different positions records the activation `timeStamp` with a capturing `pointerdown` listener installed via `page.evaluate` and reads the matching `step` entry's `scheduledAtMs` from `__fmAudioLog`; assert median(`scheduledAtMs − timeStamp`) ≤ 100 ms so a budget regression fails CI. Depends on T028 (log field) and T027 (wiring). Do not raise the budget.
 - [ ] T081 Validate quickstart.md §3–§6 end to end, including the manual listening check on a phone and a laptop (tap string 6 open, string 5 fret 3, string 1 fret 22; headphone switch mid-note).
 
 ---

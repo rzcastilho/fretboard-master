@@ -90,7 +90,7 @@ follows each one):
 
 **Performance Goals**: Tap → note scheduled ≤ 100 ms after unlock (render of a 1.5 s voice ≈ < 1 ms desktop, a few ms on a 4× throttled phone; 7-voice chord well within budget). Synth preload runs in an idle callback after mount, with zero effect on fretboard interactivity (SC-007). Pulse start ≤ one frame after the request. Initial JS ≤ 80 KB gzip (estimate +5–7 KB). Lighthouse mobile ≥ 90.
 
-**Constraints**: No `AudioContext` before a sound-asking gesture. Zero network requests after load (ADR 0002 continuity test, FR-016). CSP unchanged (`script-src 'self'`, `style-src 'self'`; the pulse duration is set through CSSOM only client-side). Every visual value is a token and every string is in the catalog. WCAG 2.2 AA, zero axe violations. 320–2560 px with only the board scrolling horizontally. Deterministic tests only (no real-time audio measurement).
+**Constraints**: No `AudioContext` before a sound-asking gesture. Zero network requests after load (ADR 0002 continuity test, FR-016). CSP unchanged (`script-src 'self'`, `style-src 'self'`; the pulse duration is set through CSSOM only client-side). Every visual value is a token and every string is in the catalog. WCAG 2.2 AA, zero axe violations. 320–2560 px with only the board scrolling horizontally. Deterministic behavior tests only (no real-time audio measurement); the only wall-clock check is the constitution VI tap-to-sound budget gate in `e2e/perf.spec.ts` (4× CPU throttle, median), like the navigation gate.
 
 **Scale/Scope**: Pitch range A1–E6 (56 pitches) × 2 sample rates in offline suites. 1 new `src/lib/audio` module (≈ 6 files), 1 new `src/lib/state` file, 1 new fretboard helper, 3 new shell components, 2 edited components (`Fretboard`, `Notice`), 5 edited hosts (`ToolLayout`, `ToolPlaceholder`, about page, `HomeScreen`, root layout). 14 catalog keys, 4 tokens, 1 ADR + 1 ADR amendment, about 10 new or extended unit suites, and 1 new e2e spec.
 
@@ -198,7 +198,9 @@ region rules intact.
 - [x] Instrument change ≤ 300 ms: N/A. There is no instrument-change UI yet; `stop('instrument')`
   is O(active voices).
 - [x] Tap → sound ≤ 100 ms after unlock: scheduled at `ctx.currentTime` with no look-ahead,
-  verified with the injected clock (SC-001). The render cost is bounded (R-01).
+  verified with the injected clock (SC-001). The render cost is bounded (R-01). CI gate: a
+  4× CPU-throttled tap-to-sound median ≤ 100 ms case in `e2e/perf.spec.ts` (T082); a regression
+  fails the build.
 - [x] Initial JS ≤ 80 KB gzip: `check-bundle-size.mjs`, estimate +5–7 KB (R-10).
 - [x] Sound material never blocks interactivity: the synth preload is idle-scheduled and creates
   no context (FR-017, SC-007).
