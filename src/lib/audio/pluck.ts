@@ -163,9 +163,25 @@ function renderVoice(pitch: number, sampleRate: number, lengthSamples: number): 
   return x;
 }
 
-/** mixVoices arrives with US6 (T052); until then a single voice is passed through. */
+/** Static peak ceiling for mixes: −1 dBFS. */
+const MIX_PEAK = 0.89;
+
+/** Sums voices scaled by 1/√n, then applies a static peak limiter so the peak is ≤ 0.89. */
 function mixVoices(voices: readonly Float32Array[]): Float32Array {
-  return voices.length > 0 ? voices[0] : new Float32Array(0);
+  const n = voices.length;
+  let length = 0;
+  for (const v of voices) length = Math.max(length, v.length);
+  const out = new Float32Array(length);
+  if (n === 0) return out;
+  const scale = 1 / Math.sqrt(n);
+  for (const v of voices) for (let i = 0; i < v.length; i++) out[i] += v[i] * scale;
+  let peak = 0;
+  for (let i = 0; i < length; i++) peak = Math.max(peak, Math.abs(out[i]));
+  if (peak > MIX_PEAK) {
+    const g = MIX_PEAK / peak;
+    for (let i = 0; i < length; i++) out[i] *= g;
+  }
+  return out;
 }
 
 export const pluckSynth: Synth = { renderVoice, mixVoices };

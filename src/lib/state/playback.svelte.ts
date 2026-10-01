@@ -93,7 +93,29 @@ export const playback = {
     return marks;
   },
 
-  /** Silence the active request and clear pulses. A no-op when nothing is playing. */
+  /** Sound several positions as one chord (shared onset). Call from a user-gesture handler. */
+  chord(positions: readonly Position[], instrument: Instrument): readonly TimeMark[] {
+    const marks = engine.play({ kind: 'chord', positions }, instrument);
+    markUnlocked();
+    return marks;
+  },
+
+  /** Sound steps (a position or a chord each) at `bpm` (clamped 30–300). Call from a gesture handler. */
+  sequence(
+    steps: readonly (Position | readonly Position[])[],
+    bpm: number,
+    instrument: Instrument
+  ): readonly TimeMark[] {
+    const marks = engine.play({ kind: 'sequence', steps, bpm }, instrument);
+    markUnlocked();
+    return marks;
+  },
+
+  /**
+   * Silence the active request and clear pulses. A no-op when nothing is playing.
+   * Caller obligation (FR-014): a tool whose view state changes must call `stop('view')`;
+   * nothing in this feature triggers it, so later tools own that call.
+   */
   stop(reason: StopReason = 'stop'): void {
     engine.stop(reason);
     state.pulses = [];

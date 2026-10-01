@@ -662,3 +662,92 @@ describe('engine E7-E9: availability and the synth window (US5)', () => {
     expect(port.sources).toHaveLength(1);
   });
 });
+
+describe('engine E10/E11: chords and sequences (US6)', () => {
+  function mixSynth() {
+    const mixed: Float32Array[][] = [];
+    const synth: Synth = {
+      renderVoice: (pitch, _sr, length) => new Float32Array(length).fill(pitch / 100),
+      mixVoices(voices) {
+        mixed.push([...voices]);
+        const out = new Float32Array(voices[0].length).fill(0.77);
+        return out;
+      }
+    };
+    return { synth, mixed };
+  }
+  function build() {
+    const port = new FakeAudioPort();
+    port.currentTime = 2;
+    const clock = new FakeClock();
+    const ev = events();
+    const { synth, mixed } = mixSynth();
+    const engine = createPlaybackEngine(ev, {
+      createContext: () => port,
+      loadSynth: () => Promise.resolve(synth),
+      clock
+    });
+    return { port, clock, ev, engine, mixed };
+  }
+  const p = (string: number, fret: number) => ({ string, fret });
+
+  it('E10: a chord plays exactly one source from mixVoices with one shared onset', async () => {
+    const { port, engine, mixed } = build();
+    engine.preload();
+    await flush();
+    const request = { kind: 'chord', positions: [p(6, 0), p(5, 2), p(4, 2)] } as const;
+    const marks = engine.play(request, STANDARD_GUITAR);
+    expect(port.sources).toHaveLength(1);
+    expect(mixed).toHaveLength(1);
+    expect(mixed[0]).toHaveLength(3);
+    expect(port.sources[0].buffer?.getChannelData(0)[0]).toBeCloseTo(0.77, 5);
+    expect(port.sources[0].startCalls).toEqual([2]);
+    expect(new Set(marks.map((m) => m.onsetMs))).toEqual(new Set([0]));
+    expect(marks).toEqual(planRequest(request, STANDARD_GUITAR).marks);
+  });
+
+  it('E11: step i is scheduled at t0 + i·60/bpm on the audio clock, not by timers', async () => {
+    const { port, clock, engine } = build();
+    engine.preload();
+    await flush();
+    const request = {
+      kind: 'sequence',
+      steps: [p(6, 0), [p(5, 2), p(4, 2)], p(3, 0)],
+      bpm: 120
+    } as const;
+    const pendingBefore = clock.pendingCount;
+    const marks = engine.play(request, STANDARD_GUITAR);
+    expect(port.sources.map((s) => s.startCalls[0])).toEqual([2, 2.5, 3]);
+    expect(port.sources).toHaveLength(3);
+    expect(marks).toEqual(planRequest(request, STANDARD_GUITAR).marks);
+    // Only pulse/end timers exist; sources were all scheduled up front.
+    expect(clock.pendingCount).toBeGreaterThan(pendingBefore);
+  });
+
+  it('E11: onSequenceChange(true) at start and (false) after the last endMs', async () => {
+    const { clock, ev, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play({ kind: 'sequence', steps: [p(6, 0), p(5, 0)], bpm: 60 }, STANDARD_GUITAR);
+    expect(ev.onSequenceChange).toHaveBeenCalledWith(true);
+    expect(ev.onSequenceChange).not.toHaveBeenCalledWith(false);
+    clock.advance(1000);
+    expect(ev.onSequenceChange).not.toHaveBeenCalledWith(false);
+    clock.advance(1000);
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('E11: tempo clamps to 30–300 (29 → 30, 301 → 300)', async () => {
+    const { port, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play({ kind: 'sequence', steps: [p(6, 0), p(5, 0)], bpm: 29 }, STANDARD_GUITAR);
+    expect(port.sources[1].startCalls[0] - port.sources[0].startCalls[0]).toBeCloseTo(2, 6);
+    engine.play({ kind: 'sequence', steps: [p(6, 0), p(5, 0)], bpm: 301 }, STANDARD_GUITAR);
+    const n = port.sources.length;
+    expect(port.sources[n - 1].startCalls[0] - port.sources[n - 2].startCalls[0]).toBeCloseTo(
+      0.2,
+      6
+    );
+  });
+});

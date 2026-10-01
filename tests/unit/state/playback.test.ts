@@ -215,10 +215,31 @@ describe('playback.stop and interruption (US4)', () => {
     expect(playback.pulses).toEqual([]);
   });
 
-  // Enabled in T067, once playback.sequence exists (US6).
-  it.todo(
-    'sequencePlaying is true from sequence start until the last endMs, stop, or interruption'
-  );
+  it('sequencePlaying is true from sequence start until the last endMs, stop, or interruption', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    const steps = [
+      { string: 6, fret: 0 },
+      { string: 5, fret: 0 }
+    ];
+    playback.sequence(steps, 60, STANDARD_GUITAR);
+    expect(playback.sequencePlaying).toBe(true);
+    d.deps.clock.advance(1999);
+    expect(playback.sequencePlaying).toBe(true);
+    d.deps.clock.advance(1);
+    expect(playback.sequencePlaying).toBe(false);
+
+    playback.sequence(steps, 60, STANDARD_GUITAR);
+    expect(playback.sequencePlaying).toBe(true);
+    playback.stop();
+    expect(playback.sequencePlaying).toBe(false);
+
+    playback.sequence(steps, 60, STANDARD_GUITAR);
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    expect(playback.sequencePlaying).toBe(false);
+  });
 });
 
 describe('playback availability and the one-time notice (US5)', () => {
@@ -296,5 +317,44 @@ describe('playback availability and the one-time notice (US5)', () => {
     playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
     playback.setVolume(40);
     expect(playback.availability).toBe('unavailable');
+  });
+});
+
+describe('playback.chord and playback.sequence (US6)', () => {
+  const pos = (string: number, fret: number) => ({ string, fret });
+
+  it('chord returns shared-onset marks and its pulses start together', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    const marks = playback.chord([pos(6, 0), pos(5, 2), pos(4, 2)], STANDARD_GUITAR);
+    expect(marks).toEqual([
+      { position: pos(6, 0), onsetMs: 0, endMs: 1500 },
+      { position: pos(5, 2), onsetMs: 0, endMs: 1500 },
+      { position: pos(4, 2), onsetMs: 0, endMs: 1500 }
+    ]);
+    d.deps.clock.advance(0);
+    expect(playback.pulses).toHaveLength(3);
+    d.deps.clock.advance(1500);
+    expect(playback.pulses).toEqual([]);
+  });
+
+  it('sequence returns step marks; pulses follow onsets and ends', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    const marks = playback.sequence([pos(6, 0), pos(5, 0)], 120, STANDARD_GUITAR);
+    expect(marks).toEqual([
+      { position: pos(6, 0), onsetMs: 0, endMs: 500 },
+      { position: pos(5, 0), onsetMs: 500, endMs: 1000 }
+    ]);
+    d.deps.clock.advance(0);
+    expect(playback.pulses.map((x) => x.position)).toEqual([pos(6, 0)]);
+    d.deps.clock.advance(500);
+    expect(playback.pulses.map((x) => x.position)).toEqual([pos(5, 0)]);
+    d.deps.clock.advance(500);
+    expect(playback.pulses).toEqual([]);
   });
 });

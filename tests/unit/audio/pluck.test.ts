@@ -79,3 +79,51 @@ for (const sampleRate of [44100, 48000]) {
     });
   });
 }
+
+describe('pluckSynth.mixVoices (US6)', () => {
+  const sampleRate = 44100;
+  const length = Math.round(1.5 * sampleRate);
+  const peakOf = (x: Float32Array): number => x.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  const voice = (p: number, gain = 1): Float32Array => {
+    const x = pluckSynth.renderVoice(p, sampleRate, length);
+    if (gain !== 1) for (let i = 0; i < x.length; i++) x[i] *= gain;
+    return x;
+  };
+
+  it('keeps the peak ≤ 0.89 for every 1–7 voice combination', () => {
+    const pool = [33, 40, 45, 52, 59, 64, 88].map((p) => voice(p));
+    for (let n = 1; n <= 7; n++) {
+      const mixed = pluckSynth.mixVoices(pool.slice(0, n));
+      expect(peakOf(mixed)).toBeLessThanOrEqual(0.89 + 1e-6);
+    }
+  });
+
+  it('limits 7 loud simultaneous voices at full gain', () => {
+    const loud = Array.from({ length: 7 }, () => new Float32Array(1000).fill(1));
+    const mixed = pluckSynth.mixVoices(loud);
+    expect(peakOf(mixed)).toBeLessThanOrEqual(0.89 + 1e-6);
+    expect(peakOf(mixed)).toBeGreaterThan(0.5);
+  });
+
+  it('applies 1/√n scaling before the limiter', () => {
+    const a = new Float32Array([0.1, 0.2, 0.0]);
+    const b = new Float32Array([0.1, 0.0, 0.2]);
+    const mixed = pluckSynth.mixVoices([a, b]);
+    const k = 1 / Math.sqrt(2);
+    expect(mixed[0]).toBeCloseTo(0.2 * k, 6);
+    expect(mixed[1]).toBeCloseTo(0.2 * k, 6);
+    expect(mixed[2]).toBeCloseTo(0.2 * k, 6);
+  });
+
+  it('is deterministic and as long as the longest input', () => {
+    const voices = [new Float32Array(10).fill(0.3), new Float32Array(25).fill(0.3)];
+    const a = pluckSynth.mixVoices(voices);
+    const b = pluckSynth.mixVoices(voices);
+    expect(a.length).toBe(25);
+    expect(Array.from(a)).toEqual(Array.from(b));
+  });
+
+  it('returns an empty buffer for no voices', () => {
+    expect(pluckSynth.mixVoices([]).length).toBe(0);
+  });
+});
