@@ -8,6 +8,7 @@ import { pluckSynth } from './pluck';
 import { planRequest } from './schedule';
 import type {
   AudioLogEntry,
+  Plan,
   PlaybackRequest,
   PulseEvent,
   Synth,
@@ -52,12 +53,31 @@ export interface PlaybackEngine {
   preload(): void;
   /** Must be called from a user-gesture handler. */
   play(request: PlaybackRequest, instrument: Instrument): readonly TimeMark[];
+  /**
+   * Silences the active request (if any): ramps voices to 0, cancels pending steps and pulses.
+   * A no-op when nothing is active. Never auto-resumes.
+   */
+  stop(reason?: StopReason): void;
   /** Unlocks audio without playing (sound-control interaction). */
   unlock(): void;
   /** Ramps the mute gain over 10 ms; never stops sources. Also unlocks. */
   setMuted(muted: boolean): void;
   /** 0..100, gain (v/100)², ramped over 10 ms; never stops sources. Also unlocks. */
   setVolume(volume: number): void;
+}
+
+export type StopReason = 'stop' | 'hidden' | 'navigate' | 'instrument' | 'view';
+
+/** Voice-gain ramp to silence on interruption or stop (≤ 20 ms budget, E4). */
+const STOP_RAMP_S = 0.01;
+/** Sources are stopped just after the ramp completes. */
+const STOP_AFTER_S = 0.012;
+
+interface ActiveRequest {
+  readonly id: number;
+  readonly sequence: boolean;
+  readonly voices: { source: AudioBufferSourceNode; gain: GainNode }[];
+  readonly livePulses: Set<number>;
 }
 
 const DEFAULT_VOLUME = 80;
@@ -100,6 +120,33 @@ export function createPlaybackEngine(
   let loading: Promise<Synth | null> | null = null;
   let failed = false;
   let nextRequestId = 1;
+  let active: ActiveRequest | null = null;
+
+  /** Ends the active request: silence, drop pending timers, end live pulses, clear sequence. */
+  function halt(reason: Extract<AudioLogEntry, { type: 'stop' }>['reason']): void {
+    const current = active;
+    if (!current) return;
+    active = null;
+    log({ type: 'stop', requestId: current.id, reason });
+    for (const id of pulseTimers) d.clock.clearTimeout(id);
+    pulseTimers.clear();
+    if (ctx) {
+      const now = ctx.currentTime;
+      for (const { source, gain } of current.voices) {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.linearRampToValueAtTime(0, now + STOP_RAMP_S);
+        try {
+          source.stop(now + STOP_AFTER_S);
+        } catch {
+          // Already ended.
+        }
+      }
+    }
+    for (const id of current.livePulses) events.onPulseEnd(id);
+    current.livePulses.clear();
+    if (current.sequence) events.onSequenceChange(false);
+  }
 
   function after(ms: number, cb: () => void): void {
     const id = d.clock.setTimeout(() => {
@@ -110,16 +157,30 @@ export function createPlaybackEngine(
   }
 
   /** Pulses depend only on the plan, never on audio success, mute, or dropped notes (E5). */
-  function schedulePulses(marks: readonly TimeMark[]): void {
+  function schedulePulses(request: ActiveRequest, marks: readonly TimeMark[]): void {
+    let lastEnd = 0;
     for (const mark of marks) {
       const pulse: PulseEvent = {
         id: nextPulseId++,
         position: mark.position,
         durationMs: mark.endMs - mark.onsetMs
       };
-      after(mark.onsetMs, () => events.onPulseStart(pulse));
-      after(mark.endMs, () => events.onPulseEnd(pulse.id));
+      lastEnd = Math.max(lastEnd, mark.endMs);
+      after(mark.onsetMs, () => {
+        request.livePulses.add(pulse.id);
+        events.onPulseStart(pulse);
+      });
+      after(mark.endMs, () => {
+        request.livePulses.delete(pulse.id);
+        events.onPulseEnd(pulse.id);
+      });
     }
+    // Natural end of the request.
+    after(lastEnd, () => {
+      if (active !== request) return;
+      active = null;
+      if (request.sequence) events.onSequenceChange(false);
+    });
   }
 
   function ramp(node: GainNode | null, target: number): void {
@@ -177,16 +238,10 @@ export function createPlaybackEngine(
   }
 
   /** Render and schedule every step of the plan on the audio clock. */
-  function schedule(
-    port: AudioPort,
-    s: Synth,
-    request: PlaybackRequest,
-    instrument: Instrument
-  ): void {
-    const plan = planRequest(request, instrument);
+  function schedule(port: AudioPort, s: Synth, plan: Plan, current: ActiveRequest): void {
     const destination = volumeGain;
     if (!destination) return;
-    const requestId = nextRequestId++;
+    const requestId = current.id;
     const t0 = port.currentTime;
     for (const step of plan.steps) {
       const length = Math.max(1, Math.round((step.durationMs / 1000) * port.sampleRate));
@@ -200,6 +255,7 @@ export function createPlaybackEngine(
       voice.gain.value = 1;
       source.connect(voice);
       voice.connect(destination);
+      current.voices.push({ source, gain: voice });
       source.onended = () => {
         source.disconnect();
         voice.disconnect();
@@ -241,17 +297,32 @@ export function createPlaybackEngine(
       ramp(volumeGain, volumeToGain(volume));
     },
 
+    stop(reason = 'stop'): void {
+      halt(reason);
+    },
+
     play(request, instrument): readonly TimeMark[] {
-      const marks = planRequest(request, instrument).marks;
+      const plan = planRequest(request, instrument);
+      const marks = plan.marks;
       if (marks.length === 0) return marks;
-      schedulePulses(marks);
+      // SC-004: at most one active request; a new one supersedes it.
+      halt('interrupt');
+      const current: ActiveRequest = {
+        id: nextRequestId++,
+        sequence: plan.kind === 'sequence',
+        voices: [],
+        livePulses: new Set()
+      };
+      active = current;
+      if (current.sequence) events.onSequenceChange(true);
+      schedulePulses(current, marks);
       const port = ensureContext();
       if (!port) return marks;
       if (synth) {
-        schedule(port, synth, request, instrument);
+        schedule(port, synth, plan, current);
       } else {
         void startLoader().then((s) => {
-          if (s) schedule(port, s, request, instrument);
+          if (s && active === current) schedule(port, s, plan, current);
         });
       }
       return marks;

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPlaybackEngine, type EngineEvents } from '../../../src/lib/audio/engine';
 import { planRequest } from '../../../src/lib/audio/schedule';
 import type { Synth } from '../../../src/lib/audio/types';
@@ -345,6 +345,169 @@ describe('engine gain checks (US3)', () => {
     const call = mute.gain.calls.find((c) => c.method === 'setTargetAtTime');
     expect(call?.args[0]).toBe(0);
     expect(call?.args[2]).toBeCloseTo(0.003, 6);
+    expect((port.sources[0] as unknown as FakeSource).stopCalls).toEqual([]);
+  });
+});
+
+describe('engine E4/E6: interruption and stop (US4)', () => {
+  const string5Fret3 = { kind: 'note', position: { string: 5, fret: 3 } } as const;
+  const sequence = {
+    kind: 'sequence',
+    steps: [
+      { string: 6, fret: 0 },
+      { string: 5, fret: 3 }
+    ],
+    bpm: 60
+  } as const;
+
+  function full() {
+    const port = new FakeAudioPort();
+    const clock = new FakeClock();
+    const ev = events();
+    const synth = recordingSynth();
+    const engine = createPlaybackEngine(ev, {
+      createContext: () => port,
+      loadSynth: () => Promise.resolve(synth),
+      clock
+    });
+    return { port, clock, ev, engine };
+  }
+
+  const gainOf = (port: FakeAudioPort, i: number) => port.gains[2 + i] as unknown as FakeGain;
+  const stopLog = () =>
+    (globalThis.__fmAudioLog ?? []).filter((e) => e.type === 'stop') as {
+      type: 'stop';
+      requestId: number;
+      reason: string;
+    }[];
+
+  beforeEach(() => {
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('a new play ramps live voices to 0 within 20 ms and stops each source', async () => {
+    const { port, engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    const ramp = gainOf(port, 0).gain.calls.find((c) => c.method === 'linearRampToValueAtTime');
+    expect(ramp?.args[0]).toBe(0);
+    expect((ramp?.args[1] ?? Infinity) - port.currentTime).toBeLessThanOrEqual(0.02);
+    const stops = (port.sources[0] as unknown as FakeSource).stopCalls;
+    expect(stops).toHaveLength(1);
+    expect(stops[0] - port.currentTime).toBeLessThanOrEqual(0.02);
+    expect((port.sources[1] as unknown as FakeSource).stopCalls).toEqual([]);
+  });
+
+  it('interruption clears pending pulse timers and ends live pulses', async () => {
+    const { clock, ev, engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    expect(ev.onPulseEnd).toHaveBeenCalledWith(1);
+    clock.advance(0);
+    clock.advance(1500);
+    // Only the second request's pulse started; the first one's end timer never fires twice.
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(ev.onPulseEnd).mock.calls.map(([id]) => id)).toEqual([1, 2]);
+  });
+
+  it('three rapid plays log two interrupt stops (SC-004)', async () => {
+    const { engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    engine.play(string6Open, STANDARD_GUITAR);
+    expect(stopLog().map((e) => e.reason)).toEqual(['interrupt', 'interrupt']);
+  });
+
+  it('a request that already finished is not logged as interrupted', async () => {
+    const { clock, engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(1500);
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    expect(stopLog()).toEqual([]);
+  });
+
+  it('stop() silences, cancels pending steps and pulses, and ends the sequence', async () => {
+    const { port, clock, ev, engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(sequence, STANDARD_GUITAR);
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(true);
+    clock.advance(0);
+    engine.stop();
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(false);
+    expect(ev.onPulseEnd).toHaveBeenCalledWith(1);
+    for (const s of port.sources) expect((s as unknown as FakeSource).stopCalls).toHaveLength(1);
+    expect(clock.pendingCount).toBe(0);
+    clock.advance(5000);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('a sequence ends itself at its last endMs', async () => {
+    const { clock, ev, engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(sequence, STANDARD_GUITAR);
+    clock.advance(1999);
+    expect(ev.onSequenceChange).toHaveBeenCalledTimes(1);
+    clock.advance(1);
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(false);
+    expect(ev.onSequenceChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('stop() emits onSequenceChange(false) only if a sequence was active', async () => {
+    const { ev, engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    engine.stop();
+    expect(ev.onSequenceChange).not.toHaveBeenCalled();
+  });
+
+  it.each(['stop', 'hidden', 'navigate', 'instrument', 'view'] as const)(
+    'stop(%s) logs its reason',
+    async (reason) => {
+      const { engine } = full();
+      engine.preload();
+      await flush();
+      engine.play(string6Open, STANDARD_GUITAR);
+      engine.stop(reason);
+      expect(stopLog().map((e) => e.reason)).toEqual([reason]);
+    }
+  );
+
+  it('stop() with nothing active is a no-op', () => {
+    const { ev, engine } = full();
+    engine.stop();
+    expect(stopLog()).toEqual([]);
+    expect(ev.onPulseEnd).not.toHaveBeenCalled();
+    expect(ev.onSequenceChange).not.toHaveBeenCalled();
+  });
+
+  it('a request stopped before the synth loads schedules nothing', async () => {
+    const { port, engine } = full();
+    engine.play(string6Open, STANDARD_GUITAR);
+    engine.stop();
+    await flush();
+    expect(port.sources).toHaveLength(0);
+  });
+
+  it('mute and volume still never stop sources', async () => {
+    const { port, engine } = full();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    engine.setMuted(true);
+    engine.setVolume(10);
     expect((port.sources[0] as unknown as FakeSource).stopCalls).toEqual([]);
   });
 });

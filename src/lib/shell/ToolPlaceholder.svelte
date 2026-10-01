@@ -21,6 +21,16 @@
     if (__FM_FAULT_INJECTION__) model = fixtureModel(globalThis.__fmFretboardFixture);
   });
 
+  // US4-4: changing the instrument stops playback (not on first run).
+  let previousInstrument: Instrument | undefined;
+  $effect(() => {
+    const current = instrument;
+    if (previousInstrument !== undefined && previousInstrument !== current) {
+      playback.stop('instrument');
+    }
+    previousInstrument = current;
+  });
+
   // Test-only hook: log activations for e2e assertions (dead code in production).
   function onactivate(p: Position) {
     playback.note(p, instrument);

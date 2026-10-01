@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Synth } from '../../src/lib/audio/types';
 import PlaybackHost from '../../src/lib/shell/PlaybackHost.svelte';
-import { resetPlaybackForTests } from '../../src/lib/state/playback.svelte';
+import { playback, resetPlaybackForTests } from '../../src/lib/state/playback.svelte';
 import { FakeAudioPort, FakeClock } from './audio/support/fake-audio';
 
 beforeEach(() => {
@@ -45,5 +45,46 @@ describe('PlaybackHost preload', () => {
     callbacks[0]();
     expect(loadSynth).toHaveBeenCalledTimes(1);
     expect(createContext).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlaybackHost interruption (US4-3, FR-013)', () => {
+  beforeEach(() => resetPlaybackForTests());
+
+  const setVisibility = (state: 'hidden' | 'visible') => {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'visibilityState');
+  });
+
+  it('visibilitychange to hidden calls playback.stop("hidden"); visible does nothing', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    const note = vi.spyOn(playback, 'note');
+    render(PlaybackHost);
+    setVisibility('hidden');
+    expect(stop).toHaveBeenCalledWith('hidden');
+    stop.mockClear();
+    setVisibility('visible');
+    expect(stop).not.toHaveBeenCalled();
+    expect(note).not.toHaveBeenCalled();
+  });
+
+  it('pagehide calls playback.stop("hidden")', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    render(PlaybackHost);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(stop).toHaveBeenCalledWith('hidden');
+  });
+
+  it('removes its listeners on destroy', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    const { unmount } = render(PlaybackHost);
+    unmount();
+    window.dispatchEvent(new Event('pagehide'));
+    setVisibility('hidden');
+    expect(stop).not.toHaveBeenCalled();
   });
 });

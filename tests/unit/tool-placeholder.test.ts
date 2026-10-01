@@ -99,3 +99,16 @@ describe('ToolPlaceholder playback wiring', () => {
     expect(alt.pitches).toEqual([38]);
   });
 });
+
+describe('ToolPlaceholder instrument change (US4-4)', () => {
+  it('stops playback when the instrument changes, not on first render', async () => {
+    injectEngine();
+    const stop = vi.spyOn(playback, 'stop');
+    const { rerender } = render(ToolPlaceholder, { tool: 'notes', instrument: STANDARD_GUITAR });
+    await flush();
+    expect(stop).not.toHaveBeenCalled();
+    await rerender({ tool: 'notes', instrument: { ...STANDARD_GUITAR } });
+    await flush();
+    expect(stop).toHaveBeenCalledWith('instrument');
+  });
+});

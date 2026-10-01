@@ -62,6 +62,6 @@ export type AudioLogEntry =
   | {
       type: 'stop';
       requestId: number;
-      reason: 'interrupt' | 'stop' | 'hidden' | 'navigate' | 'instrument';
+      reason: 'interrupt' | 'stop' | 'hidden' | 'navigate' | 'instrument' | 'view';
     }
   | { type: 'unavailable'; cause: 'context' | 'resume' | 'synth' };

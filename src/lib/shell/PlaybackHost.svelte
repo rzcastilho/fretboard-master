@@ -14,4 +14,15 @@
     const id = setTimeout(run, 0);
     return () => clearTimeout(id);
   });
+
+  // FR-013: a hidden page stops playback and never resumes it on return.
+  function onVisibilityChange(): void {
+    if (document.visibilityState === 'hidden') playback.stop('hidden');
+  }
+  function onPageHide(): void {
+    playback.stop('hidden');
+  }
 </script>
+
+<svelte:document onvisibilitychange={onVisibilityChange} />
+<svelte:window onpagehide={onPageHide} />

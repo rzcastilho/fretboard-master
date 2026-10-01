@@ -180,3 +180,70 @@ test.describe('sound control (US3)', () => {
     await expect(group).toHaveScreenshot('sound-control-muted.png');
   });
 });
+
+test.describe('interruption, stop, and hidden app (US4)', () => {
+  async function stops(page: Page) {
+    return (await readAudioLog(page)).filter((e) => e.type === 'stop');
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+  });
+
+  test('three rapid taps: two interrupt stops and one live pulse (US4-1, SC-004)', async ({
+    page
+  }) => {
+    await cellAt(page, 6, 0).click();
+    await cellAt(page, 5, 3).click();
+    await cellAt(page, 4, 2).click();
+    await expect.poll(async () => (await stops(page)).length).toBe(2);
+    for (const e of await stops(page)) {
+      if (e.type !== 'stop') throw new Error('not a stop');
+      expect(e.reason).toBe('interrupt');
+    }
+    await expect(page.locator('.marker.pulse')).toHaveCount(1);
+  });
+
+  test('hiding the page stops playback; returning does not resume (US4-3, SC-006)', async ({
+    page
+  }) => {
+    await cellAt(page, 6, 0).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(1);
+    const hide = (state: 'hidden' | 'visible') =>
+      page.evaluate((s) => {
+        Object.defineProperty(document, 'visibilityState', { value: s, configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, state);
+    await hide('hidden');
+    const entries = await stops(page);
+    expect(entries).toHaveLength(1);
+    if (entries[0]?.type !== 'stop') throw new Error('not a stop');
+    expect(entries[0].reason).toBe('hidden');
+    await expect(page.locator('.marker.pulse')).toHaveCount(0);
+    await hide('visible');
+    await page.clock.runFor(3000);
+    expect(await stepEntries(page)).toHaveLength(1);
+    await expect(page.locator('.marker.pulse')).toHaveCount(0);
+  });
+
+  test('navigating via the app nav stops playback (US4-4)', async ({ page }) => {
+    await cellAt(page, 6, 0).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(1);
+    await page
+      .getByRole('link', { name: /triads/i })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/triads$/);
+    const entries = await stops(page);
+    expect(entries).toHaveLength(1);
+    if (entries[0]?.type !== 'stop') throw new Error('not a stop');
+    expect(entries[0].reason).toBe('navigate');
+  });
+
+  test('no Stop button for a single note', async ({ page }) => {
+    await cellAt(page, 6, 0).click();
+    await expect(page.getByRole('button', { name: 'Stop' })).toHaveCount(0);
+  });
+});

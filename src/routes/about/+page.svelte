@@ -2,6 +2,7 @@
   import { m } from '$lib/paraglide/messages.js';
   import AppNav from '$lib/shell/AppNav.svelte';
   import SoundControl from '$lib/shell/SoundControl.svelte';
+  import StopButton from '$lib/shell/StopButton.svelte';
   import { screenTitle } from '$lib/shell/screens';
 </script>
 
@@ -11,6 +12,7 @@
 
 <header aria-label={m.zone_app_bar()}>
   <AppNav current="about" />
+  <StopButton />
   <SoundControl />
 </header>
 

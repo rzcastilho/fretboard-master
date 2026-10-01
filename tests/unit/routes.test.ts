@@ -4,11 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type NavCallback = (nav: { type: string }) => void;
 let navCallback: NavCallback | undefined;
+let beforeNavCallback: (() => void) | undefined;
 const replaceState = vi.fn();
 
 vi.mock('$app/navigation', () => ({
   afterNavigate: (cb: NavCallback) => {
     navCallback = cb;
+  },
+  beforeNavigate: (cb: () => void) => {
+    beforeNavCallback = cb;
   },
   goto: vi.fn(),
   replaceState: (...args: unknown[]) => replaceState(...args)
@@ -19,6 +23,7 @@ import { handleError } from '../../src/hooks.client';
 import { prerender, trailingSlash } from '../../src/routes/+layout';
 import ErrorPage from '../../src/routes/+error.svelte';
 import Layout from '../../src/routes/+layout.svelte';
+import { playback } from '../../src/lib/state/playback.svelte';
 import HomePage from '../../src/routes/+page.svelte';
 import NotesPage from '../../src/routes/notes/+page.svelte';
 import TriadsPage from '../../src/routes/triads/+page.svelte';
@@ -34,6 +39,7 @@ const broken = createRawSnippet(() => ({
 
 beforeEach(() => {
   navCallback = undefined;
+  beforeNavCallback = undefined;
   replaceState.mockReset();
   vi.restoreAllMocks();
 });
@@ -110,5 +116,15 @@ describe('root layout', () => {
     expect(screen.getByText('Something went wrong in this view')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Go to home' })).toBeTruthy();
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('layout playback navigation (US4-4)', () => {
+  it('beforeNavigate stops playback with reason navigate', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    render(Layout, { children: child });
+    expect(beforeNavCallback).toBeTypeOf('function');
+    beforeNavCallback?.();
+    expect(stop).toHaveBeenCalledWith('navigate');
   });
 });

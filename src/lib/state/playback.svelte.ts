@@ -2,7 +2,12 @@
  * App-wide playback state (contracts/playback-api.md §3, data-model §5).
  * The only module that imports the audio engine.
  */
-import { createPlaybackEngine, type EngineDeps, type PlaybackEngine } from '$lib/audio/engine';
+import {
+  createPlaybackEngine,
+  type EngineDeps,
+  type PlaybackEngine,
+  type StopReason
+} from '$lib/audio/engine';
 import type { PulseEvent, TimeMark } from '$lib/audio/types';
 import type { Instrument, Position } from '$lib/instrument/instrument';
 
@@ -86,6 +91,13 @@ export const playback = {
     const marks = engine.play({ kind: 'note', position }, instrument);
     markUnlocked();
     return marks;
+  },
+
+  /** Silence the active request and clear pulses. A no-op when nothing is playing. */
+  stop(reason: StopReason = 'stop'): void {
+    engine.stop(reason);
+    state.pulses = [];
+    state.sequencePlaying = false;
   },
 
   /** Mute or unmute; ramps gain only, never stops a sounding note. Unlocks the engine. */

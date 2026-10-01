@@ -181,3 +181,42 @@ describe('sound control state (US3)', () => {
     expect(e.createContext).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('playback.stop and interruption (US4)', () => {
+  it('stop() clears pulses and sequencePlaying', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    d.deps.clock.advance(0);
+    expect(playback.pulses).toHaveLength(1);
+    playback.stop();
+    expect(playback.pulses).toEqual([]);
+    expect(playback.sequencePlaying).toBe(false);
+    d.deps.clock.advance(2000);
+    expect(playback.pulses).toEqual([]);
+  });
+
+  it('a new request replaces the prior pulse', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    d.deps.clock.advance(0);
+    playback.note({ string: 5, fret: 3 }, STANDARD_GUITAR);
+    d.deps.clock.advance(0);
+    expect(playback.pulses.map((p) => p.position)).toEqual([{ string: 5, fret: 3 }]);
+  });
+
+  it('stop() with nothing active is harmless', () => {
+    expect(() => playback.stop('hidden')).not.toThrow();
+    expect(playback.pulses).toEqual([]);
+  });
+
+  // Enabled in T067, once playback.sequence exists (US6).
+  it.todo(
+    'sequencePlaying is true from sequence start until the last endMs, stop, or interruption'
+  );
+});
