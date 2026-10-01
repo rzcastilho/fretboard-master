@@ -32,3 +32,4 @@
 ## Notes
 
 - Q-4 (synthesized vs recorded) resolved by the constitution's mandated synthesized audio; recorded in Assumptions.
+- Clarify pass 2026-10-01: 24 ambiguities resolved (derived or defaulted) in `## Clarifications`; none escalated.
