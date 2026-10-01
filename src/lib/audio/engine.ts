@@ -80,6 +80,8 @@ interface ActiveRequest {
   readonly livePulses: Set<number>;
 }
 
+/** A note waiting on the synth loader plays only if the loader settles this soon after activation (R-10). */
+const SYNTH_WINDOW_MS = 100;
 const DEFAULT_VOLUME = 80;
 /** setTargetAtTime time constant: ≈ 10 ms to settle (E12). */
 const RAMP_TAU_S = 0.003;
@@ -108,6 +110,17 @@ export function createPlaybackEngine(
   deps: Partial<EngineDeps> = {}
 ): PlaybackEngine {
   const d: EngineDeps = { ...defaultDeps(), ...deps };
+  // Test builds only (R-16): force a failure on the first unlock. Read once, enum allow-list.
+  if (__FM_FAULT_INJECTION__) {
+    const fault = globalThis.__fmAudioFault;
+    if (fault === 'context') {
+      d.createContext = () => {
+        throw new Error('injected audio context fault');
+      };
+    } else if (fault === 'synth') {
+      d.loadSynth = () => Promise.reject(new Error('injected synth fault'));
+    }
+  }
 
   let ctx: AudioPort | null = null;
   let volumeGain: GainNode | null = null;
@@ -119,8 +132,29 @@ export function createPlaybackEngine(
   let synth: Synth | null = null;
   let loading: Promise<Synth | null> | null = null;
   let failed = false;
+  /** The first resume() resolved: audio was on, so later failures are not "unavailable" (R-09). */
+  let wasOn = false;
+  let loadFailed = false;
+  let gestureSeen = false;
   let nextRequestId = 1;
   let active: ActiveRequest | null = null;
+
+  /** Ramps the request's voices to 0 and stops their sources. Pulses are untouched. */
+  function silence(current: ActiveRequest): void {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    for (const { source, gain } of current.voices) {
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + STOP_RAMP_S);
+      try {
+        source.stop(now + STOP_AFTER_S);
+      } catch {
+        // Already ended.
+      }
+    }
+    current.voices.length = 0;
+  }
 
   /** Ends the active request: silence, drop pending timers, end live pulses, clear sequence. */
   function halt(reason: Extract<AudioLogEntry, { type: 'stop' }>['reason']): void {
@@ -130,19 +164,7 @@ export function createPlaybackEngine(
     log({ type: 'stop', requestId: current.id, reason });
     for (const id of pulseTimers) d.clock.clearTimeout(id);
     pulseTimers.clear();
-    if (ctx) {
-      const now = ctx.currentTime;
-      for (const { source, gain } of current.voices) {
-        gain.gain.cancelScheduledValues(now);
-        gain.gain.setValueAtTime(gain.gain.value, now);
-        gain.gain.linearRampToValueAtTime(0, now + STOP_RAMP_S);
-        try {
-          source.stop(now + STOP_AFTER_S);
-        } catch {
-          // Already ended.
-        }
-      }
-    }
+    silence(current);
     for (const id of current.livePulses) events.onPulseEnd(id);
     current.livePulses.clear();
     if (current.sequence) events.onSequenceChange(false);
@@ -202,15 +224,25 @@ export function createPlaybackEngine(
         return s;
       },
       () => {
-        fail('synth');
+        // Unavailable only counts once a gesture attempted to unlock audio (R-09).
+        loadFailed = true;
+        if (gestureSeen) fail('synth');
         return null;
       }
     );
     return loading;
   }
 
+  /** A resume() that rejected: terminal on the first unlock, otherwise only that request's sound is lost. */
+  function resumeRejected(request: ActiveRequest | null): void {
+    if (!wasOn) fail('resume');
+    else if (request) silence(request);
+  }
+
   /** Creates the context and graph on first use, and asks a suspended context to resume. */
-  function ensureContext(): AudioPort | null {
+  function ensureContext(request: ActiveRequest | null = null): AudioPort | null {
+    gestureSeen = true;
+    if (loadFailed) fail('synth');
     if (failed) return null;
     if (!ctx) {
       try {
@@ -225,7 +257,12 @@ export function createPlaybackEngine(
         muteGain = muteNode;
         ctx = created;
         // Unlock: resume() is called inside the gesture and deliberately not awaited (R-08).
-        created.resume().catch(() => undefined);
+        created.resume().then(
+          () => {
+            wasOn = true;
+          },
+          () => resumeRejected(request)
+        );
         log({ type: 'unlock', state: created.state as AudioContextState });
         return created;
       } catch {
@@ -233,7 +270,8 @@ export function createPlaybackEngine(
         return null;
       }
     }
-    if (ctx.state !== 'running') ctx.resume().catch(() => undefined);
+    // 'suspended' or Safari's 'interrupted': resumable, never unavailable once audio was on.
+    if (ctx.state !== 'running') ctx.resume().catch(() => resumeRejected(request));
     return ctx;
   }
 
@@ -316,13 +354,17 @@ export function createPlaybackEngine(
       active = current;
       if (current.sequence) events.onSequenceChange(true);
       schedulePulses(current, marks);
-      const port = ensureContext();
+      const activatedAt = d.clock.now();
+      const port = ensureContext(current);
       if (!port) return marks;
       if (synth) {
         schedule(port, synth, plan, current);
       } else {
+        // FR-017: pulse now; the note sounds only if the synth arrives within the window.
         void startLoader().then((s) => {
-          if (s && active === current) schedule(port, s, plan, current);
+          if (s && active === current && d.clock.now() - activatedAt <= SYNTH_WINDOW_MS) {
+            schedule(port, s, plan, current);
+          }
         });
       }
       return marks;

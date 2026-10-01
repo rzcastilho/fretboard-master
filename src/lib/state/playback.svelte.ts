@@ -115,6 +115,11 @@ export const playback = {
     markUnlocked();
   },
 
+  /** Hide the unavailable notice. It is never shown again this session. */
+  dismissNotice(): void {
+    state.noticeVisible = false;
+  },
+
   /** Start loading the synth (no AudioContext is created). */
   preload(): void {
     engine.preload();

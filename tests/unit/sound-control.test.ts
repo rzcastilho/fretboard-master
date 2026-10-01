@@ -190,3 +190,43 @@ describe('unavailable (S4)', () => {
     expect((screen.getByRole('slider') as HTMLInputElement).disabled).toBe(true);
   });
 });
+
+describe('unavailable notice (S8)', () => {
+  const fail = async (): Promise<void> => {
+    resetPlaybackForTests({
+      createContext: () => {
+        throw new Error('no audio');
+      }
+    });
+    playback.setMuted(false);
+    await vi.waitFor(() => expect(playback.noticeVisible).toBe(true));
+  };
+
+  it('renders the notice text inside the polite status container', async () => {
+    await fail();
+    const { container } = render(SoundControl);
+    const slot = container.querySelector('.notice-slot') as HTMLElement;
+    expect(slot.getAttribute('role')).toBe('status');
+    expect(slot.getAttribute('aria-live')).toBe('polite');
+    expect(within(slot).getByText('Sound is not available on this device right now')).toBeTruthy();
+  });
+
+  it('Dismiss calls playback.dismissNotice() and focuses the mute button', async () => {
+    await fail();
+    const spy = vi.spyOn(playback, 'dismissNotice');
+    render(SoundControl);
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(playback.noticeVisible).toBe(false);
+    expect(screen.queryByText('Sound is not available on this device right now')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Sound unavailable' }));
+    spy.mockRestore();
+  });
+
+  it('keeps the slot present, empty, when there is nothing to say', () => {
+    const { container } = render(SoundControl);
+    const slot = container.querySelector('.notice-slot') as HTMLElement;
+    expect(slot).toBeTruthy();
+    expect(slot.children).toHaveLength(0);
+  });
+});

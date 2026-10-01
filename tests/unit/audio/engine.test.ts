@@ -511,3 +511,154 @@ describe('engine E4/E6: interruption and stop (US4)', () => {
     expect((port.sources[0] as unknown as FakeSource).stopCalls).toEqual([]);
   });
 });
+
+describe('engine E7-E9: availability and the synth window (US5)', () => {
+  function build(over: Partial<Parameters<typeof createPlaybackEngine>[1]> = {}) {
+    const port = new FakeAudioPort();
+    const clock = new FakeClock();
+    const ev = events();
+    const createContext = vi.fn(() => port);
+    const loadSynth = vi.fn(() => Promise.resolve(recordingSynth()));
+    const engine = createPlaybackEngine(ev, { createContext, loadSynth, clock, ...over });
+    return { port, clock, ev, engine, createContext, loadSynth };
+  }
+  const string5Fret3 = { kind: 'note', position: { string: 5, fret: 3 } } as const;
+
+  it('E7: a throwing constructor reports unavailable once, never retries, and still pulses', () => {
+    const createContext = vi.fn(() => {
+      throw new Error('no audio');
+    });
+    const { clock, ev, engine } = build({ createContext });
+    engine.play(string6Open, STANDARD_GUITAR);
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    engine.unlock();
+    expect(ev.onUnavailable).toHaveBeenCalledTimes(1);
+    expect(ev.onUnavailable).toHaveBeenCalledWith('context');
+    expect(createContext).toHaveBeenCalledTimes(1);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalled();
+  });
+
+  it('E7: a missing AudioContext API reports unavailable once', () => {
+    const createContext = vi.fn(() => {
+      throw new ReferenceError('AudioContext is not defined');
+    });
+    const { ev, engine } = build({ createContext });
+    engine.unlock();
+    engine.unlock();
+    expect(ev.onUnavailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('E7: a rejecting first resume() reports unavailable once and never resumes again', async () => {
+    const { port, ev, clock, engine } = build();
+    port.resumeMode = 'reject';
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    await flush();
+    expect(ev.onUnavailable).toHaveBeenCalledTimes(1);
+    expect(ev.onUnavailable).toHaveBeenCalledWith('resume');
+    const calls = port.resumeCalls;
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    engine.unlock();
+    await flush();
+    expect(port.resumeCalls).toBe(calls);
+    expect(ev.onUnavailable).toHaveBeenCalledTimes(1);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalled();
+  });
+
+  it('E7: a rejecting loader reports unavailable once on the first gesture and still pulses', async () => {
+    const loadSynth = vi.fn(() => Promise.reject(new Error('no synth')));
+    const { clock, ev, createContext, engine } = build({ loadSynth });
+    engine.preload();
+    await flush();
+    expect(ev.onUnavailable).not.toHaveBeenCalled();
+    engine.play(string6Open, STANDARD_GUITAR);
+    await flush();
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    await flush();
+    expect(ev.onUnavailable).toHaveBeenCalledTimes(1);
+    expect(ev.onUnavailable).toHaveBeenCalledWith('synth');
+    expect(createContext.mock.calls.length).toBeLessThanOrEqual(1);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalled();
+  });
+
+  it('E7: a loader that rejects after the gesture also reports unavailable once', async () => {
+    let reject: (e: unknown) => void = () => undefined;
+    const loadSynth = () => new Promise<Synth>((_, r) => (reject = r));
+    const { ev, engine } = build({ loadSynth });
+    engine.play(string6Open, STANDARD_GUITAR);
+    reject(new Error('late'));
+    await flush();
+    expect(ev.onUnavailable).toHaveBeenCalledTimes(1);
+    expect(ev.onUnavailable).toHaveBeenCalledWith('synth');
+  });
+
+  it('E8: after audio was on, a later resume() rejection drops that sound, is not unavailable, and retries', async () => {
+    const { port, ev, clock, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    await flush();
+    port.state = 'suspended';
+    port.resumeMode = 'reject';
+    const before = port.resumeCalls;
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    await flush();
+    expect(port.resumeCalls).toBe(before + 1);
+    expect(ev.onUnavailable).not.toHaveBeenCalled();
+    expect(port.sources[1].stopCalls).toHaveLength(1);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1); // the superseded first request never pulsed
+    port.resumeMode = 'resolve';
+    engine.play(string6Open, STANDARD_GUITAR);
+    await flush();
+    expect(port.resumeCalls).toBe(before + 2);
+    expect(port.sources[2].stopCalls).toHaveLength(0);
+  });
+
+  it('E8: Safari "interrupted" is resumable, not unavailable', async () => {
+    const { port, ev, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    await flush();
+    port.state = 'interrupted';
+    const before = port.resumeCalls;
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    await flush();
+    expect(port.resumeCalls).toBe(before + 1);
+    expect(ev.onUnavailable).not.toHaveBeenCalled();
+    expect(port.sources).toHaveLength(2);
+  });
+
+  it('E9: a loader resolving within 100 ms plays at that moment’s currentTime', async () => {
+    let resolve: (s: Synth) => void = () => undefined;
+    const loadSynth = () => new Promise<Synth>((r) => (resolve = r));
+    const { port, clock, engine } = build({ loadSynth });
+    engine.play(string6Open, STANDARD_GUITAR);
+    expect(port.sources).toHaveLength(0);
+    clock.advance(60);
+    port.currentTime = 2.5;
+    resolve(recordingSynth());
+    await flush();
+    expect(port.sources).toHaveLength(1);
+    expect(port.sources[0].startCalls).toEqual([2.5]);
+  });
+
+  it('E9: a loader resolving after 100 ms drops the note; later taps play', async () => {
+    let resolve: (s: Synth) => void = () => undefined;
+    const loadSynth = () => new Promise<Synth>((r) => (resolve = r));
+    const { port, clock, ev, engine } = build({ loadSynth });
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(101);
+    resolve(recordingSynth());
+    await flush();
+    expect(port.sources).toHaveLength(0);
+    expect(ev.onPulseStart).toHaveBeenCalled();
+    engine.play(string5Fret3, STANDARD_GUITAR);
+    expect(port.sources).toHaveLength(1);
+  });
+});

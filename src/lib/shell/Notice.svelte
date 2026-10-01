@@ -9,10 +9,14 @@
   let { message, ondismiss }: Props = $props();
   let visible = $state(true);
 
-  function dismiss() {
+  function dismiss(event: MouseEvent) {
+    const button = event.currentTarget as HTMLElement;
     visible = false;
     ondismiss?.();
-    document.querySelector<HTMLElement>('h1')?.focus();
+    // Respect a handler that already moved focus elsewhere; otherwise fall back to the heading.
+    if (document.activeElement === button || document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('h1')?.focus();
+    }
   }
 </script>
 

@@ -1,6 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
+import {
+  expectNoHorizontalScroll,
+  injectAudioFault,
+  readAudioLog,
+  runAxe
+} from './support/helpers';
 
 const cellAt = (page: Page, string: number, fret: number) =>
   page.locator(`.cell[data-string="${string}"][data-fret="${fret}"]`);
@@ -245,5 +250,86 @@ test.describe('interruption, stop, and hidden app (US4)', () => {
   test('no Stop button for a single note', async ({ page }) => {
     await cellAt(page, 6, 0).click();
     await expect(page.getByRole('button', { name: 'Stop' })).toHaveCount(0);
+  });
+});
+
+test.describe('graceful failure when sound is unavailable (US5)', () => {
+  const NOTICE = 'Sound is not available on this device right now';
+
+  for (const cause of ['context', 'synth'] as const) {
+    test(`'${cause}' fault: one notice, unavailable control, pulses, no retry (US5-1/2/4, SC-005)`, async ({
+      page
+    }) => {
+      await injectAudioFault(page, cause);
+      await page.clock.install();
+      await page.goto('/notes');
+      await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+
+      await cellAt(page, 6, 0).click();
+      await expect(page.getByText(NOTICE)).toHaveCount(1);
+      await expect(page.locator('.marker.pulse')).toHaveCount(1);
+      await expect(page.getByRole('button', { name: 'Sound unavailable' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
+
+      await page.clock.runFor(1500);
+      await cellAt(page, 5, 3).click();
+      await expect(page.locator('.marker.pulse')).toHaveCount(1);
+      await expect(page.getByText(NOTICE)).toHaveCount(1);
+
+      const log = await readAudioLog(page);
+      expect(log.filter((e) => e.type === 'unavailable')).toHaveLength(1);
+      expect(log.filter((e) => e.type === 'step')).toHaveLength(0);
+    });
+  }
+
+  test('dismiss removes the notice for good and focuses the mute button (US5-3)', async ({
+    page
+  }) => {
+    await injectAudioFault(page, 'context');
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await cellAt(page, 6, 0).click();
+    await expect(page.getByText(NOTICE)).toBeVisible();
+    await page.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(page.getByText(NOTICE)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Sound unavailable' })).toBeFocused();
+    await cellAt(page, 5, 3).click();
+    await expect(page.getByText(NOTICE)).toHaveCount(0);
+  });
+
+  test('notice is at most two lines at 320 px', async ({ page }) => {
+    await injectAudioFault(page, 'context');
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await cellAt(page, 6, 0).click();
+    const text = page.getByText(NOTICE);
+    await expect(text).toBeVisible();
+    const { height, lineHeight } = await text.evaluate((el) => ({
+      height: el.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(el).lineHeight)
+    }));
+    expect(height).toBeLessThanOrEqual(2 * lineHeight + 1);
+    await expectNoHorizontalScroll(page);
+  });
+
+  test('axe: zero violations with the notice visible (SC-009)', async ({ page }) => {
+    await injectAudioFault(page, 'context');
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await cellAt(page, 6, 0).click();
+    await expect(page.getByText(NOTICE)).toBeVisible();
+    await runAxe(page);
+  });
+
+  test('offline after load: a tap still sounds (FR-016, SC-008)', async ({ page, context }) => {
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await context.setOffline(true);
+    await cellAt(page, 6, 0).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(1);
+    await expect(page.getByText(NOTICE)).toHaveCount(0);
   });
 });

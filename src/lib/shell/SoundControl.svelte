@@ -1,9 +1,11 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
+  import Notice from '$lib/shell/Notice.svelte';
   import { playback } from '$lib/state/playback.svelte';
 
   let root: HTMLElement | undefined = $state();
   let settingsButton: HTMLButtonElement | undefined = $state();
+  let muteButton: HTMLButtonElement | undefined = $state();
   let open = $state(false);
 
   const controlState = $derived(playback.controlState);
@@ -19,6 +21,11 @@
   function toggleMute(): void {
     if (unavailable) return;
     playback.setMuted(!playback.muted);
+  }
+
+  function dismissNotice(): void {
+    playback.dismissNotice();
+    muteButton?.focus();
   }
 
   function onVolume(event: Event): void {
@@ -46,6 +53,7 @@
     aria-pressed={unavailable ? undefined : playback.muted ? 'true' : 'false'}
     aria-disabled={unavailable ? 'true' : undefined}
     aria-describedby="sound-status"
+    bind:this={muteButton}
     onclick={toggleMute}
   >
     <svg
@@ -123,7 +131,11 @@
   </div>
 
   <!-- Always present so assistive tech registers the live region before content arrives. -->
-  <div class="notice-slot" role="status" aria-live="polite"></div>
+  <div class="notice-slot" role="status" aria-live="polite">
+    {#if playback.noticeVisible}
+      <Notice message={m.sound_unavailable_notice()} ondismiss={dismissNotice} />
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -192,6 +204,10 @@
   ul {
     margin: 0;
     padding-inline-start: var(--space-4);
+  }
+
+  .notice-slot {
+    flex-basis: 100%;
   }
 
   .notice-slot:empty {

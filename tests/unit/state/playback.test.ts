@@ -220,3 +220,81 @@ describe('playback.stop and interruption (US4)', () => {
     'sequencePlaying is true from sequence start until the last endMs, stop, or interruption'
   );
 });
+
+describe('playback availability and the one-time notice (US5)', () => {
+  const failing = (kind: 'context' | 'synth') => {
+    const port = new FakeAudioPort();
+    const clock = new FakeClock();
+    const synth: Synth = {
+      renderVoice: (_p, _s, n) => new Float32Array(n),
+      mixVoices: (v) => v[0]
+    };
+    return {
+      clock,
+      deps: {
+        createContext: () => {
+          if (kind === 'context') throw new Error('no audio');
+          return port;
+        },
+        loadSynth: () =>
+          kind === 'synth' ? Promise.reject(new Error('x')) : Promise.resolve(synth),
+        clock
+      }
+    };
+  };
+
+  it('idle → on after a working gesture; stays on', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    expect(playback.availability).toBe('idle');
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    await flush();
+    expect(playback.availability).toBe('on');
+    expect(playback.noticeVisible).toBe(false);
+  });
+
+  it('a context failure is terminal: unavailable, one notice, control unavailable, pulses continue', () => {
+    const f = failing('context');
+    resetPlaybackForTests(f.deps);
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    expect(playback.availability).toBe('unavailable');
+    expect(playback.controlState).toBe('unavailable');
+    expect(playback.noticeVisible).toBe(true);
+    f.clock.advance(0);
+    expect(playback.pulses).toHaveLength(1);
+    f.clock.advance(1500);
+    playback.note({ string: 5, fret: 3 }, STANDARD_GUITAR);
+    f.clock.advance(0);
+    expect(playback.availability).toBe('unavailable');
+    expect(playback.pulses).toHaveLength(1);
+  });
+
+  it('a synth failure after the first gesture is unavailable too', async () => {
+    const f = failing('synth');
+    resetPlaybackForTests(f.deps);
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    await flush();
+    expect(playback.availability).toBe('unavailable');
+    expect(playback.noticeVisible).toBe(true);
+  });
+
+  it('dismiss hides the notice for good; it never returns', () => {
+    const f = failing('context');
+    resetPlaybackForTests(f.deps);
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    playback.dismissNotice();
+    expect(playback.noticeVisible).toBe(false);
+    playback.note({ string: 5, fret: 3 }, STANDARD_GUITAR);
+    playback.setMuted(true);
+    expect(playback.noticeVisible).toBe(false);
+    expect(playback.controlState).toBe('unavailable');
+  });
+
+  it('setMuted/setVolume do not leave unavailable', () => {
+    const f = failing('context');
+    resetPlaybackForTests(f.deps);
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    playback.setVolume(40);
+    expect(playback.availability).toBe('unavailable');
+  });
+});
