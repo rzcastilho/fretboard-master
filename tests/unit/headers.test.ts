@@ -42,6 +42,10 @@ describe('static/_headers', () => {
     );
   });
 
+  it('caches self-hosted fonts for one year', () => {
+    expect(rules.get('/fonts/*')?.get('cache-control')).toBe('public, max-age=31536000, immutable');
+  });
+
   it.each(['/', '/*.html', '/notes', '/triads', '/about', '/404.html'])(
     'revalidates HTML at %s',
     (path) => {

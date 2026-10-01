@@ -44,9 +44,62 @@
   --focus-ring-offset: 2px;
   --indicator-width: 3px;
 
+  /* Fretboard geometry (rem) */
+  --fb-row: 2.75rem;
+  --fb-open-col: 2.75rem;
+  --fb-fret-first: 3.25rem;
+  --fb-fret-last: 2.75rem;
+  --fb-label-col: 1.5rem;
+  --fb-numbers-row: 1.5rem;
+  --fb-nut-width: 0.375rem;
+  --fb-string-width-1: 0.0625rem;
+  --fb-string-width-2: 0.09375rem;
+  --fb-string-width-3: 0.125rem;
+  --fb-string-width-4: 0.1875rem;
+  --fb-string-width-5: 0.25rem;
+  --fb-string-width-6: 0.3125rem;
+  --fb-thumb-row: 0.5rem;
+  --fb-thumb-open-col: 0.5rem;
+  --fb-thumb-fret: 0.75rem;
+  --zone-fretboard-padding-inline: 0;
+
+  /* Markers */
+  --marker-root: 2.25rem;
+  --marker-medium: 1.875rem;
+  --marker-small: 1.5rem;
+  --marker-radius: 50%;
+  --marker-stroke: 2px;
+  --marker-neutral-stroke-width: 2px;
+  --marker-elevation-stroke: 1px;
+  --marker-label-size: 0.875rem;
+  --marker-label-min-size: 0.75rem;
+
+  /* Emphasis */
+  --emph-highlight-scale: 1.15;
+  --emph-dim-scale: 0.85;
+  --emph-dim-opacity: 0.4;
+
+  /* Fretboard colors (light) */
+  --color-fretboard-wood: #e7d3b0;
+  --color-fretboard-line: #6b5a3e;
+  --color-nut: #f5f0e6;
+  --color-inlay: #b8a888;
+  --color-root: #b3261e;
+  --color-third: #0b5cad;
+  --color-fifth: #1b6e3a;
+  --color-neutral-note: #ffffff;
+  --color-neutral-note-stroke: #1a1d21;
+  --color-degree-stroke: #1a1d21;
+  --color-marker-label: #ffffff;
+  --color-hint-surface: #e8eef6;
+  --color-hint-text: #1a1d21;
+
+  --font-family-notes: 'FM Accidentals', var(--font-family-ui);
+
   /* Motion */
   --duration-fast: 120ms;
   --duration-base: 200ms;
+  --duration-short: 300ms;
 
   /* Sizing */
   --target-min: 44px;
@@ -71,6 +124,19 @@
     --color-notice-surface: #1f2a38;
     --color-notice-text: #eef0f3;
     --color-notice-border: #7f93ad;
+    --color-fretboard-wood: #4a3a26;
+    --color-fretboard-line: #c9b896;
+    --color-nut: #d9d2c3;
+    --color-inlay: #8a7a5c;
+    --color-root: #ff8a80;
+    --color-third: #7ab4f0;
+    --color-fifth: #7fd49a;
+    --color-neutral-note: #1b2027;
+    --color-neutral-note-stroke: #eef0f3;
+    --color-degree-stroke: #eef0f3;
+    --color-marker-label: #101317;
+    --color-hint-surface: #1f2a38;
+    --color-hint-text: #eef0f3;
   }
 }
 
@@ -81,6 +147,14 @@
     --color-notice-border: var(--color-text);
     --border-width: 2px;
     --focus-ring-width: 4px;
+    --color-fretboard-wood: Canvas;
+    --color-fretboard-line: CanvasText;
+    --color-nut: CanvasText;
+    --color-inlay: CanvasText;
+    --color-neutral-note-stroke: CanvasText;
+    --color-degree-stroke: CanvasText;
+    --marker-neutral-stroke-width: 3px;
+    --marker-stroke: 3px;
   }
 }
 
@@ -88,6 +162,7 @@
   :root {
     --duration-fast: 0s;
     --duration-base: 0s;
+    --duration-short: 0s;
   }
 }
 

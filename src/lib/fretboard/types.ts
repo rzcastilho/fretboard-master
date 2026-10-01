@@ -1,0 +1,71 @@
+import type { Instrument, Position } from '../instrument/instrument';
+import type { Spelling } from '../theory/pitch';
+
+export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
+export type Emphasis = 'highlighted' | 'normal' | 'dimmed' | 'hidden';
+export type LabelMode = 'note' | 'none';
+
+export interface Marker {
+  readonly string: number;
+  readonly fret: number;
+  readonly function: NoteFunction;
+  readonly emphasis: Emphasis;
+  /** Explicit spelling (e.g. E♯, B𝄫); absent → notation default (sharps). */
+  readonly spelling?: Spelling;
+}
+
+export interface DisplayModel {
+  /** At most one per position; first wins. */
+  readonly markers: readonly Marker[];
+  readonly labelMode: LabelMode;
+  /** Optional localized leading sentence of the text description. */
+  readonly summary?: string;
+}
+
+export interface FretboardProps {
+  instrument: Instrument;
+  model?: DisplayModel;
+  variant?: 'interactive' | 'thumbnail';
+  onactivate?: (position: Position) => void;
+}
+
+/** Gesture state machine (data-model §6). */
+export type GestureState =
+  | { readonly kind: 'idle' }
+  | {
+      readonly kind: 'pending';
+      readonly pointerId: number;
+      readonly pointerType: string;
+      readonly originX: number;
+      readonly originY: number;
+    }
+  | {
+      readonly kind: 'scrolling';
+      readonly pointerId: number;
+      readonly pointerType: string;
+      readonly lastX: number;
+    }
+  | { readonly kind: 'cancelled' };
+
+export type GestureEvent =
+  | {
+      readonly type: 'down';
+      readonly pointerId: number;
+      readonly pointerType: string;
+      readonly button: number;
+      readonly isPrimary: boolean;
+      readonly x: number;
+      readonly y: number;
+    }
+  | { readonly type: 'move'; readonly pointerId: number; readonly x: number; readonly y: number }
+  | { readonly type: 'up'; readonly pointerId: number; readonly x: number; readonly y: number }
+  | { readonly type: 'cancel'; readonly pointerId: number };
+
+export type GestureEffect =
+  | { readonly kind: 'none' }
+  /** Pointer released as a tap: caller resolves the nearest position from (x, y). */
+  | { readonly kind: 'activate'; readonly x: number; readonly y: number }
+  /** Drag started: hide hover hint. */
+  | { readonly kind: 'hide-hover' }
+  /** Mouse drag-to-scroll: `scrollLeft -= dx`. */
+  | { readonly kind: 'scroll'; readonly dx: number };

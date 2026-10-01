@@ -15,4 +15,13 @@ describe('ToolCard', () => {
     expect(screen.getByText('Where is every note?')).toBeTruthy();
     expect(container.innerHTML).not.toMatch(/truncate|ellipsis/);
   });
+
+  it('shows a decorative fretboard thumbnail without changing the link name or tab stops', () => {
+    const { container } = render(ToolCard, { tool: TOOLS[0] });
+    const link = container.querySelector('a') as HTMLAnchorElement;
+    const svg = link.querySelector('svg.fretboard-thumbnail');
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(link.getAttribute('aria-label')).toBe('Fretboard Notes — Where is every note?');
+    expect(container.querySelectorAll('[tabindex], button, [role="grid"]')).toHaveLength(0);
+  });
 });

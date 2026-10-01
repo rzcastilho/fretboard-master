@@ -20,6 +20,16 @@ test.describe('home without JavaScript', () => {
   });
 });
 
+test.describe('tool screens without JavaScript', () => {
+  test('prerendered /notes shows the drawn fretboard', async ({ page }) => {
+    await page.goto('/notes');
+    const grid = page.getByRole('grid', { name: 'Fretboard' });
+    await expect(grid).toBeVisible();
+    await expect(grid.getByRole('gridcell')).toHaveCount(138);
+    await expect(grid.locator('.fret-number')).toHaveCount(22);
+  });
+});
+
 test.describe('unknown address without JavaScript', () => {
   test('prerendered 404 markup shows home with the notice', async ({ page }) => {
     const response = await page.goto('/nope');

@@ -24,6 +24,33 @@ test.describe('home screen', () => {
     await expect(page.getByText(/sign[ -]?(up|in)|log ?in/i)).toHaveCount(0);
   });
 
+  test('each card has a decorative fretboard thumbnail and one tab stop', async ({ page }) => {
+    const cards = page.getByRole('list').getByRole('link');
+    for (const i of [0, 1]) {
+      await expect(cards.nth(i).locator('svg.fretboard-thumbnail[aria-hidden="true"]')).toHaveCount(
+        1
+      );
+    }
+    await page.keyboard.press('Tab');
+    const stops: string[] = [];
+    // The app nav also links to /notes and /triads; only card stops (and anything focusable
+    // inside a card, e.g. the thumbnail) count. Stop once focus wraps to an already-seen element.
+    for (let i = 0; i < 20; i++) {
+      const stop = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || el === document.body) return null;
+        if (el.dataset.tabSeen) return null;
+        el.dataset.tabSeen = '1';
+        return el.closest('a.card')?.getAttribute('href') ?? '';
+      });
+      if (stop === null) break;
+      if (stop) stops.push(stop);
+      await page.keyboard.press('Tab');
+    }
+    expect(stops.filter((h) => h === '/notes')).toHaveLength(1);
+    expect(stops.filter((h) => h === '/triads')).toHaveLength(1);
+  });
+
   test('cards are equal size and at least 44x44', async ({ page }) => {
     const cards = page.getByRole('list').getByRole('link');
     const a = await box(cards.nth(0));

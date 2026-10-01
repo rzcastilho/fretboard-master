@@ -1,14 +1,17 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0 (MINOR: stack guidance expanded with a mandated tool installer;
-  per Governance, stack changes are MINOR)
-- Modified principles: none
-- Modified sections: Technology Stack and Constraints (new "Tool installation" row, pnpm row
-  now notes it is installed via mise, new "Tool installation" rule)
+- Version change: 1.1.0 → 1.2.0 (MINOR: mandated font choice changed, per "Changing the
+  stack"; also a PATCH-level clarification of the Principle I merge gate scope)
+- Modified principles: I. Musical Correctness — merge gate clarified: each table/property
+  suite is added by the slice that introduces the theory code it tests and from then on gates
+  every later theory change (no gate removed or weakened)
+- Modified sections: Technology Stack and Constraints ("Fonts" row: self-hosted accidentals
+  subset + system UI stack with tabular numerals; ADR 0006)
 - Added sections: none
 - Removed sections: none
 - Templates: plan-template.md, spec-template.md, tasks-template.md read the constitution at
   runtime; no edits required (✅ not modified per scope guard)
+- Prior amendment: 1.0.0 → 1.1.0 added the mise "Tool installation" row and rule
 - Deferred TODOs: none
 -->
 
@@ -30,6 +33,11 @@ Sync Impact Report
   - property tests enforcing NFR-9.3 across randomly generated tunings (three adjacent
     strings, strictly rising pitch, span under one octave, correct pitch classes, correct bass
     note).
+  - Scope: each of these suites MUST be added by the slice that introduces the theory code it
+    tests (triad spelling, triad shapes, CAGED), and from then on it gates every later theory
+    change. A theory change made before that code exists MUST pass the table and property
+    tests for the theory code it does introduce (for example TM-1 and TM-3 for pitch
+    arithmetic) plus every suite already in place.
 - Each note MUST sound at its calculated pitch.
 
 Rationale: one enharmonic or shape error makes teachers stop recommending the product, and
@@ -207,7 +215,7 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 | State | Svelte runes-based stores in `src/lib/state` |
 | Storage | `localStorage` behind `src/lib/prefs`. Every access wrapped, storage failures tolerated |
 | Styling | Plain CSS with custom-property design tokens. Media queries for theme, reduced motion, contrast, print |
-| Fonts | Self-hosted, tabular numerals, glyph coverage for ♯ ♭ 𝄪 𝄫 |
+| Fonts | Self-hosted accidentals subset covering ♯ ♭ 𝄪 𝄫 (loaded via `unicode-range`); letters and digits use the system UI stack with tabular numerals (`font-variant-numeric: tabular-nums`). See ADR 0006 |
 | Unit and property tests | Vitest + fast-check |
 | E2E and accessibility | Playwright (phone and desktop profiles) + @axe-core/playwright |
 | Performance | Lighthouse CI with budgets, plus a bundle-size check |
@@ -290,4 +298,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-09-30
+**Version**: 1.2.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-09-30

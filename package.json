@@ -15,11 +15,13 @@
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:nojs": "playwright test --project=nojs",
-    "lhci": "lhci autorun"
+    "lhci": "lhci autorun",
+    "fonts:accidentals": "node scripts/subset-accidentals-font.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@fontsource/noto-music": "^5.3.0",
     "@inlang/paraglide-js": "^2.25.4",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.63.0",
@@ -30,10 +32,12 @@
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.11.0",
     "eslint-plugin-svelte": "^3.23.0",
+    "fast-check": "^4.10.2",
     "globals": "^17.12.0",
     "jsdom": "^30.1.1",
     "prettier": "^3.9.9",
     "prettier-plugin-svelte": "^4.1.1",
+    "subset-font": "^2.9.0",
     "svelte": "^5.57.1",
     "svelte-check": "^4.7.6",
     "typescript": "^5.9.3",

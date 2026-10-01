@@ -25,7 +25,12 @@ export default tseslint.config(
   ...svelte.configs['flat/recommended'],
   {
     languageOptions: {
-      globals: { ...globals.browser, ...globals.node, __APP_VERSION__: 'readonly' }
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        __APP_VERSION__: 'readonly',
+        __FM_FAULT_INJECTION__: 'readonly'
+      }
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -51,7 +56,9 @@ export default tseslint.config(
             '$lib/prefs/*',
             '$lib/audio/*',
             '$lib/fretboard/*',
-            '$lib/state/*'
+            '$lib/state/*',
+            '$lib/instrument/*',
+            '$lib/notation/*'
           ]
         }
       ],
@@ -61,6 +68,54 @@ export default tseslint.config(
         { name: 'document', message: 'Theory code must be DOM-free.' },
         { name: 'localStorage', message: 'Theory code must be DOM-free.' }
       ]
+    }
+  },
+  {
+    files: ['src/lib/instrument/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            'svelte',
+            'svelte/*',
+            '$app/*',
+            '$lib/paraglide/*',
+            '$lib/fretboard/*',
+            '$lib/notation/*'
+          ]
+        }
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'Instrument code must be DOM-free.' },
+        { name: 'document', message: 'Instrument code must be DOM-free.' },
+        { name: 'localStorage', message: 'Instrument code must be DOM-free.' },
+        { name: 'navigator', message: 'Instrument code must be DOM-free.' }
+      ]
+    }
+  },
+  {
+    files: ['src/lib/notation/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['svelte', 'svelte/*', '$app/*', '$lib/fretboard/*', '$lib/instrument/*'] }
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'Notation code must be DOM-free.' },
+        { name: 'document', message: 'Notation code must be DOM-free.' },
+        { name: 'localStorage', message: 'Notation code must be DOM-free.' },
+        { name: 'navigator', message: 'Notation code must be DOM-free.' }
+      ]
+    }
+  },
+  {
+    // Shell and routes must not compute theory; go through instrument/fretboard.
+    files: ['src/lib/shell/**', 'src/routes/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['$lib/theory/*'] }]
     }
   }
 );

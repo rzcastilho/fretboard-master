@@ -1,0 +1,102 @@
+import fc from 'fast-check';
+import { describe, expect, it } from 'vitest';
+import {
+  octaveOf,
+  pitchClass,
+  pitchClassOfSpelling,
+  pitchOfSpelling,
+  transpose
+} from '../../../src/lib/theory/pitch';
+
+describe('pitchOfSpelling golden values (TM-1)', () => {
+  it('maps spelled pitches to MIDI-style numbers (C4 = 60)', () => {
+    expect(pitchOfSpelling({ letter: 'E', accidental: 0, octave: 2 })).toBe(40);
+    expect(pitchOfSpelling({ letter: 'E', accidental: 0, octave: 4 })).toBe(64);
+    expect(pitchOfSpelling({ letter: 'C', accidental: 0, octave: 4 })).toBe(60);
+    expect(pitchOfSpelling({ letter: 'B', accidental: 1, octave: 3 })).toBe(60);
+    expect(pitchOfSpelling({ letter: 'C', accidental: -1, octave: 4 })).toBe(59);
+  });
+});
+
+describe('octaveOf (TM-1.3)', () => {
+  it('changes octave at C', () => {
+    expect(octaveOf(59)).toBe(3);
+    expect(octaveOf(60)).toBe(4);
+    expect(octaveOf(0)).toBe(-1);
+  });
+});
+
+describe('pitchClass', () => {
+  it('reduces mod 12, including negatives', () => {
+    expect(pitchClass(60)).toBe(0);
+    expect(pitchClass(61)).toBe(1);
+    expect(pitchClass(-1)).toBe(11);
+    expect(pitchClass(-12)).toBe(0);
+    expect(pitchClass(-13)).toBe(11);
+  });
+});
+
+describe('pitchClassOfSpelling', () => {
+  it('handles accidentals and wraps', () => {
+    expect(pitchClassOfSpelling({ letter: 'C', accidental: 0 })).toBe(0);
+    expect(pitchClassOfSpelling({ letter: 'B', accidental: 1 })).toBe(0);
+    expect(pitchClassOfSpelling({ letter: 'C', accidental: -1 })).toBe(11);
+    expect(pitchClassOfSpelling({ letter: 'F', accidental: 2 })).toBe(7);
+    expect(pitchClassOfSpelling({ letter: 'B', accidental: -2 })).toBe(9);
+  });
+});
+
+describe('properties (TM-3)', () => {
+  it('pitchClass is always an integer in 0..11', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -2000, max: 2000 }), (p) => {
+        const pc = pitchClass(p);
+        return Number.isInteger(pc) && pc >= 0 && pc <= 11;
+      })
+    );
+  });
+
+  it('octave/pitch-class round-trip: (octave+1)*12 + pc === p', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -2000, max: 2000 }), (p) => {
+        return (octaveOf(p) + 1) * 12 + pitchClass(p) === p;
+      })
+    );
+  });
+
+  it('transpose adds semitones and composes', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: -500, max: 500 }),
+        fc.integer({ min: -100, max: 100 }),
+        fc.integer({ min: -100, max: 100 }),
+        (p, a, b) =>
+          transpose(p, a) === p + a && transpose(transpose(p, a), b) === transpose(p, a + b)
+      )
+    );
+  });
+
+  it('transposing by 12 keeps pitch class and raises octave by 1', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -500, max: 500 }), (p) => {
+        const q = transpose(p, 12);
+        return pitchClass(q) === pitchClass(p) && octaveOf(q) === octaveOf(p) + 1;
+      })
+    );
+  });
+
+  it('pitchOfSpelling agrees with pitchClassOfSpelling mod 12', () => {
+    const letters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const;
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...letters),
+        fc.constantFrom(-2, -1, 0, 1, 2),
+        fc.integer({ min: -1, max: 9 }),
+        (letter, accidental, octave) => {
+          const s = { letter, accidental: accidental as -2 | -1 | 0 | 1 | 2 };
+          return pitchClass(pitchOfSpelling({ ...s, octave })) === pitchClassOfSpelling(s);
+        }
+      )
+    );
+  });
+});

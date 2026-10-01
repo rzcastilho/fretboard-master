@@ -1,7 +1,7 @@
 # ADR 0004: Test-only fault injection
 
 - **Status**: Accepted
-- **Source**: research R-06 (spec 001-walking-skeleton)
+- **Source**: research R-06 (spec 001-walking-skeleton); amended by R-18 (spec 002-interactive-fretboard)
 
 ## Context
 
@@ -21,6 +21,14 @@ trigger it in production.
   `addInitScript` (see `injectFault` in `e2e/support/helpers.ts`).
 - `scripts/check-no-fault-hook.mjs` greps the production `build/` for `__fmFault` and
   `Injected fault`, and fails CI if either is found.
+
+## Amendment: fretboard fixture hook (spec 002)
+
+The fretboard test hooks follow the same build-flag rule. `__fmFretboardFixture` (read once on
+mount to pick a fixture model from `src/lib/fretboard/fixtures.ts`) and `__fmFretboardEvents`
+(activation log) are only read or written when `__FM_FAULT_INJECTION__` is true, so they are
+removed from production bundles. `scripts/check-no-fault-hook.mjs` also fails the build if
+`build/` contains either name. No new ADR.
 
 ## Consequences
 

@@ -34,6 +34,20 @@ describe('check-no-fault-hook', () => {
     expect(r.status).toBe(1);
   });
 
+  it('fails when the output contains __fmFretboardFixture', () => {
+    const r = spawnSync('node', [script, fixture('globalThis.__fmFretboardFixture')], {
+      encoding: 'utf8'
+    });
+    expect(r.status).toBe(1);
+  });
+
+  it('fails when the output contains __fmFretboardEvents', () => {
+    const r = spawnSync('node', [script, fixture('globalThis.__fmFretboardEvents = []')], {
+      encoding: 'utf8'
+    });
+    expect(r.status).toBe(1);
+  });
+
   it('passes on a clean directory', () => {
     const r = spawnSync('node', [script, fixture('console.log("hi")')], { encoding: 'utf8' });
     expect(r.status).toBe(0);

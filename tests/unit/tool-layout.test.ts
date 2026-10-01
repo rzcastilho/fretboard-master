@@ -11,11 +11,14 @@ describe('ToolLayout', () => {
     expect(banner.getAttribute('aria-label')).toBe('Application bar');
   });
 
-  it('renders the four zones with placeholders', () => {
+  it('renders the fretboard in zone C and placeholders in the other zones', () => {
     render(ToolLayout, { tool: 'notes' });
+    const fretboard = screen.getByRole('region', { name: 'Fretboard' });
+    expect(within(fretboard).getByRole('grid', { name: 'Fretboard' })).toBeTruthy();
+    expect(within(fretboard).getAllByRole('gridcell')).toHaveLength(138);
+    expect(screen.queryByText('The fretboard will appear here.')).toBeNull();
     const zones: Array<[string, string]> = [
       ['Main controls', 'Controls will appear here.'],
-      ['Fretboard', 'The fretboard will appear here.'],
       ['Context panel', 'Details will appear here.'],
       ['Actions', 'Actions will appear here.']
     ];

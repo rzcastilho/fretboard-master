@@ -13,3 +13,4 @@ specs
 project.inlang/cache
 project.inlang/.gitignore
 project.inlang/.meta.json
+project.inlang/README.md
