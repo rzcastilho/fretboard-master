@@ -3,6 +3,7 @@
   import AppNav from './AppNav.svelte';
   import FailureView from './FailureView.svelte';
   import { recordFailure } from './failure';
+  import NotesTool from '$lib/tools/notes/NotesTool.svelte';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
   import StopButton from './StopButton.svelte';
@@ -28,7 +29,11 @@
   <h1 tabindex="-1">{name}</h1>
   <div class="grid">
     <svelte:boundary onerror={(e) => recordFailure(tool, e)}>
-      <ToolPlaceholder {tool} />
+      {#if tool === 'notes'}
+        <NotesTool />
+      {:else}
+        <ToolPlaceholder {tool} />
+      {/if}
       {#snippet failed(_error, reset)}
         <FailureView {reset} />
       {/snippet}

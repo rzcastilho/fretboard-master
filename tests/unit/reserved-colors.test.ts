@@ -43,4 +43,47 @@ describe('reserved marker colors', () => {
     }
     expect(bad).toEqual([]);
   });
+
+  describe('notes tokens', () => {
+    const tokens = all.find((f) => f.path === 'src/lib/styles/tokens.css')?.text ?? '';
+    const names = [
+      '--color-note-highlight',
+      '--color-note-highlight-label',
+      ...[1, 2, 3, 4, 5, 6, 7].map((n) => `--octave-tone-${n}`),
+      '--region-band'
+    ];
+
+    /** Declaration blocks: light (:root), dark (color-scheme media), contrast (contrast media). */
+    const blocks = {
+      light: /^:root\s*\{([\s\S]*?)\n\}/m.exec(tokens)?.[1] ?? '',
+      dark:
+        /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([\s\S]*?)\n\s*\}/.exec(
+          tokens
+        )?.[1] ?? '',
+      contrast:
+        /@media \(prefers-contrast: more\)\s*\{\s*:root\s*\{([\s\S]*?)\n\s*\}/.exec(tokens)?.[1] ??
+        ''
+    };
+
+    const value = (block: string, name: string): string | undefined =>
+      new RegExp(`${name}:\\s*([^;]+);`).exec(block)?.[1].trim();
+
+    it.each(names)('%s is defined for light, dark, and more-contrast', (name) => {
+      for (const mode of ['light', 'dark', 'contrast'] as const) {
+        expect(value(blocks[mode], name), `${name} in ${mode}`).toBeDefined();
+      }
+    });
+
+    it('never equals or references the reserved root/third/fifth colors', () => {
+      for (const mode of ['light', 'dark', 'contrast'] as const) {
+        const reserved = ['root', 'third', 'fifth'].map((n) => value(blocks[mode], `--color-${n}`));
+        for (const name of names) {
+          const v = value(blocks[mode], name);
+          if (v === undefined) continue;
+          expect(v).not.toMatch(/--color-(root|third|fifth)\b/);
+          expect(reserved).not.toContain(v);
+        }
+      }
+    });
+  });
 });

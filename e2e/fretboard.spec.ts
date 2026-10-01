@@ -18,11 +18,12 @@ for (const path of ['/notes', '/triads']) {
     });
 
     test('string 2 fret 1 is C and string 6 open is E', async ({ page }) => {
+      // /notes marks the natural notes, which appends ", note" to those cell names
       await expect(
-        page.getByRole('gridcell', { name: 'C, string 2, fret 1', exact: true })
+        page.getByRole('gridcell', { name: /^C, string 2, fret 1(, note)?$/ })
       ).toHaveCount(1);
       await expect(
-        page.getByRole('gridcell', { name: 'E, string 6, open', exact: true })
+        page.getByRole('gridcell', { name: /^E, string 6, open(, note)?$/ })
       ).toHaveCount(1);
     });
 
@@ -60,11 +61,12 @@ for (const path of ['/notes', '/triads']) {
   });
 }
 
+// Fixtures and pointer events run on /triads, whose board starts blank (/notes marks naturals).
 async function withFixture(page: Page, name: string): Promise<void> {
   await page.addInitScript((n) => {
     globalThis.__fmFretboardFixture = n as typeof globalThis.__fmFretboardFixture;
   }, name);
-  await page.goto('/notes');
+  await page.goto('/triads');
 }
 
 test.describe('markers (US2)', () => {
@@ -119,7 +121,7 @@ test.describe('fretboard pointer interaction (US3)', () => {
     await page.addInitScript(() => {
       globalThis.__fmFretboardEvents = [];
     });
-    await page.goto('/notes');
+    await page.goto('/triads');
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -395,6 +397,8 @@ test.describe('keyboard operation (US5)', () => {
   });
 
   test('toggle shows the description text', async ({ page }) => {
+    await page.goto('/triads'); // blank board: the empty description
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     const toggle = page.getByRole('button', { name: 'Show text description' });
     await toggle.click();
     await expect(page.getByRole('button', { name: 'Hide text description' })).toHaveAttribute(

@@ -94,6 +94,19 @@
   --color-hint-surface: #e8eef6;
   --color-hint-text: #1a1d21;
 
+  /* Notes tool: highlight, octave-tone ramp (accent hue), region band */
+  --color-note-highlight: #1b6498;
+  --color-note-highlight-label: #ffffff;
+  --octave-tone-1: #2078b6;
+  --octave-tone-2: #1d6ea7;
+  --octave-tone-3: #1b6498;
+  --octave-tone-4: #185a89;
+  --octave-tone-5: #155079;
+  --octave-tone-6: #13466a;
+  --octave-tone-7: #103c5b;
+  --region-band: hsl(205 70% 40% / 0.14);
+  --marker-badge-size: 0.75rem;
+
   --font-family-notes: 'FM Accidentals', var(--font-family-ui);
 
   /* Motion */
@@ -145,6 +158,18 @@
     --color-marker-label: #101317;
     --color-hint-surface: #1f2a38;
     --color-hint-text: #eef0f3;
+
+    /* Notes tool: highlight, octave-tone ramp (accent hue), region band */
+    --color-note-highlight: #86c0ea;
+    --color-note-highlight-label: #101317;
+    --octave-tone-1: #a8d2f0;
+    --octave-tone-2: #97c9ed;
+    --octave-tone-3: #86c0ea;
+    --octave-tone-4: #74b7e7;
+    --octave-tone-5: #63aee3;
+    --octave-tone-6: #52a5e0;
+    --octave-tone-7: #409cdd;
+    --region-band: hsl(205 80% 70% / 0.18);
   }
 }
 
@@ -164,6 +189,17 @@
     --color-degree-stroke: CanvasText;
     --marker-neutral-stroke-width: 3px;
     --marker-stroke: 3px;
+
+    --color-note-highlight: CanvasText;
+    --color-note-highlight-label: Canvas;
+    --octave-tone-1: CanvasText;
+    --octave-tone-2: CanvasText;
+    --octave-tone-3: CanvasText;
+    --octave-tone-4: CanvasText;
+    --octave-tone-5: CanvasText;
+    --octave-tone-6: CanvasText;
+    --octave-tone-7: CanvasText;
+    --region-band: color-mix(in srgb, CanvasText 18%, transparent);
   }
 }
 

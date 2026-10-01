@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSpelling, noteLabel, spokenNote } from '../../../src/lib/notation/notation';
+import {
+  defaultSpelling,
+  flatSpelling,
+  noteLabel,
+  noteList,
+  pitchLabel,
+  spokenNote,
+  spokenNoteList
+} from '../../../src/lib/notation/notation';
 import {
   pitchClassOfSpelling,
   type Accidental,
@@ -58,5 +66,66 @@ describe('spokenNote', () => {
 
   it('never contains accidental glyphs', () => {
     for (const s of ALL_SPELLINGS) expect(spokenNote(s)).not.toMatch(/[♯♭𝄪𝄫]/u);
+  });
+});
+
+describe('spokenNoteList (R-12)', () => {
+  it('joins with a conjunction in the active locale', () => {
+    expect(
+      spokenNoteList([
+        { letter: 'C', accidental: 1 },
+        { letter: 'E', accidental: 0 }
+      ])
+    ).toBe('C sharp and E');
+  });
+
+  it('gives a single note alone', () => {
+    expect(spokenNoteList([{ letter: 'G', accidental: 0 }])).toBe('G');
+  });
+
+  it('uses a serial conjunction for three notes', () => {
+    expect(
+      spokenNoteList([
+        { letter: 'C', accidental: 0 },
+        { letter: 'E', accidental: 0 },
+        { letter: 'G', accidental: 0 }
+      ])
+    ).toBe('C, E, and G');
+  });
+});
+
+describe('pitchLabel (R-05)', () => {
+  it('appends the octave number to the note label', () => {
+    expect(pitchLabel({ letter: 'A', accidental: 0 }, 3)).toBe('A3');
+    expect(pitchLabel({ letter: 'C', accidental: 1 }, 5)).toBe('C♯5');
+  });
+});
+
+describe('flatSpelling', () => {
+  it('gives D♭ for C♯ and leaves naturals alone (card heading)', () => {
+    expect(noteLabel(flatSpelling(1))).toBe('D♭');
+    expect(noteLabel(flatSpelling(9))).toBe('A');
+  });
+
+  it('spells altered notes with flats and leaves naturals alone', () => {
+    const expected = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+    for (let pc = 0; pc < 12; pc++) {
+      const s = flatSpelling(pc);
+      expect(noteLabel(s)).toBe(expected[pc]);
+      expect(pitchClassOfSpelling(s)).toBe(pc);
+    }
+  });
+});
+
+describe('noteList (disjunction)', () => {
+  it('joins with "or" in the given order', () => {
+    expect(noteList([defaultSpelling(1), defaultSpelling(2)])).toBe('C♯ or D');
+    expect(noteList([defaultSpelling(3), defaultSpelling(1), defaultSpelling(2)])).toBe(
+      'D♯, C♯, or D'
+    );
+  });
+
+  it('gives a single note alone', () => {
+    expect(noteList([defaultSpelling(1)])).toBe('C♯');
   });
 });

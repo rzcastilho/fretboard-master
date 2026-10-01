@@ -8,7 +8,8 @@ const needles = [
   '__fmFretboardFixture',
   '__fmFretboardEvents',
   '__fmAudioFault',
-  '__fmAudioLog'
+  '__fmAudioLog',
+  '__fmInstrument'
 ];
 const hits = [];
 

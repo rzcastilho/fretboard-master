@@ -162,5 +162,29 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': ['error', { patterns: ['$lib/theory/*', '$lib/audio/engine'] }]
     }
+  },
+  {
+    // Tools consume state/instrument/fretboard; they never compute theory or touch the engine.
+    files: ['src/lib/tools/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['$lib/theory/*', '$lib/audio/engine'] }]
+    }
+  },
+  {
+    // notes-view is pure: no framework, i18n, or DOM.
+    files: ['src/lib/state/notes-view.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['svelte', 'svelte/*', '$lib/paraglide/*', '$lib/audio/engine'] }
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'notes-view must be DOM-free.' },
+        { name: 'document', message: 'notes-view must be DOM-free.' },
+        { name: 'localStorage', message: 'notes-view must be DOM-free.' },
+        { name: 'navigator', message: 'notes-view must be DOM-free.' }
+      ]
+    }
   }
 );

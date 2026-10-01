@@ -3,7 +3,8 @@ import type { Spelling } from '../theory/pitch';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
 export type Emphasis = 'highlighted' | 'normal' | 'dimmed' | 'hidden';
-export type LabelMode = 'note' | 'none';
+export type LabelMode = 'note' | 'octave' | 'none';
+export type OctaveTone = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface Marker {
   readonly string: number;
@@ -12,6 +13,12 @@ export interface Marker {
   readonly emphasis: Emphasis;
   /** Explicit spelling (e.g. E♯, B𝄫); absent → notation default (sharps). */
   readonly spelling?: Spelling;
+  /** Overrides the default label rule (labeled iff highlighted or normal). */
+  readonly label?: boolean;
+  /** Same-octave tone token (Notes). Drawing only. */
+  readonly tone?: OctaveTone;
+  /** Draw the small octave number beside a 'note' label. */
+  readonly octaveBadge?: boolean;
 }
 
 export interface DisplayModel {
@@ -20,6 +27,12 @@ export interface DisplayModel {
   readonly labelMode: LabelMode;
   /** Optional localized leading sentence of the text description. */
   readonly summary?: string;
+  /** Lit band over frets start..end; a change scrolls it into view. */
+  readonly region?: { readonly start: number; readonly end: number };
+  /** false → no hover hint (Hide names). Default true. */
+  readonly hoverHint?: boolean;
+  /** Replaces the computed text description verbatim. */
+  readonly description?: string;
 }
 
 /** A position currently sounding (data-model §6). Drawing only; never part of `DisplayModel`. */

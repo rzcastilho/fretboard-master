@@ -274,6 +274,15 @@ describe('Fretboard pointer activation', () => {
     expect(container.querySelector('.hover-hint')).toBeNull();
   });
 
+  it('model.hoverHint === false never renders the hover hint', async () => {
+    const model: DisplayModel = { markers: [], labelMode: 'note', hoverHint: false };
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model });
+    const c = center(2, 1);
+    ptr(screen.getByRole('grid'), 'pointermove', { ...c, type: 'mouse' });
+    await tick();
+    expect(container.querySelector('.hover-hint')).toBeNull();
+  });
+
   it('shows the hint on hidden markers too', async () => {
     const model: DisplayModel = {
       markers: [{ string: 2, fret: 1, function: 'root', emphasis: 'hidden' }],
@@ -576,5 +585,223 @@ describe('Fretboard pulses (US2)', () => {
     const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
     const block = /@media \(prefers-reduced-motion: reduce\)\s*\{([^}]*\{[^}]*\}[^}]*)\}/.exec(src);
     expect(block?.[1]).toMatch(/\.marker\.pulse \.shape\s*\{\s*animation:\s*none;/);
+  });
+});
+
+describe('Fretboard notes-tool model fields (US1)', () => {
+  it('fills neutral highlighted markers with the highlight token', () => {
+    const { container } = show([mk({ string: 1, fret: 3, emphasis: 'highlighted' })]);
+    const marker = container.querySelector('.marker.neutral.highlighted');
+    expect(marker).toBeTruthy();
+    const css = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(css).toMatch(
+      /\.marker\.neutral\.highlighted[^{]*\.glyph[^{]*\{[^}]*--color-note-highlight\)/
+    );
+  });
+
+  it('adds tone-N only on highlighted markers, wired to --octave-tone-N', () => {
+    const { container } = show([
+      mk({ string: 1, fret: 3, emphasis: 'highlighted', tone: 3 }),
+      mk({ string: 2, fret: 3, emphasis: 'dimmed', tone: 3 }),
+      mk({ string: 3, fret: 3, emphasis: 'normal', tone: 3 })
+    ]);
+    expect(container.querySelectorAll('.marker.tone-3')).toHaveLength(1);
+    expect(container.querySelector('.marker.tone-3')?.classList.contains('highlighted')).toBe(true);
+    const css = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    for (let n = 1; n <= 7; n++) expect(css).toContain(`var(--octave-tone-${n})`);
+  });
+
+  it('draws an octave badge only for labelMode note', () => {
+    const marker = mk({ string: 1, fret: 3, emphasis: 'highlighted', octaveBadge: true });
+    const note = show([marker]);
+    expect(note.container.querySelector('text.octave-badge')?.textContent).toBe('4');
+    note.unmount();
+    const oct = show([marker], 'octave');
+    expect(oct.container.querySelector('text.octave-badge')).toBeNull();
+    oct.unmount();
+    const none = show([marker], 'none');
+    expect(none.container.querySelector('text.octave-badge')).toBeNull();
+  });
+
+  it('labels in octave mode with pitch + octave', () => {
+    const { container } = show([mk({ string: 1, fret: 3, emphasis: 'highlighted' })], 'octave');
+    expect(container.querySelector('text.marker-label')?.textContent).toBe('G4');
+  });
+
+  it('octave mode labels with the spelled pitch and octave, e.g. A3 and C♯5', () => {
+    // string 6 fret 5 = A2? use positions: string 2 fret 1 = C5, string 1 fret 9 = C♯5
+    const { container } = show(
+      [
+        mk({ string: 1, fret: 9, emphasis: 'normal' }),
+        mk({ string: 4, fret: 7, emphasis: 'dimmed', label: true })
+      ],
+      'octave'
+    );
+    const labels = [...container.querySelectorAll('text.marker-label')].map((t) => t.textContent);
+    expect(labels).toEqual(['C♯5', 'A3']);
+  });
+
+  it('labelMode none renders no marker-label', () => {
+    const { container } = show(
+      [
+        mk({ string: 1, fret: 3, emphasis: 'highlighted' }),
+        mk({ string: 2, fret: 3, emphasis: 'normal' }),
+        mk({ string: 3, fret: 3, emphasis: 'dimmed', label: true })
+      ],
+      'none'
+    );
+    expect(container.querySelector('.marker-label')).toBeNull();
+  });
+
+  it('label:true labels a dimmed marker; label:false never labels', () => {
+    const { container } = show([
+      mk({ string: 1, fret: 3, emphasis: 'dimmed', label: true }),
+      mk({ string: 2, fret: 3, emphasis: 'highlighted', label: false }),
+      mk({ string: 3, fret: 3, emphasis: 'dimmed' })
+    ]);
+    expect(container.querySelectorAll('text.marker-label')).toHaveLength(1);
+    expect(container.querySelector('[data-key="1:3"] text.marker-label')).toBeTruthy();
+  });
+
+  it('replaces the description verbatim', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: {
+        markers: [mk({ string: 1, fret: 3, emphasis: 'highlighted' })],
+        labelMode: 'note',
+        summary: 'ignored',
+        description: 'Custom description.'
+      }
+    });
+    expect(container.querySelector('.description')?.textContent).toBe('Custom description.');
+  });
+
+  it('keeps the tone class while pulsing', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: {
+        markers: [mk({ string: 1, fret: 3, emphasis: 'highlighted', tone: 4 })],
+        labelMode: 'note'
+      },
+      pulses: [{ id: 1, position: { string: 1, fret: 3 }, durationMs: 1000 }]
+    });
+    const el = container.querySelector('.marker.pulse');
+    expect(el?.classList.contains('tone-4')).toBe(true);
+  });
+});
+
+describe('Fretboard focusPosition (US2)', () => {
+  it('focuses the cell, moves the roving tabindex, and keeps accessible names', async () => {
+    const { container, component } = render(Fretboard, { instrument: STANDARD_GUITAR });
+    component.focusPosition({ string: 3, fret: 2 });
+    await tick();
+    const cell = container.querySelector<SVGElement>('.cell[data-string="3"][data-fret="2"]');
+    expect(document.activeElement).toBe(cell);
+    const stops = container.querySelectorAll('[role="gridcell"][tabindex="0"]');
+    expect(stops).toHaveLength(1);
+    expect(stops[0]).toBe(cell);
+    expect(cell?.getAttribute('aria-label')).toBe('A, string 3, fret 2');
+  });
+
+  it('is a no-op for an invalid position', async () => {
+    const { container, component } = render(Fretboard, { instrument: STANDARD_GUITAR });
+    component.focusPosition({ string: 9, fret: 2 });
+    component.focusPosition({ string: 1, fret: 99 });
+    await tick();
+    expect(document.activeElement).not.toBe(
+      container.querySelector('.cell[data-string="9"][data-fret="2"]')
+    );
+    const stop = container.querySelector('[role="gridcell"][tabindex="0"]');
+    expect(stop?.getAttribute('data-string')).toBe('1');
+    expect(stop?.getAttribute('data-fret')).toBe('0');
+  });
+});
+
+describe('Fretboard region band (US3)', () => {
+  const withRegion = (region?: { start: number; end: number }): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    ...(region ? { region } : {})
+  });
+
+  it('draws no band without a region', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withRegion()
+    });
+    expect(container.querySelector('.region-band')).toBeNull();
+  });
+
+  it('draws one aria-hidden band in the drawing layer, below strings and markers', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withRegion({ start: 5, end: 9 })
+    });
+    const bands = container.querySelectorAll('rect.region-band');
+    expect(bands).toHaveLength(1);
+    const band = bands[0];
+    expect(band.closest('g.drawing')).toBeTruthy();
+    expect(band.closest('[aria-hidden="true"]')).toBeTruthy();
+    const layout = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 1000, 'interactive');
+    const x = Number(band.getAttribute('x'));
+    const w = Number(band.getAttribute('width'));
+    expect(x).toBeCloseTo(layout.columns[5].start, 3);
+    expect(x + w).toBeCloseTo(layout.columns[9].end, 3);
+    const all = [...container.querySelectorAll('g.drawing *')];
+    const firstString = container.querySelector('g.drawing .string');
+    if (!firstString) throw new Error('no strings');
+    expect(all.indexOf(band)).toBeLessThan(all.indexOf(firstString));
+    const css = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(css).toMatch(/\.region-band[^{]*\{[^}]*var\(--region-band\)/);
+  });
+
+  it('clamps an out-of-range region to 0..fretCount', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withRegion({ start: -4, end: 99 })
+    });
+    const band = container.querySelector('rect.region-band');
+    expect(band).toBeTruthy();
+    const layout = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 1000, 'interactive');
+    expect(Number(band?.getAttribute('x'))).toBeCloseTo(layout.columns[0].start, 3);
+  });
+
+  it('scrolls when the region changes (by start:end), not on first render or an equal region', async () => {
+    const writes: number[] = [];
+    const proto = HTMLElement.prototype;
+    const widthDesc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => 286 });
+    Object.defineProperty(proto, 'scrollLeft', {
+      configurable: true,
+      get(this: HTMLElement & { __sl?: number }) {
+        return this.__sl ?? 0;
+      },
+      set(this: HTMLElement & { __sl?: number }, v: number) {
+        this.__sl = v;
+        writes.push(v);
+      }
+    });
+    try {
+      const view = render(Fretboard, {
+        instrument: STANDARD_GUITAR,
+        model: withRegion({ start: 0, end: 4 })
+      });
+      await tick();
+      expect(writes).toHaveLength(0);
+      await view.rerender({ instrument: STANDARD_GUITAR, model: withRegion({ start: 0, end: 4 }) });
+      await tick();
+      expect(writes).toHaveLength(0);
+      await view.rerender({
+        instrument: STANDARD_GUITAR,
+        model: withRegion({ start: 15, end: 19 })
+      });
+      await tick();
+      expect(writes.length).toBeGreaterThan(0);
+      expect(writes[writes.length - 1]).toBeGreaterThan(0);
+    } finally {
+      if (widthDesc) Object.defineProperty(proto, 'clientWidth', widthDesc);
+      else delete (proto as unknown as Record<string, unknown>).clientWidth;
+      delete (proto as unknown as Record<string, unknown>).scrollLeft;
+    }
   });
 });

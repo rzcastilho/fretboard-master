@@ -94,3 +94,45 @@ test.describe('tap-to-sound latency (constitution VI)', () => {
     expect(median(latencies)).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('control-change latency (SC-001, quickstart #30)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median select note → highlighted markers ≤ 100 ms at 4× CPU throttle', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    const board = page.getByRole('grid', { name: 'Fretboard' });
+    await board.waitFor();
+    const selector = page.getByRole('group', { name: 'Choose notes' });
+    // Measured in the page (pointerdown → highlighted markers in the DOM), like tap-to-sound, so
+    // Playwright round-trips under throttling are not counted.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as { __selectTimes: number[]; __downAt: number | null };
+      w.__selectTimes = [];
+      w.__downAt = null;
+      const grid = document.querySelector('[role="grid"]');
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || !grid?.querySelector('.marker.highlighted')) return;
+        w.__selectTimes.push(performance.now() - w.__downAt);
+        w.__downAt = null;
+      }).observe(grid as Element, { subtree: true, childList: true, attributes: true });
+    });
+
+    const names = ['G', 'C', 'E', 'A', 'D'];
+    for (const name of names) {
+      const button = selector.getByRole('button', { name, exact: true });
+      await button.click();
+      await expect(board.locator('.marker.highlighted').first()).toBeVisible();
+      await button.click(); // back to the initial view for the next sample
+      await expect(board.locator('.marker.highlighted')).toHaveCount(0);
+      await page.evaluate(() => ((globalThis as unknown as { __downAt: null }).__downAt = null));
+    }
+    const times = await page.evaluate(
+      () => (globalThis as unknown as { __selectTimes: number[] }).__selectTimes
+    );
+    expect(times).toHaveLength(names.length);
+    expect(median(times)).toBeLessThanOrEqual(100);
+  });
+});

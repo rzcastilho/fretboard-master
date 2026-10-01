@@ -40,7 +40,7 @@ test.describe('note playback (US1)', () => {
     await page.goto('/notes');
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     expect(await readAudioLog(page)).toEqual([]);
-    await page.getByRole('gridcell', { name: 'E, string 6, open', exact: true }).click();
+    await cellAt(page, 6, 0).click();
     await expect.poll(async () => (await stepEntries(page)).length).toBe(1);
     const log = await readAudioLog(page);
     expect(log.map((e) => e.type).slice(0, 2)).toEqual(['unlock', 'step']);
@@ -67,9 +67,10 @@ test.describe('pulse feedback (US2)', () => {
   const openString6 = (page: Page) =>
     page.getByRole('gridcell', { name: 'E, string 6, open', exact: true });
 
+  // /triads: its board starts blank, so string 6 open has no marker until tapped (/notes marks naturals).
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
-    await page.goto('/notes');
+    await page.goto('/triads');
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 

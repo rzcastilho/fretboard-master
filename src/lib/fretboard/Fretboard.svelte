@@ -1,8 +1,8 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import { onMount, untrack } from 'svelte';
-  import { defaultSpelling, noteLabel } from '../notation/notation';
-  import { pitchClass } from '../theory/pitch';
+  import { defaultSpelling, noteLabel, pitchLabel } from '../notation/notation';
+  import { octaveOf, pitchClass } from '../theory/pitch';
   import {
     isValidPosition,
     positionKey,
@@ -129,6 +129,44 @@
     });
   });
 
+  /** Region clamped to the board, or null when the model has none. */
+  const band = $derived.by(() => {
+    const r = model.region;
+    if (!r || thumb || !Number.isFinite(r.start) || !Number.isFinite(r.end)) return null;
+    const clamp = (v: number) => Math.min(lastFret, Math.max(0, Math.round(v)));
+    const start = clamp(Math.min(r.start, r.end));
+    const end = clamp(Math.max(r.start, r.end));
+    return {
+      start,
+      end,
+      x: layout.columns[start].start,
+      width: layout.columns[end].end - layout.columns[start].start
+    };
+  });
+  let lastRegionKey: string | undefined;
+
+  $effect(() => {
+    const key = band ? `${band.start}:${band.end}` : '';
+    if (!scroller || thumb) return;
+    const previous = lastRegionKey;
+    lastRegionKey = key;
+    if (previous === undefined || previous === key || band === null) return;
+    untrack(() => {
+      if (!scroller || band === null) return;
+      const target = autoScrollTarget(
+        layout,
+        [
+          { string: 1, fret: band.start },
+          { string: 1, fret: band.end }
+        ],
+        { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth }
+      );
+      if (target === null) return;
+      stopAutoScroll();
+      cancelScroll = animateScroll(scroller, target, scrollDuration(), browserClock);
+    });
+  });
+
   /** First marker per valid position wins; invalid positions are ignored. */
   function firstPerPosition(markers: readonly DrawnMarker[]): Record<string, DrawnMarker> {
     const map: Record<string, DrawnMarker> = Object.create(null);
@@ -145,6 +183,18 @@
   /** Model markers with sounding positions overlaid (drawing only). */
   const drawnMap = $derived(firstPerPosition(applyPulses(model.markers, pulses, instrument)));
 
+  /** Label rule (contracts/fretboard-model.md §1): explicit `label` wins, else highlighted/normal. */
+  function labelText(mk: DrawnMarker): string | null {
+    if (model.labelMode === 'none') return null;
+    const labeled = mk.label ?? (mk.emphasis === 'highlighted' || mk.emphasis === 'normal');
+    if (!labeled) return null;
+    const pitch = positionPitch(instrument, mk);
+    const spelling = mk.spelling ?? defaultSpelling(pitchClass(pitch));
+    return model.labelMode === 'octave'
+      ? pitchLabel(spelling, octaveOf(pitch))
+      : noteLabel(spelling);
+  }
+
   const drawn = $derived(
     Object.entries(drawnMap)
       .filter(([, mk]) => mk.emphasis !== 'hidden')
@@ -153,9 +203,11 @@
         mk,
         x: layout.columns[mk.fret].center,
         y: layout.rows[mk.string - 1].center,
-        label:
-          model.labelMode === 'note' && (mk.emphasis === 'highlighted' || mk.emphasis === 'normal')
-            ? noteLabel(mk.spelling ?? defaultSpelling(pitchClass(positionPitch(instrument, mk))))
+        label: labelText(mk),
+        tone: mk.emphasis === 'highlighted' ? mk.tone : undefined,
+        badge:
+          mk.octaveBadge === true && model.labelMode === 'note'
+            ? `${octaveOf(positionPitch(instrument, mk))}`
             : null
       }))
   );
@@ -246,7 +298,7 @@
   }
 
   const hoverHint = $derived.by(() => {
-    if (!hovered) return null;
+    if (!hovered || model.hoverHint === false) return null;
     const mk = markerMap[positionKey(hovered)];
     const text = noteLabel(
       mk?.spelling ?? defaultSpelling(pitchClass(positionPitch(instrument, hovered)))
@@ -271,6 +323,12 @@
 
   const cellAt = (p: Position) =>
     svgEl?.querySelector<SVGElement>(`.cell[data-string="${p.string}"][data-fret="${p.fret}"]`);
+
+  /** Move focus to the cell for `p` (roving tabindex and scroll follow via focusin). */
+  export function focusPosition(p: Position): void {
+    if (!isValidPosition(instrument, p)) return;
+    cellAt(p)?.focus({ preventScroll: true });
+  }
 
   function onFocusIn(e: FocusEvent) {
     const t = e.target as Element | null;
@@ -307,7 +365,7 @@
     }
   }
 
-  const description = $derived(describeView(instrument, model));
+  const description = $derived(model.description ?? describeView(instrument, model));
   let liveText = $state('');
   let lastDescription: string | undefined;
   let showDescription = $state(false);
@@ -342,6 +400,16 @@
     width={layout.width - layout.columns[0].start}
     height={layout.boardBottom}
   />
+  {#if band}
+    <rect
+      class="region-band"
+      aria-hidden="true"
+      x={band.x}
+      y="0"
+      width={band.width}
+      height={layout.boardBottom}
+    />
+  {/if}
   {#each singleInlays as cx (cx)}
     <circle class="inlay" {cx} cy={inlayY} r={inlayRadius} />
   {/each}
@@ -426,7 +494,7 @@
         <g aria-hidden="true" class="markers">
           {#each drawn as d (d.mk.pulse?.id ?? d.key)}
             <g
-              class="marker {d.mk.function} {d.mk.emphasis}"
+              class="marker {d.mk.function} {d.mk.emphasis}{d.tone ? ` tone-${d.tone}` : ''}"
               class:pulse={d.mk.pulse !== undefined}
               style:--pulse-duration={d.mk.pulse ? `${d.mk.pulse.durationMs}ms` : undefined}
               data-key={d.key}
@@ -453,6 +521,13 @@
                 {/if}
                 {#if d.label}
                   <text class="marker-label" class:long={d.label.length > 1}>{d.label}</text>
+                {/if}
+                {#if d.badge}
+                  <text
+                    class="octave-badge"
+                    x={metrics.markerMedium / 2}
+                    y={-metrics.markerMedium / 2}>{d.badge}</text
+                  >
                 {/if}
               </g>
             </g>
@@ -563,6 +638,10 @@
 
   .wood {
     fill: var(--color-fretboard-wood);
+  }
+
+  .region-band {
+    fill: var(--region-band);
   }
 
   .fret-line,
@@ -730,6 +809,47 @@
     fill: var(--color-neutral-note);
     stroke: var(--color-neutral-note-stroke);
     stroke-width: var(--marker-neutral-stroke-width);
+  }
+
+  .marker.neutral.highlighted .glyph {
+    fill: var(--color-note-highlight);
+    stroke: var(--color-neutral-note-stroke);
+  }
+
+  .marker.neutral.highlighted.tone-1 .glyph {
+    fill: var(--octave-tone-1);
+  }
+  .marker.neutral.highlighted.tone-2 .glyph {
+    fill: var(--octave-tone-2);
+  }
+  .marker.neutral.highlighted.tone-3 .glyph {
+    fill: var(--octave-tone-3);
+  }
+  .marker.neutral.highlighted.tone-4 .glyph {
+    fill: var(--octave-tone-4);
+  }
+  .marker.neutral.highlighted.tone-5 .glyph {
+    fill: var(--octave-tone-5);
+  }
+  .marker.neutral.highlighted.tone-6 .glyph {
+    fill: var(--octave-tone-6);
+  }
+  .marker.neutral.highlighted.tone-7 .glyph {
+    fill: var(--octave-tone-7);
+  }
+
+  .marker.neutral.highlighted text.marker-label {
+    fill: var(--color-note-highlight-label);
+  }
+
+  .marker text.octave-badge {
+    fill: var(--color-text);
+    font-size: var(--marker-badge-size);
+    font-weight: 700;
+    text-anchor: start;
+    paint-order: stroke;
+    stroke: var(--color-surface-raised);
+    stroke-width: 2px;
   }
 
   .glyph.outline {

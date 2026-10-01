@@ -17,12 +17,19 @@ describe('ToolLayout', () => {
     expect(within(banner).getByRole('group', { name: 'Sound' })).toBeTruthy();
   });
 
-  it('renders the fretboard in zone C and placeholders in the other zones', () => {
+  it('notes renders the four named zones with the fretboard in zone C', () => {
     render(ToolLayout, { tool: 'notes' });
+    for (const name of ['Notes', 'Fretboard', 'Details', 'Actions']) {
+      expect(screen.getByRole('region', { name })).toBeTruthy();
+    }
     const fretboard = screen.getByRole('region', { name: 'Fretboard' });
     expect(within(fretboard).getByRole('grid', { name: 'Fretboard' })).toBeTruthy();
     expect(within(fretboard).getAllByRole('gridcell')).toHaveLength(138);
-    expect(screen.queryByText('The fretboard will appear here.')).toBeNull();
+    expect(screen.queryByText('Controls will appear here.')).toBeNull();
+  });
+
+  it('triads still renders the placeholder zones', () => {
+    render(ToolLayout, { tool: 'triads' });
     const zones: Array<[string, string]> = [
       ['Main controls', 'Controls will appear here.'],
       ['Context panel', 'Details will appear here.'],
@@ -32,6 +39,7 @@ describe('ToolLayout', () => {
       const region = screen.getByRole('region', { name });
       expect(within(region).getByText(text)).toBeTruthy();
     }
+    expect(screen.queryByRole('region', { name: 'Notes' })).toBeNull();
   });
 
   it('has one h1 with the tool name in main, before zone B', () => {

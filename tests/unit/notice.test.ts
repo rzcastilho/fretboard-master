@@ -61,4 +61,24 @@ describe('Notice', () => {
     render(Notice, { message: 'Hello' });
     expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
   });
+
+  it('renders an optional action button before Dismiss and calls it', async () => {
+    const onclick = vi.fn();
+    render(Notice, {
+      message: 'There is no C♯ in this region',
+      ondismiss: () => {},
+      action: { label: 'Widen region', onclick }
+    });
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.map((b) => b.textContent?.trim())).toEqual(['Widen region', 'Dismiss']);
+    await fireEvent.click(buttons[0]);
+    expect(onclick).toHaveBeenCalledTimes(1);
+    const status = screen.getByRole('status');
+    expect(status.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('is unchanged without an action', () => {
+    render(Notice, { message: 'Hello', ondismiss: () => {} });
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
 });

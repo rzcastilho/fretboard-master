@@ -1,5 +1,11 @@
 /** Instrument model and positions (DM-5, DM-6). Pure. */
-import { pitchOfSpelling, type Pitch, type SpelledPitch } from '../theory/pitch';
+import {
+  pitchClass,
+  pitchOfSpelling,
+  type Pitch,
+  type PitchClass,
+  type SpelledPitch
+} from '../theory/pitch';
 
 export interface Instrument {
   readonly stringCount: number;
@@ -62,4 +68,17 @@ export function allPositions(instrument: Instrument): readonly Position[] {
     for (let fret = 0; fret <= instrument.fretCount; fret++) out.push({ string, fret });
   }
   return out;
+}
+
+/** Every valid position sounding pitch class `pc`: string ascending, fret ascending. */
+export function positionsWithPitchClass(instrument: Instrument, pc: PitchClass): Position[] {
+  return allPositions(instrument).filter((p) => pitchClass(positionPitch(instrument, p)) === pc);
+}
+
+/** Every other valid position with the same pitch as `p`: string ascending, fret ascending. */
+export function unisonsOf(instrument: Instrument, p: Position): Position[] {
+  const pitch = positionPitch(instrument, p);
+  return allPositions(instrument).filter(
+    (q) => (q.string !== p.string || q.fret !== p.fret) && positionPitch(instrument, q) === pitch
+  );
 }
