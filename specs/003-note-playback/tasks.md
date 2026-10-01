@@ -108,7 +108,7 @@
 - [X] T037 [US2] Edit `src/lib/audio/engine.ts`: schedule pulse timers on the `TimerClock` from `plan.marks` (`onPulseStart` at `onsetMs`, `onPulseEnd` at `endMs`, monotonic ids, durations `endMs − onsetMs`), independent of audio success, mute, or dropped notes (E5). Implement `setMuted(muted)` and `setVolume(volume)` gain automation here too (10 ms ramp via `setTargetAtTime`, τ = 3 ms; never stops sources; E12) since pulse behavior with mute is tested in this story.
 - [X] T038 [US2] Edit `src/lib/state/playback.svelte.ts`: maintain `pulses` from engine `onPulseStart`/`onPulseEnd`; add `setMuted`/`setVolume` facade (volume clamped to 0–100 and snapped to step 5; also unlocks the engine) so mute-with-pulse works. Depends on T037.
 - [X] T039 [US2] Edit `src/lib/shell/ToolPlaceholder.svelte`: pass `pulses={playback.pulses}` to the fretboard next to the unchanged `model`. Depends on T036, T038.
-- [ ] T040 [US2] Run the US2 unit suites and e2e cases (`pnpm test:unit`, `pnpm build:test && pnpm test:e2e -g playback`) and fix failures.
+- [X] T040 [US2] Run the US2 unit suites and e2e cases (`pnpm test:unit`, `pnpm build:test && pnpm test:e2e -g playback`) and fix failures.
 
 **Checkpoint**: US1 and US2 both work independently; visual feedback exists without sound.
 
@@ -134,7 +134,7 @@
 - [X] T047 [US3] Edit `src/lib/shell/ToolLayout.svelte`: render `<SoundControl/>` in the `<header aria-label="Application bar">` beside `AppNav`. Depends on T046.
 - [X] T048 [P] [US3] Edit `src/routes/about/+page.svelte`: render `<SoundControl/>` in its application-bar header. Depends on T046.
 - [X] T049 [P] [US3] Edit `src/lib/shell/HomeScreen.svelte`: render `<SoundControl/>` in `header.top` next to the About link. Depends on T046.
-- [ ] T050 [US3] Run the US3 unit suites, e2e cases, and update snapshots only for the new grayscale states (`pnpm test:e2e --update-snapshots` limited to the new test).
+- [X] T050 [US3] Run the US3 unit suites, e2e cases, and update snapshots only for the new grayscale states (`pnpm test:e2e --update-snapshots` limited to the new test).
 
 **Checkpoint**: Mute and volume work on every screen; session-only.
 
@@ -184,7 +184,7 @@
 - [X] T065 [US5] Edit `src/lib/audio/engine.ts`: availability handling per R-09 (constructor missing/throw, first `resume()` reject, loader reject → terminal unavailable, emit `onUnavailable` exactly once, never call `createContext`/`resume` again; later `resume()` rejection only drops sound), synth-loading 100 ms window using the injected clock per R-10/E9, and test-build fault hook: read `globalThis.__fmAudioFault` once at engine creation under `__FM_FAULT_INJECTION__` (`'context'` → factory throws, `'synth'` → loader rejects; enum allow-list only) and log `unavailable {cause}` entries.
 - [X] T066 [US5] Edit `src/lib/state/playback.svelte.ts`: handle `onUnavailable` (availability = `'unavailable'`, `noticeShown = true`, `noticeVisible = true` once), add `dismissNotice()` (visible false, shown stays true).
 - [X] T067 [US5] Edit `src/lib/shell/SoundControl.svelte`: unavailable presentation (mute `aria-disabled="true"` focusable with activation ignored, unavailable icon and label `sound_unavailable_label`, range `disabled`), render `Notice` in the notice slot with `ondismiss` → `playback.dismissNotice()` then focus the mute button.
-- [ ] T068 [US5] Run the US5 unit and e2e cases with `pnpm build:test`, then `node scripts/check-no-fault-hook.mjs build` against a production `pnpm build` to confirm neither hook string is shipped. Amend `docs/adr/0004-test-only-fault-injection.md` with a section for `__fmAudioFault` / `__fmAudioLog` (contracts/test-hooks.md).
+- [X] T068 [US5] Run the US5 unit and e2e cases with `pnpm build:test`, then `node scripts/check-no-fault-hook.mjs build` against a production `pnpm build` to confirm neither hook string is shipped. Amend `docs/adr/0004-test-only-fault-injection.md` with a section for `__fmAudioFault` / `__fmAudioLog` (contracts/test-hooks.md).
 
 **Checkpoint**: Audio failure is handled with one notice and visible pulses.
 

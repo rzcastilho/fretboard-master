@@ -178,7 +178,9 @@ test.describe('sound control (US3)', () => {
   test('grayscale: on / muted states are distinguishable without color', async ({ page }) => {
     await page.goto('/about');
     await page.emulateMedia({ colorScheme: 'light' });
-    await page.addStyleTag({ content: 'html { filter: grayscale(1); }' });
+    await page.evaluate(() => {
+      document.documentElement.style.filter = 'grayscale(1)';
+    });
     const group = page.getByRole('group', { name: 'Sound' });
     await expect(group).toHaveScreenshot('sound-control-on.png');
     await page.getByRole('button', { name: 'Mute sound' }).click();
