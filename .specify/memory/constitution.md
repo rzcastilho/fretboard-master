@@ -1,20 +1,15 @@
 <!--
 Sync Impact Report
-- Version change: template (unversioned) → 1.0.0
-- Modified principles: all template placeholders replaced
-  - [PRINCIPLE_1..5] → I. Musical Correctness; II. On-Device, Static, Private by Design;
-    III. Pure Core, Thin Shell; IV. Test-First for Logic, Tested Behavior for UI;
-    V. Accessible by Default
-- Added principles: VI. Performance Budgets Are Gates; VII. Design System Fidelity;
-  VIII. International From the First Line; IX. Untrusted Input, Versioned Formats;
-  X. Simplicity and Incremental Delivery
-- Added sections: Technology Stack and Constraints; Development Workflow and Quality Gates;
-  Governance (filled)
+- Version change: 1.0.0 → 1.1.0 (MINOR: stack guidance expanded with a mandated tool installer;
+  per Governance, stack changes are MINOR)
+- Modified principles: none
+- Modified sections: Technology Stack and Constraints (new "Tool installation" row, pnpm row
+  now notes it is installed via mise, new "Tool installation" rule)
+- Added sections: none
 - Removed sections: none
 - Templates: plan-template.md, spec-template.md, tasks-template.md read the constitution at
   runtime; no edits required (✅ not modified per scope guard)
-- Deferred TODOs: none. Open product questions (Q-1 measurement, Q-4 sound source) are
-  tracked in specs/autonomous/breakdown/README.md, not here.
+- Deferred TODOs: none
 -->
 
 # Fretboard Master Constitution
@@ -217,7 +212,8 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 | E2E and accessibility | Playwright (phone and desktop profiles) + @axe-core/playwright |
 | Performance | Lighthouse CI with budgets, plus a bundle-size check |
 | Lint and format | ESLint (with import-boundary rules) + Prettier + `svelte-check` |
-| Package manager | pnpm (lockfile committed) |
+| Tool installation | mise (`mise.toml` at the repo root pins every tool version) |
+| Package manager | pnpm, installed through mise (lockfile committed) |
 | CI | GitHub Actions |
 | Hosting | Cloudflare Pages: static, atomic zero-downtime deploys, HTTPS, PR previews |
 | Browsers | Last two major versions of the evergreen browsers, desktop and mobile |
@@ -228,6 +224,15 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
   - `messages/`, `tests/`, `e2e/`, `docs/adr/`
 - **Dependency licenses:** runtime dependencies MUST use MIT-, Apache-2.0-, or BSD-compatible
   licenses.
+- **Tool installation:** every developer and CI tool (Node.js, pnpm, and any CLI not
+  shipped in `node_modules`) MUST be installed and version-pinned through mise, in
+  `mise.toml` at the repository root.
+  - Contributors set up the project with `mise install`. Global installs, `nvm`, Homebrew, or
+    `corepack` are not part of the supported setup.
+  - CI MUST install tools through mise (for example the `jdx/mise-action` GitHub Action)
+    using the same `mise.toml`, so local and CI versions are identical.
+  - npm packages that belong to the app itself stay in `package.json` and are managed by
+    pnpm. mise installs the toolchain, not app dependencies.
 - **Changing the stack:** replacing a mandated choice requires an ADR and a MINOR
   constitution amendment.
 
@@ -285,4 +290,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-09-30
+**Version**: 1.1.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-09-30
