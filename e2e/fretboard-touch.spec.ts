@@ -18,18 +18,26 @@ const visibleColumns = (page: Page) =>
     return total;
   });
 
+/**
+ * One-finger drag from the scroller's center by (dx, dy) as raw touch events.
+ * `Input.synthesizeScrollGesture` with touch is a no-op in Linux Chromium (CI), so the drag is
+ * dispatched point by point; the browser still resolves it through `touch-action` as a real swipe.
+ */
 async function swipe(page: Page, dx: number, dy: number) {
   const cdp = await page.context().newCDPSession(page);
   const box = await page.locator('.fretboard .scroller').boundingBox();
   if (!box) throw new Error('no scroller box');
-  await cdp.send('Input.synthesizeScrollGesture', {
-    x: Math.round(box.x + box.width / 2),
-    y: Math.round(box.y + box.height / 2),
-    xDistance: dx,
-    yDistance: dy,
-    gestureSourceType: 'touch',
-    speed: 800
-  });
+  const x = Math.round(box.x + box.width / 2);
+  const y = Math.round(box.y + box.height / 2);
+  const steps = 10;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: x + (dx * i) / steps, y: y + (dy * i) / steps }]
+    });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
 test.beforeEach(async ({ page }, testInfo) => {

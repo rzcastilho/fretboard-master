@@ -4,6 +4,8 @@
   import FailureView from './FailureView.svelte';
   import { recordFailure } from './failure';
   import { screenTitle } from './screens';
+  import SoundControl from './SoundControl.svelte';
+  import StopButton from './StopButton.svelte';
   import ToolPlaceholder from './ToolPlaceholder.svelte';
   import { TOOLS, type ToolId } from './tools';
 
@@ -18,6 +20,8 @@
 
 <header aria-label={m.zone_app_bar()}>
   <AppNav current={tool} />
+  <StopButton />
+  <SoundControl />
 </header>
 
 <main>
@@ -34,6 +38,11 @@
 
 <style>
   header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
     padding: var(--space-2) var(--space-4);
   }
 

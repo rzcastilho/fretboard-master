@@ -10,7 +10,7 @@ afterEach(() => {
 
 describe('Notice', () => {
   it('is a polite status region with the not-found text and a Dismiss button', () => {
-    render(Notice);
+    render(Notice, { message: 'We could not find that page', ondismiss: () => {} });
     const status = screen.getByRole('status');
     expect(status.getAttribute('aria-live')).toBe('polite');
     expect(status.textContent).toContain('We could not find that page');
@@ -18,7 +18,7 @@ describe('Notice', () => {
   });
 
   it('does not use error styling', () => {
-    render(Notice);
+    render(Notice, { message: 'We could not find that page', ondismiss: () => {} });
     const status = screen.getByRole('status');
     expect(status.getAttribute('role')).not.toBe('alert');
     expect(status.className).not.toMatch(/error/i);
@@ -26,7 +26,7 @@ describe('Notice', () => {
 
   it('has no timer: still visible after 60 s', async () => {
     vi.useFakeTimers();
-    render(Notice);
+    render(Notice, { message: 'We could not find that page', ondismiss: () => {} });
     await vi.advanceTimersByTimeAsync(60_000);
     expect(screen.getByRole('status')).toBeTruthy();
   });
@@ -36,9 +36,29 @@ describe('Notice', () => {
     h1.tabIndex = -1;
     h1.textContent = 'Fretboard Master';
     document.body.appendChild(h1);
-    render(Notice, { target: document.body.appendChild(document.createElement('div')) });
+    render(Notice, {
+      target: document.body.appendChild(document.createElement('div')),
+      props: { message: 'We could not find that page', ondismiss: () => {} }
+    });
     await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('status')).toBeNull();
     expect(document.activeElement).toBe(h1);
+  });
+
+  it('renders a generic message prop', () => {
+    render(Notice, { message: 'Sound is unavailable', ondismiss: () => {} });
+    expect(screen.getByRole('status').textContent).toContain('Sound is unavailable');
+  });
+
+  it('calls ondismiss when Dismiss is pressed', async () => {
+    const ondismiss = vi.fn();
+    render(Notice, { message: 'Hello', ondismiss });
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(ondismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no Dismiss button without a handler', () => {
+    render(Notice, { message: 'Hello' });
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
   });
 });

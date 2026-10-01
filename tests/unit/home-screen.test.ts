@@ -14,6 +14,12 @@ describe('HomeScreen', () => {
     expect(about.getAttribute('href')).toBe('/about');
   });
 
+  it('puts the sound control in header.top', () => {
+    render(HomeScreen);
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('group', { name: 'Sound' })).toBeTruthy();
+  });
+
   it('renders exactly two tool cards in order', () => {
     render(HomeScreen);
     const list = screen.getByRole('list');

@@ -1,18 +1,31 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
 
+  interface Props {
+    message: string;
+    ondismiss?: () => void;
+  }
+
+  let { message, ondismiss }: Props = $props();
   let visible = $state(true);
 
-  function dismiss() {
+  function dismiss(event: MouseEvent) {
+    const button = event.currentTarget as HTMLElement;
     visible = false;
-    document.querySelector<HTMLElement>('h1')?.focus();
+    ondismiss?.();
+    // Respect a handler that already moved focus elsewhere; otherwise fall back to the heading.
+    if (document.activeElement === button || document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('h1')?.focus();
+    }
   }
 </script>
 
 {#if visible}
   <div class="notice" role="status" aria-live="polite">
-    <p>{m.notice_not_found()}</p>
-    <button type="button" onclick={dismiss}>{m.notice_dismiss()}</button>
+    <p>{message}</p>
+    {#if ondismiss}
+      <button type="button" onclick={dismiss}>{m.notice_dismiss()}</button>
+    {/if}
   </div>
 {/if}
 
@@ -24,7 +37,8 @@
     justify-content: space-between;
     gap: var(--space-2) var(--space-3);
     margin-block-end: var(--space-4);
-    padding: var(--space-2) var(--space-3);
+    /* Inline padding capped by the viewport: keeps the message within two lines at 200 % zoom. */
+    padding: var(--space-2) min(var(--space-3), 3vw);
     background: var(--color-notice-surface);
     color: var(--color-notice-text);
     border: var(--border-width) solid var(--color-notice-border);

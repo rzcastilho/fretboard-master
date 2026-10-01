@@ -22,11 +22,25 @@ export interface DisplayModel {
   readonly summary?: string;
 }
 
+/** A position currently sounding (data-model §6). Drawing only; never part of `DisplayModel`. */
+export interface Pulse {
+  readonly id: number;
+  readonly position: Position;
+  readonly durationMs: number;
+}
+
+/** Renderer-internal marker record produced by `applyPulses`. */
+export interface DrawnMarker extends Marker {
+  readonly pulse?: { readonly id: number; readonly durationMs: number };
+}
+
 export interface FretboardProps {
   instrument: Instrument;
   model?: DisplayModel;
   variant?: 'interactive' | 'thumbnail';
   onactivate?: (position: Position) => void;
+  /** Positions sounding now; drawn as a pulse, never announced. */
+  pulses?: readonly Pulse[];
 }
 
 /** Gesture state machine (data-model §6). */

@@ -30,6 +30,16 @@ mount to pick a fixture model from `src/lib/fretboard/fixtures.ts`) and `__fmFre
 removed from production bundles. `scripts/check-no-fault-hook.mjs` also fails the build if
 `build/` contains either name. No new ADR.
 
+## Amendment: audio hooks (spec 003)
+
+The playback engine adds two hooks under the same build-flag rule. `__fmAudioFault`
+(`'context' | 'synth'`) is read once at engine creation and makes the `AudioContext` factory throw
+or the synth loader reject, so e2e can exercise the unavailable path. `__fmAudioLog` is an
+append-only log of `unlock`, `step`, `stop`, and `unavailable` entries (numbers and enum strings
+only), never read by app code. Both are only touched when `__FM_FAULT_INJECTION__` is true, and
+`scripts/check-no-fault-hook.mjs` fails the build if `build/` contains either name. See
+`specs/003-note-playback/contracts/test-hooks.md`. No new ADR.
+
 ## Consequences
 
 - E2E tests run against the `--mode test` build and exercise real boundary and reset behavior.

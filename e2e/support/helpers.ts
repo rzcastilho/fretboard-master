@@ -1,6 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type Request } from '@playwright/test';
 
+import type { AudioLogEntry } from '../../src/lib/audio/types';
+
 export type ToolId = 'notes' | 'triads';
 
 /** Make the next `count` renders of a tool's zones B–E throw (test builds only). */
@@ -45,4 +47,16 @@ export async function runAxe(page: Page): Promise<void> {
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
   expect(results.violations).toEqual([]);
+}
+
+/** Test-build audio log (`__fmAudioLog`, data-model §8). Empty before any entry is written. */
+export async function readAudioLog(page: Page): Promise<AudioLogEntry[]> {
+  return page.evaluate(() => globalThis.__fmAudioLog ?? []);
+}
+
+/** Make the audio engine fail at `cause` on its first unlock (test builds only). */
+export async function injectAudioFault(page: Page, cause: 'context' | 'synth'): Promise<void> {
+  await page.addInitScript((c) => {
+    globalThis.__fmAudioFault = c;
+  }, cause);
 }

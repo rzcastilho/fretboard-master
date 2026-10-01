@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 
 import { m } from '../../src/lib/paraglide/messages.js';
@@ -20,5 +20,11 @@ describe('app version', () => {
     expect(screen.getByText(m.about_version({ version: __APP_VERSION__ }))).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: m.about_heading() })).toBeTruthy();
     expect(screen.getByText(m.about_description())).toBeTruthy();
+  });
+
+  it('About application bar contains the sound control', () => {
+    render(AboutPage);
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('group', { name: 'Sound' })).toBeTruthy();
   });
 });

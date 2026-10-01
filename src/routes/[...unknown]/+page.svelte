@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { m } from '$lib/paraglide/messages.js';
   import HomeScreen from '$lib/shell/HomeScreen.svelte';
   import Notice from '$lib/shell/Notice.svelte';
 
@@ -19,6 +20,6 @@
 
 <HomeScreen>
   {#snippet notice()}
-    <Notice />
+    <Notice message={m.notice_not_found()} ondismiss={() => {}} />
   {/snippet}
 </HomeScreen>

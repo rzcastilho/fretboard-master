@@ -9,7 +9,7 @@
     "build:test": "vite build --mode test && node scripts/make-404.mjs",
     "build:test:skew": "node scripts/build-next-version.mjs",
     "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "check": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --silent && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "test:unit": "vitest run",

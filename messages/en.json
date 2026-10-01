@@ -45,5 +45,19 @@
   "note_spoken_sharp": "{letter} sharp",
   "note_spoken_flat": "{letter} flat",
   "note_spoken_double_sharp": "{letter} double sharp",
-  "note_spoken_double_flat": "{letter} double flat"
+  "note_spoken_double_flat": "{letter} double flat",
+  "sound_group_label": "Sound",
+  "sound_mute": "Mute sound",
+  "sound_unavailable_label": "Sound unavailable",
+  "sound_state_on": "Sound on",
+  "sound_state_muted": "Sound muted",
+  "sound_state_unavailable": "Sound is not available",
+  "sound_settings": "Sound settings",
+  "sound_volume": "Volume",
+  "sound_volume_value": "{value} %",
+  "sound_help_title": "No sound?",
+  "sound_help_silent_mode": "Check that silent mode is off and the system volume is up.",
+  "sound_help_app_volume": "Check that sound is not muted here and the volume is above 0 %.",
+  "sound_unavailable_notice": "Sound is not available on this device right now",
+  "playback_stop": "Stop"
 }
