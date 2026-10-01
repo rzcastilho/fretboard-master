@@ -333,9 +333,11 @@ tests/unit/
 ├── theory/pitch.test.ts              (edit) frequencyOf table + property
 ├── audio/
 │   ├── support/analysis.ts           # independent zoom-DFT pitch, FFT-domain A-weighted RMS, harmonic share
+│   ├── support/analysis.test.ts      # self-test of the analysis helpers
 │   ├── support/fake-audio.ts         # recording fake AudioPort + fake TimerClock
 │   ├── pluck.test.ts
 │   ├── loudness.test.ts
+│   ├── prng.test.ts
 │   ├── schedule.test.ts
 │   └── engine.test.ts
 ├── fretboard/pulse.test.ts
@@ -344,6 +346,12 @@ tests/unit/
 ├── sound-control.test.ts
 ├── stop-button.test.ts
 ├── playback-host.test.ts
+├── tool-placeholder.test.ts          # onactivate wiring, pulses, instrument-change stop
+├── home-screen.test.ts               (edit) header controls
+├── tool-layout.test.ts               (edit) header controls
+├── routes.test.ts                    (edit)
+├── version.test.ts                   (edit)
+├── no-fault-hook.test.ts             (edit) audio needles
 └── notice.test.ts                    (edit)
 e2e/
 ├── playback.spec.ts                  # US1–US5 flows via audio log/fault hooks, axe, grayscale states
