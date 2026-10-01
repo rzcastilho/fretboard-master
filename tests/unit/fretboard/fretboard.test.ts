@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { readFileSync } from 'node:fs';
 import { tick } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_METRICS, layoutFretboard } from '../../../src/lib/fretboard/geometry';
@@ -503,5 +504,77 @@ describe('Fretboard keyboard and description', () => {
     expect(btn.textContent).toContain('Hide text description');
     expect(para.hidden).toBe(false);
     expect(para.textContent).toBe('No positions marked.');
+  });
+});
+
+describe('Fretboard pulses (US2)', () => {
+  const pulse = (id: number, string: number, fret: number, durationMs = 1500) => ({
+    id,
+    position: { string, fret },
+    durationMs
+  });
+
+  it('draws .pulse markers keyed by pulse id and sets --pulse-duration', async () => {
+    const view = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      pulses: [pulse(1, 6, 0)]
+    });
+    const el = view.container.querySelector('.marker.pulse') as HTMLElement | null;
+    expect(el).toBeTruthy();
+    expect(el?.getAttribute('data-key')).toBe('6:0');
+    expect(el?.style.getPropertyValue('--pulse-duration')).toBe('1500ms');
+    // Re-sounding with a new id re-creates the element (restarts the animation).
+    await view.rerender({ instrument: STANDARD_GUITAR, pulses: [pulse(2, 6, 0)] });
+    await tick();
+    const again = view.container.querySelector('.marker.pulse');
+    expect(again).toBeTruthy();
+    expect(again).not.toBe(el);
+    await view.rerender({ instrument: STANDARD_GUITAR, pulses: [] });
+    await tick();
+    expect(view.container.querySelector('.marker.pulse')).toBeNull();
+  });
+
+  it('keeps cell names and the text description identical with and without pulses', () => {
+    const model: DisplayModel = {
+      markers: [{ string: 2, fret: 1, function: 'root', emphasis: 'normal' }],
+      labelMode: 'note'
+    };
+    const names = (c: HTMLElement) =>
+      [...c.querySelectorAll('[role="gridcell"]')].map((n) => n.getAttribute('aria-label'));
+    const plain = render(Fretboard, { instrument: STANDARD_GUITAR, model });
+    const pulsed = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model,
+      pulses: [pulse(1, 2, 1), pulse(2, 6, 0)]
+    });
+    expect(names(pulsed.container)).toEqual(names(plain.container));
+    expect(pulsed.container.querySelector('.description')?.textContent).toBe(
+      plain.container.querySelector('.description')?.textContent
+    );
+  });
+
+  it('does not change the live region when a pulse starts', async () => {
+    const view = render(Fretboard, { instrument: STANDARD_GUITAR });
+    const live = view.container.querySelector('[aria-live="polite"]');
+    await view.rerender({ instrument: STANDARD_GUITAR, pulses: [pulse(1, 6, 0)] });
+    await tick();
+    expect(live?.textContent).toBe('');
+  });
+
+  it('draws a transient neutral highlighted marker for an empty position', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      pulses: [pulse(1, 3, 5)]
+    });
+    const el = container.querySelector('.marker[data-key="3:5"]');
+    expect(el?.classList).toContain('neutral');
+    expect(el?.classList).toContain('highlighted');
+    expect(el?.classList).toContain('pulse');
+  });
+
+  it('declares animation: none for the pulse under reduced motion', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    const block = /@media \(prefers-reduced-motion: reduce\)\s*\{([^}]*\{[^}]*\}[^}]*)\}/.exec(src);
+    expect(block?.[1]).toMatch(/\.marker\.pulse \.shape\s*\{\s*animation:\s*none;/);
   });
 });

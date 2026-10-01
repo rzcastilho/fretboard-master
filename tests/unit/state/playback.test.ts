@@ -71,3 +71,63 @@ describe('navigation helpers never touch the engine (FR-002)', () => {
     expect(playback.availability).toBe('idle');
   });
 });
+
+describe('playback pulses (US2)', () => {
+  it('gains a pulse at the onset and loses it at the end mark', async () => {
+    const d = deps();
+    const clock = d.deps.clock;
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    playback.note({ string: 6, fret: 0 }, STANDARD_GUITAR);
+    clock.advance(0);
+    expect(playback.pulses).toEqual([
+      { id: 1, position: { string: 6, fret: 0 }, durationMs: 1500 }
+    ]);
+    clock.advance(1499);
+    expect(playback.pulses).toHaveLength(1);
+    clock.advance(1);
+    expect(playback.pulses).toEqual([]);
+  });
+
+  it('still pulses when muted (US2-2)', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    playback.setMuted(true);
+    expect(playback.muted).toBe(true);
+    expect(playback.controlState).toBe('muted');
+    playback.note({ string: 5, fret: 3 }, STANDARD_GUITAR);
+    d.deps.clock.advance(0);
+    expect(playback.pulses).toHaveLength(1);
+    d.deps.clock.advance(1500);
+    expect(playback.pulses).toEqual([]);
+  });
+});
+
+describe('playback.setMuted / setVolume (US2)', () => {
+  it('setMuted toggles muted and unlocks the engine', () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.setMuted(true);
+    expect(d.createContext).toHaveBeenCalledTimes(1);
+    playback.setMuted(false);
+    expect(playback.muted).toBe(false);
+    expect(playback.controlState).toBe('on');
+  });
+
+  it('setVolume clamps to 0–100, snaps to step 5, and unlocks the engine', () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.setVolume(63);
+    expect(playback.volume).toBe(65);
+    expect(d.createContext).toHaveBeenCalledTimes(1);
+    playback.setVolume(500);
+    expect(playback.volume).toBe(100);
+    playback.setVolume(-20);
+    expect(playback.volume).toBe(0);
+    playback.setVolume(Number.NaN);
+    expect(playback.volume).toBe(0);
+  });
+});

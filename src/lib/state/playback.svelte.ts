@@ -88,6 +88,21 @@ export const playback = {
     return marks;
   },
 
+  /** Mute or unmute; ramps gain only, never stops a sounding note. Unlocks the engine. */
+  setMuted(muted: boolean): void {
+    state.muted = muted;
+    engine.setMuted(muted);
+    markUnlocked();
+  },
+
+  /** Volume 0–100, clamped and snapped to steps of 5. Unlocks the engine. */
+  setVolume(volume: number): void {
+    const v = Number.isFinite(volume) ? Math.min(100, Math.max(0, Math.round(volume / 5) * 5)) : 0;
+    state.volume = v;
+    engine.setVolume(v);
+    markUnlocked();
+  },
+
   /** Start loading the synth (no AudioContext is created). */
   preload(): void {
     engine.preload();

@@ -181,3 +181,144 @@ describe('engine graph: source → voice gain → volume gain → mute gain → 
     expect(mute.gain.value).toBe(1);
   });
 });
+
+describe('engine E5: pulses', () => {
+  function pulseSetup() {
+    const port = new FakeAudioPort();
+    const clock = new FakeClock();
+    const ev = events();
+    const createContext = vi.fn(() => port);
+    const loadSynth = vi.fn(() => Promise.resolve(recordingSynth()));
+    const engine = createPlaybackEngine(ev, { createContext, loadSynth, clock });
+    return { port, clock, ev, engine, createContext, loadSynth };
+  }
+  const pulseOf = (id: number) => ({ id, position: { string: 6, fret: 0 }, durationMs: 1500 });
+
+  it('fires onPulseStart at onsetMs and onPulseEnd at endMs on the clock', async () => {
+    const { clock, ev, engine } = pulseSetup();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+    expect(ev.onPulseStart).toHaveBeenCalledWith(pulseOf(1));
+    expect(ev.onPulseEnd).not.toHaveBeenCalled();
+    clock.advance(1499);
+    expect(ev.onPulseEnd).not.toHaveBeenCalled();
+    clock.advance(1);
+    expect(ev.onPulseEnd).toHaveBeenCalledTimes(1);
+    expect(ev.onPulseEnd).toHaveBeenCalledWith(1);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('pulses when muted', async () => {
+    const { clock, ev, engine } = pulseSetup();
+    engine.preload();
+    await flush();
+    engine.setMuted(true);
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+    clock.advance(1500);
+    expect(ev.onPulseEnd).toHaveBeenCalledWith(1);
+  });
+
+  it('pulses when the context is unavailable', () => {
+    const port = new FakeAudioPort();
+    const clock = new FakeClock();
+    const ev = events();
+    const engine = createPlaybackEngine(ev, {
+      createContext: () => {
+        throw new Error('no audio');
+      },
+      loadSynth: () => Promise.resolve(recordingSynth()),
+      clock
+    });
+    void port;
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(0);
+    expect(ev.onUnavailable).toHaveBeenCalledWith('context');
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+    clock.advance(1500);
+    expect(ev.onPulseEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('pulses when the note was dropped (synth never loaded)', () => {
+    const clock = new FakeClock();
+    const ev = events();
+    const engine = createPlaybackEngine(ev, {
+      createContext: () => new FakeAudioPort(),
+      loadSynth: () => new Promise<Synth>(() => undefined),
+      clock
+    });
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+    clock.advance(1500);
+    expect(ev.onPulseEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires one pulse per onset, ids strictly increasing', async () => {
+    const { clock, ev, engine } = pulseSetup();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(1500);
+    engine.play(string6Open, STANDARD_GUITAR);
+    clock.advance(1500);
+    engine.play({ kind: 'note', position: { string: 5, fret: 3 } }, STANDARD_GUITAR);
+    clock.advance(1500);
+    const ids = vi.mocked(ev.onPulseStart).mock.calls.map(([p]) => p.id);
+    expect(ids).toEqual([1, 2, 3]);
+    expect(ev.onPulseEnd).toHaveBeenCalledTimes(3);
+  });
+
+  it('plays nothing and pulses nothing for an invalid position', async () => {
+    const { clock, ev, engine } = pulseSetup();
+    engine.play({ kind: 'note', position: { string: 9, fret: 0 } }, STANDARD_GUITAR);
+    clock.advance(2000);
+    expect(ev.onPulseStart).not.toHaveBeenCalled();
+  });
+});
+
+describe('engine E12: mute and volume are gain automation only', () => {
+  it('setMuted ramps the mute gain with setTargetAtTime and never stops sources', async () => {
+    const { port, engine } = setup();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    const mute = port.gains[1] as unknown as FakeGain;
+    engine.setMuted(true);
+    const call = mute.gain.calls.find((c) => c.method === 'setTargetAtTime');
+    expect(call?.args[0]).toBe(0);
+    expect(call?.args[2]).toBeCloseTo(0.003, 6);
+    engine.setMuted(false);
+    expect(mute.gain.calls.filter((c) => c.method === 'setTargetAtTime').at(-1)?.args[0]).toBe(1);
+    expect((port.sources[0] as unknown as FakeSource).stopCalls).toEqual([]);
+  });
+
+  it('setVolume ramps the volume gain to (v/100)² and never stops sources', async () => {
+    const { port, engine } = setup();
+    engine.preload();
+    await flush();
+    engine.play(string6Open, STANDARD_GUITAR);
+    const volume = port.gains[0] as unknown as FakeGain;
+    engine.setVolume(50);
+    const call = volume.gain.calls.filter((c) => c.method === 'setTargetAtTime').at(-1);
+    expect(call?.args[0]).toBeCloseTo(0.25, 10);
+    expect((port.sources[0] as unknown as FakeSource).stopCalls).toEqual([]);
+  });
+
+  it('setMuted unlocks the context (sound-control gesture)', () => {
+    const { createContext, engine } = setup();
+    engine.setMuted(true);
+    expect(createContext).toHaveBeenCalledTimes(1);
+  });
+
+  it('a mute set before the first context is applied when the context is created', async () => {
+    const { port, engine } = setup();
+    engine.setMuted(true);
+    const mute = port.gains[1] as unknown as FakeGain;
+    expect(mute.gain.value === 0 || mute.gain.calls.some((c) => c.args[0] === 0)).toBe(true);
+  });
+});

@@ -57,3 +57,51 @@ test.describe('note playback (US1)', () => {
     expect(step.pitches).toEqual([48]);
   });
 });
+
+test.describe('pulse feedback (US2)', () => {
+  const openString6 = (page: Page) =>
+    page.getByRole('gridcell', { name: 'E, string 6, open', exact: true });
+
+  test.beforeEach(async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+  });
+
+  test('a tapped position pulses until the 1.5 s end mark (US2-1)', async ({ page }) => {
+    await openString6(page).click();
+    const pulse = page.locator('.marker.pulse[data-key="6:0"]');
+    await expect(pulse).toHaveCount(1);
+    await page.clock.runFor(1500);
+    await expect(page.locator('.marker.pulse')).toHaveCount(0);
+  });
+
+  // The mute control is built in Phase 5 (US3); until it exists this case cannot click it.
+  // Mute-with-pulse is covered at unit level by engine E5 and state/playback tests (T031/T032).
+  test.fixme('still pulses after muting (US2-2)', async ({ page }) => {
+    await page.getByRole('button', { name: /mute/i }).click();
+    await openString6(page).click();
+    await expect(page.locator('.marker.pulse')).toHaveCount(1);
+  });
+
+  test('reduced motion: highlighted with no running animation (US2-3)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openString6(page).click();
+    const marker = page.locator('.marker.pulse[data-key="6:0"]');
+    await expect(marker).toHaveClass(/highlighted/);
+    const animations = await marker.evaluate(
+      (el) => el.querySelector('.shape')?.getAnimations().length
+    );
+    expect(animations).toBe(0);
+  });
+
+  test('an empty position shows a transient neutral marker (US2-4)', async ({ page }) => {
+    expect(await page.locator('.marker[data-key="6:0"]').count()).toBe(0);
+    await openString6(page).click();
+    const marker = page.locator('.marker[data-key="6:0"]');
+    await expect(marker).toHaveClass(/neutral/);
+    await expect(marker).toHaveClass(/highlighted/);
+    await page.clock.runFor(1500);
+    await expect(page.locator('.marker[data-key="6:0"]')).toHaveCount(0);
+  });
+});

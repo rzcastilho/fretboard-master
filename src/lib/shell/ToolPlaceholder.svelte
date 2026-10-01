@@ -34,7 +34,7 @@
 </section>
 <section class="c" aria-labelledby="zone-c">
   <h2 id="zone-c">{m.zone_fretboard()}</h2>
-  <Fretboard {instrument} {model} {onactivate} />
+  <Fretboard {instrument} {model} {onactivate} pulses={playback.pulses} />
 </section>
 <section class="d" aria-labelledby="zone-d">
   <h2 id="zone-d">{m.zone_context_panel()}</h2>

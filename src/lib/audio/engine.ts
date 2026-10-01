@@ -54,9 +54,15 @@ export interface PlaybackEngine {
   play(request: PlaybackRequest, instrument: Instrument): readonly TimeMark[];
   /** Unlocks audio without playing (sound-control interaction). */
   unlock(): void;
+  /** Ramps the mute gain over 10 ms; never stops sources. Also unlocks. */
+  setMuted(muted: boolean): void;
+  /** 0..100, gain (v/100)², ramped over 10 ms; never stops sources. Also unlocks. */
+  setVolume(volume: number): void;
 }
 
 const DEFAULT_VOLUME = 80;
+/** setTargetAtTime time constant: ≈ 10 ms to settle (E12). */
+const RAMP_TAU_S = 0.003;
 
 function defaultDeps(): EngineDeps {
   return {
@@ -75,7 +81,7 @@ function log(entry: AudioLogEntry): void {
   if (__FM_FAULT_INJECTION__) (globalThis.__fmAudioLog ??= []).push(entry);
 }
 
-const volumeToGain = (volume: number): number => (volume / 100) ** 2;
+const volumeToGain = (v: number): number => (v / 100) ** 2;
 
 export function createPlaybackEngine(
   events: EngineEvents,
@@ -85,10 +91,41 @@ export function createPlaybackEngine(
 
   let ctx: AudioPort | null = null;
   let volumeGain: GainNode | null = null;
+  let muteGain: GainNode | null = null;
+  let muted = false;
+  let volume = DEFAULT_VOLUME;
+  let nextPulseId = 1;
+  const pulseTimers = new Set<number>();
   let synth: Synth | null = null;
   let loading: Promise<Synth | null> | null = null;
   let failed = false;
   let nextRequestId = 1;
+
+  function after(ms: number, cb: () => void): void {
+    const id = d.clock.setTimeout(() => {
+      pulseTimers.delete(id);
+      cb();
+    }, ms);
+    pulseTimers.add(id);
+  }
+
+  /** Pulses depend only on the plan, never on audio success, mute, or dropped notes (E5). */
+  function schedulePulses(marks: readonly TimeMark[]): void {
+    for (const mark of marks) {
+      const pulse: PulseEvent = {
+        id: nextPulseId++,
+        position: mark.position,
+        durationMs: mark.endMs - mark.onsetMs
+      };
+      after(mark.onsetMs, () => events.onPulseStart(pulse));
+      after(mark.endMs, () => events.onPulseEnd(pulse.id));
+    }
+  }
+
+  function ramp(node: GainNode | null, target: number): void {
+    if (!node || !ctx) return;
+    node.gain.setTargetAtTime(target, ctx.currentTime, RAMP_TAU_S);
+  }
 
   function fail(cause: 'context' | 'resume' | 'synth'): void {
     if (failed) return;
@@ -117,13 +154,14 @@ export function createPlaybackEngine(
     if (!ctx) {
       try {
         const created = d.createContext();
-        const volume = created.createGain();
-        const mute = created.createGain();
-        volume.gain.value = volumeToGain(DEFAULT_VOLUME);
-        mute.gain.value = 1;
-        volume.connect(mute);
-        mute.connect(created.destination);
-        volumeGain = volume;
+        const volumeNode = created.createGain();
+        const muteNode = created.createGain();
+        volumeNode.gain.value = volumeToGain(volume);
+        muteNode.gain.value = muted ? 0 : 1;
+        volumeNode.connect(muteNode);
+        muteNode.connect(created.destination);
+        volumeGain = volumeNode;
+        muteGain = muteNode;
         ctx = created;
         // Unlock: resume() is called inside the gesture and deliberately not awaited (R-08).
         created.resume().catch(() => undefined);
@@ -176,7 +214,7 @@ export function createPlaybackEngine(
         frequencies: step.pitches.map(frequencyOf),
         when,
         contextTime: port.currentTime,
-        gain: volumeGain ? volumeGain.gain.value : volumeToGain(DEFAULT_VOLUME),
+        gain: volumeToGain(volume),
         scheduledAtMs: performance.now()
       });
     }
@@ -191,9 +229,22 @@ export function createPlaybackEngine(
       ensureContext();
     },
 
+    setMuted(next): void {
+      muted = next;
+      if (!ensureContext()) return;
+      ramp(muteGain, muted ? 0 : 1);
+    },
+
+    setVolume(next): void {
+      volume = Math.min(100, Math.max(0, Number.isFinite(next) ? next : 0));
+      if (!ensureContext()) return;
+      ramp(volumeGain, volumeToGain(volume));
+    },
+
     play(request, instrument): readonly TimeMark[] {
       const marks = planRequest(request, instrument).marks;
       if (marks.length === 0) return marks;
+      schedulePulses(marks);
       const port = ensureContext();
       if (!port) return marks;
       if (synth) {

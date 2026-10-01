@@ -19,9 +19,16 @@
     type FretboardMetrics
   } from './geometry';
   import { autoScrollTarget, moveFocus, reduceGesture, scrollIntoViewTarget } from './interaction';
+  import { applyPulses } from './pulse';
   import { readMetrics } from './metrics';
   import { animateScroll, browserClock } from './scroll-animation';
-  import type { FretboardProps, GestureEffect, GestureEvent, GestureState, Marker } from './types';
+  import type {
+    DrawnMarker,
+    FretboardProps,
+    GestureEffect,
+    GestureEvent,
+    GestureState
+  } from './types';
 
   const NO_MARKERS = { markers: [], labelMode: 'none' } as const;
 
@@ -29,7 +36,8 @@
     instrument,
     model = NO_MARKERS,
     variant = 'interactive',
-    onactivate
+    onactivate,
+    pulses = []
   }: FretboardProps = $props();
 
   const uid = $props.id();
@@ -122,18 +130,23 @@
   });
 
   /** First marker per valid position wins; invalid positions are ignored. */
-  const markerMap = $derived.by(() => {
-    const map: Record<string, Marker> = Object.create(null);
-    for (const mk of model.markers) {
+  function firstPerPosition(markers: readonly DrawnMarker[]): Record<string, DrawnMarker> {
+    const map: Record<string, DrawnMarker> = Object.create(null);
+    for (const mk of markers) {
       if (!isValidPosition(instrument, mk)) continue;
       const key = positionKey(mk);
       if (!(key in map)) map[key] = mk;
     }
     return map;
-  });
+  }
+
+  /** Model markers only: cell names and the description never include pulses. */
+  const markerMap = $derived(firstPerPosition(model.markers));
+  /** Model markers with sounding positions overlaid (drawing only). */
+  const drawnMap = $derived(firstPerPosition(applyPulses(model.markers, pulses, instrument)));
 
   const drawn = $derived(
-    Object.entries(markerMap)
+    Object.entries(drawnMap)
       .filter(([, mk]) => mk.emphasis !== 'hidden')
       .map(([key, mk]) => ({
         key,
@@ -411,9 +424,11 @@
           {/each}
         </g>
         <g aria-hidden="true" class="markers">
-          {#each drawn as d (d.key)}
+          {#each drawn as d (d.mk.pulse?.id ?? d.key)}
             <g
               class="marker {d.mk.function} {d.mk.emphasis}"
+              class:pulse={d.mk.pulse !== undefined}
+              style:--pulse-duration={d.mk.pulse ? `${d.mk.pulse.durationMs}ms` : undefined}
               data-key={d.key}
               transform="translate({d.x} {d.y})"
             >
@@ -664,6 +679,31 @@
   .marker.highlighted .shape {
     transform: scale(var(--emph-highlight-scale));
     filter: drop-shadow(0 0 var(--marker-elevation-stroke) var(--color-text));
+  }
+
+  .marker.pulse .shape {
+    animation: marker-pulse var(--pulse-duration) var(--ease-standard) 1 both;
+  }
+
+  @keyframes marker-pulse {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    15% {
+      transform: scale(var(--pulse-scale));
+      opacity: var(--pulse-opacity-peak);
+    }
+    100% {
+      transform: scale(var(--emph-highlight-scale));
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marker.pulse .shape {
+      animation: none;
+    }
   }
 
   .marker.dimmed {
