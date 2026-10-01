@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  frequencyOf,
   octaveOf,
   pitchClass,
   pitchClassOfSpelling,
@@ -97,6 +98,26 @@ describe('properties (TM-3)', () => {
           return pitchClass(pitchOfSpelling({ ...s, octave })) === pitchClassOfSpelling(s);
         }
       )
+    );
+  });
+});
+
+describe('frequencyOf (12-TET, A4 = 440 Hz)', () => {
+  it.each([
+    [40, 82.41],
+    [33, 55.0],
+    [48, 130.81],
+    [69, 440.0],
+    [88, 1318.51]
+  ])('pitch %i is %f Hz', (p, hz) => {
+    expect(frequencyOf(p)).toBeCloseTo(hz, 2);
+  });
+
+  it('an octave up doubles the frequency', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 20, max: 100 }), (p) => {
+        expect(frequencyOf(p + 12) / frequencyOf(p)).toBeCloseTo(2, 9);
+      })
     );
   });
 });

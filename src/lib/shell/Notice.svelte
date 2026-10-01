@@ -1,18 +1,27 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
 
+  interface Props {
+    message: string;
+    ondismiss?: () => void;
+  }
+
+  let { message, ondismiss }: Props = $props();
   let visible = $state(true);
 
   function dismiss() {
     visible = false;
+    ondismiss?.();
     document.querySelector<HTMLElement>('h1')?.focus();
   }
 </script>
 
 {#if visible}
   <div class="notice" role="status" aria-live="polite">
-    <p>{m.notice_not_found()}</p>
-    <button type="button" onclick={dismiss}>{m.notice_dismiss()}</button>
+    <p>{message}</p>
+    {#if ondismiss}
+      <button type="button" onclick={dismiss}>{m.notice_dismiss()}</button>
+    {/if}
   </div>
 {/if}
 

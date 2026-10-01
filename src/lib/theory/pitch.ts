@@ -48,3 +48,8 @@ export function pitchClassOfSpelling(s: Spelling): PitchClass {
 export function pitchOfSpelling(s: SpelledPitch): Pitch {
   return (s.octave + 1) * 12 + NATURAL_CLASS[s.letter] + s.accidental;
 }
+
+/** 12-TET, A4 = 440 Hz, C4 = 60. */
+export function frequencyOf(p: Pitch): number {
+  return 440 * Math.pow(2, (p - 69) / 12);
+}
