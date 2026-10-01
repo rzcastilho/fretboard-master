@@ -1,0 +1,13 @@
+node_modules
+build
+build-next
+.svelte-kit
+src/lib/paraglide
+playwright-report
+.lighthouseci
+coverage
+test-results
+.wrangler
+.env*
+.DS_Store
+*.log
