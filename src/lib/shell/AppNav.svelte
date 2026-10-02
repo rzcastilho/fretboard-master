@@ -1,6 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import type { ScreenId } from './screens';
+  import { linkTools, type LinkedTool } from '$lib/state/links.svelte';
   import { TOOLS } from './tools';
 
   let { current }: { current: ScreenId } = $props();
@@ -10,6 +11,24 @@
     ...TOOLS.map((t) => ({ id: t.id, path: t.path as string, label: t.name() })),
     { id: 'about' as const, path: '/about', label: m.nav_about() }
   ]);
+
+  const toolIds: readonly ScreenId[] = TOOLS.map((t) => t.id);
+
+  /** Carry applies at activation, only for a plain primary click to a different tool (ADR 0011). */
+  function carry(e: MouseEvent, id: ScreenId): void {
+    if (
+      e.button !== 0 ||
+      e.ctrlKey ||
+      e.metaKey ||
+      e.shiftKey ||
+      e.altKey ||
+      e.defaultPrevented ||
+      id === current ||
+      !toolIds.includes(id)
+    )
+      return;
+    linkTools(current, id as LinkedTool);
+  }
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- static internal paths; app is not deployed under a base path -->
@@ -20,6 +39,7 @@
       <li>
         <a
           href={item.path}
+          onclick={(e) => carry(e, item.id)}
           class:current={isCurrent}
           aria-current={isCurrent ? 'page' : undefined}
           data-sveltekit-replacestate={isCurrent ? '' : undefined}>{item.label}</a

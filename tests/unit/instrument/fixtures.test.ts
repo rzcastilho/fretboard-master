@@ -62,7 +62,9 @@ describe('instrument fixtures (contracts/test-hooks.md)', () => {
       'AF-21',
       'AF-4',
       'AF-7',
-      'NC-UNISON'
+      'AF-8',
+      'NC-UNISON',
+      'SHORT-7'
     ]);
   });
 

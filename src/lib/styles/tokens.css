@@ -13,6 +13,9 @@
   --color-accent: #0b5cad;
   --color-accent-text: #ffffff;
   --color-border: #9ca3af;
+  /* Disabled controls: greyed, never error red (feature 006) */
+  --color-disabled-text: #6b7280;
+  --color-disabled-border: #d1d5db;
   --color-focus-ring: #0b5cad;
   --color-notice-surface: #e8eef6;
   --color-notice-text: #1a1d21;
@@ -107,6 +110,12 @@
   --region-band: hsl(205 70% 40% / 0.14);
   --marker-badge-size: 0.75rem;
 
+  /* Quality comparison (feature 007) */
+  --marker-dash: 4px;
+  --marker-dash-gap: 3px;
+  --arrow-head-size: 0.5rem;
+  --panel-column-min: 8rem;
+
   --font-family-notes: 'FM Accidentals', var(--font-family-ui);
 
   /* Motion */
@@ -141,6 +150,8 @@
     --color-accent: #7ab4f0;
     --color-accent-text: #101317;
     --color-border: #6b7480;
+    --color-disabled-text: #8a929e;
+    --color-disabled-border: #3a414b;
     --color-focus-ring: #9cc8f7;
     --color-notice-surface: #1f2a38;
     --color-notice-text: #eef0f3;
@@ -177,6 +188,8 @@
   :root {
     --color-text-muted: var(--color-text);
     --color-border: var(--color-text);
+    --color-disabled-text: GrayText;
+    --color-disabled-border: GrayText;
     --color-notice-border: var(--color-text);
     --color-sound-panel-border: var(--color-text);
     --border-width: 2px;

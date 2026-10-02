@@ -336,3 +336,128 @@ test.describe('graceful failure when sound is unavailable (US5)', () => {
     await expect(page.getByText(NOTICE)).toHaveCount(0);
   });
 });
+
+test.describe('Listen follows the view (feature 006, US4)', () => {
+  const listen = (page: Page) => page.getByRole('button', { name: 'Listen', exact: true });
+
+  async function openAMajor(page: Page, view: 'Full neck' | 'All notes') {
+    await page.goto('/triads');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await page
+      .getByRole('group', { name: 'Root' })
+      .getByRole('button', { name: 'A', exact: true })
+      .click();
+    await page.getByRole('radio', { name: view }).click();
+  }
+
+  test('US4-1: Full neck plays 24 steps, three notes then the chord per shape', async ({
+    page
+  }) => {
+    await openAMajor(page, 'Full neck');
+    await listen(page).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(24);
+    const steps = (await stepEntries(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    const pitches = steps.map((e) => [...e.pitches].sort((a, b) => a - b));
+    // First shape: A major root position, 2-2-0 on strings 3-2-1 → A3, C#4, E4.
+    expect(pitches.slice(0, 4)).toEqual([[57], [61], [64], [57, 61, 64]]);
+    expect(steps.filter((e) => e.pitches.length === 3)).toHaveLength(6);
+  });
+
+  test('US4-2: All notes plays three ascending single notes', async ({ page }) => {
+    await openAMajor(page, 'All notes');
+    await listen(page).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(3);
+    const steps = (await stepEntries(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    expect(steps.map((e) => e.pitches)).toEqual([[45], [49], [52]]);
+  });
+
+  test('US4-3: changing the view stops playback', async ({ page }) => {
+    await page.clock.install();
+    await openAMajor(page, 'Full neck');
+    await listen(page).click();
+    await expect(page.locator('.marker.pulse').first()).toBeVisible();
+    await page.getByRole('radio', { name: 'All notes' }).click();
+    await expect(page.locator('.marker.pulse')).toHaveCount(0);
+    const stops = (await readAudioLog(page)).filter((e) => e.type === 'stop');
+    expect(stops.length).toBeGreaterThan(0);
+  });
+
+  test('US4-4: muted, sounding positions still pulse', async ({ page }) => {
+    await openAMajor(page, 'Full neck');
+    await page.getByRole('button', { name: 'Mute sound' }).click();
+    await listen(page).click();
+    await expect(page.locator('.marker.pulse').first()).toBeVisible();
+  });
+});
+
+test.describe('Listen to comparison (007 US6)', () => {
+  const board = (page: Page) => page.locator('.fretboard');
+  const toggle = (page: Page) => page.getByRole('button', { name: 'Compare', exact: true });
+  const listenCmp = (page: Page) =>
+    page.getByRole('button', { name: 'Listen to comparison', exact: true });
+
+  async function openTriads(page: Page, fixture?: string) {
+    if (fixture) {
+      await page.addInitScript((i) => {
+        globalThis.__fmInstrument = i;
+      }, fixture);
+    }
+    await page.goto('/triads');
+    await board(page).waitFor();
+  }
+
+  test('hidden until Compare is on, hidden again in All notes (US6-4)', async ({ page }) => {
+    await openTriads(page);
+    await expect(listenCmp(page)).toHaveCount(0);
+    await toggle(page).click();
+    await expect(listenCmp(page)).toHaveCount(1);
+    await page.getByRole('radio', { name: 'All notes' }).click();
+    await expect(listenCmp(page)).toHaveCount(0);
+  });
+
+  test('block, 500 ms rest, block; pulses sit on displayed markers', async ({ page }) => {
+    await openTriads(page);
+    await toggle(page).click();
+    await listenCmp(page).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(2);
+    const steps = (await stepEntries(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    expect(steps[0].pitches).toHaveLength(3);
+    expect(steps[1].pitches).toHaveLength(3);
+    // 0 ms and 1000 ms onsets: the empty step in between is the 500 ms rest.
+    expect(steps[1].when - steps[0].when).toBeCloseTo(1.0, 2);
+    await expect(board(page).locator('.marker.pulse').first()).toBeVisible();
+  });
+
+  test('SHORT-7: plays the first block then only D and G, naming B♭ in one notice', async ({
+    page
+  }) => {
+    await openTriads(page, 'SHORT-7');
+    await page
+      .getByRole('group', { name: 'Root' })
+      .getByRole('button', { name: 'G', exact: true })
+      .click();
+    await page.getByRole('radio', { name: '2nd inversion' }).click();
+    await page.getByRole('radio', { name: '4-3-2' }).click();
+    await toggle(page).click();
+    await listenCmp(page).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(2);
+    const steps = (await stepEntries(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    expect(steps[0].pitches).toHaveLength(3);
+    expect(steps[1].pitches).toHaveLength(2);
+    await expect(page.getByText('B♭ is off the fretboard and was not played')).toBeVisible();
+  });
+
+  test('changing a control during playback stops it', async ({ page }) => {
+    await openTriads(page);
+    await toggle(page).click();
+    await listenCmp(page).click();
+    await expect(board(page).locator('.marker.pulse').first()).toBeVisible();
+    await page.getByRole('radio', { name: '1st inversion' }).click();
+    await expect
+      .poll(async () =>
+        (await readAudioLog(page)).some((e) => e.type === 'stop' && e.reason === 'view')
+      )
+      .toBe(true);
+    await expect(board(page).locator('.marker.pulse')).toHaveCount(0);
+  });
+});

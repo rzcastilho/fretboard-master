@@ -171,8 +171,8 @@ export default tseslint.config(
     }
   },
   {
-    // notes-view is pure: no framework, i18n, or DOM.
-    files: ['src/lib/state/notes-view.ts'],
+    // notes-view and links are pure: no framework, i18n, or DOM.
+    files: ['src/lib/state/notes-view.ts', 'src/lib/state/links.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -180,10 +180,10 @@ export default tseslint.config(
       ],
       'no-restricted-globals': [
         'error',
-        { name: 'window', message: 'notes-view must be DOM-free.' },
-        { name: 'document', message: 'notes-view must be DOM-free.' },
-        { name: 'localStorage', message: 'notes-view must be DOM-free.' },
-        { name: 'navigator', message: 'notes-view must be DOM-free.' }
+        { name: 'window', message: 'notes-view and links must be DOM-free.' },
+        { name: 'document', message: 'notes-view and links must be DOM-free.' },
+        { name: 'localStorage', message: 'notes-view and links must be DOM-free.' },
+        { name: 'navigator', message: 'notes-view and links must be DOM-free.' }
       ]
     }
   }

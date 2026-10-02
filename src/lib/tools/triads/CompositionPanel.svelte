@@ -7,7 +7,8 @@
     qualityName,
     stackingName,
     type Composition,
-    type NoteEntry
+    type NoteEntry,
+    type TriadFunction
   } from '$lib/state/triads-model';
 
   interface Props {
@@ -18,68 +19,93 @@
 
   let { composition, onswitch }: Props = $props();
 
-  const name = $derived(
-    m.triads_name({
-      root: noteLabel(composition.name.root),
-      quality: qualityName(composition.name.quality),
-      inversion: inversionName(composition.name.inversion)
-    })
-  );
-  const spoken = (n: NoteEntry) => `${spokenNote(n.spelling)}, ${functionName(n.function)}`;
-  const intervals = $derived(composition.intervals.map(intervalLabel).join(' – '));
-  const lowToHigh = $derived(
-    composition.lowToHigh
+  const nameOf = (c: Composition): string =>
+    c.name.inversion === null
+      ? m.triads_name_no_inversion({
+          root: noteLabel(c.name.root),
+          quality: qualityName(c.name.quality)
+        })
+      : m.triads_name({
+          root: noteLabel(c.name.root),
+          quality: qualityName(c.name.quality),
+          inversion: inversionName(c.name.inversion)
+        });
+  const name = $derived(nameOf(composition));
+  const second = $derived(composition.comparison);
+  const changed = $derived<ReadonlySet<TriadFunction>>(new Set(composition.changed));
+  const SEP = ' – ';
+  const FUNCTION_AT = ['root', 'third', 'fifth'] as const;
+  const isChanged = (f: TriadFunction) => changed.has(f);
+  const spoken = (n: NoteEntry, mark: boolean) =>
+    `${spokenNote(n.spelling)}, ${functionName(n.function)}${
+      mark && isChanged(n.function) ? `, ${m.triads_compare_changed()}` : ''
+    }`;
+  const lowToHigh = (c: Composition) =>
+    (c.lowToHigh ?? [])
       .map((n) =>
         m.triads_low_to_high_entry({
           note: noteLabel(n.spelling),
           function: functionName(n.function)
         })
       )
-      .join(', ')
-  );
+      .join(', ');
 </script>
 
-<section aria-labelledby="triads-composition">
-  <h2 id="triads-composition">{m.triads_panel_composition()}</h2>
-  <p class="name">{name}</p>
+{#snippet glyph(n: NoteEntry)}
+  <svg width="16" height="16" viewBox="0 0 16 16" data-function={n.function} aria-hidden="true">
+    {#if n.function === 'root'}
+      <rect x="2" y="2" width="12" height="12" rx="3" />
+    {:else if n.function === 'third'}
+      <circle cx="8" cy="8" r="6" />
+    {:else}
+      <path d="M8 1 L15 8 L8 15 L1 8 Z" />
+    {/if}
+  </svg>
+{/snippet}
+
+{#snippet column(c: Composition, mark: boolean)}
   <h3>{m.triads_panel_notes()}</h3>
   <ul aria-label={m.triads_panel_notes()}>
-    {#each composition.notes as n (n.function)}
-      <li aria-label={spoken(n)}>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          data-function={n.function}
-          aria-hidden="true"
-        >
-          {#if n.function === 'root'}
-            <rect x="2" y="2" width="12" height="12" rx="3" />
-          {:else if n.function === 'third'}
-            <circle cx="8" cy="8" r="6" />
-          {:else}
-            <path d="M8 1 L15 8 L8 15 L1 8 Z" />
-          {/if}
-        </svg>
-        <span aria-hidden="true">{noteLabel(n.spelling)}</span>
+    {#each c.notes as n (n.function)}
+      <li aria-label={spoken(n, mark)}>
+        {@render glyph(n)}
+        {#if mark && isChanged(n.function)}
+          <strong aria-hidden="true">{noteLabel(n.spelling)}</strong>
+          <span class="changed-tag" aria-hidden="true">{m.triads_compare_changed()}</span>
+        {:else}
+          <span aria-hidden="true">{noteLabel(n.spelling)}</span>
+        {/if}
       </li>
     {/each}
   </ul>
   <h3>{m.triads_panel_intervals()}</h3>
-  <p>{intervals}</p>
+  {#if mark}
+    <p class="interval-list">
+      {#each c.intervals as id, k (k)}{#if k > 0}{SEP}{/if}{#if isChanged(FUNCTION_AT[k])}<strong
+            >{intervalLabel(id)}</strong
+          >
+          <span class="changed-tag">{m.triads_compare_changed()}</span>{:else}<span
+            >{intervalLabel(id)}</span
+          >{/if}{/each}
+    </p>
+  {:else}
+    <p>{c.intervals.map(intervalLabel).join(SEP)}</p>
+  {/if}
   <h3>{m.triads_panel_stacking()}</h3>
-  <p>{stackingName(composition.stacking)}</p>
-  <h3>{m.triads_panel_low_to_high()}</h3>
-  <p>{lowToHigh}</p>
-  {#if composition.symmetric}
+  <p>{stackingName(c.stacking)}</p>
+  {#if c.lowToHigh !== null}
+    <h3>{m.triads_panel_low_to_high()}</h3>
+    <p>{lowToHigh(c)}</p>
+  {/if}
+  {#if c.symmetric}
     <p class="note">{m.triads_symmetry()}</p>
   {/if}
-  {#if composition.characteristic === 'b5'}
+  {#if c.characteristic === 'b5'}
     <p class="note">{m.triads_characteristic_flat_five()}</p>
   {/if}
-  {#if composition.soundsAs.length > 0}
+  {#if c.soundsAs.length > 0}
     <ul class="sounds-as" aria-label={m.triads_panel_sounds_as()}>
-      {#each composition.soundsAs as line (line.written.letter)}
+      {#each c.soundsAs as line (line.written.letter)}
         <li
           aria-label={m.triads_sounds_as({
             written: spokenNote(line.written),
@@ -95,6 +121,30 @@
         </li>
       {/each}
     </ul>
+  {/if}
+{/snippet}
+
+<section aria-labelledby="triads-composition">
+  <h2 id="triads-composition">{m.triads_panel_composition()}</h2>
+  {#if second}
+    <div class="columns">
+      <div class="column" role="group" aria-label={name}>
+        <p class="name">{name}</p>
+        {@render column(composition, true)}
+      </div>
+      <div class="column" role="group" aria-label={nameOf(second)}>
+        <p class="name">
+          <svg class="swatch" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="2" y="2" width="12" height="12" rx="3" />
+          </svg>
+          {nameOf(second)}
+        </p>
+        {@render column(second, true)}
+      </div>
+    </div>
+  {:else}
+    <p class="name">{name}</p>
+    {@render column(composition, false)}
   {/if}
   {#if composition.suggestion || composition.switchTo}
     <div class="spelling">
@@ -135,7 +185,8 @@
 
   ul {
     display: flex;
-    gap: var(--space-3);
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -150,5 +201,36 @@
 
   svg {
     fill: var(--color-text);
+  }
+
+  .columns {
+    display: grid;
+    gap: var(--space-4, 1rem);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--panel-column-min)), 1fr));
+  }
+
+  .column {
+    min-inline-size: 0;
+  }
+
+  .swatch {
+    vertical-align: middle;
+    fill: none;
+    stroke: var(--color-text);
+    stroke-width: var(--marker-stroke);
+    stroke-dasharray: var(--marker-dash) var(--marker-dash-gap);
+  }
+
+  .changed-tag {
+    white-space: nowrap;
+    font-size: var(--font-size-sm, 0.875em);
+    font-weight: 400;
+    padding-inline: var(--space-1);
+    border: var(--border-width, 1px) solid var(--color-border);
+    border-radius: var(--radius-md, 4px);
+  }
+
+  strong {
+    font-weight: 800;
   }
 </style>

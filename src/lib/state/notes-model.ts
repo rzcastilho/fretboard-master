@@ -11,8 +11,18 @@ import {
   type Instrument,
   type Position
 } from '../instrument/instrument';
-import { defaultSpelling, flatSpelling, pitchLabel, spokenNoteList } from '../notation/notation';
+import {
+  defaultSpelling,
+  flatSpelling,
+  noteLabel,
+  pitchLabel,
+  spokenNote,
+  spokenNoteList
+} from '../notation/notation';
 import { octaveOf, pitchClass, type PitchClass, type Spelling } from '../theory/pitch';
+import type { Quality } from '../theory/triad';
+import { detectTriad } from '../theory/triad-detect';
+import { qualityName } from './triads-model';
 import { LISTEN_BPM, type ListenStep } from './listen';
 import { missingNotes, type Background, type NotesViewState } from './notes-view';
 
@@ -38,6 +48,34 @@ export type ListenState =
   | { readonly enabled: true }
   | { readonly enabled: false; readonly reason: 'none' | 'too-many' | 'no-positions' };
 
+export type { Quality };
+
+/** The triad formed by exactly three selected notes (data-model §3). */
+export interface DetectedTriad {
+  readonly rootPc: PitchClass;
+  readonly quality: Quality;
+  /** Notes primary spelling of the root. */
+  readonly rootSpelling: Spelling;
+  /** Visible name, e.g. "G♯ augmented". */
+  readonly name: string;
+  /** Spoken name, e.g. "G sharp augmented". */
+  readonly spokenName: string;
+}
+
+export function detectedTriad(selection: readonly PitchClass[]): DetectedTriad | null {
+  const match = detectTriad(selection);
+  if (match === null) return null;
+  const rootSpelling = defaultSpelling(match.rootPc);
+  const quality = qualityName(match.quality);
+  return {
+    rootPc: match.rootPc,
+    quality: match.quality,
+    rootSpelling,
+    name: m.notes_triad_name({ root: noteLabel(rootSpelling), quality }),
+    spokenName: m.notes_triad_name({ root: spokenNote(rootSpelling), quality })
+  };
+}
+
 export interface NotesDisplay {
   readonly model: DisplayModel;
   /** Number of `highlighted` markers. */
@@ -50,6 +88,8 @@ export interface NotesDisplay {
   readonly listen: ListenState;
   /** Nothing can be shown: background none and no selection (FR-004 guidance). */
   readonly emptyGuidance: boolean;
+  /** Triad named by exactly three selected notes, else `null` (FR-009, FR-010). */
+  readonly detected: DetectedTriad | null;
 }
 
 export function cardInfo(s: NotesViewState, instrument: Instrument): CardInfo | null {
@@ -150,7 +190,8 @@ function fretsText(start: number, end: number): string {
 function describe(
   s: NotesViewState,
   instrument: Instrument,
-  highlighted: readonly Position[]
+  highlighted: readonly Position[],
+  detected: DetectedTriad | null
 ): string {
   const strings = stringsText(s.activeStrings);
   const frets = fretsText(s.region.start, s.region.end);
@@ -172,7 +213,10 @@ function describe(
         ? m.notes_desc_entry_open({ string: p.string, note })
         : m.notes_desc_entry({ string: p.string, fret: p.fret, note });
     });
-  return entries.length > 0 ? `${summary} ${entries.join('; ')}` : summary;
+  const listed = entries.length > 0 ? `${summary} ${entries.join('; ')}` : summary;
+  return detected === null
+    ? listed
+    : `${listed} ${m.notes_desc_triad({ name: detected.spokenName })}`;
 }
 
 export function buildNotesModel(s: NotesViewState, instrument: Instrument): NotesDisplay {
@@ -226,7 +270,8 @@ export function buildNotesModel(s: NotesViewState, instrument: Instrument): Note
   }
 
   const steps = listenSteps(s, instrument);
-  const base = describe(s, instrument, highlighted);
+  const detected = detectedTriad(s.selection);
+  const base = describe(s, instrument, highlighted, detected);
   const wholeNeck = s.region.start === 0 && s.region.end === instrument.fretCount;
   return {
     model: {
@@ -241,6 +286,7 @@ export function buildNotesModel(s: NotesViewState, instrument: Instrument): Note
     cardInfo: info,
     listenSteps: steps,
     listen: listenState(s, steps),
-    emptyGuidance: s.background === 'none' && s.selection.length === 0
+    emptyGuidance: s.background === 'none' && s.selection.length === 0,
+    detected
   };
 }

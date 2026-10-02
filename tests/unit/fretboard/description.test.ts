@@ -108,3 +108,23 @@ describe('describeView', () => {
     ).toBe('Hi. string 1, open, E, root');
   });
 });
+
+describe('positionName comparison suffix (F8)', () => {
+  it('appends the comparison note suffix for comparison markers only', () => {
+    const marker = {
+      string: 2,
+      fret: 4,
+      function: 'third',
+      emphasis: 'highlighted',
+      variant: 'comparison'
+    } as const;
+    const plain = positionName(
+      STANDARD_GUITAR,
+      { string: 2, fret: 4 },
+      { ...marker, variant: undefined }
+    );
+    const named = positionName(STANDARD_GUITAR, { string: 2, fret: 4 }, marker);
+    expect(named).toBe(`${plain}, comparison`);
+    expect(plain).not.toContain('comparison');
+  });
+});

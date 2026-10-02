@@ -52,4 +52,29 @@ describe('ChoiceGroup', () => {
     await fireEvent.keyDown(first, { key: 'x' });
     expect(onchoose).not.toHaveBeenCalled();
   });
+
+  it('disabled: aria-disabled on group and radios, interactions ignored, checked radio focusable', async () => {
+    const onchoose = vi.fn();
+    render(ChoiceGroup, { name: 'Letters', options, current: 'b', onchoose, disabled: true });
+    const group = screen.getByRole('radiogroup', { name: 'Letters' });
+    expect(group.getAttribute('aria-disabled')).toBe('true');
+    const radios = screen.getAllByRole('radio');
+    expect(radios.map((r) => r.getAttribute('aria-disabled'))).toEqual(['true', 'true', 'true']);
+    expect(radios.every((r) => !r.hasAttribute('disabled'))).toBe(true);
+    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
+    expect(radios[1].getAttribute('tabindex')).toBe('0');
+    radios[1].focus();
+    expect(document.activeElement).toBe(radios[1]);
+    await fireEvent.click(radios[2]);
+    for (const key of ['ArrowRight', 'ArrowLeft', 'Home', 'End']) {
+      await fireEvent.keyDown(radios[1], { key });
+    }
+    expect(onchoose).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(radios[1]);
+  });
+
+  it('enabled by default: no aria-disabled attribute on the group', () => {
+    setup();
+    expect(screen.getByRole('radiogroup').hasAttribute('aria-disabled')).toBe(false);
+  });
 });

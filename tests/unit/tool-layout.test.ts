@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { notes } from '../../src/lib/state/notes.svelte';
+import { triads } from '../../src/lib/state/triads.svelte';
 import ToolLayout from '../../src/lib/shell/ToolLayout.svelte';
 
 describe('ToolLayout', () => {
@@ -67,6 +69,21 @@ describe('ToolLayout', () => {
       expect(spy).toHaveBeenCalledTimes(1);
       await fireEvent.click(screen.getByRole('button', { name: 'Reset tool' }));
       expect(screen.getByRole('region', { name: 'Fretboard' })).toBeTruthy();
+    });
+
+    it('Reset tool resets the failed tool store, then the boundary (EC-1.3)', async () => {
+      vi.stubGlobal('__FM_FAULT_INJECTION__', true);
+      globalThis.__fmFault = { triads: 1 };
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const triadsReset = vi.spyOn(triads, 'reset');
+      const notesReset = vi.spyOn(notes, 'reset');
+      render(ToolLayout, { tool: 'triads' });
+      await fireEvent.click(screen.getByRole('button', { name: 'Reset tool' }));
+      expect(triadsReset).toHaveBeenCalledTimes(1);
+      expect(notesReset).not.toHaveBeenCalled();
+      expect(screen.getByRole('region', { name: 'Fretboard' })).toBeTruthy();
+      triadsReset.mockRestore();
+      notesReset.mockRestore();
     });
   });
 });

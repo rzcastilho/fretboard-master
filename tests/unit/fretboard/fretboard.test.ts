@@ -852,3 +852,605 @@ describe('Fretboard interval label mode (005)', () => {
     expect(labels(container)).toEqual(['F𝄪']);
   });
 });
+
+describe('Fretboard tags (Full neck)', () => {
+  const tags = [
+    {
+      id: 'root:0',
+      start: 2,
+      end: 2,
+      label: 'Root position',
+      name: 'Root position, frets 2-2-0',
+      pressed: false
+    },
+    {
+      id: 'first:0',
+      start: 5,
+      end: 6,
+      label: '1st',
+      name: '1st inversion, frets 6-5-5',
+      pressed: false
+    },
+    {
+      id: 'second:0',
+      start: 9,
+      end: 10,
+      label: '2nd',
+      name: '2nd inversion, frets 9-10-9',
+      pressed: true,
+      detail: 'Wide stretch'
+    }
+  ];
+  const withTags = (extra: Partial<DisplayModel> = {}): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    tags,
+    ...extra
+  });
+
+  function scrollEnv() {
+    const writes: number[] = [];
+    const proto = HTMLElement.prototype;
+    const widthDesc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    const leftDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollLeft');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => 286 });
+    Object.defineProperty(proto, 'scrollLeft', {
+      configurable: true,
+      get(this: HTMLElement & { __sl?: number }) {
+        return this.__sl ?? 0;
+      },
+      set(this: HTMLElement & { __sl?: number }, v: number) {
+        this.__sl = v;
+        writes.push(v);
+      }
+    });
+    return {
+      writes,
+      restore() {
+        if (widthDesc) Object.defineProperty(proto, 'clientWidth', widthDesc);
+        else delete (proto as unknown as Record<string, unknown>).clientWidth;
+        if (leftDesc) Object.defineProperty(Element.prototype, 'scrollLeft', leftDesc);
+        delete (proto as unknown as Record<string, unknown>).scrollLeft;
+      }
+    };
+  }
+
+  it('renders tag buttons in order inside the scroller, before the svg', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags() });
+    const group = screen.getByRole('group', { name: 'Shapes' });
+    expect(group.closest('.scroller')).toBeTruthy();
+    expect(group.nextElementSibling?.tagName.toLowerCase()).toBe('svg');
+    const buttons = within(group).getAllByRole('button');
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(tags.map((t) => t.name));
+    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
+    expect(buttons[2].textContent).toContain('Wide stretch');
+    expect(container.querySelector('.scroller')?.firstElementChild).toBe(group);
+  });
+
+  it('calls ontag on click, Enter and Space', async () => {
+    const ontag = vi.fn();
+    render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags(), ontag });
+    const button = screen.getByRole('button', { name: '1st inversion, frets 6-5-5' });
+    await fireEvent.click(button);
+    expect(ontag).toHaveBeenLastCalledWith('first:0');
+    // Native buttons turn Enter/Space into click; jsdom does not, so assert they are buttons.
+    expect(button.tagName).toBe('BUTTON');
+    expect(button.getAttribute('type')).toBe('button');
+  });
+
+  it('does not change scrollLeft when a tag is clicked', async () => {
+    const env = scrollEnv();
+    try {
+      render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags(), ontag: vi.fn() });
+      await tick();
+      const before = env.writes.length;
+      await fireEvent.click(screen.getAllByRole('button', { name: /inversion/ })[0]);
+      await tick();
+      expect(env.writes.length).toBe(before);
+    } finally {
+      env.restore();
+    }
+  });
+
+  it('renders no strip without tags (or with an empty list)', () => {
+    const a = render(Fretboard, { instrument: STANDARD_GUITAR });
+    expect(a.container.querySelector('.tags')).toBeNull();
+    a.unmount();
+    const b = render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags({ tags: [] }) });
+    expect(b.container.querySelector('.tags')).toBeNull();
+  });
+
+  it('keeps tags out of the text description', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags() });
+    expect(container.querySelector('.description')?.textContent).not.toContain('2nd');
+  });
+
+  it('auto-scrolls only when autoScroll.key changes', async () => {
+    const env = scrollEnv();
+    try {
+      const group = [
+        { string: 3, fret: 15 },
+        { string: 2, fret: 16 },
+        { string: 1, fret: 16 }
+      ];
+      const model = (key: string, groups = [group]): DisplayModel =>
+        withTags({ autoScroll: { key, groups } });
+      const view = render(Fretboard, { instrument: STANDARD_GUITAR, model: model('a') });
+      await tick();
+      expect(env.writes).toHaveLength(1);
+      expect(env.writes[0]).toBeGreaterThan(0);
+
+      await view.rerender({ instrument: STANDARD_GUITAR, model: model('a') });
+      await tick();
+      expect(env.writes).toHaveLength(1);
+
+      await view.rerender({
+        instrument: STANDARD_GUITAR,
+        model: model('b', [[{ string: 3, fret: 1 }]])
+      });
+      await tick();
+      expect(env.writes).toHaveLength(2);
+      expect(env.writes[1]).toBeLessThan(env.writes[0]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  it('keeps unchanged marker elements on a view switch (keyed per position, FR-021)', async () => {
+    const a = mk({ string: 1, fret: 3, function: 'root', emphasis: 'highlighted' });
+    const b = mk({ string: 2, fret: 5, function: 'third', emphasis: 'normal' });
+    const view = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: { markers: [a, b], labelMode: 'note' }
+    });
+    const before = view.container.querySelector('.marker[data-key="1:3"]');
+    expect(before).toBeTruthy();
+    await view.rerender({
+      instrument: STANDARD_GUITAR,
+      model: {
+        markers: [a, mk({ string: 4, fret: 7, function: 'fifth', emphasis: 'normal' })],
+        labelMode: 'note'
+      }
+    });
+    expect(view.container.querySelector('.marker[data-key="1:3"]')).toBe(before);
+    expect(view.container.querySelector('.marker[data-key="2:5"]')).toBeNull();
+    expect(view.container.querySelector('.marker[data-key="4:7"]')).toBeTruthy();
+  });
+
+  it('scrolls instantly (one write) under reduced motion', async () => {
+    const env = scrollEnv();
+    const original = globalThis.matchMedia;
+    globalThis.matchMedia = ((query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+      onchange: null
+    })) as unknown as typeof globalThis.matchMedia;
+    try {
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame');
+      render(Fretboard, {
+        instrument: STANDARD_GUITAR,
+        model: withTags({
+          autoScroll: { key: 'k', groups: [[{ string: 3, fret: 18 }]] }
+        })
+      });
+      await tick();
+      expect(env.writes).toHaveLength(1);
+      expect(env.writes[0]).toBeGreaterThan(0);
+      expect(raf).not.toHaveBeenCalled();
+      raf.mockRestore();
+    } finally {
+      globalThis.matchMedia = original;
+      env.restore();
+    }
+  });
+});
+
+describe('Fretboard comparison markers and arrows (007 US1)', () => {
+  const cmp = (over: Partial<Marker> = {}): Marker =>
+    mk({
+      string: 2,
+      fret: 4,
+      function: 'third',
+      emphasis: 'highlighted',
+      variant: 'comparison',
+      ...over
+    });
+  const move = (over: Record<string, unknown> = {}) =>
+    ({
+      kind: 'move',
+      id: 'iso:arrow:third',
+      string: 2,
+      fromFret: 5,
+      toFret: 4,
+      label: '1 fret',
+      ...over
+    }) as const;
+  const showWith = (markers: Marker[], arrows: DisplayModel['arrows'], extra = {}) =>
+    render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: { markers, labelMode: 'note', arrows },
+      ...extra
+    });
+
+  it('F6: a comparison marker carries the comparison class and keeps its function', () => {
+    const { container } = showWith([cmp()], []);
+    const g = container.querySelector('.marker[data-key="2:4"]');
+    expect(g?.classList).toContain('comparison');
+    expect(g?.classList).toContain('third');
+    expect(g?.getAttribute('data-variant')).toBe('comparison');
+    const plain = showWith([mk({ string: 2, fret: 5, function: 'third' })], []).container;
+    expect(plain.querySelector('.marker[data-key="2:5"]')?.classList).not.toContain('comparison');
+  });
+
+  it('F9: a move arrow joins the two cells with an arrowhead at toFret and the label', () => {
+    const { container } = showWith([cmp()], [move()]);
+    const arrow = container.querySelector('g.arrows .arrow[data-id="iso:arrow:third"]');
+    expect(arrow).toBeTruthy();
+    const line = arrow?.querySelector('line');
+    const l = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 0, 'interactive');
+    const x1 = Number(line?.getAttribute('x1'));
+    const x2 = Number(line?.getAttribute('x2'));
+    // Drawn toward the nut (smaller x), between the two cell centres.
+    expect(x2).toBeLessThan(x1);
+    expect(x1).toBeLessThanOrEqual(l.columns[5].center);
+    expect(x2).toBeGreaterThanOrEqual(l.columns[4].center);
+    expect(Number(line?.getAttribute('y1'))).toBeCloseTo(l.rows[1].center, 0);
+    expect(arrow?.querySelector('polygon.arrowhead')).toBeTruthy();
+    expect(arrow?.querySelector('text')?.textContent).toBe('1 fret');
+  });
+
+  it('F11: arrow direction follows the layout columns (toFret side)', () => {
+    const normal = showWith([cmp()], [move()]).container;
+    const reversed = showWith([cmp()], [move({ fromFret: 4, toFret: 5 })]).container;
+    const dir = (c: HTMLElement) => {
+      const line = c.querySelector('g.arrows line');
+      return Math.sign(Number(line?.getAttribute('x2')) - Number(line?.getAttribute('x1')));
+    };
+    expect(dir(normal)).toBe(-1);
+    expect(dir(reversed)).toBe(1);
+  });
+
+  it('F12: arrows sit in an aria-hidden group above the markers', () => {
+    const { container } = showWith([cmp()], [move()]);
+    const group = container.querySelector('g.arrows');
+    expect(group?.getAttribute('aria-hidden')).toBe('true');
+    const markers = container.querySelector('g.markers');
+    expect(
+      markers && group && markers.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('F14: invalid arrows are dropped without throwing', () => {
+    const { container } = showWith(
+      [cmp()],
+      [
+        move({ id: 'a', string: 7 }),
+        move({ id: 'b', string: 0 }),
+        move({ id: 'c', toFret: 23 }),
+        move({ id: 'd', fromFret: -1 }),
+        move({ id: 'e', fromFret: 4, toFret: 4 }),
+        move({ id: 'f', toFret: 1.5 })
+      ]
+    );
+    expect(container.querySelectorAll('g.arrows .arrow')).toHaveLength(0);
+  });
+
+  it('F15: the thumbnail ignores arrows', () => {
+    const { container } = showWith([cmp()], [move()], { variant: 'thumbnail' });
+    expect(container.querySelector('.arrows')).toBeNull();
+    expect(container.querySelector('.arrow')).toBeNull();
+  });
+
+  it('US1-5: no arrows or dashes when the model has none', () => {
+    const { container } = showWith([mk({ string: 2, fret: 5, function: 'third' })], undefined);
+    expect(container.querySelectorAll('.arrow')).toHaveLength(0);
+    expect(container.querySelectorAll('.marker.comparison')).toHaveLength(0);
+  });
+
+  it('US1-6: every comparison marker has a dash style hook and an arrow', () => {
+    const { container } = showWith([cmp()], [move()]);
+    expect(container.querySelectorAll('.marker.comparison')).toHaveLength(1);
+    expect(container.querySelectorAll('.arrow')).toHaveLength(1);
+    const css = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(css).toMatch(/\.marker\.comparison[^{]*\{[^}]*stroke-dasharray:\s*var\(--marker-dash\)/);
+  });
+
+  it('F8: the comparison cell name carries the comparison suffix', () => {
+    render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: { markers: [cmp()], labelMode: 'note' }
+    });
+    expect(screen.getByRole('gridcell', { name: /string 2, fret 4.*comparison/ })).toBeTruthy();
+  });
+});
+
+describe('Fretboard off-board arrows (007 US3)', () => {
+  const base = mk({ string: 2, fret: 12, function: 'third' });
+  const off = (over: Record<string, unknown> = {}) =>
+    ({
+      kind: 'off-board',
+      id: 'iso:arrow:off:third',
+      string: 2,
+      fromFret: 0,
+      edge: 'nut',
+      label: 'B♭',
+      ...over
+    }) as const;
+  const showWith = (arrows: DisplayModel['arrows'], markers: Marker[] = [base], extra = {}) =>
+    render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: { markers, labelMode: 'note', arrows },
+      ...extra
+    });
+  const layout = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 0, 'interactive');
+  const tipX = (c: HTMLElement) => {
+    const pts = c.querySelector('g.arrows polygon.arrowhead')?.getAttribute('points') ?? '';
+    return Number(pts.split(' ')[0]?.split(',')[0]);
+  };
+
+  it('F10: edge nut draws a head at the open-string side edge, with the note name', () => {
+    const { container } = showWith([off()], [mk({ string: 2, fret: 0, function: 'third' })]);
+    const arrow = container.querySelector('g.arrows .arrow[data-id="iso:arrow:off:third"]');
+    expect(arrow).toBeTruthy();
+    expect(arrow?.querySelector('polygon.arrowhead')).toBeTruthy();
+    expect(arrow?.querySelector('text')?.textContent).toBe('B♭');
+    // Toward the nut: left of the open-string marker, no further than the column edge.
+    expect(tipX(container)).toBeLessThan(layout.columns[0].center);
+    expect(tipX(container)).toBeGreaterThanOrEqual(layout.columns[0].start);
+  });
+
+  it('F10: edge end draws a head past the last fret column centre, toward the board end', () => {
+    const last = STANDARD_GUITAR.fretCount;
+    const { container } = showWith(
+      [off({ edge: 'end', fromFret: last, label: 'E♯' })],
+      [mk({ string: 2, fret: last, function: 'third' })]
+    );
+    expect(container.querySelector('g.arrows .arrow text')?.textContent).toBe('E♯');
+    expect(tipX(container)).toBeGreaterThan(layout.columns[last].center);
+    expect(tipX(container)).toBeLessThanOrEqual(layout.columns[last].end);
+    const line = container.querySelector('g.arrows line');
+    expect(Number(line?.getAttribute('y1'))).toBeCloseTo(layout.rows[1].center, 0);
+  });
+
+  it('F11: the head side follows the layout columns (nut left of end)', () => {
+    const nut = showWith([off()], [mk({ string: 2, fret: 0, function: 'third' })]).container;
+    const last = STANDARD_GUITAR.fretCount;
+    const end = showWith(
+      [off({ edge: 'end', fromFret: last })],
+      [mk({ string: 2, fret: last, function: 'third' })]
+    ).container;
+    expect(tipX(nut)).toBeLessThan(layout.columns[0].center);
+    expect(tipX(end)).toBeGreaterThan(layout.columns[last].center);
+  });
+
+  it('F12: off-board arrows are aria-hidden with the move arrows', () => {
+    const { container } = showWith([off()], [mk({ string: 2, fret: 0, function: 'third' })]);
+    expect(container.querySelector('g.arrows')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('F14: invalid off-board arrows are dropped without throwing', () => {
+    const { container } = showWith(
+      [
+        off({ id: 'a', string: 0 }),
+        off({ id: 'b', string: 7 }),
+        off({ id: 'c', fromFret: 23 }),
+        off({ id: 'd', fromFret: -1 }),
+        off({ id: 'e', edge: 'top' })
+      ],
+      [mk({ string: 2, fret: 0, function: 'third' })]
+    );
+    expect(container.querySelectorAll('g.arrows .arrow')).toHaveLength(0);
+  });
+
+  it('F15: the thumbnail ignores off-board arrows', () => {
+    const { container } = showWith([off()], [base], { variant: 'thumbnail' });
+    expect(container.querySelector('.arrow')).toBeNull();
+  });
+});
+
+describe('Fretboard marker motion (007 US5)', () => {
+  const id = (over: Partial<Marker> & Pick<Marker, 'string' | 'fret'>): Marker =>
+    mk({ function: 'third', emphasis: 'highlighted', ...over });
+  const model = (markers: Marker[], arrows: DisplayModel['arrows'] = []): DisplayModel => ({
+    markers,
+    labelMode: 'note',
+    arrows
+  });
+  const nodes = (c: HTMLElement) => [...c.querySelectorAll<SVGGElement>('.marker')];
+
+  it('F1: markers without an id keep the position key (Notes tool unchanged)', async () => {
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model([mk({ string: 2, fret: 3 })])
+    });
+    const before = container.querySelector('.marker[data-key="2:3"]');
+    await rerender({ instrument: STANDARD_GUITAR, model: model([mk({ string: 2, fret: 3 })]) });
+    expect(container.querySelector('.marker[data-key="2:3"]')).toBe(before);
+    await rerender({ instrument: STANDARD_GUITAR, model: model([mk({ string: 2, fret: 4 })]) });
+    expect(container.querySelector('.marker[data-key="2:3"]')).toBeNull();
+    expect(container.querySelector('.marker[data-key="2:4"]')).not.toBe(before);
+  });
+
+  it('F2: same id at a new fret reuses the DOM node with a changed transform', async () => {
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model([id({ string: 2, fret: 5, id: 'a:third' })])
+    });
+    const [node] = nodes(container);
+    const t0 = node.style.transform;
+    expect(t0).toMatch(/^translate\(.+px, .+px\)$/);
+    await rerender({
+      instrument: STANDARD_GUITAR,
+      model: model([id({ string: 2, fret: 4, id: 'a:third' })])
+    });
+    const [after] = nodes(container);
+    expect(after).toBe(node);
+    expect(after.getAttribute('data-key')).toBe('2:4');
+    expect(after.style.transform).not.toBe(t0);
+    // The SVG attribute (the CSP-safe prerender position) follows; the inline style wins once mounted.
+    const attr = after.getAttribute('transform') ?? '';
+    expect(attr).toMatch(/^translate\(\S+ \S+\)$/);
+    expect(after.style.transform).toBe(
+      attr.replace(/translate\((\S+) (\S+)\)/, 'translate($1px, $2px)')
+    );
+  });
+
+  it('F3: unchanged id, position and function keep node and transform', async () => {
+    const ms = () => [
+      id({ string: 3, fret: 0, id: 'a:root', function: 'root' }),
+      id({ string: 2, fret: 5, id: 'a:third' })
+    ];
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model(ms())
+    });
+    const before = nodes(container);
+    const transforms = before.map((n) => n.style.transform);
+    await rerender({ instrument: STANDARD_GUITAR, model: model(ms()) });
+    const after = nodes(container);
+    expect(after).toHaveLength(2);
+    after.forEach((n, i) => {
+      expect(n).toBe(before[i]);
+      expect(n.style.transform).toBe(transforms[i]);
+    });
+  });
+
+  it('F4: the slide uses the duration and easing tokens, zeroed under reduced motion', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(src).toMatch(
+      /\.marker\s*\{[^}]*transition:\s*transform var\(--duration-short\) var\(--ease-standard\)/s
+    );
+    expect(src).not.toMatch(/duration:\s*\d/);
+    const tokens = readFileSync('src/lib/styles/tokens.css', 'utf8');
+    expect(tokens).toMatch(/prefers-reduced-motion: reduce[\s\S]*--duration-short:\s*0s/);
+  });
+
+  describe('fades (F5)', () => {
+    const animate = vi.fn();
+    const proto = Element.prototype as unknown as { animate: unknown };
+    const original = proto.animate;
+    const stub = (value: string, reduce = false) => {
+      vi.spyOn(globalThis, 'getComputedStyle').mockImplementation(
+        () => ({ getPropertyValue: () => value }) as unknown as CSSStyleDeclaration
+      );
+      vi.stubGlobal('matchMedia', (q: string) => ({
+        matches: reduce && q.includes('reduce'),
+        addEventListener() {}
+      }));
+      proto.animate = (...args: unknown[]) => {
+        animate(...args);
+        return { cancel() {}, finished: Promise.resolve(), onfinish: null, currentTime: 0 };
+      };
+    };
+    const cleanup = () => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+      animate.mockReset();
+      proto.animate = original;
+    };
+
+    it('comparison markers and arrows fade in using --duration-short; arrows are delayed', async () => {
+      stub('300ms');
+      try {
+        const base = [id({ string: 2, fret: 5, id: 'a:third' })];
+        const { container, rerender } = render(Fretboard, {
+          instrument: STANDARD_GUITAR,
+          model: model(base)
+        });
+        animate.mockClear();
+        await rerender({
+          instrument: STANDARD_GUITAR,
+          model: model(
+            [...base, id({ string: 2, fret: 4, id: 'a:cmp', variant: 'comparison' })],
+            [{ kind: 'move', id: 'a:arrow', string: 2, fromFret: 5, toFret: 4, label: '1 fret' }]
+          )
+        });
+        const opts = animate.mock.calls.map((c) => c[1] as { duration: number; delay: number });
+        expect(opts.length).toBeGreaterThanOrEqual(2);
+        // Marker fades over the token duration; the delayed arrow holds (duration 0) until the
+        // marker's fade has run, then fades with the same token duration.
+        expect(opts.filter((o) => o.duration === 300)).toHaveLength(1);
+        expect(opts.filter((o) => o.duration === 0)).toHaveLength(1);
+        // The unchanged first-triad marker does not fade.
+        expect(container.querySelectorAll('.marker')).toHaveLength(2);
+        expect(opts).toHaveLength(2);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('fades are instant under reduced motion', async () => {
+      stub('300ms', true);
+      try {
+        const { rerender } = render(Fretboard, {
+          instrument: STANDARD_GUITAR,
+          model: model([id({ string: 2, fret: 5, id: 'a:third' })])
+        });
+        animate.mockClear();
+        await rerender({
+          instrument: STANDARD_GUITAR,
+          model: model(
+            [id({ string: 2, fret: 4, id: 'a:cmp', variant: 'comparison' })],
+            [{ kind: 'move', id: 'a:arrow', string: 2, fromFret: 5, toFret: 4, label: '1 fret' }]
+          )
+        });
+        // Arrows get no transition at all; markers keep a 1 ms floor (never 0, see markerFade),
+        // so nothing waits or fades for a visible time.
+        for (const c of animate.mock.calls) {
+          expect((c[1] as { duration: number }).duration).toBeLessThanOrEqual(1);
+        }
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
+  it('US5-2: a comparison-quality change slides only the changed comparison note', async () => {
+    const first = [
+      id({ string: 3, fret: 0, id: 'a:root', function: 'root' }),
+      id({ string: 2, fret: 5, id: 'a:first:third' }),
+      id({ string: 2, fret: 4, id: 'a:cmp:third', variant: 'comparison' }),
+      id({ string: 1, fret: 3, id: 'a:first:fifth', function: 'fifth' }),
+      id({ string: 1, fret: 2, id: 'a:cmp:fifth', variant: 'comparison', function: 'fifth' })
+    ];
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model(first)
+    });
+    const before = nodes(container);
+    const t = before.map((n) => n.style.transform);
+    const next = first.map((m) => (m.id === 'a:cmp:fifth' ? { ...m, fret: 1 } : m));
+    await rerender({ instrument: STANDARD_GUITAR, model: model(next) });
+    const after = nodes(container);
+    expect(after).toHaveLength(5);
+    const changed = after.filter((n, i) => n.style.transform !== t[i]);
+    expect(changed).toHaveLength(1);
+    expect(changed[0]).toBe(before[4]);
+    after.forEach((n, i) => expect(n).toBe(before[i]));
+  });
+
+  it('US5-4: when every id changes, old nodes are replaced and nothing slides', async () => {
+    const set = (p: string, fret: number) => [
+      id({ string: 3, fret, id: `${p}:root`, function: 'root' }),
+      id({ string: 2, fret: fret + 1, id: `${p}:third` })
+    ];
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model(set('C', 5))
+    });
+    const before = nodes(container);
+    await rerender({ instrument: STANDARD_GUITAR, model: model(set('D', 7)) });
+    const after = nodes(container);
+    expect(after).toHaveLength(2);
+    for (const n of after) {
+      expect(before).not.toContain(n);
+      expect(n.isConnected).toBe(true);
+    }
+    for (const n of before) expect(n.isConnected).toBe(false);
+  });
+});

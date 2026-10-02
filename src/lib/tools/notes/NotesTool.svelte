@@ -9,11 +9,13 @@
   import { defaultSpelling, noteList } from '$lib/notation/notation';
   import Notice from '$lib/shell/Notice.svelte';
   import NoteSelector from '$lib/tools/NoteSelector.svelte';
+  import DetectedTriad from '$lib/tools/notes/DetectedTriad.svelte';
   import NotesActions from '$lib/tools/notes/NotesActions.svelte';
   import RegionFilter from '$lib/tools/notes/RegionFilter.svelte';
   import StringFilter from '$lib/tools/notes/StringFilter.svelte';
   import PositionCard from '$lib/tools/notes/PositionCard.svelte';
   import { maybeFault } from '$lib/shell/fault';
+  import { openTriadsFromNote, viewAsTriad } from '$lib/state/links.svelte';
   import { notes } from '$lib/state/notes.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { onMount } from 'svelte';
@@ -76,6 +78,7 @@
 <section class="b" aria-labelledby="notes-zone-b">
   <h2 id="notes-zone-b">{m.notes_zone_selector()}</h2>
   <NoteSelector selected={notes.state.selection} ontoggle={notes.toggleNote} />
+  <DetectedTriad detected={notes.display.detected} onview={viewAsTriad} />
 </section>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions (Escape closes the card; cells are the interactive stops) -->
 <section class="c" aria-labelledby="notes-zone-c" {onkeydown}>
@@ -102,7 +105,12 @@
 <section class="d" aria-labelledby="notes-zone-d" {onkeydown}>
   <h2 id="notes-zone-d">{m.notes_zone_details()}</h2>
   {#if notes.display.cardInfo}
-    <PositionCard info={notes.display.cardInfo} onaddnote={notes.addNote} onclose={closeCard} />
+    <PositionCard
+      info={notes.display.cardInfo}
+      onaddnote={notes.addNote}
+      ontriads={openTriadsFromNote}
+      onclose={closeCard}
+    />
   {/if}
   <StringFilter
     instrument={notes.instrument}

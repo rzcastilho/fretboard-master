@@ -56,6 +56,52 @@ describe('TriadsGuidance (US8)', () => {
   });
 });
 
+describe('TriadsGuidance See all notes (US3)', () => {
+  for (const shape of [{ kind: 'beyond', fretCount: 12 }, { kind: 'does-not-close' }] as const) {
+    it(`${shape.kind}: See all notes shown, calls onseeallnotes, not error-coloured`, async () => {
+      const onseeallnotes = vi.fn();
+      const { container } = render(TriadsGuidance, {
+        shape,
+        anotherSet: null,
+        onanotherset: vi.fn(),
+        seeAllNotes: true,
+        onseeallnotes
+      });
+      await fireEvent.click(screen.getByRole('button', { name: 'See all notes' }));
+      expect(onseeallnotes).toHaveBeenCalledTimes(1);
+      expect(container.innerHTML).not.toMatch(/error|danger/i);
+    });
+  }
+
+  it('Another set only for does-not-close; hidden See all notes when flag is false', () => {
+    const { unmount } = render(TriadsGuidance, {
+      shape: { kind: 'beyond', fretCount: 12 },
+      anotherSet: 5,
+      onanotherset: vi.fn(),
+      seeAllNotes: true,
+      onseeallnotes: vi.fn()
+    });
+    expect(screen.queryByRole('button', { name: 'Another set' })).toBeNull();
+    unmount();
+    render(TriadsGuidance, {
+      shape: { kind: 'does-not-close' },
+      anotherSet: 5,
+      onanotherset: vi.fn(),
+      seeAllNotes: false
+    });
+    expect(screen.queryByRole('button', { name: 'See all notes' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Another set' })).toBeTruthy();
+  });
+
+  it('TriadsTool: shown in Isolated, absent in All notes', async () => {
+    triads.useInstrument(NC_UNISON);
+    render(TriadsTool);
+    await fireEvent.click(screen.getByRole('button', { name: 'See all notes' }));
+    expect(triads.state.view).toBe('all-notes');
+    expect(screen.queryByRole('button', { name: 'See all notes' })).toBeNull();
+  });
+});
+
 describe('TriadsTool guidance (US8)', () => {
   it('US8-1: beyond fret 12 shows guidance on AF-1-12', () => {
     triads.useInstrument(AF_1_12);

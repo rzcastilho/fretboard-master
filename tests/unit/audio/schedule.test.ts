@@ -107,3 +107,21 @@ describe('planRequest', () => {
     expect(plan.steps[0].pitches).toEqual([38 + 5]);
   });
 });
+
+describe('planRequest rest step (007 US6, R-10)', () => {
+  it('an empty step keeps its slot: two blocks at 0 and 1000 ms, 500 ms each', () => {
+    const a = [p(3, 0), p(2, 1), p(1, 0)];
+    const d = [p(3, 0), p(2, 0), p(1, 0)];
+    const plan = planRequest({ kind: 'sequence', steps: [a, [], d], bpm: 120 }, STANDARD_GUITAR);
+    expect(plan.steps).toHaveLength(2);
+    expect(plan.steps.map((s) => s.onsetMs)).toEqual([0, 1000]);
+    expect(plan.marks.map((k) => [k.onsetMs, k.endMs])).toEqual([
+      [0, 500],
+      [0, 500],
+      [0, 500],
+      [1000, 1500],
+      [1000, 1500],
+      [1000, 1500]
+    ]);
+  });
+});

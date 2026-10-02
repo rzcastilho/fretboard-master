@@ -1,24 +1,23 @@
 /** Pure triad shapes on three adjacent strings (TM-5). Imports only `./pitch` and `./triad`. */
 import { pitchClass, type Pitch } from './pitch';
-import type { TriadFunction, TriadSpelling } from './triad';
+import { QUALITY_INTERVALS, type Quality, type TriadFunction, type TriadSpelling } from './triad';
 
 export type Inversion = 'root' | 'first' | 'second';
+export type Functions3 = readonly [TriadFunction, TriadFunction, TriadFunction];
 /** Frets from the lowest string of the set to the highest. */
 export type Frets3 = readonly [number, number, number];
 export type ShapeResult =
   | {
       readonly kind: 'shape';
       readonly frets: Frets3;
-      readonly functions: readonly [TriadFunction, TriadFunction, TriadFunction];
+      readonly functions: Functions3;
     }
   | { readonly kind: 'does-not-close' };
 
 export const INVERSIONS: readonly Inversion[] = ['root', 'first', 'second'];
 
 /** TM-5.2, low → high. */
-export const INVERSION_ORDER: Readonly<
-  Record<Inversion, readonly [TriadFunction, TriadFunction, TriadFunction]>
-> = {
+export const INVERSION_ORDER: Readonly<Record<Inversion, Functions3>> = {
   root: ['root', 'third', 'fifth'],
   first: ['third', 'fifth', 'root'],
   second: ['fifth', 'root', 'third']
@@ -77,4 +76,112 @@ export function span(frets: Frets3): number {
 
 export function isWideStretch(frets: Frets3): boolean {
   return span(frets) >= WIDE_STRETCH_SPAN;
+}
+
+export interface ChainShape {
+  /** Named relative to the chosen root (TM-5.2), never re-rooted. */
+  readonly inversion: Inversion;
+  /** k: 0 = TM-5.3 lowest occurrence of this inversion. */
+  readonly octave: number;
+  readonly frets: Frets3;
+  readonly functions: Functions3;
+}
+
+export type ChainResult =
+  | { readonly kind: 'chain'; readonly shapes: readonly ChainShape[] }
+  | { readonly kind: 'beyond' }
+  | { readonly kind: 'does-not-close' };
+
+/** Every occurrence of every inversion on three open pitches that fits in `fretCount`, ordered by lowest-string fret (C1, C2). */
+export function inversionChain(
+  open: readonly [Pitch, Pitch, Pitch],
+  t: TriadSpelling,
+  fretCount: number
+): ChainResult {
+  const shapes: ChainShape[] = [];
+  for (const inversion of INVERSIONS) {
+    const base = triadShape(open, t, inversion);
+    if (base.kind !== 'shape') return { kind: 'does-not-close' };
+    occurrences(base.frets, fretCount).forEach((frets, octave) =>
+      shapes.push({ inversion, octave, frets, functions: INVERSION_ORDER[inversion] })
+    );
+  }
+  if (shapes.length === 0) return { kind: 'beyond' };
+  shapes.sort((a, b) => a.frets[0] - b.frets[0]);
+  return { kind: 'chain', shapes };
+}
+
+export interface NoteMove {
+  readonly index: 0 | 1 | 2;
+  readonly function: 'third' | 'fifth';
+  readonly fromFret: number;
+  /** `fromFret + delta`; may be < 0 or > fretCount. */
+  readonly toFret: number;
+  readonly delta: -2 | -1 | 1 | 2;
+}
+
+/** The quality that differs from each quality by exactly one note (C3). */
+export const ONE_NOTE_PARTNER: Readonly<Record<Quality, Quality>> = {
+  major: 'minor',
+  minor: 'major',
+  diminished: 'minor',
+  augmented: 'major'
+};
+
+/** Fret change of the note with function `fn` going from quality `from` to `to`. */
+function deltaOf(fn: TriadFunction, from: Quality, to: Quality): number {
+  if (fn === 'root') return 0;
+  return QUALITY_INTERVALS[to][fn] - QUALITY_INTERVALS[from][fn];
+}
+
+/** First shape with each differing note moved on its own string; result may be out of 0…fretCount. */
+export function comparisonFrets(
+  frets: Frets3,
+  functions: Functions3,
+  from: Quality,
+  to: Quality
+): Frets3 {
+  return [
+    frets[0] + deltaOf(functions[0], from, to),
+    frets[1] + deltaOf(functions[1], from, to),
+    frets[2] + deltaOf(functions[2], from, to)
+  ];
+}
+
+/** Notes whose interval differs between `from` and `to`, low → high; [] when from === to. */
+export function noteMoves(
+  frets: Frets3,
+  functions: Functions3,
+  from: Quality,
+  to: Quality
+): readonly NoteMove[] {
+  const moves: NoteMove[] = [];
+  functions.forEach((fn, i) => {
+    const delta = deltaOf(fn, from, to);
+    if (delta === 0 || fn === 'root') return;
+    moves.push({
+      index: i as 0 | 1 | 2,
+      function: fn,
+      fromFret: frets[i],
+      toFret: frets[i] + delta,
+      delta: delta as NoteMove['delta']
+    });
+  });
+  return moves;
+}
+
+/** Indexes k of `occs` where every comparison fret lies in 0…fretCount. */
+export function pairOccurrences(
+  occs: readonly Frets3[],
+  functions: Functions3,
+  from: Quality,
+  to: Quality,
+  fretCount: number
+): readonly number[] {
+  const out: number[] = [];
+  occs.forEach((frets, k) => {
+    const cmp = comparisonFrets(frets, functions, from, to);
+    if (cmp.every((f) => f >= 0 && f <= fretCount)) out.push(k);
+  });
+  return out;
 }

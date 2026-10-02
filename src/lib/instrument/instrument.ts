@@ -82,3 +82,17 @@ export function unisonsOf(instrument: Instrument, p: Position): Position[] {
     (q) => (q.string !== p.string || q.fret !== p.fret) && positionPitch(instrument, q) === pitch
   );
 }
+
+/**
+ * Lowest-fret position sounding `pitch`; a tie goes to the thicker (higher-numbered)
+ * string. `null` when the pitch is not on the board.
+ */
+export function lowestPositionOfPitch(instrument: Instrument, pitch: Pitch): Position | null {
+  let best: Position | null = null;
+  for (let string = instrument.stringCount; string >= 1; string--) {
+    const fret = pitch - pitchOfSpelling(instrument.openStrings[string - 1]);
+    if (fret < 0 || fret > instrument.fretCount) continue;
+    if (best === null || fret < best.fret) best = { string, fret };
+  }
+  return best;
+}

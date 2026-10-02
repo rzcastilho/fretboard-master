@@ -207,3 +207,243 @@ test.describe('triads control-change latency (FR-031, SC-003)', () => {
     expect(median(times)).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('triads view-switch and tag-tap latency (FR-021, SC-006)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median view switch and tag tap → updated board ≤ 100 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/triads');
+    await page
+      .getByRole('group', { name: 'Root' })
+      .getByRole('button', { name: 'A', exact: true })
+      .click();
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await board.waitFor();
+
+    // Measured in the page (pointerdown → observed DOM change), so Playwright round-trips under
+    // throttling are not counted. `check` runs on every mutation; the first time it is true after
+    // a pointerdown, the elapsed time is recorded.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as {
+        __viewTimes: number[];
+        __tagTimes: number[];
+        __downAt: number | null;
+        __kind: 'view' | 'tag';
+        __check: () => boolean;
+      };
+      w.__viewTimes = [];
+      w.__tagTimes = [];
+      w.__downAt = null;
+      w.__kind = 'view';
+      w.__check = () => false;
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || !w.__check()) return;
+        (w.__kind === 'view' ? w.__viewTimes : w.__tagTimes).push(performance.now() - w.__downAt);
+        w.__downAt = null;
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true
+      });
+    });
+    const arm = (kind: 'view' | 'tag', check: string) =>
+      page.evaluate(
+        ([k, c]) => {
+          const w = globalThis as unknown as Record<string, unknown>;
+          w.__kind = k;
+          w.__check = new Function(`return (${c})`)();
+          w.__downAt = null;
+        },
+        [kind, check] as const
+      );
+    const tagCount = `() => document.querySelectorAll('.tags button').length === 6`;
+    const noTags = `() => document.querySelectorAll('.tags button').length === 0`;
+    const pressedTag = (i: number) =>
+      `() => document.querySelectorAll('.tags button')[${i}]?.getAttribute('aria-pressed') === 'true'`;
+
+    const samples = 5;
+    for (let i = 0; i < samples; i++) {
+      // Isolated → Full neck.
+      await arm('view', tagCount);
+      await page.getByRole('radio', { name: 'Full neck' }).click();
+      await expect(page.locator('.tags button')).toHaveCount(6);
+
+      // Tag tap: select the 2nd-inversion tag (index 2), then the 1st (index 1) next round.
+      const target = i % 2 === 0 ? 2 : 1;
+      await arm('tag', pressedTag(target));
+      await page.locator('.tags button').nth(target).click();
+      await expect(page.locator('.tags button').nth(target)).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+
+      // Full neck → All notes → Isolated, timing the All notes switch.
+      await arm('view', noTags);
+      await page.getByRole('radio', { name: 'All notes' }).click();
+      await expect(page.locator('.tags button')).toHaveCount(0);
+      await page.getByRole('radio', { name: 'Isolated' }).click();
+      await page.evaluate(() => ((globalThis as unknown as { __downAt: null }).__downAt = null));
+    }
+
+    const { viewTimes, tagTimes } = await page.evaluate(() => {
+      const w = globalThis as unknown as { __viewTimes: number[]; __tagTimes: number[] };
+      return { viewTimes: w.__viewTimes, tagTimes: w.__tagTimes };
+    });
+    expect(viewTimes.length).toBeGreaterThanOrEqual(samples);
+    expect(tagTimes.length).toBeGreaterThanOrEqual(samples);
+    expect(median(viewTimes)).toBeLessThanOrEqual(100);
+    expect(median(tagTimes)).toBeLessThanOrEqual(100);
+  });
+});
+
+test.describe('triads Compare latency (FR-021, SC-007)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median Compare on and comparison-quality change → updated board ≤ 100 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/triads');
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await expect(board.locator('.marker')).toHaveCount(3);
+    const toggle = page.getByRole('button', { name: 'Compare', exact: true });
+    const list = page.getByRole('radiogroup', { name: 'Compare with' });
+
+    // Measured in the page (pointerdown → observed DOM change), so Playwright round-trips under
+    // throttling are not counted.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as {
+        __onTimes: number[];
+        __qualityTimes: number[];
+        __downAt: number | null;
+        __kind: 'on' | 'quality';
+        __check: () => boolean;
+      };
+      w.__onTimes = [];
+      w.__qualityTimes = [];
+      w.__downAt = null;
+      w.__kind = 'on';
+      w.__check = () => false;
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || !w.__check()) return;
+        (w.__kind === 'on' ? w.__onTimes : w.__qualityTimes).push(performance.now() - w.__downAt);
+        w.__downAt = null;
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true
+      });
+    });
+    const arm = (kind: 'on' | 'quality', check: string) =>
+      page.evaluate(
+        ([k, c]) => {
+          const w = globalThis as unknown as Record<string, unknown>;
+          w.__kind = k;
+          w.__check = new Function(`return (${c})`)();
+          w.__downAt = null;
+        },
+        [kind, check] as const
+      );
+    const hasComparison = `() => document.querySelectorAll('.marker.comparison').length === 1`;
+    // Compare off fades the comparison marker out (F5). Svelte flags an outroing node with the
+    // `inert` property (not an attribute on SVG), so the board has updated once every comparison
+    // marker left is outroing, not when the fade ends.
+    const noComparison = `() => [...document.querySelectorAll('.marker.comparison')].every((n) => n.inert)`;
+    const comparisonFifth = `() => document.querySelector('.marker.comparison.fifth') !== null`;
+    const comparisonThird = `() => document.querySelector('.marker.comparison.third') !== null`;
+
+    const samples = 5;
+    for (let i = 0; i < samples; i++) {
+      // Compare on (major vs minor: the third moves).
+      await arm('on', hasComparison);
+      await toggle.click();
+      await expect(board.locator('.marker.comparison')).toHaveCount(1);
+
+      // Comparison-quality change: diminished moves the fifth, then back to minor (the third).
+      await arm('quality', comparisonFifth);
+      await list.getByRole('radio', { name: 'diminished' }).click();
+      await expect(board.locator('.marker.comparison.fifth')).toHaveCount(1);
+      await arm('quality', comparisonThird);
+      await list.getByRole('radio', { name: 'minor' }).click();
+      await expect(board.locator('.marker.comparison.third')).toHaveCount(1);
+
+      // Compare off, back to the initial view for the next sample.
+      await arm('on', noComparison);
+      await toggle.click();
+      await expect(board.locator('.marker.comparison')).toHaveCount(0);
+      await page.evaluate(() => ((globalThis as unknown as { __downAt: null }).__downAt = null));
+    }
+
+    const { onTimes, qualityTimes } = await page.evaluate(() => {
+      const w = globalThis as unknown as { __onTimes: number[]; __qualityTimes: number[] };
+      return { onTimes: w.__onTimes, qualityTimes: w.__qualityTimes };
+    });
+    expect(onTimes.length).toBeGreaterThanOrEqual(samples);
+    expect(qualityTimes.length).toBeGreaterThanOrEqual(samples * 2);
+    expect(median(onTimes)).toBeLessThanOrEqual(100);
+    expect(median(qualityTimes)).toBeLessThanOrEqual(100);
+  });
+});
+
+test.describe('linked-tools carry latency (SC-005, FR-017)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('nav click Notes → Triads with a carry shows the carried root ≤ 300 ms', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const times: number[] = [];
+    for (const [pitch, heading] of [
+      ['A', 'A major — Root position'],
+      ['D', 'D major — Root position'],
+      ['E', 'E major — Root position'],
+      ['G', 'G major — Root position'],
+      ['B', 'B major — Root position']
+    ] as const) {
+      await page.goto('/notes');
+      await page
+        .getByRole('group', { name: 'Choose notes' })
+        .getByRole('button', { name: pitch, exact: true })
+        .click();
+      // Measured in the page: pointerdown → carried heading text in the DOM.
+      await page.evaluate((expected) => {
+        const w = globalThis as unknown as { __carryMs: number | null };
+        w.__carryMs = null;
+        let downAt = 0;
+        document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+          capture: true,
+          once: true
+        });
+        const check = () => {
+          if (w.__carryMs === null && document.body.innerText.includes(expected)) {
+            w.__carryMs = performance.now() - downAt;
+            observer.disconnect();
+          }
+        };
+        const observer = new MutationObserver(check);
+        observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+      }, heading);
+      await page
+        .getByRole('navigation', { name: 'Tools' })
+        .getByRole('link', { name: 'Triads' })
+        .click();
+      await page.waitForFunction(
+        () => (globalThis as unknown as { __carryMs: number | null }).__carryMs !== null
+      );
+      times.push(
+        await page.evaluate(() => (globalThis as unknown as { __carryMs: number }).__carryMs)
+      );
+    }
+    expect(median(times)).toBeLessThanOrEqual(300);
+  });
+});

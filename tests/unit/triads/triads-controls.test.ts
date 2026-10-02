@@ -71,4 +71,51 @@ describe('TriadsControls (US2)', () => {
     await fireEvent.keyDown(document.activeElement as Element, { key: 'End' });
     expect(triads.state.quality).toBe('augmented');
   });
+
+  it('has a View group with Isolated, Full neck and All notes', () => {
+    render(TriadsTool);
+    const views = screen.getByRole('radiogroup', { name: 'View' });
+    expect(
+      within(views)
+        .getAllByRole('radio')
+        .map((r) => r.textContent?.trim())
+    ).toEqual(['Isolated', 'Full neck', 'All notes']);
+  });
+
+  it('SC-004: inversion and string set are disabled only in All notes, values kept', async () => {
+    triads.setInversion('second');
+    triads.setStringSet(4);
+    render(TriadsTool);
+    const inversion = () => screen.getByRole('radiogroup', { name: 'Inversion' });
+    const sets = () => screen.getByRole('radiogroup', { name: 'String set' });
+    for (const v of ['isolated', 'full-neck'] as const) {
+      triads.setView(v);
+      await Promise.resolve();
+      expect(inversion().hasAttribute('aria-disabled')).toBe(false);
+      expect(inversion().getAttribute('aria-describedby')).toBeNull();
+      expect(screen.queryByText('Not used in All notes')).toBeNull();
+    }
+    await fireEvent.click(screen.getByRole('radio', { name: 'All notes' }));
+    expect(triads.state.view).toBe('all-notes');
+    for (const g of [inversion(), sets()]) {
+      expect(g.getAttribute('aria-disabled')).toBe('true');
+      const hint = g.getAttribute('aria-describedby');
+      expect(hint).toBeTruthy();
+      expect(document.getElementById(hint as string)?.textContent).toBe('Not used in All notes');
+    }
+    expect(
+      within(inversion()).getByRole('radio', { name: '2nd inversion' }).getAttribute('aria-checked')
+    ).toBe('true');
+    expect(within(sets()).getByRole('radio', { name: '4-3-2' }).getAttribute('aria-checked')).toBe(
+      'true'
+    );
+    // Operating a disabled group changes nothing.
+    await fireEvent.click(within(inversion()).getByRole('radio', { name: 'Root position' }));
+    expect(triads.state.inversion).toBe('second');
+    // Back to another view: enabled again with prior values.
+    await fireEvent.click(screen.getByRole('radio', { name: 'Isolated' }));
+    expect(inversion().hasAttribute('aria-disabled')).toBe(false);
+    expect(sets().hasAttribute('aria-disabled')).toBe(false);
+    expect(triads.state).toMatchObject({ inversion: 'second', stringSet: 4 });
+  });
 });

@@ -15,6 +15,7 @@ export interface FretboardMetrics {
   markerRoot: number;
   markerMedium: number;
   markerSmall: number;
+  arrowHead: number;
 }
 
 /** Token values at a 16 px root. */
@@ -31,7 +32,8 @@ export const DEFAULT_METRICS: FretboardMetrics = Object.freeze({
   thumbFret: 12,
   markerRoot: 36,
   markerMedium: 30,
-  markerSmall: 24
+  markerSmall: 24,
+  arrowHead: 8
 });
 
 export interface Column {

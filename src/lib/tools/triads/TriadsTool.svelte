@@ -8,12 +8,23 @@
   import { maybeFault } from '$lib/shell/fault';
   import { playback } from '$lib/state/playback.svelte';
   import { triads } from '$lib/state/triads.svelte';
+  import { noteLabel } from '$lib/notation/notation';
+  import { qualityName } from '$lib/state/triads-model';
+  import Notice from '$lib/shell/Notice.svelte';
   import { onMount } from 'svelte';
   import CompositionPanel from './CompositionPanel.svelte';
   import TriadsGuidance from './TriadsGuidance.svelte';
+  import TriadsCompare from './TriadsCompare.svelte';
   import TriadsControls from './TriadsControls.svelte';
   import TriadsSecondary from './TriadsSecondary.svelte';
   import WideStretchMark from './WideStretchMark.svelte';
+
+  function omittedMessage(notes: readonly Parameters<typeof noteLabel>[0][]): string {
+    const list = notes.map(noteLabel).join(', ');
+    return notes.length === 1
+      ? m.triads_compare_omitted_one({ notes: list })
+      : m.triads_compare_omitted_other({ notes: list });
+  }
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
   const guard = () => maybeFault('triads');
@@ -42,6 +53,8 @@
   <TriadsControls
     state={triads.state}
     instrument={triads.instrument}
+    controls={triads.display.controls}
+    onview={triads.setView}
     onroot={triads.selectRoot}
     onquality={triads.setQuality}
     oninversion={triads.setInversion}
@@ -54,12 +67,15 @@
     instrument={triads.instrument}
     model={fixture ?? triads.display.model}
     {onactivate}
+    ontag={(id) => triads.selectTag(id)}
     pulses={playback.pulses}
   />
   <TriadsGuidance
     shape={triads.display.shape}
     anotherSet={triads.display.anotherSet}
     onanotherset={triads.anotherSet}
+    seeAllNotes={triads.display.seeAllNotes}
+    onseeallnotes={triads.seeAllNotes}
   />
   {#if triads.display.shape.kind === 'shown' && triads.display.shape.wideStretch}
     <WideStretchMark />
@@ -70,6 +86,24 @@
 </div>
 <section class="e" aria-labelledby="triads-zone-e">
   <h2 id="triads-zone-e">{m.zone_actions()}</h2>
+  {#if triads.notice?.kind === 'compare-swapped'}
+    {#key triads.notice}
+      <Notice
+        message={m.triads_compare_swapped({ quality: qualityName(triads.notice.quality) })}
+        ondismiss={triads.dismissNotice}
+      />
+    {/key}
+  {/if}
+  {#if triads.notice?.kind === 'compare-omitted'}
+    {#key triads.notice}
+      <Notice message={omittedMessage(triads.notice.notes)} ondismiss={triads.dismissNotice} />
+    {/key}
+  {/if}
+  <TriadsCompare
+    compare={triads.display.compare}
+    onsetcompare={triads.setCompare}
+    oncomparequality={triads.setCompareQuality}
+  />
   <TriadsSecondary
     labelType={triads.state.labelType}
     onlabeltype={triads.setLabelType}
@@ -78,6 +112,10 @@
     onoctavedown={triads.octaveDown}
     listen={triads.display.listen}
     onlisten={triads.listen}
+    compareOn={triads.display.compare.on && triads.display.compare.offered}
+    listenComparison={triads.display.listenComparison}
+    onlistencomparison={triads.listenComparison}
+    onreset={triads.reset}
   />
 </section>
 
@@ -111,5 +149,17 @@
   }
   .e {
     grid-area: e;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .e h2 {
+    margin: 0;
+  }
+
+  /* The flex gap already spaces the zone's children. */
+  .e :global(.notice) {
+    margin-block-end: 0;
   }
 </style>

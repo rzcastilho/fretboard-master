@@ -6,6 +6,7 @@
 import { STANDARD_GUITAR, type Instrument, type Position } from '$lib/instrument/instrument';
 import type { PitchClass } from '$lib/theory/pitch';
 import { LISTEN_BPM } from './listen';
+import { carrySelection } from './links';
 import { buildNotesModel, type NotesDisplay } from './notes-model';
 import {
   addNote,
@@ -59,6 +60,10 @@ export const notes = {
   },
   addNote(pc: PitchClass): void {
     apply(addNote(view, pc));
+  },
+  /** Triads → Notes carry: replaces only the selection (FR-002). */
+  carrySelection(sel: readonly PitchClass[]): void {
+    apply(carrySelection(view, sel));
   },
   toggleString(n: number): void {
     apply(toggleString(view, n, instrument));
