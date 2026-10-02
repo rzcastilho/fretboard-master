@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm check
+      - run: pnpm test:unit --coverage
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:test:skew
+      - run: pnpm exec playwright install --with-deps
+      - run: pnpm test:e2e
+
+  perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/check-no-fault-hook.mjs build
+      - run: node scripts/check-bundle-size.mjs build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build:test && pnpm test:e2e:nojs
+      - run: pnpm build && pnpm lhci
+
+  deploy:
+    needs: [checks, e2e, perf]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BRANCH: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Compute target URL
+        run: |
+          slug=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-28)
+          if [ "$BRANCH" = main ]; then
+            echo "TARGET_URL=https://fretboard-master.pages.dev" >> "$GITHUB_ENV"
+          else
+            echo "TARGET_URL=https://${slug}.fretboard-master.pages.dev" >> "$GITHUB_ENV"
+          fi
+      - name: Deploy while probing availability
+        run: |
+          stop=$(mktemp -u)
+          node scripts/deploy-availability-probe.mjs "$TARGET_URL" --stop-file "$stop" > probe.log 2>&1 &
+          probe=$!
+          status=0
+          pnpm exec wrangler pages deploy build --project-name fretboard-master --branch "$BRANCH" || status=$?
+          touch "$stop"
+          wait $probe || { cat probe.log; status=1; }
+          cat probe.log
+          exit $status
+      - name: Smoke delivery checks
+        run: scripts/smoke-delivery.sh "$TARGET_URL"

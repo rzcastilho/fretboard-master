@@ -1,0 +1,17 @@
+node_modules
+build
+build-next
+.svelte-kit
+src/lib/paraglide
+playwright-report
+.lighthouseci
+coverage
+pnpm-lock.yaml
+specs
+.specify
+.claude
+project.inlang/cache
+project.inlang/.gitignore
+project.inlang/.meta.json
+project.inlang/README.md
+.vitest

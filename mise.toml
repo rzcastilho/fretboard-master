@@ -1,0 +1,4 @@
+[tools]
+node = "24.21.0"
+# npm backend: the default aqua backend has no darwin-x64 asset for pnpm.
+"npm:pnpm" = "10.34.6"
