@@ -13,6 +13,7 @@ import {
 } from '../instrument/instrument';
 import { defaultSpelling, flatSpelling, pitchLabel, spokenNoteList } from '../notation/notation';
 import { octaveOf, pitchClass, type PitchClass, type Spelling } from '../theory/pitch';
+import { LISTEN_BPM, type ListenStep } from './listen';
 import { missingNotes, type Background, type NotesViewState } from './notes-view';
 
 /** Facts for the position card (data-model §6). */
@@ -30,10 +31,8 @@ export interface CardInfo {
   readonly selected: boolean;
 }
 
-/** Listen tempo (R-07, FR-012). */
-export const LISTEN_BPM = 120;
-
-export type ListenStep = Position | readonly Position[];
+// Moved to ./listen (shared with Triads); re-exported so existing imports keep working.
+export { LISTEN_BPM, type ListenStep };
 
 export type ListenState =
   | { readonly enabled: true }

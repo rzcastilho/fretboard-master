@@ -1,6 +1,7 @@
 /** Note naming: glyph labels and spoken names. */
 import { m } from '$lib/paraglide/messages.js';
 import { getLocale } from '$lib/paraglide/runtime.js';
+import type { IntervalId } from '../theory/triad';
 import type { Accidental, Letter, PitchClass, Spelling } from '../theory/pitch';
 
 const SHARP_SPELLINGS: readonly Spelling[] = [
@@ -75,4 +76,20 @@ export function noteList(spellings: readonly Spelling[]): string {
   return new Intl.ListFormat(getLocale(), { style: 'long', type: 'disjunction' }).format(
     spellings.map(noteLabel)
   );
+}
+
+/** Interval label for a triad member: R from the catalog, other ids as glyph strings. */
+export function intervalLabel(id: IntervalId): string {
+  switch (id) {
+    case 'R':
+      return m.interval_root();
+    case 'b3':
+      return '♭3';
+    case 'b5':
+      return '♭5';
+    case '#5':
+      return '♯5';
+    default:
+      return id;
+  }
 }

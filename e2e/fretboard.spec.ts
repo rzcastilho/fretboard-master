@@ -61,7 +61,7 @@ for (const path of ['/notes', '/triads']) {
   });
 }
 
-// Fixtures and pointer events run on /triads, whose board starts blank (/notes marks naturals).
+// Fixtures and pointer events run on /triads, which honours the test-build fixture and event hooks.
 async function withFixture(page: Page, name: string): Promise<void> {
   await page.addInitScript((n) => {
     globalThis.__fmFretboardFixture = n as typeof globalThis.__fmFretboardFixture;
@@ -70,7 +70,11 @@ async function withFixture(page: Page, name: string): Promise<void> {
 }
 
 test.describe('markers (US2)', () => {
-  test('all-markers fixture is distinguishable in grayscale', async ({ page }) => {
+  test('all-markers fixture is distinguishable in grayscale', async ({ page }, testInfo) => {
+    // Capturing a board wider than a mobile-emulated viewport enlarges the viewport, which
+    // reflows the responsive triads controls above it and offsets the capture; the phone and
+    // desktop projects cover the same board.
+    test.skip(!!testInfo.project.use.isMobile, 'element capture reflows under mobile emulation');
     await withFixture(page, 'all-markers');
     const grid = page.getByRole('grid', { name: 'Fretboard' });
     for (const fn of ['root', 'third', 'fifth', 'degree', 'neutral']) {
@@ -121,8 +125,22 @@ test.describe('fretboard pointer interaction (US3)', () => {
     await page.addInitScript(() => {
       globalThis.__fmFretboardEvents = [];
     });
-    await page.goto('/triads');
+    // A blank board, in view and unscrolled (the triads shape would auto-scroll it).
+    await withFixture(page, 'empty');
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await expect(page.locator('.fretboard .marker')).toHaveCount(0);
+    // Reset until settled: the initial auto-scroll toward the triads shape may still be running.
+    await expect
+      .poll(() =>
+        page.locator('.fretboard .scroller').evaluate(async (el) => {
+          el.scrollIntoView({ block: 'center', behavior: 'instant' });
+          el.scrollTo({ left: 0, behavior: 'instant' });
+          const y = el.getBoundingClientRect().top;
+          await new Promise((r) => setTimeout(r, 200));
+          return el.scrollLeft === 0 && el.getBoundingClientRect().top === y;
+        })
+      )
+      .toBe(true);
   });
 
   const events = (page: Page) => page.evaluate(() => globalThis.__fmFretboardEvents);
@@ -397,7 +415,7 @@ test.describe('keyboard operation (US5)', () => {
   });
 
   test('toggle shows the description text', async ({ page }) => {
-    await page.goto('/triads'); // blank board: the empty description
+    await withFixture(page, 'empty'); // blank board: the empty description
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     const toggle = page.getByRole('button', { name: 'Show text description' });
     await toggle.click();
@@ -405,7 +423,9 @@ test.describe('keyboard operation (US5)', () => {
       'aria-expanded',
       'true'
     );
-    await expect(page.getByText('No positions marked.')).toBeVisible();
+    const description = page.locator('p.description');
+    await expect(description).toBeVisible();
+    await expect(description).toHaveText('No positions marked.');
   });
 });
 

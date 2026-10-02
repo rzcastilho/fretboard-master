@@ -6,9 +6,11 @@
     /** Selected pitch classes (0–11, C = 0). */
     selected: readonly number[];
     ontoggle: (pc: number) => void;
+    /** Group name; defaults to the Notes label. */
+    label?: string;
   }
 
-  let { selected, ontoggle }: Props = $props();
+  let { selected, ontoggle, label }: Props = $props();
 
   const notes = Array.from({ length: 12 }, (_, pc) => {
     const sharp = defaultSpelling(pc);
@@ -25,7 +27,7 @@
   });
 </script>
 
-<div class="selector" role="group" aria-label={m.notes_selector_label()}>
+<div class="selector" role="group" aria-label={label ?? m.notes_selector_label()}>
   {#each notes as n (n.pc)}
     <button
       type="button"

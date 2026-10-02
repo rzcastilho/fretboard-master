@@ -4,6 +4,7 @@
   import FailureView from './FailureView.svelte';
   import { recordFailure } from './failure';
   import NotesTool from '$lib/tools/notes/NotesTool.svelte';
+  import TriadsTool from '$lib/tools/triads/TriadsTool.svelte';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
   import StopButton from './StopButton.svelte';
@@ -31,6 +32,8 @@
     <svelte:boundary onerror={(e) => recordFailure(tool, e)}>
       {#if tool === 'notes'}
         <NotesTool />
+      {:else if tool === 'triads'}
+        <TriadsTool />
       {:else}
         <ToolPlaceholder {tool} />
       {/if}

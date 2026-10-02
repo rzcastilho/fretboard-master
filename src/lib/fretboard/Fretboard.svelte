@@ -1,7 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import { onMount, untrack } from 'svelte';
-  import { defaultSpelling, noteLabel, pitchLabel } from '../notation/notation';
+  import { defaultSpelling, intervalLabel, noteLabel, pitchLabel } from '../notation/notation';
   import { octaveOf, pitchClass } from '../theory/pitch';
   import {
     isValidPosition,
@@ -188,6 +188,8 @@
     if (model.labelMode === 'none') return null;
     const labeled = mk.label ?? (mk.emphasis === 'highlighted' || mk.emphasis === 'normal');
     if (!labeled) return null;
+    if (model.labelMode === 'interval')
+      return mk.interval === undefined ? null : intervalLabel(mk.interval);
     const pitch = positionPitch(instrument, mk);
     const spelling = mk.spelling ?? defaultSpelling(pitchClass(pitch));
     return model.labelMode === 'octave'

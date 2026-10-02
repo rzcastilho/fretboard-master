@@ -805,3 +805,50 @@ describe('Fretboard region band (US3)', () => {
     }
   });
 });
+
+describe('Fretboard interval label mode (005)', () => {
+  const m = (o: Partial<Marker>): Marker => ({
+    string: 1,
+    fret: 1,
+    function: 'neutral',
+    emphasis: 'highlighted',
+    ...o
+  });
+  const labels = (c: HTMLElement) =>
+    [...c.querySelectorAll('.marker text')].map((t) => t.textContent);
+
+  it('labels with the interval glyphs when present', () => {
+    const { container } = show(
+      [
+        m({ string: 3, fret: 5, function: 'root', interval: 'R' }),
+        m({ string: 2, fret: 5, function: 'third', interval: 'b3' }),
+        m({ string: 1, fret: 3, function: 'fifth', interval: '#5' })
+      ],
+      'interval'
+    );
+    expect(new Set(labels(container))).toEqual(new Set(['R', '♭3', '♯5']));
+  });
+
+  it('shows no label when the marker has no interval', () => {
+    const { container } = show([m({ string: 2, fret: 1 })], 'interval');
+    expect(container.querySelectorAll('.marker text')).toHaveLength(0);
+  });
+
+  it('does not change marker shape classes or cell names', () => {
+    const markers = [m({ string: 2, fret: 1, function: 'fifth', interval: '5' })];
+    const interval = show(markers, 'interval').container;
+    const note = show(markers, 'note').container;
+    expect(interval.querySelector('.marker')?.classList).toContain('fifth');
+    expect(interval.querySelector('.marker')?.outerHTML.replace(/<text.*<\/text>/, '')).toBe(
+      note.querySelector('.marker')?.outerHTML.replace(/<text.*<\/text>/, '')
+    );
+  });
+
+  it('note mode shows F𝄪 for a double-sharp spelling', () => {
+    const { container } = show(
+      [m({ string: 2, fret: 6, spelling: { letter: 'F', accidental: 2 }, interval: '3' })],
+      'note'
+    );
+    expect(labels(container)).toEqual(['F𝄪']);
+  });
+});

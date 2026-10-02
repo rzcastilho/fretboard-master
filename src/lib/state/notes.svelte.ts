@@ -5,7 +5,8 @@
  */
 import { STANDARD_GUITAR, type Instrument, type Position } from '$lib/instrument/instrument';
 import type { PitchClass } from '$lib/theory/pitch';
-import { LISTEN_BPM, buildNotesModel, type NotesDisplay } from './notes-model';
+import { LISTEN_BPM } from './listen';
+import { buildNotesModel, type NotesDisplay } from './notes-model';
 import {
   addNote,
   clear,

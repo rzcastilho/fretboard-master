@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   defaultSpelling,
+  intervalLabel,
   flatSpelling,
   noteLabel,
   noteList,
@@ -127,5 +128,19 @@ describe('noteList (disjunction)', () => {
 
   it('gives a single note alone', () => {
     expect(noteList([defaultSpelling(1)])).toBe('C♯');
+  });
+});
+
+describe('intervalLabel', () => {
+  it('uses real glyphs, never ASCII b / #', () => {
+    expect(intervalLabel('R')).toBe('R');
+    expect(intervalLabel('3')).toBe('3');
+    expect(intervalLabel('b3')).toBe('♭3');
+    expect(intervalLabel('5')).toBe('5');
+    expect(intervalLabel('b5')).toBe('♭5');
+    expect(intervalLabel('#5')).toBe('♯5');
+    for (const id of ['R', '3', 'b3', '5', 'b5', '#5'] as const) {
+      expect(intervalLabel(id)).not.toMatch(/[b#]/);
+    }
   });
 });

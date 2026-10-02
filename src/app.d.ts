@@ -15,8 +15,8 @@ declare global {
   /** Test-only (`__FM_FAULT_INJECTION__`): log of audio engine events. */
   var __fmAudioLog: import('$lib/audio/types').AudioLogEntry[] | undefined;
 
-  /** Test-only (`__FM_FAULT_INJECTION__`): allow-listed instrument the Notes tool uses instead of the default. */
-  var __fmInstrument: 'AF-7' | 'AF-21' | undefined;
+  /** Test-only (`__FM_FAULT_INJECTION__`): allow-listed instrument the Notes and Triads tools use instead of the default. */
+  var __fmInstrument: 'AF-7' | 'AF-21' | 'AF-4' | 'AF-1-12' | 'NC-UNISON' | undefined;
 
   namespace App {}
 }

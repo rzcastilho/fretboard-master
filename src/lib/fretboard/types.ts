@@ -1,9 +1,10 @@
 import type { Instrument, Position } from '../instrument/instrument';
 import type { Spelling } from '../theory/pitch';
+import type { IntervalId } from '../theory/triad';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
 export type Emphasis = 'highlighted' | 'normal' | 'dimmed' | 'hidden';
-export type LabelMode = 'note' | 'octave' | 'none';
+export type LabelMode = 'note' | 'octave' | 'interval' | 'none';
 export type OctaveTone = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export interface Marker {
@@ -17,6 +18,8 @@ export interface Marker {
   readonly label?: boolean;
   /** Same-octave tone token (Notes). Drawing only. */
   readonly tone?: OctaveTone;
+  /** Interval from the root (Triads). Used only when labelMode is 'interval'. */
+  readonly interval?: IntervalId;
   /** Draw the small octave number beside a 'note' label. */
   readonly octaveBadge?: boolean;
 }

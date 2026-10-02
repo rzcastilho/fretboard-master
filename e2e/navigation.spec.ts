@@ -9,7 +9,7 @@ test('card opens tool with five named zones @smoke', async ({ page }) => {
   await page.getByRole('link', { name: 'Triads — What is a chord made of?' }).click();
   await expect(page).toHaveURL(/\/triads$/);
   await expect(page.getByRole('banner')).toBeVisible();
-  for (const name of ['Main controls', 'Fretboard', 'Context panel', 'Actions']) {
+  for (const name of ['Main controls', 'Fretboard', 'Composition', 'Actions']) {
     await expect(page.getByRole('region', { name })).toBeVisible();
   }
 });
@@ -95,7 +95,7 @@ test('layout: fretboard largest; context panel placement', async ({ page }, info
     return r;
   };
   const [b, c, d, e] = await Promise.all(
-    ['Main controls', 'Fretboard', 'Context panel', 'Actions'].map(box)
+    ['Main controls', 'Fretboard', 'Composition', 'Actions'].map(box)
   );
   const area = (r: { width: number; height: number }) => r.width * r.height;
   expect(area(c)).toBeGreaterThan(area(b));

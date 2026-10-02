@@ -27,6 +27,12 @@ describe('NoteSelector', () => {
     for (const b of buttons) expect(b.getAttribute('aria-pressed')).toBe('false');
   });
 
+  it('uses a custom group label when given', () => {
+    render(NoteSelector, { selected: [], ontoggle: () => {}, label: 'Root' });
+    expect(screen.getByRole('group', { name: 'Root' })).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Choose notes' })).toBeNull();
+  });
+
   it('exposes spoken accessible names', () => {
     render(NoteSelector, { selected: [], ontoggle: () => {} });
     expect(screen.getByRole('button', { name: 'C' })).toBeTruthy();

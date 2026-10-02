@@ -12,3 +12,7 @@ test-results
 .DS_Store
 *.log
 .vitest
+*.tmp
+*.swp
+.idea/
+Thumbs.db

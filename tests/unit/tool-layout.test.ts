@@ -28,17 +28,14 @@ describe('ToolLayout', () => {
     expect(screen.queryByText('Controls will appear here.')).toBeNull();
   });
 
-  it('triads still renders the placeholder zones', () => {
+  it('triads renders the composition panel, fretboard and actions instead of the placeholder', () => {
     render(ToolLayout, { tool: 'triads' });
-    const zones: Array<[string, string]> = [
-      ['Main controls', 'Controls will appear here.'],
-      ['Context panel', 'Details will appear here.'],
-      ['Actions', 'Actions will appear here.']
-    ];
-    for (const [name, text] of zones) {
-      const region = screen.getByRole('region', { name });
-      expect(within(region).getByText(text)).toBeTruthy();
+    for (const name of ['Fretboard', 'Composition', 'Actions']) {
+      expect(screen.getByRole('region', { name })).toBeTruthy();
     }
+    const fretboard = screen.getByRole('region', { name: 'Fretboard' });
+    expect(within(fretboard).getByRole('grid', { name: 'Fretboard' })).toBeTruthy();
+    expect(screen.queryByText('Controls will appear here.')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Notes' })).toBeNull();
   });
 
@@ -49,10 +46,8 @@ describe('ToolLayout', () => {
     expect(h1s).toHaveLength(1);
     expect(h1s[0].textContent).toBe('Triads');
     expect(main.contains(h1s[0])).toBe(true);
-    const controls = screen.getByRole('region', { name: 'Main controls' });
-    expect(
-      h1s[0].compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    const board = screen.getByRole('region', { name: 'Fretboard' });
+    expect(h1s[0].compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   describe('failure containment', () => {

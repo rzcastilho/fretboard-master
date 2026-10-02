@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AF_1_12,
   AF_21,
+  AF_4,
   AF_7,
+  NC_UNISON,
   INSTRUMENT_FIXTURES,
   fixtureInstrument
 } from '../../../src/lib/instrument/fixtures';
@@ -29,13 +32,38 @@ describe('instrument fixtures (contracts/test-hooks.md)', () => {
     expect(AF_21.fretCount).toBe(22);
   });
 
+  it('AF-4 is Drop D with 22 frets', () => {
+    expect(names(AF_4)).toEqual(['E4', 'B3', 'G3', 'D3', 'A2', 'D2']);
+    expect(AF_4.fretCount).toBe(22);
+  });
+
+  it('AF-1-12 is standard tuning with 12 frets', () => {
+    expect(names(AF_1_12)).toEqual(names(STANDARD_GUITAR));
+    expect(AF_1_12.stringCount).toBe(6);
+    expect(AF_1_12.fretCount).toBe(12);
+  });
+
+  it('NC-UNISON repeats B3 on strings 2 and 3, 22 frets', () => {
+    expect(names(NC_UNISON)).toEqual(['E4', 'B3', 'B3', 'D3', 'A2', 'E2']);
+    expect(NC_UNISON.fretCount).toBe(22);
+  });
+
   it('lookup is allow-listed and falls back to the default without throwing', () => {
     expect(fixtureInstrument('AF-7')).toBe(AF_7);
     expect(fixtureInstrument('AF-21')).toBe(AF_21);
+    expect(fixtureInstrument('AF-4')).toBe(AF_4);
+    expect(fixtureInstrument('AF-1-12')).toBe(AF_1_12);
+    expect(fixtureInstrument('NC-UNISON')).toBe(NC_UNISON);
     for (const bad of [undefined, 'nope', '__proto__', 'toString', 'constructor', 7, null]) {
       expect(fixtureInstrument(bad)).toBe(STANDARD_GUITAR);
     }
-    expect(Object.keys(INSTRUMENT_FIXTURES).sort()).toEqual(['AF-21', 'AF-7']);
+    expect(Object.keys(INSTRUMENT_FIXTURES).sort()).toEqual([
+      'AF-1-12',
+      'AF-21',
+      'AF-4',
+      'AF-7',
+      'NC-UNISON'
+    ]);
   });
 
   it('useInstrument revalidates: 7 strings kept, switching back drops string 7, keeps selection', () => {

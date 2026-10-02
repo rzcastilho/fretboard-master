@@ -1,5 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
+  import ChoiceGroup from '../ChoiceGroup.svelte';
   import type { ListenState } from '$lib/state/notes-model';
   import type { Background, LabelType } from '$lib/state/notes-view';
 
@@ -49,63 +50,21 @@
     { value: 'octave', label: m.notes_label_octave() },
     { value: 'none', label: m.notes_label_none() }
   ]);
-
-  const NEXT: Readonly<Record<string, number>> = {
-    ArrowRight: 1,
-    ArrowDown: 1,
-    ArrowLeft: -1,
-    ArrowUp: -1
-  };
-
-  // Roving tabindex: arrows move focus and select (wrapping); Tab is left alone.
-  function onkey<T extends string>(
-    e: KeyboardEvent,
-    options: readonly { value: T }[],
-    current: T,
-    choose: (v: T) => void
-  ) {
-    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    const index = options.findIndex((o) => o.value === current);
-    let next: number;
-    if (e.key in NEXT) next = (index + NEXT[e.key] + options.length) % options.length;
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = options.length - 1;
-    else return;
-    e.preventDefault();
-    choose(options[next].value);
-    const radios = (e.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>(
-      '[role="radio"]'
-    );
-    radios?.[next]?.focus();
-  }
 </script>
 
-{#snippet group<T extends string>(
-  name: string,
-  options: readonly { value: T; label: string }[],
-  current: T,
-  choose: (v: T) => void
-)}
-  <div class="group" role="radiogroup" aria-label={name}>
-    <span class="name" aria-hidden="true">{name}</span>
-    {#each options as o (o.value)}
-      <button
-        type="button"
-        role="radio"
-        aria-checked={current === o.value}
-        tabindex={current === o.value ? 0 : -1}
-        onclick={() => choose(o.value)}
-        onkeydown={(e) => onkey(e, options, current, choose)}
-      >
-        {o.label}
-      </button>
-    {/each}
-  </div>
-{/snippet}
-
 <div class="actions">
-  {@render group(m.notes_show_group(), shows, background, onbackground)}
-  {@render group(m.notes_label_group(), labels, labelType, onlabeltype)}
+  <ChoiceGroup
+    name={m.notes_show_group()}
+    options={shows}
+    current={background}
+    onchoose={onbackground}
+  />
+  <ChoiceGroup
+    name={m.notes_label_group()}
+    options={labels}
+    current={labelType}
+    onchoose={onlabeltype}
+  />
   <div class="group">
     <button type="button" aria-pressed={hideNames} onclick={() => onhidenames(!hideNames)}>
       {m.notes_hide_names()}
@@ -138,11 +97,6 @@
     align-items: center;
   }
 
-  .name {
-    font-weight: 600;
-    color: var(--color-text);
-  }
-
   button {
     min-block-size: var(--target-min);
     min-inline-size: var(--target-min);
@@ -167,7 +121,6 @@
     color: var(--color-text);
   }
 
-  button[aria-checked='true'],
   button[aria-pressed='true'] {
     background: var(--color-note-highlight);
     color: var(--color-note-highlight-label);
