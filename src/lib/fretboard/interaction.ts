@@ -130,6 +130,36 @@ export function autoScrollTarget(
   return spanTarget(layout, min, max, viewport);
 }
 
+/**
+ * Full neck auto-scroll (C15, R-06): null when no group exists or any group is already fully
+ * visible; otherwise the `spanTarget` move for the first group.
+ */
+export function groupScrollTarget(
+  layout: FretboardLayout,
+  groups: readonly (readonly Position[])[],
+  viewport: ScrollViewport
+): number | null {
+  const spans = groups
+    .map((g) => {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const p of g) {
+        const col = layout.columns[p.fret];
+        if (!col) continue;
+        min = Math.min(min, col.start);
+        max = Math.max(max, col.end);
+      }
+      return min === Infinity ? null : { min, max };
+    })
+    .filter((x): x is { min: number; max: number } => x !== null);
+  if (spans.length === 0) return null;
+  const visible = spans.some(
+    (s) => s.min >= viewport.scrollLeft && s.max <= viewport.scrollLeft + viewport.width
+  );
+  if (visible) return null;
+  return spanTarget(layout, spans[0].min, spans[0].max, viewport);
+}
+
 /** Minimal scrollLeft that brings one cell fully into view (keyboard moves, US5). */
 export function scrollIntoViewTarget(
   layout: FretboardLayout,

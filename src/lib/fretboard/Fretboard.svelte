@@ -18,7 +18,14 @@
     nearestPosition,
     type FretboardMetrics
   } from './geometry';
-  import { autoScrollTarget, moveFocus, reduceGesture, scrollIntoViewTarget } from './interaction';
+  import {
+    autoScrollTarget,
+    groupScrollTarget,
+    moveFocus,
+    reduceGesture,
+    scrollIntoViewTarget
+  } from './interaction';
+  import { layoutTags } from './tags';
   import { applyPulses } from './pulse';
   import { readMetrics } from './metrics';
   import { animateScroll, browserClock } from './scroll-animation';
@@ -37,7 +44,8 @@
     model = NO_MARKERS,
     variant = 'interactive',
     onactivate,
-    pulses = []
+    pulses = [],
+    ontag
   }: FretboardProps = $props();
 
   const uid = $props.id();
@@ -106,27 +114,67 @@
       .sort()
       .join(',')
   );
+  /** A model `autoScroll` replaces the highlighted-set trigger (R-06). */
+  const scrollKey = $derived(model.autoScroll ? `auto:${model.autoScroll.key}` : highlightKey);
   let lastHighlightKey: string | undefined;
 
   $effect(() => {
-    const key = highlightKey;
+    const key = scrollKey;
     if (!scroller || thumb) return;
     if (key === lastHighlightKey) return;
     lastHighlightKey = key;
     untrack(() => {
       if (!scroller || key === '') return;
-      const positions = key.split(',').map((k) => {
-        const [string, fret] = k.split(':').map(Number);
-        return { string, fret };
-      });
-      const target = autoScrollTarget(layout, positions, {
-        scrollLeft: scroller.scrollLeft,
-        width: scroller.clientWidth
-      });
+      const viewport = { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth };
+      let target: number | null;
+      if (model.autoScroll) {
+        const groups = model.autoScroll.groups.map((g) =>
+          g.filter((p) => isValidPosition(instrument, p))
+        );
+        target = groupScrollTarget(layout, groups, viewport);
+      } else {
+        const positions = key.split(',').map((k) => {
+          const [string, fret] = k.split(':').map(Number);
+          return { string, fret };
+        });
+        target = autoScrollTarget(layout, positions, viewport);
+      }
       if (target === null) return;
       stopAutoScroll();
       cancelScroll = animateScroll(scroller, target, scrollDuration(), browserClock);
     });
+  });
+
+  // Shape tags (Full neck): measured widths feed the pure layout; absent tags reserve nothing.
+  const TAG_GAP = 4;
+  const tags = $derived(thumb ? [] : (model.tags ?? []));
+  let tagEls: HTMLElement[] = $state([]);
+  let tagWidths: number[] = $state([]);
+  const tagMin = $derived(metrics.row);
+  const placedTags = $derived.by(() => {
+    const items = tags.map((t, i) => {
+      const a = layout.columns[Math.min(Math.max(t.start, 0), lastFret)];
+      const b = layout.columns[Math.min(Math.max(t.end, 0), lastFret)];
+      return { center: (a.start + b.end) / 2, width: Math.max(tagWidths[i] ?? 0, tagMin) };
+    });
+    return layoutTags(items, layout.width, TAG_GAP);
+  });
+  const tagRows = $derived(placedTags.reduce((n, p) => Math.max(n, p.row + 1), 0));
+  const tagsHeight = $derived(tagRows === 0 ? 0 : tagRows * tagMin + (tagRows - 1) * TAG_GAP);
+
+  $effect(() => {
+    const els = tagEls.slice(0, tags.length);
+    if (els.length === 0) return;
+    const measure = () => {
+      const next = els.map((el) => el?.offsetWidth ?? 0);
+      if (next.length !== tagWidths.length || next.some((w, i) => w !== tagWidths[i]))
+        tagWidths = next;
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    for (const el of els) if (el) ro.observe(el);
+    return () => ro.disconnect();
   });
 
   /** Region clamped to the board, or null when the model has none. */
@@ -460,6 +508,32 @@
       onpointerdown={stopAutoScroll}
       onwheel={stopAutoScroll}
     >
+      {#if tags.length > 0}
+        <div
+          class="tags"
+          role="group"
+          aria-label={m.fretboard_tags_label()}
+          style:inline-size={`${layout.width}px`}
+          style:block-size={`${tagsHeight}px`}
+        >
+          {#each tags as t, i (t.id)}
+            <button
+              type="button"
+              class="tag"
+              class:pressed={t.pressed}
+              aria-pressed={t.pressed}
+              aria-label={t.name}
+              bind:this={tagEls[i]}
+              style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
+              style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
+              onclick={() => ontag?.(t.id)}
+            >
+              <span>{t.label}</span>
+              {#if t.detail}<span class="detail">{t.detail}</span>{/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
       <!-- svelte-ignore a11y_interactive_supports_focus (cells are the focusable stops) -->
       <svg
         role="grid"
@@ -610,6 +684,42 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
     touch-action: auto;
+  }
+
+  .tags {
+    position: relative;
+  }
+
+  .tag {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+    padding-inline: var(--space-2);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    line-height: 1.1;
+    white-space: nowrap;
+    color: var(--color-text);
+    background: var(--color-surface-raised);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .tag.pressed {
+    font-weight: 700;
+    background: var(--color-surface);
+    border-width: calc(var(--border-width) * 2);
+    border-color: var(--color-text);
+  }
+
+  .tag .detail {
+    font-size: var(--marker-label-min-size);
+    font-weight: 400;
   }
 
   svg {

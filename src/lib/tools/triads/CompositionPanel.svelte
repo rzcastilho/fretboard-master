@@ -19,16 +19,21 @@
   let { composition, onswitch }: Props = $props();
 
   const name = $derived(
-    m.triads_name({
-      root: noteLabel(composition.name.root),
-      quality: qualityName(composition.name.quality),
-      inversion: inversionName(composition.name.inversion)
-    })
+    composition.name.inversion === null
+      ? m.triads_name_no_inversion({
+          root: noteLabel(composition.name.root),
+          quality: qualityName(composition.name.quality)
+        })
+      : m.triads_name({
+          root: noteLabel(composition.name.root),
+          quality: qualityName(composition.name.quality),
+          inversion: inversionName(composition.name.inversion)
+        })
   );
   const spoken = (n: NoteEntry) => `${spokenNote(n.spelling)}, ${functionName(n.function)}`;
   const intervals = $derived(composition.intervals.map(intervalLabel).join(' – '));
   const lowToHigh = $derived(
-    composition.lowToHigh
+    (composition.lowToHigh ?? [])
       .map((n) =>
         m.triads_low_to_high_entry({
           note: noteLabel(n.spelling),
@@ -69,8 +74,10 @@
   <p>{intervals}</p>
   <h3>{m.triads_panel_stacking()}</h3>
   <p>{stackingName(composition.stacking)}</p>
-  <h3>{m.triads_panel_low_to_high()}</h3>
-  <p>{lowToHigh}</p>
+  {#if composition.lowToHigh !== null}
+    <h3>{m.triads_panel_low_to_high()}</h3>
+    <p>{lowToHigh}</p>
+  {/if}
   {#if composition.symmetric}
     <p class="note">{m.triads_symmetry()}</p>
   {/if}

@@ -852,3 +852,200 @@ describe('Fretboard interval label mode (005)', () => {
     expect(labels(container)).toEqual(['F𝄪']);
   });
 });
+
+describe('Fretboard tags (Full neck)', () => {
+  const tags = [
+    {
+      id: 'root:0',
+      start: 2,
+      end: 2,
+      label: 'Root position',
+      name: 'Root position, frets 2-2-0',
+      pressed: false
+    },
+    {
+      id: 'first:0',
+      start: 5,
+      end: 6,
+      label: '1st',
+      name: '1st inversion, frets 6-5-5',
+      pressed: false
+    },
+    {
+      id: 'second:0',
+      start: 9,
+      end: 10,
+      label: '2nd',
+      name: '2nd inversion, frets 9-10-9',
+      pressed: true,
+      detail: 'Wide stretch'
+    }
+  ];
+  const withTags = (extra: Partial<DisplayModel> = {}): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    tags,
+    ...extra
+  });
+
+  function scrollEnv() {
+    const writes: number[] = [];
+    const proto = HTMLElement.prototype;
+    const widthDesc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    const leftDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollLeft');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => 286 });
+    Object.defineProperty(proto, 'scrollLeft', {
+      configurable: true,
+      get(this: HTMLElement & { __sl?: number }) {
+        return this.__sl ?? 0;
+      },
+      set(this: HTMLElement & { __sl?: number }, v: number) {
+        this.__sl = v;
+        writes.push(v);
+      }
+    });
+    return {
+      writes,
+      restore() {
+        if (widthDesc) Object.defineProperty(proto, 'clientWidth', widthDesc);
+        else delete (proto as unknown as Record<string, unknown>).clientWidth;
+        if (leftDesc) Object.defineProperty(Element.prototype, 'scrollLeft', leftDesc);
+        delete (proto as unknown as Record<string, unknown>).scrollLeft;
+      }
+    };
+  }
+
+  it('renders tag buttons in order inside the scroller, before the svg', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags() });
+    const group = screen.getByRole('group', { name: 'Shapes' });
+    expect(group.closest('.scroller')).toBeTruthy();
+    expect(group.nextElementSibling?.tagName.toLowerCase()).toBe('svg');
+    const buttons = within(group).getAllByRole('button');
+    expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(tags.map((t) => t.name));
+    expect(buttons.map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
+    expect(buttons[2].textContent).toContain('Wide stretch');
+    expect(container.querySelector('.scroller')?.firstElementChild).toBe(group);
+  });
+
+  it('calls ontag on click, Enter and Space', async () => {
+    const ontag = vi.fn();
+    render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags(), ontag });
+    const button = screen.getByRole('button', { name: '1st inversion, frets 6-5-5' });
+    await fireEvent.click(button);
+    expect(ontag).toHaveBeenLastCalledWith('first:0');
+    // Native buttons turn Enter/Space into click; jsdom does not, so assert they are buttons.
+    expect(button.tagName).toBe('BUTTON');
+    expect(button.getAttribute('type')).toBe('button');
+  });
+
+  it('does not change scrollLeft when a tag is clicked', async () => {
+    const env = scrollEnv();
+    try {
+      render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags(), ontag: vi.fn() });
+      await tick();
+      const before = env.writes.length;
+      await fireEvent.click(screen.getAllByRole('button', { name: /inversion/ })[0]);
+      await tick();
+      expect(env.writes.length).toBe(before);
+    } finally {
+      env.restore();
+    }
+  });
+
+  it('renders no strip without tags (or with an empty list)', () => {
+    const a = render(Fretboard, { instrument: STANDARD_GUITAR });
+    expect(a.container.querySelector('.tags')).toBeNull();
+    a.unmount();
+    const b = render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags({ tags: [] }) });
+    expect(b.container.querySelector('.tags')).toBeNull();
+  });
+
+  it('keeps tags out of the text description', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model: withTags() });
+    expect(container.querySelector('.description')?.textContent).not.toContain('2nd');
+  });
+
+  it('auto-scrolls only when autoScroll.key changes', async () => {
+    const env = scrollEnv();
+    try {
+      const group = [
+        { string: 3, fret: 15 },
+        { string: 2, fret: 16 },
+        { string: 1, fret: 16 }
+      ];
+      const model = (key: string, groups = [group]): DisplayModel =>
+        withTags({ autoScroll: { key, groups } });
+      const view = render(Fretboard, { instrument: STANDARD_GUITAR, model: model('a') });
+      await tick();
+      expect(env.writes).toHaveLength(1);
+      expect(env.writes[0]).toBeGreaterThan(0);
+
+      await view.rerender({ instrument: STANDARD_GUITAR, model: model('a') });
+      await tick();
+      expect(env.writes).toHaveLength(1);
+
+      await view.rerender({
+        instrument: STANDARD_GUITAR,
+        model: model('b', [[{ string: 3, fret: 1 }]])
+      });
+      await tick();
+      expect(env.writes).toHaveLength(2);
+      expect(env.writes[1]).toBeLessThan(env.writes[0]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  it('keeps unchanged marker elements on a view switch (keyed per position, FR-021)', async () => {
+    const a = mk({ string: 1, fret: 3, function: 'root', emphasis: 'highlighted' });
+    const b = mk({ string: 2, fret: 5, function: 'third', emphasis: 'normal' });
+    const view = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: { markers: [a, b], labelMode: 'note' }
+    });
+    const before = view.container.querySelector('.marker[data-key="1:3"]');
+    expect(before).toBeTruthy();
+    await view.rerender({
+      instrument: STANDARD_GUITAR,
+      model: {
+        markers: [a, mk({ string: 4, fret: 7, function: 'fifth', emphasis: 'normal' })],
+        labelMode: 'note'
+      }
+    });
+    expect(view.container.querySelector('.marker[data-key="1:3"]')).toBe(before);
+    expect(view.container.querySelector('.marker[data-key="2:5"]')).toBeNull();
+    expect(view.container.querySelector('.marker[data-key="4:7"]')).toBeTruthy();
+  });
+
+  it('scrolls instantly (one write) under reduced motion', async () => {
+    const env = scrollEnv();
+    const original = globalThis.matchMedia;
+    globalThis.matchMedia = ((query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+      onchange: null
+    })) as unknown as typeof globalThis.matchMedia;
+    try {
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame');
+      render(Fretboard, {
+        instrument: STANDARD_GUITAR,
+        model: withTags({
+          autoScroll: { key: 'k', groups: [[{ string: 3, fret: 18 }]] }
+        })
+      });
+      await tick();
+      expect(env.writes).toHaveLength(1);
+      expect(env.writes[0]).toBeGreaterThan(0);
+      expect(raf).not.toHaveBeenCalled();
+      raf.mockRestore();
+    } finally {
+      globalThis.matchMedia = original;
+      env.restore();
+    }
+  });
+});

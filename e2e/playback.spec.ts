@@ -336,3 +336,56 @@ test.describe('graceful failure when sound is unavailable (US5)', () => {
     await expect(page.getByText(NOTICE)).toHaveCount(0);
   });
 });
+
+test.describe('Listen follows the view (feature 006, US4)', () => {
+  const listen = (page: Page) => page.getByRole('button', { name: 'Listen', exact: true });
+
+  async function openAMajor(page: Page, view: 'Full neck' | 'All notes') {
+    await page.goto('/triads');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await page
+      .getByRole('group', { name: 'Root' })
+      .getByRole('button', { name: 'A', exact: true })
+      .click();
+    await page.getByRole('radio', { name: view }).click();
+  }
+
+  test('US4-1: Full neck plays 24 steps, three notes then the chord per shape', async ({
+    page
+  }) => {
+    await openAMajor(page, 'Full neck');
+    await listen(page).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(24);
+    const steps = (await stepEntries(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    const pitches = steps.map((e) => [...e.pitches].sort((a, b) => a - b));
+    // First shape: A major root position, 2-2-0 on strings 3-2-1 → A3, C#4, E4.
+    expect(pitches.slice(0, 4)).toEqual([[57], [61], [64], [57, 61, 64]]);
+    expect(steps.filter((e) => e.pitches.length === 3)).toHaveLength(6);
+  });
+
+  test('US4-2: All notes plays three ascending single notes', async ({ page }) => {
+    await openAMajor(page, 'All notes');
+    await listen(page).click();
+    await expect.poll(async () => (await stepEntries(page)).length).toBe(3);
+    const steps = (await stepEntries(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    expect(steps.map((e) => e.pitches)).toEqual([[45], [49], [52]]);
+  });
+
+  test('US4-3: changing the view stops playback', async ({ page }) => {
+    await page.clock.install();
+    await openAMajor(page, 'Full neck');
+    await listen(page).click();
+    await expect(page.locator('.marker.pulse').first()).toBeVisible();
+    await page.getByRole('radio', { name: 'All notes' }).click();
+    await expect(page.locator('.marker.pulse')).toHaveCount(0);
+    const stops = (await readAudioLog(page)).filter((e) => e.type === 'stop');
+    expect(stops.length).toBeGreaterThan(0);
+  });
+
+  test('US4-4: muted, sounding positions still pulse', async ({ page }) => {
+    await openAMajor(page, 'Full neck');
+    await page.getByRole('button', { name: 'Mute sound' }).click();
+    await listen(page).click();
+    await expect(page.locator('.marker.pulse').first()).toBeVisible();
+  });
+});

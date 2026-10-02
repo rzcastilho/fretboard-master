@@ -78,3 +78,36 @@ export function span(frets: Frets3): number {
 export function isWideStretch(frets: Frets3): boolean {
   return span(frets) >= WIDE_STRETCH_SPAN;
 }
+
+export interface ChainShape {
+  /** Named relative to the chosen root (TM-5.2), never re-rooted. */
+  readonly inversion: Inversion;
+  /** k: 0 = TM-5.3 lowest occurrence of this inversion. */
+  readonly octave: number;
+  readonly frets: Frets3;
+  readonly functions: readonly [TriadFunction, TriadFunction, TriadFunction];
+}
+
+export type ChainResult =
+  | { readonly kind: 'chain'; readonly shapes: readonly ChainShape[] }
+  | { readonly kind: 'beyond' }
+  | { readonly kind: 'does-not-close' };
+
+/** Every occurrence of every inversion on three open pitches that fits in `fretCount`, ordered by lowest-string fret (C1, C2). */
+export function inversionChain(
+  open: readonly [Pitch, Pitch, Pitch],
+  t: TriadSpelling,
+  fretCount: number
+): ChainResult {
+  const shapes: ChainShape[] = [];
+  for (const inversion of INVERSIONS) {
+    const base = triadShape(open, t, inversion);
+    if (base.kind !== 'shape') return { kind: 'does-not-close' };
+    occurrences(base.frets, fretCount).forEach((frets, octave) =>
+      shapes.push({ inversion, octave, frets, functions: INVERSION_ORDER[inversion] })
+    );
+  }
+  if (shapes.length === 0) return { kind: 'beyond' };
+  shapes.sort((a, b) => a.frets[0] - b.frets[0]);
+  return { kind: 'chain', shapes };
+}

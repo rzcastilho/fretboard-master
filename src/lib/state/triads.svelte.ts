@@ -4,19 +4,24 @@
  * `triads-model`, `listen` and `state/playback.svelte` (never `audio/engine`).
  */
 import { STANDARD_GUITAR, type Instrument, type Position } from '$lib/instrument/instrument';
-import { buildTriadsModel, type TriadsDisplay } from './triads-model';
+import { buildTriadsModel, tagTarget, type TriadsDisplay } from './triads-model';
 import {
   equalsTriadsView,
   initialTriadsView,
   octaveDown,
   octaveUp,
+  resetTriads,
   selectRoot,
+  seeAllNotes,
+  selectShape,
   setInversion,
   setLabelType,
   setQuality,
   setStringSet,
+  setView,
   switchSpelling,
   type TriadsLabelType,
+  type TriadsView,
   type TriadsViewState
 } from './triads-view';
 import type { PitchClass } from '$lib/theory/pitch';
@@ -67,6 +72,22 @@ export const triads = {
   anotherSet(): void {
     const id = display.anotherSet;
     if (id !== null) apply(setStringSet(view, id, instrument));
+  },
+  /** Guidance recovery: switch to All notes, keeping inversion, set and occurrence (C8). */
+  seeAllNotes(): void {
+    apply(seeAllNotes(view));
+  },
+  setView(v: TriadsView): void {
+    apply(setView(view, v));
+  },
+  /** Full neck tag tap: select the tag's inversion and occurrence together (C3). */
+  selectTag(id: string): void {
+    const target = tagTarget(display, id);
+    if (target) apply(selectShape(view, target.inversion, target.octave, instrument));
+  },
+  /** Reset tool: back to the initial state, view isolated (C14). */
+  reset(): void {
+    apply(resetTriads(instrument));
   },
   setLabelType(t: TriadsLabelType): void {
     apply(setLabelType(view, t));

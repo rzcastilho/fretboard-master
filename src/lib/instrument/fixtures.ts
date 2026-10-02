@@ -79,14 +79,38 @@ export const NC_UNISON: Instrument = Object.freeze({
   orientation: 'highest-top'
 });
 
-export type FixtureName = 'AF-7' | 'AF-21' | 'AF-4' | 'AF-1-12' | 'NC-UNISON';
+/** Open G (D4 B3 G3 D3 G2 D2), strings 1 → 6, 22 frets. */
+export const AF_8: Instrument = Object.freeze({
+  stringCount: 6,
+  fretCount: 22,
+  openStrings: Object.freeze([
+    open('D', 4),
+    open('B', 3),
+    open('G', 3),
+    open('D', 3),
+    open('G', 2),
+    open('D', 2)
+  ]),
+  handedness: 'right',
+  orientation: 'highest-top'
+});
+
+/** Standard tuning with only 7 frets (US5-3: few inversions fit, no message). */
+export const SHORT_7: Instrument = Object.freeze({
+  ...STANDARD_GUITAR,
+  fretCount: 7
+});
+
+export type FixtureName = 'AF-7' | 'AF-21' | 'AF-4' | 'AF-1-12' | 'NC-UNISON' | 'AF-8' | 'SHORT-7';
 
 export const INSTRUMENT_FIXTURES: Readonly<Record<FixtureName, Instrument>> = Object.freeze({
   'AF-7': AF_7,
   'AF-21': AF_21,
   'AF-4': AF_4,
   'AF-1-12': AF_1_12,
-  'NC-UNISON': NC_UNISON
+  'NC-UNISON': NC_UNISON,
+  'AF-8': AF_8,
+  'SHORT-7': SHORT_7
 });
 
 /** Allow-list lookup; anything unknown falls back to the default instrument. Never throws. */

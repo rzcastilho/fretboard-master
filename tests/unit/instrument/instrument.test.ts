@@ -3,6 +3,7 @@ import {
   STANDARD_GUITAR,
   allPositions,
   isValidPosition,
+  lowestPositionOfPitch,
   positionKey,
   positionPitch
 } from '../../../src/lib/instrument/instrument';
@@ -88,5 +89,59 @@ describe('allPositions', () => {
     expect(all.every((p) => isValidPosition(STANDARD_GUITAR, p))).toBe(true);
     expect(all[0]).toEqual({ string: 1, fret: 0 });
     expect(all[137]).toEqual({ string: 6, fret: 22 });
+  });
+});
+
+describe('test-only fixtures AF-8 and SHORT-7 (feature 006)', () => {
+  it('AF-8 is Open G, 22 frets', async () => {
+    const { fixtureInstrument } = await import('../../../src/lib/instrument/fixtures');
+    const i = fixtureInstrument('AF-8');
+    expect(i.stringCount).toBe(6);
+    expect(i.fretCount).toBe(22);
+    expect(i.openStrings.map((s) => `${s.letter}${s.octave}`)).toEqual([
+      'D4',
+      'B3',
+      'G3',
+      'D3',
+      'G2',
+      'D2'
+    ]);
+    expect(Object.isFrozen(i)).toBe(true);
+  });
+
+  it('SHORT-7 is standard tuning with 7 frets', async () => {
+    const { fixtureInstrument } = await import('../../../src/lib/instrument/fixtures');
+    const i = fixtureInstrument('SHORT-7');
+    expect(i.fretCount).toBe(7);
+    expect(i.openStrings).toEqual(STANDARD_GUITAR.openStrings);
+  });
+});
+
+describe('lowestPositionOfPitch (feature 006)', () => {
+  it('picks the lowest fret', () => {
+    // E4 = 64: string 1 fret 0 beats string 2 fret 5.
+    expect(lowestPositionOfPitch(STANDARD_GUITAR, 64)).toEqual({ string: 1, fret: 0 });
+    // A2 = 45: open string 5 beats string 6 fret 5.
+    expect(lowestPositionOfPitch(STANDARD_GUITAR, 45)).toEqual({ string: 5, fret: 0 });
+    // E3 = 52: string 4 fret 2 beats string 5 fret 7 and string 6 fret 12.
+    expect(lowestPositionOfPitch(STANDARD_GUITAR, 52)).toEqual({ string: 4, fret: 2 });
+  });
+
+  it('ties go to the thicker (higher-numbered) string', () => {
+    const twin = Object.freeze({
+      ...STANDARD_GUITAR,
+      openStrings: Object.freeze([
+        ...STANDARD_GUITAR.openStrings.slice(0, 1),
+        STANDARD_GUITAR.openStrings[1],
+        STANDARD_GUITAR.openStrings[1],
+        ...STANDARD_GUITAR.openStrings.slice(3)
+      ])
+    });
+    expect(lowestPositionOfPitch(twin, 59)).toEqual({ string: 3, fret: 0 });
+  });
+
+  it('is null when the pitch is not on the board', () => {
+    expect(lowestPositionOfPitch(STANDARD_GUITAR, 39)).toBeNull();
+    expect(lowestPositionOfPitch(STANDARD_GUITAR, 64 + 22 + 1)).toBeNull();
   });
 });

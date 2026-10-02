@@ -3,6 +3,7 @@ import { DEFAULT_METRICS, layoutFretboard } from '../../../src/lib/fretboard/geo
 import {
   DRAG_THRESHOLD_PX,
   autoScrollTarget,
+  groupScrollTarget,
   moveFocus,
   reduceGesture,
   scrollIntoViewTarget
@@ -173,6 +174,30 @@ describe('autoScrollTarget', () => {
   it('never scrolls when the board fits the container', () => {
     const wide = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 2560, 'interactive');
     expect(autoScrollTarget(wide, at(22), { scrollLeft: 0, width: 2560 })).toBeNull();
+  });
+});
+
+describe('groupScrollTarget', () => {
+  const width = 286;
+  const layout = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, width, 'interactive');
+  const at = (...frets: number[]) => frets.map((fret) => ({ string: 6, fret }));
+  const viewport = (scrollLeft: number) => ({ scrollLeft, width });
+
+  it('returns null for no groups', () => {
+    expect(groupScrollTarget(layout, [], viewport(0))).toBeNull();
+  });
+
+  it('returns null when any group is fully visible', () => {
+    expect(groupScrollTarget(layout, [at(18, 19, 20), at(1, 2, 3)], viewport(0))).toBeNull();
+  });
+
+  it('moves to the first group when none is visible', () => {
+    const target = groupScrollTarget(layout, [at(15, 16, 17), at(19, 20, 21)], viewport(0));
+    expect(target).toBeCloseTo(layout.columns[17].end - width, 5);
+  });
+
+  it('ignores empty groups', () => {
+    expect(groupScrollTarget(layout, [[]], viewport(0))).toBeNull();
   });
 });
 

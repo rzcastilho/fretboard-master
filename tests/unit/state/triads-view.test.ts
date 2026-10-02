@@ -5,12 +5,16 @@ import {
   initialTriadsView,
   octaveDown,
   octaveUp,
+  resetTriads,
   revalidate,
+  seeAllNotes,
   selectRoot,
+  selectShape,
   setInversion,
   setLabelType,
   setQuality,
   setStringSet,
+  setView,
   switchSpelling
 } from '../../../src/lib/state/triads-view';
 
@@ -23,7 +27,8 @@ describe('triads view state (US1)', () => {
       inversion: 'root',
       stringSet: 3,
       labelType: 'interval',
-      occurrence: 0
+      occurrence: 0,
+      view: 'isolated'
     });
   });
 
@@ -45,6 +50,7 @@ describe('triads view state (US1)', () => {
     expect(equalsTriadsView(a, { ...a, labelType: 'name' })).toBe(false);
     expect(equalsTriadsView(a, { ...a, occurrence: 1 })).toBe(false);
     expect(equalsTriadsView(a, { ...a, rootPc: 1 })).toBe(false);
+    expect(equalsTriadsView(a, { ...a, view: 'full-neck' })).toBe(false);
   });
 });
 
@@ -189,5 +195,81 @@ describe('octave commands (US4)', () => {
     expect(dUp.occurrence).toBe(1);
     expect(switchSpelling(dUp).occurrence).toBe(1);
     expect(setLabelType(dUp, 'name').occurrence).toBe(1);
+  });
+});
+
+describe('view transitions (feature 006, data-model §3)', () => {
+  const s0 = initialTriadsView(STANDARD_GUITAR);
+  const full = setView(s0, 'full-neck');
+  const all = setView(s0, 'all-notes');
+
+  it('setView changes only the view; invalid or same value returns the same object', () => {
+    const s = { ...s0, inversion: 'first' as const, occurrence: 1, stringSet: 4 };
+    expect(setView(s, 'full-neck')).toEqual({ ...s, view: 'full-neck' });
+    expect(setView(s0, 'isolated')).toBe(s0);
+    expect(setView(s0, 'bogus' as never)).toBe(s0);
+    expect(full.view).toBe('full-neck');
+  });
+
+  it('seeAllNotes goes to all-notes and keeps the rest; no-op when already there', () => {
+    const s = { ...full, inversion: 'second' as const, occurrence: 1 };
+    expect(seeAllNotes(s)).toEqual({ ...s, view: 'all-notes' });
+    expect(seeAllNotes(all)).toBe(all);
+  });
+
+  it('selectShape sets inversion and occurrence only in full-neck (C3)', () => {
+    expect(selectShape(full, 'second', 1, STANDARD_GUITAR)).toEqual({
+      ...full,
+      inversion: 'second',
+      occurrence: 1
+    });
+    const sameInv = selectShape(full, 'root', 1, STANDARD_GUITAR);
+    expect(sameInv).toEqual({ ...full, occurrence: 1 });
+  });
+
+  it('selectShape no-ops: wrong view, invalid inversion, bad octave, already equal', () => {
+    expect(selectShape(s0, 'second', 1, STANDARD_GUITAR)).toBe(s0);
+    expect(selectShape(all, 'second', 1, STANDARD_GUITAR)).toBe(all);
+    expect(selectShape(full, 'bogus' as never, 0, STANDARD_GUITAR)).toBe(full);
+    expect(selectShape(full, 'root', -1, STANDARD_GUITAR)).toBe(full);
+    expect(selectShape(full, 'root', 1.5, STANDARD_GUITAR)).toBe(full);
+    expect(selectShape(full, 'root', 9, STANDARD_GUITAR)).toBe(full);
+    expect(selectShape(full, 'root', 0, STANDARD_GUITAR)).toBe(full);
+  });
+
+  it('setInversion still resets occurrence and is a no-op in all-notes', () => {
+    const s = { ...full, occurrence: 1 };
+    expect(setInversion(s, 'first')).toEqual({ ...s, inversion: 'first', occurrence: 0 });
+    expect(setInversion(all, 'first')).toBe(all);
+  });
+
+  it('setStringSet is a no-op in all-notes only', () => {
+    expect(setStringSet(all, 4, STANDARD_GUITAR)).toBe(all);
+    expect(setStringSet(full, 4, STANDARD_GUITAR).stringSet).toBe(4);
+  });
+
+  it('octaveUp/octaveDown are no-ops outside isolated and keep the index (C4)', () => {
+    const f = { ...full, occurrence: 1 };
+    const a = { ...all, occurrence: 1 };
+    expect(octaveUp(f, STANDARD_GUITAR)).toBe(f);
+    expect(octaveDown(f, STANDARD_GUITAR)).toBe(f);
+    expect(octaveUp(a, STANDARD_GUITAR)).toBe(a);
+    expect(octaveDown(a, STANDARD_GUITAR)).toBe(a);
+    expect(octaveUp(s0, STANDARD_GUITAR).occurrence).toBe(1);
+  });
+
+  it('resetTriads returns an isolated initial state', () => {
+    expect(resetTriads(STANDARD_GUITAR)).toEqual(s0);
+    expect(resetTriads(STANDARD_GUITAR).view).toBe('isolated');
+  });
+
+  it('view survives root, quality, spelling, label and revalidate', () => {
+    for (const v of [full, all]) {
+      expect(selectRoot(v, 3).view).toBe(v.view);
+      expect(setQuality(v, 'minor').view).toBe(v.view);
+      expect(switchSpelling(selectRoot(v, 3)).view).toBe(v.view);
+      expect(setLabelType(v, 'name').view).toBe(v.view);
+      expect(revalidate({ ...v, stringSet: 9 }, STANDARD_GUITAR).view).toBe(v.view);
+    }
   });
 });

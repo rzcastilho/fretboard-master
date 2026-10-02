@@ -16,6 +16,9 @@ import {
 } from '../theory/triad';
 import { INVERSIONS, occurrences, triadShape, type Inversion } from '../theory/triad-shape';
 
+export type TriadsView = 'isolated' | 'full-neck' | 'all-notes';
+export const TRIADS_VIEWS: readonly TriadsView[] = ['isolated', 'full-neck', 'all-notes'];
+
 export type TriadsLabelType = 'interval' | 'name';
 export type SpellingOverride = 'none' | 'sharp' | 'flat';
 
@@ -28,6 +31,8 @@ export interface TriadsViewState {
   readonly labelType: TriadsLabelType;
   /** 0 = lowest occurrence. */
   readonly occurrence: number;
+  /** Not persisted (C14, FR-019). */
+  readonly view: TriadsView;
 }
 
 /** FR-001: C major, root position, strings 3-2-1, interval labels. */
@@ -39,7 +44,8 @@ export function initialTriadsView(i: Instrument): TriadsViewState {
     inversion: 'root',
     stringSet: Math.min(3, i.stringCount),
     labelType: 'interval',
-    occurrence: 0
+    occurrence: 0,
+    view: 'isolated'
   };
 }
 
@@ -51,8 +57,37 @@ export function equalsTriadsView(a: TriadsViewState, b: TriadsViewState): boolea
     a.inversion === b.inversion &&
     a.stringSet === b.stringSet &&
     a.labelType === b.labelType &&
-    a.occurrence === b.occurrence
+    a.occurrence === b.occurrence &&
+    a.view === b.view
   );
+}
+
+export function setView(s: TriadsViewState, v: TriadsView): TriadsViewState {
+  if (!TRIADS_VIEWS.includes(v) || v === s.view) return s;
+  return { ...s, view: v };
+}
+
+export function seeAllNotes(s: TriadsViewState): TriadsViewState {
+  return setView(s, 'all-notes');
+}
+
+/** Full neck tag tap (C3): select the inversion and the occurrence together. */
+export function selectShape(
+  s: TriadsViewState,
+  inv: Inversion,
+  octave: number,
+  i: Instrument
+): TriadsViewState {
+  if (s.view !== 'full-neck' || !INVERSIONS.includes(inv)) return s;
+  const count = occurrenceCount({ ...s, inversion: inv }, i);
+  if (!Number.isInteger(octave) || octave < 0 || octave > count - 1) return s;
+  if (inv === s.inversion && octave === s.occurrence) return s;
+  return { ...s, inversion: inv, occurrence: octave };
+}
+
+/** Reset tool: back to the initial state, view isolated. */
+export function resetTriads(i: Instrument): TriadsViewState {
+  return initialTriadsView(i);
 }
 
 export function setLabelType(s: TriadsViewState, t: TriadsLabelType): TriadsViewState {
@@ -81,7 +116,7 @@ export function setQuality(s: TriadsViewState, q: Quality): TriadsViewState {
 }
 
 export function setInversion(s: TriadsViewState, inv: Inversion): TriadsViewState {
-  if (!INVERSIONS.includes(inv) || inv === s.inversion) return s;
+  if (s.view === 'all-notes' || !INVERSIONS.includes(inv) || inv === s.inversion) return s;
   return { ...s, inversion: inv, occurrence: 0 };
 }
 
@@ -89,7 +124,7 @@ const validSet = (id: StringSetId, i: Instrument): boolean =>
   Number.isInteger(id) && id >= 3 && id <= i.stringCount;
 
 export function setStringSet(s: TriadsViewState, id: StringSetId, i: Instrument): TriadsViewState {
-  if (!validSet(id, i) || id === s.stringSet) return s;
+  if (s.view === 'all-notes' || !validSet(id, i) || id === s.stringSet) return s;
   return { ...s, stringSet: id, occurrence: 0 };
 }
 
@@ -102,12 +137,14 @@ function occurrenceCount(s: TriadsViewState, i: Instrument): number {
 
 /** Move to the next higher occurrence; no-op at the last one or when none exists (C9). */
 export function octaveUp(s: TriadsViewState, i: Instrument): TriadsViewState {
+  if (s.view !== 'isolated') return s;
   const count = occurrenceCount(s, i);
   return s.occurrence < count - 1 ? { ...s, occurrence: s.occurrence + 1 } : s;
 }
 
 /** Move to the next lower occurrence; no-op at the lowest or when none exists (C9). */
 export function octaveDown(s: TriadsViewState, i: Instrument): TriadsViewState {
+  if (s.view !== 'isolated') return s;
   const count = occurrenceCount(s, i);
   return count > 0 && s.occurrence > 0 ? { ...s, occurrence: s.occurrence - 1 } : s;
 }

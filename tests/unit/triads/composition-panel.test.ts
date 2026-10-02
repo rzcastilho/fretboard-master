@@ -130,3 +130,27 @@ describe('CompositionPanel (US6)', () => {
     }
   });
 });
+
+describe('CompositionPanel in All notes (US2, C10)', () => {
+  const init = initialTriadsView(STANDARD_GUITAR);
+  const comp = buildTriadsModel(
+    { ...init, rootPc: 9, view: 'all-notes' },
+    STANDARD_GUITAR
+  ).composition;
+
+  it('name omits the inversion and the low-to-high line is hidden', () => {
+    render(CompositionPanel, { composition: comp });
+    expect(screen.getByText('A major')).toBeTruthy();
+    expect(screen.queryByText(/inversion|Root position/)).toBeNull();
+    expect(screen.queryByText('Low to high')).toBeNull();
+  });
+
+  it('still shows notes, intervals and stacking', () => {
+    render(CompositionPanel, { composition: comp });
+    expect(screen.getByText('R – 3 – 5')).toBeTruthy();
+    expect(screen.getByText('major third + minor third')).toBeTruthy();
+    expect(
+      within(screen.getByRole('list', { name: 'Notes' })).getAllByRole('listitem')
+    ).toHaveLength(3);
+  });
+});

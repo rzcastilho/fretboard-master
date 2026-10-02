@@ -207,3 +207,97 @@ test.describe('triads control-change latency (FR-031, SC-003)', () => {
     expect(median(times)).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('triads view-switch and tag-tap latency (FR-021, SC-006)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median view switch and tag tap → updated board ≤ 100 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/triads');
+    await page
+      .getByRole('group', { name: 'Root' })
+      .getByRole('button', { name: 'A', exact: true })
+      .click();
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await board.waitFor();
+
+    // Measured in the page (pointerdown → observed DOM change), so Playwright round-trips under
+    // throttling are not counted. `check` runs on every mutation; the first time it is true after
+    // a pointerdown, the elapsed time is recorded.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as {
+        __viewTimes: number[];
+        __tagTimes: number[];
+        __downAt: number | null;
+        __kind: 'view' | 'tag';
+        __check: () => boolean;
+      };
+      w.__viewTimes = [];
+      w.__tagTimes = [];
+      w.__downAt = null;
+      w.__kind = 'view';
+      w.__check = () => false;
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || !w.__check()) return;
+        (w.__kind === 'view' ? w.__viewTimes : w.__tagTimes).push(performance.now() - w.__downAt);
+        w.__downAt = null;
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true
+      });
+    });
+    const arm = (kind: 'view' | 'tag', check: string) =>
+      page.evaluate(
+        ([k, c]) => {
+          const w = globalThis as unknown as Record<string, unknown>;
+          w.__kind = k;
+          w.__check = new Function(`return (${c})`)();
+          w.__downAt = null;
+        },
+        [kind, check] as const
+      );
+    const tagCount = `() => document.querySelectorAll('.tags button').length === 6`;
+    const noTags = `() => document.querySelectorAll('.tags button').length === 0`;
+    const pressedTag = (i: number) =>
+      `() => document.querySelectorAll('.tags button')[${i}]?.getAttribute('aria-pressed') === 'true'`;
+
+    const samples = 5;
+    for (let i = 0; i < samples; i++) {
+      // Isolated → Full neck.
+      await arm('view', tagCount);
+      await page.getByRole('radio', { name: 'Full neck' }).click();
+      await expect(page.locator('.tags button')).toHaveCount(6);
+
+      // Tag tap: select the 2nd-inversion tag (index 2), then the 1st (index 1) next round.
+      const target = i % 2 === 0 ? 2 : 1;
+      await arm('tag', pressedTag(target));
+      await page.locator('.tags button').nth(target).click();
+      await expect(page.locator('.tags button').nth(target)).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+
+      // Full neck → All notes → Isolated, timing the All notes switch.
+      await arm('view', noTags);
+      await page.getByRole('radio', { name: 'All notes' }).click();
+      await expect(page.locator('.tags button')).toHaveCount(0);
+      await page.getByRole('radio', { name: 'Isolated' }).click();
+      await page.evaluate(() => ((globalThis as unknown as { __downAt: null }).__downAt = null));
+    }
+
+    const { viewTimes, tagTimes } = await page.evaluate(() => {
+      const w = globalThis as unknown as { __viewTimes: number[]; __tagTimes: number[] };
+      return { viewTimes: w.__viewTimes, tagTimes: w.__tagTimes };
+    });
+    expect(viewTimes.length).toBeGreaterThanOrEqual(samples);
+    expect(tagTimes.length).toBeGreaterThanOrEqual(samples);
+    expect(median(viewTimes)).toBeLessThanOrEqual(100);
+    expect(median(tagTimes)).toBeLessThanOrEqual(100);
+  });
+});

@@ -36,6 +36,29 @@ export interface DisplayModel {
   readonly hoverHint?: boolean;
   /** Replaces the computed text description verbatim. */
   readonly description?: string;
+  /** Tappable shape tags above the board (Triads Full neck). Interactive variant only. */
+  readonly tags?: readonly FretboardTag[];
+  /** Keyed auto-scroll: re-runs only when `key` changes (replaces the highlighted-set trigger). */
+  readonly autoScroll?: {
+    readonly key: string;
+    readonly groups: readonly (readonly Position[])[];
+  };
+}
+
+export interface FretboardTag {
+  readonly id: string;
+  /** Lowest fret of the shape (0 allowed). */
+  readonly start: number;
+  /** Highest fret of the shape. */
+  readonly end: number;
+  /** Visible short text. */
+  readonly label: string;
+  /** Accessible name. */
+  readonly name: string;
+  /** aria-pressed. */
+  readonly pressed: boolean;
+  /** Visible secondary line (e.g. wide stretch). */
+  readonly detail?: string;
 }
 
 /** A position currently sounding (data-model §6). Drawing only; never part of `DisplayModel`. */
@@ -57,6 +80,7 @@ export interface FretboardProps {
   onactivate?: (position: Position) => void;
   /** Positions sounding now; drawn as a pulse, never announced. */
   pulses?: readonly Pulse[];
+  ontag?: (id: string) => void;
 }
 
 /** Gesture state machine (data-model §6). */

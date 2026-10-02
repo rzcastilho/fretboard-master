@@ -42,6 +42,8 @@
   <TriadsControls
     state={triads.state}
     instrument={triads.instrument}
+    controls={triads.display.controls}
+    onview={triads.setView}
     onroot={triads.selectRoot}
     onquality={triads.setQuality}
     oninversion={triads.setInversion}
@@ -54,12 +56,15 @@
     instrument={triads.instrument}
     model={fixture ?? triads.display.model}
     {onactivate}
+    ontag={(id) => triads.selectTag(id)}
     pulses={playback.pulses}
   />
   <TriadsGuidance
     shape={triads.display.shape}
     anotherSet={triads.display.anotherSet}
     onanotherset={triads.anotherSet}
+    seeAllNotes={triads.display.seeAllNotes}
+    onseeallnotes={triads.seeAllNotes}
   />
   {#if triads.display.shape.kind === 'shown' && triads.display.shape.wideStretch}
     <WideStretchMark />
@@ -78,6 +83,7 @@
     onoctavedown={triads.octaveDown}
     listen={triads.display.listen}
     onlisten={triads.listen}
+    onreset={triads.reset}
   />
 </section>
 
