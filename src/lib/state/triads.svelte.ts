@@ -30,7 +30,9 @@ import type { PitchClass, Spelling } from '$lib/theory/pitch';
 import type { Quality } from '$lib/theory/triad';
 import type { Inversion } from '$lib/theory/triad-shape';
 import type { StringSetId } from '$lib/instrument/string-sets';
+import { carryRoot, carryTriad } from './links';
 import { playback } from './playback.svelte';
+import type { SpellingOverride } from './triads-view';
 import { LISTEN_BPM } from './listen';
 
 let view = $state<TriadsViewState>(initialTriadsView(STANDARD_GUITAR));
@@ -76,6 +78,20 @@ export const triads = {
   setQuality(q: Quality): void {
     const prev = view;
     const next = setQuality(prev, q);
+    const swapped =
+      next.compare.on &&
+      next.compare.quality === prev.quality &&
+      next.quality === prev.compare.quality;
+    apply(next, swapped ? { kind: 'compare-swapped', quality: prev.quality } : null);
+  },
+  /** Notes → Triads carry: root only (FR-001). */
+  carryRoot(pc: PitchClass): void {
+    apply(carryRoot(view, pc));
+  },
+  /** View as triad: root, spelling and quality (FR-008); raises compare-swapped when swapped. */
+  carryTriad(pc: PitchClass, q: Quality, spelling: SpellingOverride): void {
+    const prev = view;
+    const next = carryTriad(prev, pc, q, spelling, instrument);
     const swapped =
       next.compare.on &&
       next.compare.quality === prev.quality &&

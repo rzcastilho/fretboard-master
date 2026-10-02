@@ -21,6 +21,7 @@ const props = (info: CardInfo, over: Record<string, unknown> = {}) => ({
   info,
   onaddnote: () => {},
   onclose: () => {},
+  ontriads: () => {},
   ...over
 });
 
@@ -91,5 +92,28 @@ describe('PositionCard', () => {
     render(PositionCard, props(A3, { onclose }));
     await fireEvent.click(screen.getByRole('button', { name: 'Close position card' }));
     expect(onclose).toHaveBeenCalledTimes(1);
+  });
+
+  it('has a Triads from this note button before Close, and no CAGED button', () => {
+    const { container } = render(PositionCard, props(A3));
+    const labels = [...container.querySelectorAll('.actions button')].map((b) =>
+      b.textContent?.trim()
+    );
+    expect(labels.indexOf('Triads from this note')).toBeGreaterThan(-1);
+    expect(labels.indexOf('Triads from this note')).toBeLessThan(
+      labels.indexOf('Close position card')
+    );
+    expect(screen.queryByRole('button', { name: /CAGED/i })).toBeNull();
+  });
+
+  it('Triads from this note calls ontriads with the pitch class and is keyboard focusable', async () => {
+    const ontriads = vi.fn();
+    render(PositionCard, props(A3, { ontriads }));
+    const button = screen.getByRole('button', { name: 'Triads from this note' });
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    await fireEvent.click(button);
+    expect(ontriads).toHaveBeenCalledWith(9);
+    expect(ontriads).toHaveBeenCalledTimes(1);
   });
 });

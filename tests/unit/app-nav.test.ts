@@ -1,5 +1,8 @@
-import { render, screen, within } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const linkTools = vi.hoisted(() => vi.fn());
+vi.mock('../../src/lib/state/links.svelte', () => ({ linkTools }));
 
 import AppNav from '../../src/lib/shell/AppNav.svelte';
 
@@ -35,5 +38,66 @@ describe('AppNav', () => {
       expect(l.hasAttribute('data-sveltekit-replacestate')).toBe(false);
       expect(l.classList.contains('current')).toBe(false);
     }
+  });
+});
+
+describe('AppNav carry (US2)', () => {
+  beforeEach(() => linkTools.mockClear());
+
+  // jsdom would navigate on an unprevented link click; stop that at the document.
+  const click = (name: string, init: MouseEventInit = {}) => {
+    const link = screen.getByRole('link', { name });
+    const stop = (e: Event) => e.preventDefault();
+    document.addEventListener('click', stop);
+    const result = fireEvent.click(link, init);
+    document.removeEventListener('click', stop);
+    return result;
+  };
+
+  it('calls linkTools(current, id) for a plain primary click on a different tool', async () => {
+    render(AppNav, { current: 'notes' });
+    await click('Triads');
+    expect(linkTools).toHaveBeenCalledExactlyOnceWith('notes', 'triads');
+  });
+
+  it.each([['ctrlKey'], ['metaKey'], ['shiftKey'], ['altKey']] as const)(
+    'does not call linkTools with %s',
+    async (key) => {
+      render(AppNav, { current: 'notes' });
+      await click('Triads', { [key]: true });
+      expect(linkTools).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not call linkTools for a non-primary button', async () => {
+    render(AppNav, { current: 'notes' });
+    await click('Triads', { button: 1 });
+    expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('does not call linkTools when the click was already default-prevented', async () => {
+    render(AppNav, { current: 'notes' });
+    const link = screen.getByRole('link', { name: 'Triads' });
+    link.addEventListener('click', (e) => e.preventDefault());
+    await fireEvent.click(link);
+    expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('does not call linkTools for the current tool', async () => {
+    render(AppNav, { current: 'notes' });
+    await click('Fretboard Notes');
+    expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('does not call linkTools for Home and About', async () => {
+    render(AppNav, { current: 'notes' });
+    await click('Home');
+    await click('About');
+    expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('leaves hrefs unchanged', () => {
+    render(AppNav, { current: 'notes' });
+    expect(screen.getByRole('link', { name: 'Triads' }).getAttribute('href')).toBe('/triads');
   });
 });

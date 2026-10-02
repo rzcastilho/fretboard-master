@@ -7,10 +7,12 @@
     info: CardInfo;
     /** "See every occurrence": add the card's pitch class to the selection. */
     onaddnote: (pc: number) => void;
+    /** "Triads from this note": open Triads rooted on the card's pitch class. */
+    ontriads: (pc: CardInfo['pitchClass']) => void;
     onclose: () => void;
   }
 
-  let { info, onaddnote, onclose }: Props = $props();
+  let { info, onaddnote, ontriads, onclose }: Props = $props();
 
   const heading = $derived(
     info.altSpelling
@@ -55,6 +57,9 @@
   <div class="actions">
     <button type="button" onclick={() => onaddnote(info.pitchClass)}>
       {m.notes_card_see_every()}
+    </button>
+    <button type="button" onclick={() => ontriads(info.pitchClass)}>
+      {m.notes_card_triads_from_note()}
     </button>
     <button type="button" onclick={onclose}>{m.notes_card_close()}</button>
   </div>

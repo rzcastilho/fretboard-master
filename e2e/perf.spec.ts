@@ -393,3 +393,57 @@ test.describe('triads Compare latency (FR-021, SC-007)', () => {
     expect(median(qualityTimes)).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('linked-tools carry latency (SC-005, FR-017)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('nav click Notes → Triads with a carry shows the carried root ≤ 300 ms', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const times: number[] = [];
+    for (const [pitch, heading] of [
+      ['A', 'A major — Root position'],
+      ['D', 'D major — Root position'],
+      ['E', 'E major — Root position'],
+      ['G', 'G major — Root position'],
+      ['B', 'B major — Root position']
+    ] as const) {
+      await page.goto('/notes');
+      await page
+        .getByRole('group', { name: 'Choose notes' })
+        .getByRole('button', { name: pitch, exact: true })
+        .click();
+      // Measured in the page: pointerdown → carried heading text in the DOM.
+      await page.evaluate((expected) => {
+        const w = globalThis as unknown as { __carryMs: number | null };
+        w.__carryMs = null;
+        let downAt = 0;
+        document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+          capture: true,
+          once: true
+        });
+        const check = () => {
+          if (w.__carryMs === null && document.body.innerText.includes(expected)) {
+            w.__carryMs = performance.now() - downAt;
+            observer.disconnect();
+          }
+        };
+        const observer = new MutationObserver(check);
+        observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+      }, heading);
+      await page
+        .getByRole('navigation', { name: 'Tools' })
+        .getByRole('link', { name: 'Triads' })
+        .click();
+      await page.waitForFunction(
+        () => (globalThis as unknown as { __carryMs: number | null }).__carryMs !== null
+      );
+      times.push(
+        await page.evaluate(() => (globalThis as unknown as { __carryMs: number }).__carryMs)
+      );
+    }
+    expect(median(times)).toBeLessThanOrEqual(300);
+  });
+});

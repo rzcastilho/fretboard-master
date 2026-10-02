@@ -1,5 +1,8 @@
-import { render, screen } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
+
+const linkTools = vi.hoisted(() => vi.fn());
+vi.mock('../../src/lib/state/links.svelte', () => ({ linkTools }));
 
 import ToolCard from '../../src/lib/shell/ToolCard.svelte';
 import { TOOLS } from '../../src/lib/shell/tools';
@@ -23,5 +26,15 @@ describe('ToolCard', () => {
     expect(svg?.getAttribute('aria-hidden')).toBe('true');
     expect(link.getAttribute('aria-label')).toBe('Fretboard Notes — Where is every note?');
     expect(container.querySelectorAll('[tabindex], button, [role="grid"]')).toHaveLength(0);
+  });
+
+  it('never applies a carry on click (home card, US2)', async () => {
+    render(ToolCard, { tool: TOOLS[1] });
+    const link = screen.getByRole('link');
+    const stop = (e: Event) => e.preventDefault();
+    document.addEventListener('click', stop);
+    await fireEvent.click(link);
+    document.removeEventListener('click', stop);
+    expect(linkTools).not.toHaveBeenCalled();
   });
 });
