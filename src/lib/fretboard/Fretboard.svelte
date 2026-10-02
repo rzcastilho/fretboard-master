@@ -1,6 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import { onMount, untrack } from 'svelte';
+  import { fade } from 'svelte/transition';
   import { defaultSpelling, intervalLabel, noteLabel, pitchLabel } from '../notation/notation';
   import { octaveOf, pitchClass } from '../theory/pitch';
   import {
@@ -29,6 +30,7 @@
   import { applyPulses } from './pulse';
   import { readMetrics } from './metrics';
   import { animateScroll, browserClock } from './scroll-animation';
+  import { tokenDuration } from './motion';
   import type {
     DrawnMarker,
     FretboardProps,
@@ -55,8 +57,15 @@
   let containerWidth = $state(0);
   let root: HTMLElement | undefined = $state();
   let scroller: HTMLElement | undefined = $state();
+  /**
+   * Markers are placed with the SVG `transform` attribute, which prerenders under the
+   * `style-src 'self'` CSP. Once mounted, an inline `transform` style (set through the CSSOM,
+   * which the CSP allows) takes over so position changes run the CSS transition (R-07).
+   */
+  let mounted = $state(false);
 
   onMount(() => {
+    mounted = true;
     const refresh = () => {
       metrics = readMetrics(root);
       containerWidth = scroller?.clientWidth ?? 0;
@@ -79,13 +88,21 @@
   };
 
   /** `--duration-short` in ms; 0 when missing or under reduced motion (tokens zero it out). */
-  function scrollDuration(): number {
-    if (!root) return 0;
-    if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
-    const raw = getComputedStyle(root).getPropertyValue('--duration-short').trim();
-    const n = parseFloat(raw);
-    if (!Number.isFinite(n)) return 0;
-    return raw.endsWith('ms') ? n : raw.endsWith('s') ? n * 1000 : 0;
+  const scrollDuration = () => tokenDuration(root);
+
+  /**
+   * Fade (F5): only comparison markers and arrows fade; other markers appear instantly.
+   * Arrows fade in after the slide has finished (delay = one token duration).
+   */
+  function markerFade(node: Element, comparison: boolean) {
+    // Never 0: Svelte 5 keyed-each outro groups never finish when some items' outros complete
+    // synchronously (duration 0) and others asynchronously, leaving faded-out markers in the DOM.
+    // 1 ms keeps every marker outro asynchronous, which is visually instant.
+    return fade(node, { duration: Math.max(1, comparison ? tokenDuration(root) : 0) });
+  }
+  function arrowFade(node: Element, direction: { in: boolean }) {
+    const d = tokenDuration(root);
+    return fade(node, { duration: d, delay: direction.in ? d : 0 });
   }
 
   const layout = $derived(layoutFretboard(instrument, metrics, containerWidth, variant));
@@ -244,6 +261,68 @@
       ? pitchLabel(spelling, octaveOf(pitch))
       : noteLabel(spelling);
   }
+
+  /**
+   * Arrows (F9, F10, F14). A `move` arrow is a line between two cell centres shortened by the
+   * marker radius, arrowhead at `toFret`. An `off-board` arrow runs from the `fromFret` marker
+   * to the outer edge of the first (`nut`) or last (`end`) column, arrowhead at that edge. All x
+   * come from `layout.columns`, so orientation and handedness follow the layout alone (F11).
+   * Invalid arrows are dropped; the thumbnail draws none (F15).
+   */
+  const drawnArrows = $derived.by(() => {
+    if (thumb) return [];
+    const head = metrics.arrowHead;
+    const inset = metrics.markerMedium / 2 + 2;
+    const validFret = (f: number) => Number.isInteger(f) && f >= 0 && f <= instrument.fretCount;
+    const last = layout.columns.length - 1;
+    // Outer edge x of the nut-side and end-side columns, whichever way the layout runs.
+    const outward = (end: 'nut' | 'end'): { x: number; dir: number } => {
+      const first = layout.columns[0];
+      const second = layout.columns[1] ?? first;
+      const tail = layout.columns[last];
+      if (end === 'nut') {
+        const dir = Math.sign(first.center - second.center) || -1;
+        return { x: dir < 0 ? first.start : first.end, dir };
+      }
+      const prev = layout.columns[last - 1] ?? tail;
+      const dir = Math.sign(tail.center - prev.center) || 1;
+      return { x: dir > 0 ? tail.end : tail.start, dir };
+    };
+    return (model.arrows ?? []).flatMap((a) => {
+      if (!Number.isInteger(a.string) || a.string < 1 || a.string > instrument.stringCount)
+        return [];
+      if (!validFret(a.fromFret)) return [];
+      const row = layout.rows[a.string - 1];
+      const from = layout.columns[a.fromFret].center;
+      let tip: number;
+      let dir: number;
+      if (a.kind === 'move') {
+        if (!validFret(a.toFret) || a.fromFret === a.toFret) return [];
+        const to = layout.columns[a.toFret].center;
+        dir = Math.sign(to - from);
+        tip = to - dir * inset;
+      } else if (a.edge === 'nut' || a.edge === 'end') {
+        const o = outward(a.edge);
+        dir = o.dir;
+        tip = o.x;
+      } else return [];
+      const x1 = from + dir * inset;
+      // Short runs (the edge is closer than a marker radius plus the head) keep the head only.
+      const base = dir > 0 ? Math.max(x1, tip - head) : Math.min(x1, tip + head);
+      return [
+        {
+          id: a.id,
+          label: a.label,
+          x1,
+          x2: base,
+          y: row.center,
+          head: `${tip},${row.center} ${base},${row.center - head / 2} ${base},${row.center + head / 2}`,
+          labelX: (x1 + tip) / 2,
+          labelY: row.top + 2
+        }
+      ];
+    });
+  });
 
   const drawn = $derived(
     Object.entries(drawnMap)
@@ -568,13 +647,17 @@
           {/each}
         </g>
         <g aria-hidden="true" class="markers">
-          {#each drawn as d (d.mk.pulse?.id ?? d.key)}
+          {#each drawn as d (d.mk.pulse?.id ?? d.mk.id ?? d.key)}
             <g
               class="marker {d.mk.function} {d.mk.emphasis}{d.tone ? ` tone-${d.tone}` : ''}"
+              class:comparison={d.mk.variant === 'comparison'}
               class:pulse={d.mk.pulse !== undefined}
+              data-variant={d.mk.variant}
               style:--pulse-duration={d.mk.pulse ? `${d.mk.pulse.durationMs}ms` : undefined}
               data-key={d.key}
               transform="translate({d.x} {d.y})"
+              style:transform={mounted ? `translate(${d.x}px, ${d.y}px)` : undefined}
+              transition:markerFade={d.mk.variant === 'comparison'}
             >
               <g class="shape">
                 {#if d.mk.function === 'root'}
@@ -606,6 +689,20 @@
                   >
                 {/if}
               </g>
+            </g>
+          {/each}
+        </g>
+        <g aria-hidden="true" class="arrows">
+          {#each drawnArrows as a (a.id)}
+            <g
+              class="arrow"
+              data-id={a.id}
+              in:arrowFade={{ in: true }}
+              out:arrowFade={{ in: false }}
+            >
+              <line class="arrow-line" x1={a.x1} y1={a.y} x2={a.x2} y2={a.y} />
+              <polygon class="arrowhead" points={a.head} />
+              <text class="arrow-label" x={a.labelX} y={a.labelY}>{a.label}</text>
             </g>
           {/each}
         </g>
@@ -861,6 +958,7 @@
 
   .marker {
     pointer-events: none;
+    transition: transform var(--duration-short) var(--ease-standard);
   }
 
   .shape {
@@ -895,6 +993,42 @@
     .marker.pulse .shape {
       animation: none;
     }
+  }
+
+  .marker.comparison .glyph {
+    stroke: var(--color-text);
+    stroke-width: var(--marker-stroke);
+    stroke-dasharray: var(--marker-dash) var(--marker-dash-gap);
+  }
+
+  @media (prefers-contrast: more) {
+    .marker.comparison .glyph {
+      stroke: CanvasText;
+      stroke-width: var(--marker-stroke);
+    }
+  }
+
+  .arrows {
+    pointer-events: none;
+  }
+
+  .arrow-line {
+    stroke: var(--color-text);
+    stroke-width: var(--marker-stroke);
+  }
+
+  .arrowhead {
+    fill: var(--color-text);
+    stroke: none;
+  }
+
+  .arrows text.arrow-label {
+    fill: var(--color-text);
+    font-size: var(--marker-label-min-size);
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: var(--color-surface-raised);
+    stroke-width: 3px;
   }
 
   .marker.dimmed {

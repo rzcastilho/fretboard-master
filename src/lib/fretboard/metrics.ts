@@ -14,7 +14,8 @@ const TOKENS: Readonly<Record<keyof FretboardMetrics, string>> = {
   thumbFret: '--fb-thumb-fret',
   markerRoot: '--marker-root',
   markerMedium: '--marker-medium',
-  markerSmall: '--marker-small'
+  markerSmall: '--marker-small',
+  arrowHead: '--arrow-head-size'
 };
 
 function toPx(raw: string, rootPx: number): number | undefined {

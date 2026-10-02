@@ -82,3 +82,42 @@ describe('TriadsSecondary outside Isolated and Reset tool (US2)', () => {
     expect(onreset).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('TriadsSecondary Listen to comparison (007 US6)', () => {
+  const props = (compareOn: boolean, enabled: boolean, onlistencomparison = vi.fn()) => ({
+    labelType: 'interval' as const,
+    onlabeltype: vi.fn(),
+    octave: { up: true, down: true, applies: true },
+    onoctaveup: vi.fn(),
+    onoctavedown: vi.fn(),
+    listen: { enabled: true },
+    onlisten: vi.fn(),
+    compareOn,
+    listenComparison: { enabled },
+    onlistencomparison,
+    onreset: vi.fn()
+  });
+
+  it('is hidden when Compare is off or not offered', () => {
+    render(TriadsSecondary, props(false, true));
+    expect(screen.queryByRole('button', { name: 'Listen to comparison' })).toBeNull();
+  });
+
+  it('renders after Listen, aria-disabled when not enabled, and does nothing', async () => {
+    const fn = vi.fn();
+    render(TriadsSecondary, props(true, false, fn));
+    const names = screen.getAllByRole('button').map((b) => b.textContent?.trim());
+    expect(names.indexOf('Listen to comparison')).toBe(names.indexOf('Listen') + 1);
+    const b = screen.getByRole('button', { name: 'Listen to comparison' });
+    expect(b.getAttribute('aria-disabled')).toBe('true');
+    await fireEvent.click(b);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('activates when enabled', async () => {
+    const fn = vi.fn();
+    render(TriadsSecondary, props(true, true, fn));
+    await fireEvent.click(screen.getByRole('button', { name: 'Listen to comparison' }));
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});

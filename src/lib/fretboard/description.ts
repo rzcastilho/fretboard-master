@@ -28,7 +28,13 @@ export function positionName(instrument: Instrument, position: Position, marker?
       ? m.fretboard_position_name_open({ note, string: position.string })
       : m.fretboard_position_name({ note, string: position.string, fret: position.fret });
   if (marker && marker.emphasis !== 'hidden') {
-    return m.fretboard_position_function({ name, function: FUNCTION_NAME[marker.function]() });
+    const named = m.fretboard_position_function({
+      name,
+      function: FUNCTION_NAME[marker.function]()
+    });
+    return marker.variant === 'comparison'
+      ? m.fretboard_position_function({ name: named, function: m.fretboard_comparison_note() })
+      : named;
   }
   return name;
 }

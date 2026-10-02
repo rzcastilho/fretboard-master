@@ -22,7 +22,29 @@ export interface Marker {
   readonly interval?: IntervalId;
   /** Draw the small octave number beside a 'note' label. */
   readonly octaveBadge?: boolean;
+  /** Stable identity across model updates; a changed fret with the same id slides (R-07). */
+  readonly id?: string;
+  /** Comparison triad note: dashed outline, function fill and shape kept (R-09). */
+  readonly variant?: 'comparison';
 }
+
+export type FretboardArrow =
+  | {
+      readonly kind: 'move';
+      readonly id: string;
+      readonly string: number;
+      readonly fromFret: number;
+      readonly toFret: number;
+      readonly label: string;
+    }
+  | {
+      readonly kind: 'off-board';
+      readonly id: string;
+      readonly string: number;
+      readonly fromFret: number;
+      readonly edge: 'nut' | 'end';
+      readonly label: string;
+    };
 
 export interface DisplayModel {
   /** At most one per position; first wins. */
@@ -38,6 +60,8 @@ export interface DisplayModel {
   readonly description?: string;
   /** Tappable shape tags above the board (Triads Full neck). Interactive variant only. */
   readonly tags?: readonly FretboardTag[];
+  /** Drawn above markers, mirrored with the layout; never announced (the description covers them). */
+  readonly arrows?: readonly FretboardArrow[];
   /** Keyed auto-scroll: re-runs only when `key` changes (replaces the highlighted-set trigger). */
   readonly autoScroll?: {
     readonly key: string;

@@ -110,6 +110,12 @@
   --region-band: hsl(205 70% 40% / 0.14);
   --marker-badge-size: 0.75rem;
 
+  /* Quality comparison (feature 007) */
+  --marker-dash: 4px;
+  --marker-dash-gap: 3px;
+  --arrow-head-size: 0.5rem;
+  --panel-column-min: 8rem;
+
   --font-family-notes: 'FM Accidentals', var(--font-family-ui);
 
   /* Motion */

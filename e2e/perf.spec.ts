@@ -301,3 +301,95 @@ test.describe('triads view-switch and tag-tap latency (FR-021, SC-006)', () => {
     expect(median(tagTimes)).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('triads Compare latency (FR-021, SC-007)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median Compare on and comparison-quality change → updated board ≤ 100 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/triads');
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await expect(board.locator('.marker')).toHaveCount(3);
+    const toggle = page.getByRole('button', { name: 'Compare', exact: true });
+    const list = page.getByRole('radiogroup', { name: 'Compare with' });
+
+    // Measured in the page (pointerdown → observed DOM change), so Playwright round-trips under
+    // throttling are not counted.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as {
+        __onTimes: number[];
+        __qualityTimes: number[];
+        __downAt: number | null;
+        __kind: 'on' | 'quality';
+        __check: () => boolean;
+      };
+      w.__onTimes = [];
+      w.__qualityTimes = [];
+      w.__downAt = null;
+      w.__kind = 'on';
+      w.__check = () => false;
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || !w.__check()) return;
+        (w.__kind === 'on' ? w.__onTimes : w.__qualityTimes).push(performance.now() - w.__downAt);
+        w.__downAt = null;
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true
+      });
+    });
+    const arm = (kind: 'on' | 'quality', check: string) =>
+      page.evaluate(
+        ([k, c]) => {
+          const w = globalThis as unknown as Record<string, unknown>;
+          w.__kind = k;
+          w.__check = new Function(`return (${c})`)();
+          w.__downAt = null;
+        },
+        [kind, check] as const
+      );
+    const hasComparison = `() => document.querySelectorAll('.marker.comparison').length === 1`;
+    // Compare off fades the comparison marker out (F5). Svelte flags an outroing node with the
+    // `inert` property (not an attribute on SVG), so the board has updated once every comparison
+    // marker left is outroing, not when the fade ends.
+    const noComparison = `() => [...document.querySelectorAll('.marker.comparison')].every((n) => n.inert)`;
+    const comparisonFifth = `() => document.querySelector('.marker.comparison.fifth') !== null`;
+    const comparisonThird = `() => document.querySelector('.marker.comparison.third') !== null`;
+
+    const samples = 5;
+    for (let i = 0; i < samples; i++) {
+      // Compare on (major vs minor: the third moves).
+      await arm('on', hasComparison);
+      await toggle.click();
+      await expect(board.locator('.marker.comparison')).toHaveCount(1);
+
+      // Comparison-quality change: diminished moves the fifth, then back to minor (the third).
+      await arm('quality', comparisonFifth);
+      await list.getByRole('radio', { name: 'diminished' }).click();
+      await expect(board.locator('.marker.comparison.fifth')).toHaveCount(1);
+      await arm('quality', comparisonThird);
+      await list.getByRole('radio', { name: 'minor' }).click();
+      await expect(board.locator('.marker.comparison.third')).toHaveCount(1);
+
+      // Compare off, back to the initial view for the next sample.
+      await arm('on', noComparison);
+      await toggle.click();
+      await expect(board.locator('.marker.comparison')).toHaveCount(0);
+      await page.evaluate(() => ((globalThis as unknown as { __downAt: null }).__downAt = null));
+    }
+
+    const { onTimes, qualityTimes } = await page.evaluate(() => {
+      const w = globalThis as unknown as { __onTimes: number[]; __qualityTimes: number[] };
+      return { onTimes: w.__onTimes, qualityTimes: w.__qualityTimes };
+    });
+    expect(onTimes.length).toBeGreaterThanOrEqual(samples);
+    expect(qualityTimes.length).toBeGreaterThanOrEqual(samples * 2);
+    expect(median(onTimes)).toBeLessThanOrEqual(100);
+    expect(median(qualityTimes)).toBeLessThanOrEqual(100);
+  });
+});

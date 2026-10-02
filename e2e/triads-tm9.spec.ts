@@ -120,3 +120,18 @@ test.describe('TM-9 triads views', () => {
     await expect(page).toHaveScreenshot('tm9-view-14.png');
   });
 });
+
+test.describe('TM-9 triads Compare (feature 007)', () => {
+  test('view 10: G major vs minor, 2nd inversion, 4-3-2 → 12-12-12 and 12-12-11', async ({
+    page
+  }) => {
+    await open(page);
+    await root(page, 'G').click();
+    await page.getByRole('radio', { name: '2nd inversion' }).click();
+    await page.getByRole('radio', { name: '4-3-2' }).click();
+    await page.getByRole('button', { name: 'Compare', exact: true }).click();
+    await expect(board(page).locator('.marker.comparison[data-key="2:11"]')).toHaveCount(1);
+    await expect(board(page).locator('g.arrows .arrow')).toHaveCount(1);
+    await expect(page).toHaveScreenshot('tm9-view-10.png');
+  });
+});

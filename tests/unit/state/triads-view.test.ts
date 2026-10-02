@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { AF_1_12 } from '../../../src/lib/instrument/fixtures';
 import {
   equalsTriadsView,
   initialTriadsView,
@@ -10,6 +11,8 @@ import {
   seeAllNotes,
   selectRoot,
   selectShape,
+  setCompare,
+  setCompareQuality,
   setInversion,
   setLabelType,
   setQuality,
@@ -28,7 +31,8 @@ describe('triads view state (US1)', () => {
       stringSet: 3,
       labelType: 'interval',
       occurrence: 0,
-      view: 'isolated'
+      view: 'isolated',
+      compare: { on: false, quality: null }
     });
   });
 
@@ -271,5 +275,221 @@ describe('view transitions (feature 006, data-model §3)', () => {
       expect(setLabelType(v, 'name').view).toBe(v.view);
       expect(revalidate({ ...v, stringSet: 9 }, STANDARD_GUITAR).view).toBe(v.view);
     }
+  });
+});
+
+describe('compare field (007 S1, S7)', () => {
+  const init = initialTriadsView(STANDARD_GUITAR);
+
+  it('S1: starts off with no remembered quality', () => {
+    expect(init.compare).toEqual({ on: false, quality: null });
+  });
+
+  it('S7: reset clears compare', () => {
+    const dirty = { ...init, compare: { on: true, quality: 'minor' as const } };
+    expect(resetTriads(STANDARD_GUITAR).compare).toEqual({ on: false, quality: null });
+    expect(equalsTriadsView(resetTriads(STANDARD_GUITAR), init)).toBe(true);
+    expect(equalsTriadsView(dirty, init)).toBe(false);
+  });
+
+  it('equalsTriadsView compares compare.on and compare.quality', () => {
+    const a = { ...init, compare: { on: true, quality: 'minor' as const } };
+    expect(equalsTriadsView(a, { ...a, compare: { on: true, quality: 'minor' } })).toBe(true);
+    expect(equalsTriadsView(a, { ...a, compare: { on: false, quality: 'minor' } })).toBe(false);
+    expect(equalsTriadsView(a, { ...a, compare: { on: true, quality: 'diminished' } })).toBe(false);
+    expect(equalsTriadsView(a, { ...a, compare: { on: true, quality: null } })).toBe(false);
+  });
+});
+
+describe('triads view Compare transitions (US1: S2, S3, S4, S9)', () => {
+  const s0 = initialTriadsView(STANDARD_GUITAR);
+
+  it('S2: setCompare(true) in all-notes returns the same state', () => {
+    const s = { ...s0, view: 'all-notes' as const };
+    expect(setCompare(s, true, STANDARD_GUITAR)).toBe(s);
+  });
+
+  it('S3: turning on picks the one-note partner when nothing is remembered', () => {
+    expect(setCompare(s0, true, STANDARD_GUITAR).compare).toEqual({ on: true, quality: 'minor' });
+    const dim = { ...s0, quality: 'diminished' as const };
+    expect(setCompare(dim, true, STANDARD_GUITAR).compare).toEqual({ on: true, quality: 'minor' });
+    const minor = { ...s0, quality: 'minor' as const };
+    expect(setCompare(minor, true, STANDARD_GUITAR).compare).toEqual({
+      on: true,
+      quality: 'major'
+    });
+  });
+
+  it('S3: turning on reuses a valid remembered quality, ignores an invalid one', () => {
+    const remembered = { ...s0, compare: { on: false, quality: 'augmented' as const } };
+    expect(setCompare(remembered, true, STANDARD_GUITAR).compare).toEqual({
+      on: true,
+      quality: 'augmented'
+    });
+    const same = { ...s0, compare: { on: false, quality: 'major' as const } };
+    expect(setCompare(same, true, STANDARD_GUITAR).compare).toEqual({ on: true, quality: 'minor' });
+  });
+
+  it('S3: turning on when already on, or off when already off, is a no-op', () => {
+    const on = setCompare(s0, true, STANDARD_GUITAR);
+    expect(setCompare(on, true, STANDARD_GUITAR)).toBe(on);
+    expect(setCompare(s0, false, STANDARD_GUITAR)).toBe(s0);
+  });
+
+  it('S3: turning off keeps the quality (remembered) and the state otherwise', () => {
+    const on = setCompare(s0, true, STANDARD_GUITAR);
+    const off = setCompare(on, false, STANDARD_GUITAR);
+    expect(off).toEqual({ ...s0, compare: { on: false, quality: 'minor' } });
+    expect(off.quality).toBe('major');
+  });
+
+  it('S4: setCompareQuality changes the comparison quality only while on', () => {
+    const on = setCompare(s0, true, STANDARD_GUITAR);
+    expect(setCompareQuality(on, 'diminished', STANDARD_GUITAR).compare).toEqual({
+      on: true,
+      quality: 'diminished'
+    });
+    expect(setCompareQuality(on, 'minor', STANDARD_GUITAR)).toBe(on);
+  });
+
+  it('S4: setCompareQuality to the current quality or while off returns s', () => {
+    const on = setCompare(s0, true, STANDARD_GUITAR);
+    expect(setCompareQuality(on, on.quality, STANDARD_GUITAR)).toBe(on);
+    expect(setCompareQuality(s0, 'minor', STANDARD_GUITAR)).toBe(s0);
+  });
+
+  it('S9: invalid qualities return s', () => {
+    const on = setCompare(s0, true, STANDARD_GUITAR);
+    expect(setCompareQuality(on, 'suspended' as never, STANDARD_GUITAR)).toBe(on);
+    expect(setCompare(s0, 'yes' as never, STANDARD_GUITAR)).toBe(s0);
+  });
+
+  it('clamps occurrence to the occurrence count', () => {
+    // 2nd inversion 4-3-2 on G has two occurrences (0-0-0 and 12-12-12).
+    const high = {
+      ...s0,
+      rootPc: 7 as const,
+      inversion: 'second' as const,
+      stringSet: 4,
+      occurrence: 1
+    };
+    expect(setCompare(high, true, STANDARD_GUITAR).occurrence).toBeLessThanOrEqual(1);
+    const beyond = { ...s0, occurrence: 9 };
+    expect(setCompare(beyond, true, STANDARD_GUITAR).occurrence).toBe(
+      revalidate(beyond, STANDARD_GUITAR).occurrence
+    );
+  });
+});
+
+describe('Compare survives other transitions (007 US2: S6)', () => {
+  const s0 = initialTriadsView(STANDARD_GUITAR);
+  const on = setCompare(s0, true, STANDARD_GUITAR);
+
+  it('selectRoot, switchSpelling, setInversion, setStringSet and setView keep compare', () => {
+    expect(selectRoot(on, 1).compare).toEqual(on.compare);
+    expect(switchSpelling(selectRoot(on, 1)).compare).toEqual(on.compare);
+    expect(setInversion(on, 'first').compare).toEqual(on.compare);
+    expect(setStringSet(on, 4, STANDARD_GUITAR).compare).toEqual(on.compare);
+    expect(setView(on, 'full-neck').compare).toEqual(on.compare);
+  });
+
+  it('Isolated → Full neck → All notes → back restores the same comparison', () => {
+    const back = setView(setView(setView(on, 'full-neck'), 'all-notes'), 'isolated');
+    expect(back.compare).toEqual({ on: true, quality: 'minor' });
+  });
+});
+
+describe('Compare and octave limits in Isolated (007 US3: S8)', () => {
+  const g2nd = (o: Partial<ReturnType<typeof initialTriadsView>> = {}) => ({
+    ...initialTriadsView(STANDARD_GUITAR),
+    rootPc: 7 as const,
+    inversion: 'second' as const,
+    stringSet: 4,
+    ...o
+  });
+  const c3 = (o: Partial<ReturnType<typeof initialTriadsView>> = {}) => ({
+    ...initialTriadsView(STANDARD_GUITAR),
+    compare: { on: true, quality: 'minor' as const },
+    ...o
+  });
+
+  it('octaveUp/octaveDown step through pair occurrences (C major vs minor 3-2-1: two pairs)', () => {
+    const up = octaveUp(c3(), STANDARD_GUITAR);
+    expect(up.occurrence).toBe(1);
+    expect(octaveDown(up, STANDARD_GUITAR).occurrence).toBe(0);
+  });
+
+  it('G major 2nd inv. 4-3-2 vs minor has one pair: octaveUp is a no-op although two first triads exist', () => {
+    const s = g2nd({ compare: { on: true, quality: 'minor' } });
+    expect(octaveUp(s, STANDARD_GUITAR)).toBe(s);
+    // Without Compare the same shape has two occurrences.
+    expect(octaveUp(g2nd(), STANDARD_GUITAR).occurrence).toBe(1);
+  });
+
+  it('setCompare(true) clamps occurrence to the last pair occurrence; off clamps to first-triad count', () => {
+    const high = g2nd({ occurrence: 1 });
+    const on = setCompare(high, true, STANDARD_GUITAR);
+    expect(on.occurrence).toBe(0);
+    expect(setCompare(on, false, STANDARD_GUITAR).occurrence).toBe(0);
+  });
+
+  it('setCompareQuality clamps occurrence to the new pair count', () => {
+    // Occurrence 1 is clamped to the new quality's last pair occurrence.
+    const s = setCompare(g2nd(), true, STANDARD_GUITAR);
+    const next = setCompareQuality({ ...s, occurrence: 1 }, 'augmented', STANDARD_GUITAR);
+    expect(next.occurrence).toBeLessThanOrEqual(1);
+    expect(next.compare.quality).toBe('augmented');
+  });
+
+  it('revalidate clamps against pair occurrences with Compare on', () => {
+    const s = g2nd({ occurrence: 1, compare: { on: true, quality: 'minor' } });
+    expect(revalidate(s, STANDARD_GUITAR).occurrence).toBe(0);
+  });
+
+  it('C7: with no pair occurrence the first-triad occurrences are stepped through', () => {
+    // 12-fret instrument: C♯ minor 1st inv. 6-5-4 only fits once and its comparison is off the end.
+    const s = {
+      ...initialTriadsView(AF_1_12),
+      rootPc: 1 as const,
+      quality: 'minor' as const,
+      inversion: 'first' as const,
+      stringSet: 6,
+      compare: { on: true, quality: 'major' as const }
+    };
+    expect(octaveUp(s, AF_1_12)).toBe(s);
+    expect(octaveDown(s, AF_1_12)).toBe(s);
+    expect(revalidate(s, AF_1_12)).toBe(s);
+  });
+
+  it('quality, root, inversion and set changes still reset occurrence to 0', () => {
+    const s = c3({ occurrence: 1 });
+    expect(selectRoot(s, 2).occurrence).toBe(0);
+    expect(setInversion(s, 'first').occurrence).toBe(0);
+    expect(setStringSet(s, 4, STANDARD_GUITAR).occurrence).toBe(0);
+    expect(setQuality(s, 'augmented').occurrence).toBe(0);
+  });
+});
+
+describe('Compare quality swap (007 US4: S5)', () => {
+  const s0 = initialTriadsView(STANDARD_GUITAR);
+  const on = setCompare(s0, true, STANDARD_GUITAR); // major vs minor
+
+  it('choosing the comparison quality as the current one swaps the two', () => {
+    const next = setQuality(on, 'minor');
+    expect(next.quality).toBe('minor');
+    expect(next.compare).toEqual({ on: true, quality: 'major' });
+    expect(next.occurrence).toBe(0);
+  });
+
+  it('any other quality change keeps compare.quality', () => {
+    const next = setQuality(on, 'diminished');
+    expect(next.quality).toBe('diminished');
+    expect(next.compare).toEqual({ on: true, quality: 'minor' });
+  });
+
+  it('with Compare off, the remembered quality is not swapped', () => {
+    const off = setCompare(on, false, STANDARD_GUITAR);
+    const next = setQuality(off, 'minor');
+    expect(next.compare).toEqual({ on: false, quality: 'minor' });
   });
 });

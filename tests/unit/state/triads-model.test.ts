@@ -11,11 +11,14 @@ import {
   octaveUp,
   setLabelType,
   selectRoot,
+  setInversion,
   setQuality,
+  setStringSet,
   setView,
   switchSpelling,
   type TriadsViewState
 } from '../../../src/lib/state/triads-view';
+import type { Quality } from '../../../src/lib/theory/triad';
 
 const initial = initialTriadsView(STANDARD_GUITAR);
 const display = buildTriadsModel(initial, STANDARD_GUITAR);
@@ -850,5 +853,435 @@ describe('triads model Listen per view (US4)', () => {
   it('Isolated: sequence unchanged', () => {
     const d = buildTriadsModel(initial, STANDARD_GUITAR);
     expect(d.listenSteps).toHaveLength(4);
+  });
+});
+
+describe('triads model Compare in Isolated (US1)', () => {
+  const on = (o: Partial<TriadsViewState> = {}, q: Quality = 'minor'): TriadsViewState => ({
+    ...initial,
+    compare: { on: true, quality: q },
+    ...o
+  });
+  const build = (s: TriadsViewState) => buildTriadsModel(s, STANDARD_GUITAR);
+
+  it('M1: options are QUALITIES without the current one, in product order', () => {
+    const d = build(on());
+    expect(d.compare).toEqual({
+      offered: true,
+      on: true,
+      quality: 'minor',
+      options: ['minor', 'diminished', 'augmented']
+    });
+    expect(build(on({ quality: 'diminished' }, 'minor')).compare.options).toEqual([
+      'major',
+      'minor',
+      'augmented'
+    ]);
+  });
+
+  it('M1: Compare off still lists the offer; not offered in All notes', () => {
+    expect(display.compare).toMatchObject({ offered: true, on: false, quality: null });
+    const all = build({ ...initial, view: 'all-notes' });
+    expect(all.compare.offered).toBe(false);
+  });
+
+  it('M2: comparison is null when off, in All notes, or on guidance states', () => {
+    expect(display.comparison).toBeNull();
+    expect(build(on({ view: 'all-notes' })).comparison).toBeNull();
+    const noClose = buildTriadsModel(on({ stringSet: 3 }), NC_UNISON);
+    expect(noClose.comparison).toBeNull();
+  });
+
+  it('US1-1: C major vs minor on 3-2-1: third moves 5 → 4 toward the nut', () => {
+    const d = build(on());
+    expect(d.comparison).toMatchObject({ quality: 'minor', shifted: false, fits: true });
+    const pair = d.comparison?.pairs[0];
+    expect(pair?.scope).toBe('iso');
+    expect(pair?.firstFrets).toEqual([5, 5, 3]);
+    expect(pair?.comparisonFrets).toEqual([5, 4, 3]);
+    expect(pair?.moves).toEqual([
+      { index: 1, function: 'third', fromFret: 5, toFret: 4, delta: -1 }
+    ]);
+    // M10: the comparison uses the first triad's root spelling.
+    expect(d.comparison?.spelling.third).toEqual({ letter: 'E', accidental: -1 });
+  });
+
+  it('M4: one comparison marker per moved note, shared notes not duplicated', () => {
+    const { markers } = build(on()).model;
+    expect(markers).toHaveLength(4);
+    const cmp = markers.filter((k) => k.variant === 'comparison');
+    expect(cmp.map((k) => [k.string, k.fret, k.function])).toEqual([[2, 4, 'third']]);
+    expect(cmp[0]?.interval).toBe('b3');
+    expect(cmp[0]?.spelling).toEqual({ letter: 'E', accidental: -1 });
+    expect(markers.filter((k) => k.variant === undefined)).toHaveLength(3);
+  });
+
+  it('US1-2: minor vs diminished moves only the fifth by −1', () => {
+    const d = build(on({ quality: 'minor' }, 'diminished'));
+    expect(d.comparison?.pairs[0]?.moves.map((x) => [x.function, x.delta])).toEqual([
+      ['fifth', -1]
+    ]);
+  });
+
+  it('US1-3: major vs augmented moves only the fifth by +1', () => {
+    const d = build(on({}, 'augmented'));
+    expect(d.comparison?.pairs[0]?.moves.map((x) => [x.function, x.delta])).toEqual([['fifth', 1]]);
+  });
+
+  it('M5: one move arrow per move with the plural label; none for the root', () => {
+    const one = build(on()).model.arrows;
+    expect(one).toEqual([
+      { kind: 'move', id: 'iso:arrow:third', string: 2, fromFret: 5, toFret: 4, label: '1 fret' }
+    ]);
+    const two = build(on({ quality: 'major' }, 'diminished')).model.arrows ?? [];
+    expect(two.map((a) => a.id)).toEqual(['iso:arrow:third', 'iso:arrow:fifth']);
+    expect(two.every((a) => a.kind === 'move' && a.label === '1 fret')).toBe(true);
+    const dimAug = build(on({ quality: 'diminished' }, 'augmented')).model.arrows ?? [];
+    expect(dimAug.map((a) => (a.kind === 'move' ? a.label : ''))).toEqual(['1 fret', '2 frets']);
+  });
+
+  it('no arrows, dashes or comparison without Compare', () => {
+    expect(display.model.arrows ?? []).toEqual([]);
+    expect(display.model.markers.some((k) => k.variant === 'comparison')).toBe(false);
+  });
+
+  it('M7: first-triad markers carry ids with and without Compare; quality keeps them', () => {
+    const ids = (d: ReturnType<typeof build>) => d.model.markers.map((k) => k.id);
+    expect(ids(display)).toEqual([
+      'iso:first:root@0:root:3',
+      'iso:first:third@0:root:3',
+      'iso:first:fifth@0:root:3'
+    ]);
+    expect(ids(build(on()))).toEqual(expect.arrayContaining(ids(display)));
+    const cmpId = build(on()).model.markers.find((k) => k.variant === 'comparison')?.id;
+    expect(cmpId).toBe('iso:cmp:third@0:root:3');
+    // Quality change keeps ids; root, inversion, set change every id.
+    expect(ids(build({ ...initial, quality: 'minor' }))).toEqual(ids(display));
+    for (const o of [{ rootPc: 7 as const }, { inversion: 'first' as const }, { stringSet: 4 }]) {
+      const next = ids(build({ ...initial, ...o }));
+      expect(next.some((x) => ids(display).includes(x))).toBe(false);
+    }
+  });
+
+  it('composition: two columns, changed functions', () => {
+    const c = build(on()).composition;
+    expect(c.changed).toEqual(['third']);
+    expect(c.comparison?.name.quality).toBe('minor');
+    expect(c.comparison?.notes.map((n) => n.spelling.letter)).toEqual(['C', 'E', 'G']);
+    expect(c.comparison?.intervals).toEqual(['R', 'b3', '5']);
+    expect(display.composition.comparison).toBeNull();
+    expect(display.composition.changed).toEqual([]);
+  });
+
+  it('M8: description is the compare sentence, accidentals spoken in full', () => {
+    const d = build(on());
+    const text = d.model.description ?? '';
+    expect(text).toMatch(/^Comparing C major with C minor/);
+    expect(text).toContain('E flat');
+    expect(text).toContain('toward the nut');
+    expect(text).not.toMatch(/[♭♯]/);
+  });
+
+  it('no comparison description when Compare is off', () => {
+    expect(display.model.description).toBeUndefined();
+  });
+});
+
+describe('triads model Compare in Full neck (007 US2)', () => {
+  const full = (o: Partial<TriadsViewState> = {}): TriadsViewState => ({
+    ...initial,
+    view: 'full-neck',
+    rootPc: 9,
+    compare: { on: true, quality: 'minor' },
+    ...o
+  });
+  const off = (s: TriadsViewState): TriadsViewState => ({
+    ...s,
+    compare: { on: false, quality: null }
+  });
+  const build = (s: TriadsViewState) => buildTriadsModel(s, STANDARD_GUITAR);
+
+  it('M6: one pair per chain shape; chain, tags and auto-scroll unchanged by Compare', () => {
+    const withCmp = build(full());
+    const without = build(off(full()));
+    expect(withCmp.shape.kind).toBe('chain');
+    if (withCmp.shape.kind !== 'chain' || without.shape.kind !== 'chain') return;
+    expect(withCmp.comparison?.pairs).toHaveLength(withCmp.shape.shapes.length);
+    expect(withCmp.comparison?.pairs.map((p) => p.scope)).toEqual(
+      withCmp.shape.shapes.map((x) => x.id)
+    );
+    expect(withCmp.shape).toEqual(without.shape);
+    expect(withCmp.model.tags).toEqual(without.model.tags);
+    expect(withCmp.model.autoScroll).toEqual(without.model.autoScroll);
+    expect(without.comparison).toBeNull();
+    expect(without.model.arrows).toBeUndefined();
+  });
+
+  it('A major vs minor on 3-2-1: every shape moves the third by one fret', () => {
+    const d = build(full());
+    for (const pair of d.comparison?.pairs ?? []) {
+      expect(pair.moves).toHaveLength(1);
+      expect(pair.moves[0]).toMatchObject({ function: 'third', delta: -1 });
+    }
+    const n = d.comparison?.pairs.length ?? 0;
+    expect(d.model.markers.filter((k) => k.variant === 'comparison')).toHaveLength(n);
+    expect(d.model.arrows?.filter((a) => a.kind === 'move')).toHaveLength(n);
+  });
+
+  it('per-shape marker ids use the chain shape id; root/set change renames every id', () => {
+    const ids = (s: TriadsViewState): string[] =>
+      build(s).model.markers.flatMap((k) => (k.id ? [k.id] : []));
+    const a = build(full());
+    if (a.shape.kind !== 'chain') throw new Error('chain expected');
+    const idsA = ids(full());
+    for (const shape of a.shape.shapes) {
+      expect(idsA.some((id) => id.startsWith(`${shape.id}:first:root@`))).toBe(true);
+      expect(idsA.some((id) => id.startsWith(`${shape.id}:cmp:third@`))).toBe(true);
+    }
+    expect(new Set(idsA).size).toBe(idsA.length);
+    const b = build(full({ rootPc: 2 }));
+    if (b.shape.kind !== 'chain') throw new Error('chain expected');
+    const idsB = ids(full({ rootPc: 2 }));
+    expect(idsB.filter((id) => idsA.includes(id))).toEqual([]);
+    // changing quality keeps first-triad ids
+    const q = ids(full({ compare: { on: true, quality: 'augmented' } }));
+    expect(q.filter((id) => id.includes(':first:'))).toEqual(
+      idsA.filter((id) => id.includes(':first:'))
+    );
+  });
+
+  it('M1/M2: All notes is not offered and has no comparison, state kept', () => {
+    const d = build(full({ view: 'all-notes' }));
+    expect(d.compare).toMatchObject({ offered: false, on: true, quality: 'minor' });
+    expect(d.comparison).toBeNull();
+    expect(d.model.arrows).toBeUndefined();
+    expect(d.model.markers.some((k) => k.variant === 'comparison')).toBe(false);
+  });
+});
+
+describe('triads model Compare octave and fretboard limits (007 US3)', () => {
+  const state = (
+    o: Partial<TriadsViewState> = {},
+    quality: Quality = 'minor'
+  ): TriadsViewState => ({
+    ...initial,
+    compare: { on: true, quality },
+    ...o
+  });
+  const g2nd = (o: Partial<TriadsViewState> = {}): TriadsViewState =>
+    state({ rootPc: 7, inversion: 'second', stringSet: 4, ...o });
+  const build = (s: TriadsViewState, i = STANDARD_GUITAR) => buildTriadsModel(s, i);
+
+  it('M3/US3-1: G major 2nd inv. 4-3-2 vs minor is shown an octave up: 12-12-12 and 12-12-11', () => {
+    const d = build(g2nd());
+    expect(d.comparison).toMatchObject({ shifted: true, fits: true });
+    expect(d.shape.kind === 'shown' && d.shape.frets).toEqual([12, 12, 12]);
+    const cmpMarks = d.model.markers.filter((k) => k.variant === 'comparison');
+    expect(cmpMarks.map((k) => [k.string, k.fret])).toEqual([[2, 11]]);
+    const arrows = d.model.arrows ?? [];
+    expect(arrows).toHaveLength(1);
+    expect(arrows[0]).toMatchObject({ kind: 'move', string: 2, fromFret: 12, toFret: 11 });
+    expect(arrows[0]?.label).toBe('1 fret');
+    expect(d.model.description).toContain('shown one octave up');
+  });
+
+  it('R-15: shifted is false when occurrence 0 has a pair; Octave up never sets shifted', () => {
+    const c = build(state());
+    expect(c.comparison?.shifted).toBe(false);
+    const up = build({ ...state(), occurrence: 1 });
+    expect(up.comparison?.shifted).toBe(false);
+    expect(up.octave.index).toBe(1);
+  });
+
+  it('M3: octave controls count pair occurrences when a pair exists', () => {
+    const d = build(g2nd());
+    expect(d.octave).toMatchObject({ index: 0, count: 1, up: false, down: false });
+  });
+
+  it('M3: without a comparison the same shape keeps both first-triad occurrences', () => {
+    const d = build(g2nd({ compare: { on: false, quality: null } }));
+    expect(d.octave.count).toBe(2);
+    expect(d.shape.kind === 'shown' && d.shape.frets).toEqual([0, 0, 0]);
+  });
+
+  it('M3/M5: SHORT-7 G major 2nd inv. 4-3-2: first triad stays, B♭ is an off-nut arrow', () => {
+    const d = build(g2nd(), SHORT_7);
+    expect(d.comparison).toMatchObject({ shifted: false, fits: false });
+    expect(d.shape.kind === 'shown' && d.shape.frets).toEqual([0, 0, 0]);
+    expect(d.model.markers.filter((k) => k.variant === 'comparison')).toHaveLength(0);
+    const arrows = d.model.arrows ?? [];
+    expect(arrows).toHaveLength(1);
+    expect(arrows[0]).toMatchObject({ kind: 'off-board', edge: 'nut', fromFret: 0 });
+    expect(arrows[0]?.label).toBe('B♭');
+    const offBoard = d.comparison?.pairs[0]?.offBoard ?? [];
+    expect(offBoard).toHaveLength(1);
+    expect(offBoard[0]).toMatchObject({ edge: 'nut' });
+    expect(d.model.description).toContain('off the fretboard');
+    expect(d.model.description).toContain('below the nut');
+  });
+
+  it('M5: AF-1-12 C♯ minor 1st inv. 6-5-4 vs major: E♯ at fret 13 is an off-end arrow', () => {
+    const s = state({ rootPc: 1, quality: 'minor', inversion: 'first', stringSet: 6 }, 'major');
+    const d = build(s, AF_1_12);
+    expect(d.comparison?.fits).toBe(false);
+    const arrows = d.model.arrows ?? [];
+    expect(arrows).toHaveLength(1);
+    expect(arrows[0]).toMatchObject({ kind: 'off-board', edge: 'end', fromFret: 12 });
+    expect(arrows[0]?.label).toBe('E♯');
+    expect(d.model.description).toContain('past the last fret');
+  });
+
+  it('AF-8: Open G, G major 3-2-1 vs minor moves exactly one note by −1', () => {
+    const d = build(state({ rootPc: 7 }), AF_8);
+    const moves = d.comparison?.pairs[0]?.moves ?? [];
+    expect(moves).toHaveLength(1);
+    expect(moves[0]?.delta).toBe(-1);
+  });
+
+  it('NC-UNISON: guidance is shown, no comparison, Compare stays on', () => {
+    const d = build(state(), NC_UNISON);
+    expect(d.shape.kind).toBe('does-not-close');
+    expect(d.comparison).toBeNull();
+    expect(d.model.arrows).toBeUndefined();
+    expect(d.compare).toMatchObject({ on: true, quality: 'minor' });
+  });
+
+  it('US3-3: Full neck G 4-3-2 — 0-0-0 shape has an off-nut B♭ arrow; 12-12-12 has the 1-fret move', () => {
+    const d = build(state({ rootPc: 7, view: 'full-neck', inversion: 'second', stringSet: 4 }));
+    expect(d.shape.kind).toBe('chain');
+    const pairs = d.comparison?.pairs ?? [];
+    const low = pairs.find((p) => p.firstFrets.join('-') === '0-0-0');
+    const high = pairs.find((p) => p.firstFrets.join('-') === '12-12-12');
+    expect(low?.offBoard[0]).toMatchObject({ edge: 'nut' });
+    expect(high?.comparisonFrets).toEqual([12, 12, 11]);
+    expect(high?.offBoard).toHaveLength(0);
+    const arrows = d.model.arrows ?? [];
+    const off = arrows.filter((a) => a.kind === 'off-board');
+    expect(off).toHaveLength(1);
+    expect(off[0]).toMatchObject({ edge: 'nut', label: 'B♭' });
+    expect(
+      arrows.filter((a) => a.kind === 'move' && a.fromFret === 12 && a.toFret === 11)
+    ).toHaveLength(1);
+    // Same octave always: the comparison shape never moves to a different octave.
+    expect(d.comparison?.shifted).toBe(false);
+    expect(d.comparison?.fits).toBe(false);
+  });
+
+  it('M5: an off-board note is not drawn as a marker', () => {
+    const d = build(g2nd(), SHORT_7);
+    expect(d.model.markers.every((k) => k.variant !== 'comparison')).toBe(true);
+  });
+});
+
+describe('triads model Compare survives root, inversion and set changes (007 US4)', () => {
+  const g = (o: Partial<TriadsViewState> = {}): TriadsViewState => ({
+    ...initial,
+    rootPc: 7,
+    inversion: 'second',
+    stringSet: 4,
+    compare: { on: true, quality: 'minor' },
+    ...o
+  });
+  const build = (s: TriadsViewState) => buildTriadsModel(s, STANDARD_GUITAR);
+
+  it('US4-1: G major vs G minor, then root A: A major vs A minor, Compare on', () => {
+    const before = build(g());
+    expect(before.comparison?.spelling.root).toEqual({ letter: 'G', accidental: 0 });
+    const after = build(selectRoot(g(), 9));
+    expect(after.compare).toMatchObject({ on: true, quality: 'minor' });
+    expect(after.comparison?.quality).toBe('minor');
+    expect(after.comparison?.spelling.root).toEqual({ letter: 'A', accidental: 0 });
+    expect(after.comparison?.spelling.third).toEqual({ letter: 'C', accidental: 0 });
+    expect(after.composition.name).toMatchObject({
+      root: { letter: 'A', accidental: 0 },
+      quality: 'major'
+    });
+    expect(after.model.markers.some((k) => k.variant === 'comparison')).toBe(true);
+  });
+
+  it('US4-3 / EC-5.9: spelling follows the new root, no double accidentals', () => {
+    for (const rootPc of [1, 3, 6, 8, 10]) {
+      const d = build(selectRoot(g({ inversion: 'root', stringSet: 3 }), rootPc));
+      expect(d.comparison?.quality).toBe('minor');
+      const sp = d.comparison?.spelling;
+      for (const n of [sp?.root, sp?.third, sp?.fifth, d.rootSpelling]) {
+        expect(Math.abs(n?.accidental ?? 0)).toBeLessThanOrEqual(1);
+      }
+    }
+    // C♯ major vs C♯ minor: the minor third is E, the major third E♯ (one sharp, no E##).
+    const cs = build(
+      selectRoot(
+        g({
+          inversion: 'root',
+          stringSet: 3,
+          compare: { on: true, quality: 'major' },
+          quality: 'minor'
+        }),
+        1
+      )
+    );
+    expect(cs.comparison?.spelling.third).toEqual({ letter: 'E', accidental: 1 });
+  });
+
+  it('inversion and string-set changes recalculate the pair', () => {
+    const inv = build(setInversion(g(), 'first'));
+    expect(inv.comparison?.quality).toBe('minor');
+    expect(inv.comparison?.pairs.length ?? 0).toBeGreaterThan(0);
+    expect(inv.model.markers).not.toEqual(build(g()).model.markers);
+    const set = build(setStringSet(g(), 3, STANDARD_GUITAR));
+    expect(set.comparison?.quality).toBe('minor');
+    expect(set.model.markers).not.toEqual(build(g()).model.markers);
+  });
+});
+
+describe('triads model Listen to comparison (007 US6, M9)', () => {
+  const g = (o: Partial<TriadsViewState> = {}): TriadsViewState => ({
+    ...initial,
+    compare: { on: true, quality: 'minor' },
+    ...o
+  });
+  const build = (s: TriadsViewState, i = STANDARD_GUITAR) => buildTriadsModel(s, i);
+
+  it('Isolated: steps are [first, rest, comparison]', () => {
+    const d = build(g());
+    const lc = d.listenComparison;
+    expect(lc.enabled).toBe(true);
+    expect(lc.steps).toHaveLength(3);
+    expect(lc.steps[1]).toEqual([]);
+    expect(lc.steps[0]).toHaveLength(3);
+    expect(lc.steps[2]).toHaveLength(3);
+    expect(lc.omitted).toEqual([]);
+  });
+
+  it('SHORT-7: off-board comparison note is omitted and named', () => {
+    const d = build(g({ rootPc: 7, inversion: 'second', stringSet: 4 }), SHORT_7);
+    const lc = d.listenComparison;
+    expect(lc.enabled).toBe(true);
+    expect(lc.steps[2]).toHaveLength(2);
+    expect(lc.omitted).toEqual([{ letter: 'B', accidental: -1 }]);
+  });
+
+  it('Full neck: uses the selected pair, else the lowest shape of that inversion (C13)', () => {
+    const full = g({ view: 'full-neck', inversion: 'root', stringSet: 3 });
+    const pairs = build(full).comparison?.pairs ?? [];
+    const pairOf = (scope: string) => pairs.find((x) => x.scope === scope);
+    const frets = (steps: readonly unknown[]) =>
+      (steps[0] as { fret: number }[]).map((x) => x.fret);
+    const sel = build({ ...full, occurrence: 0 }).listenComparison;
+    const want = pairOf('root:0');
+    expect(want).toBeDefined();
+    expect(frets(sel.steps)).toEqual([...(want?.firstFrets ?? [])].map((f) => f));
+    // an occurrence with no shape falls back to the lowest shape of the inversion
+    const far = build({ ...full, occurrence: 9 }).listenComparison;
+    expect(far.enabled).toBe(true);
+    expect(frets(far.steps)).toEqual(frets(sel.steps));
+  });
+
+  it('disabled when Compare is off, in All notes, or without a shape', () => {
+    expect(build(g({ compare: { on: false, quality: null } })).listenComparison.enabled).toBe(
+      false
+    );
+    expect(build(g({ view: 'all-notes' })).listenComparison.enabled).toBe(false);
+    expect(build(g(), NC_UNISON).listenComparison.enabled).toBe(false);
   });
 });

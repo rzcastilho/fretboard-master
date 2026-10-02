@@ -11,6 +11,9 @@
     onoctavedown: () => void;
     listen: { readonly enabled: boolean };
     onlisten: () => void;
+    compareOn?: boolean;
+    listenComparison?: { readonly enabled: boolean };
+    onlistencomparison?: () => void;
     onreset: () => void;
   }
 
@@ -22,6 +25,9 @@
     onoctavedown,
     listen,
     onlisten,
+    compareOn = false,
+    listenComparison = { enabled: false },
+    onlistencomparison = () => {},
     onreset
   }: Props = $props();
 
@@ -75,6 +81,17 @@
   >
     {m.triads_listen()}
   </button>
+  {#if compareOn}
+    <button
+      type="button"
+      aria-disabled={!listenComparison.enabled}
+      onclick={() => {
+        if (listenComparison.enabled) onlistencomparison();
+      }}
+    >
+      {m.triads_compare_listen()}
+    </button>
+  {/if}
   <button type="button" onclick={() => onreset()}>{m.triads_reset()}</button>
 </div>
 

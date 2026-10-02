@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AF_4, NC_UNISON } from '../../../src/lib/instrument/fixtures';
+import { AF_4, NC_UNISON, SHORT_7 } from '../../../src/lib/instrument/fixtures';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
 import { LISTEN_BPM } from '../../../src/lib/state/listen';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
@@ -253,5 +253,150 @@ describe('triads store Listen per view (US4)', () => {
         stop.mockRestore();
       });
     }
+  });
+});
+
+describe('triads store Compare (US1)', () => {
+  it('setCompare(on) updates the display and stops playback (A1)', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    triads.setCompare(true);
+    expect(stop).toHaveBeenCalledWith('view');
+    expect(triads.display.compare).toMatchObject({ on: true, quality: 'minor' });
+    expect(triads.display.comparison?.quality).toBe('minor');
+    stop.mockClear();
+    triads.setCompare(false);
+    expect(stop).toHaveBeenCalledWith('view');
+    expect(triads.display.comparison).toBeNull();
+    stop.mockRestore();
+  });
+
+  it('setCompareQuality(q) updates the display and stops playback (A1)', () => {
+    triads.setCompare(true);
+    const stop = vi.spyOn(playback, 'stop');
+    triads.setCompareQuality('augmented');
+    expect(stop).toHaveBeenCalledWith('view');
+    expect(triads.display.compare.quality).toBe('augmented');
+    expect(triads.display.comparison?.quality).toBe('augmented');
+    stop.mockRestore();
+  });
+
+  it('no-ops do not stop playback or change the display', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    triads.setCompareQuality('minor'); // Compare is off
+    triads.setCompare(false); // already off
+    triads.setCompare(true);
+    stop.mockClear();
+    triads.setCompare(true); // already on
+    triads.setCompareQuality('minor'); // already minor
+    triads.setCompareQuality('major'); // the current quality
+    expect(stop).not.toHaveBeenCalled();
+    expect(triads.display.compare.quality).toBe('minor');
+    stop.mockRestore();
+  });
+});
+
+describe('triads store Compare notice (007 US4: A2, A5)', () => {
+  it('A2: the swap sets a compare-swapped notice naming the new comparison quality', () => {
+    triads.setCompare(true); // major vs minor
+    expect(triads.notice).toBeNull();
+    triads.setQuality('minor');
+    expect(triads.state.quality).toBe('minor');
+    expect(triads.state.compare.quality).toBe('major');
+    expect(triads.notice).toEqual({ kind: 'compare-swapped', quality: 'major' });
+  });
+
+  it('A2: any other applied transition clears the notice', () => {
+    triads.setCompare(true);
+    triads.setQuality('minor');
+    triads.selectRoot(2);
+    expect(triads.notice).toBeNull();
+    triads.setQuality('major'); // swap back: compare is major, so major becomes current
+    expect(triads.notice).toEqual({ kind: 'compare-swapped', quality: 'minor' });
+    triads.setInversion('first');
+    expect(triads.notice).toBeNull();
+  });
+
+  it('a no-op keeps the notice', () => {
+    triads.setCompare(true);
+    triads.setQuality('minor');
+    triads.setQuality('minor'); // no-op
+    expect(triads.notice).toEqual({ kind: 'compare-swapped', quality: 'major' });
+  });
+
+  it('a quality change that is not a swap sets no notice', () => {
+    triads.setCompare(true);
+    triads.setQuality('diminished');
+    expect(triads.notice).toBeNull();
+  });
+
+  it('A5: dismissNotice() clears it without touching the view', () => {
+    triads.setCompare(true);
+    triads.setQuality('minor');
+    const before = triads.state;
+    triads.dismissNotice();
+    expect(triads.notice).toBeNull();
+    expect(triads.state).toBe(before);
+  });
+
+  it('A5: reset() clears it', () => {
+    triads.setCompare(true);
+    triads.setQuality('minor');
+    triads.reset();
+    expect(triads.notice).toBeNull();
+  });
+});
+
+describe('triads store Listen to comparison (007 US6)', () => {
+  it('A1: sequence(steps, LISTEN_BPM, instrument) from listenComparison', () => {
+    triads.setCompare(true);
+    const seq = vi.spyOn(playback, 'sequence').mockImplementation(() => []);
+    triads.listenComparison();
+    expect(seq).toHaveBeenCalledWith(
+      triads.display.listenComparison.steps,
+      LISTEN_BPM,
+      STANDARD_GUITAR
+    );
+    expect(triads.notice).toBeNull();
+    seq.mockRestore();
+  });
+
+  it('A3: does nothing when disabled', () => {
+    const seq = vi.spyOn(playback, 'sequence').mockImplementation(() => []);
+    triads.listenComparison();
+    expect(seq).not.toHaveBeenCalled();
+    seq.mockRestore();
+  });
+
+  it('A4: omitted notes set the compare-omitted notice', () => {
+    triads.useInstrument(SHORT_7);
+    triads.selectRoot(7);
+    triads.setInversion('second');
+    triads.setStringSet(4);
+    triads.setCompare(true);
+    const seq = vi.spyOn(playback, 'sequence').mockImplementation(() => []);
+    triads.listenComparison();
+    expect(triads.notice).toEqual({
+      kind: 'compare-omitted',
+      notes: [{ letter: 'B', accidental: -1 }]
+    });
+    seq.mockRestore();
+  });
+
+  it('plain listen() still plays only the first triad', () => {
+    triads.setCompare(true);
+    const seq = vi.spyOn(playback, 'sequence').mockImplementation(() => []);
+    triads.listen();
+    expect(seq).toHaveBeenCalledWith(triads.display.listenSteps, LISTEN_BPM, STANDARD_GUITAR);
+    expect(triads.display.listenSteps).toHaveLength(4);
+    seq.mockRestore();
+  });
+
+  it('changing the comparison quality or Compare state stops playback', () => {
+    triads.setCompare(true);
+    const stop = vi.spyOn(playback, 'stop');
+    triads.setCompareQuality('augmented');
+    triads.setCompare(false);
+    expect(stop).toHaveBeenCalledTimes(2);
+    stop.mockRestore();
   });
 });
