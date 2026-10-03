@@ -463,3 +463,17 @@ describe('triads store applyInstrument (009 foundational)', () => {
     stop.mockRestore();
   });
 });
+
+describe('triads.restoreLabelType (010)', () => {
+  it('sets the label type without stopping playback and keeps it through reset()', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    triads.restoreLabelType('name');
+    expect(triads.state.labelType).toBe('name');
+    expect(stop).not.toHaveBeenCalled();
+    triads.selectRoot(5);
+    triads.reset();
+    expect(triads.state.labelType).toBe('name');
+    expect(triads.state.rootPc).toBe(0);
+    stop.mockRestore();
+  });
+});

@@ -272,3 +272,17 @@ describe('notes store applyInstrument (009 foundational)', () => {
     stop.mockRestore();
   });
 });
+
+describe('notes.restoreLabelType (010)', () => {
+  it('sets the label type without stopping playback and keeps it through reset()', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    notes.restoreLabelType('octave');
+    expect(notes.state.labelType).toBe('octave');
+    expect(stop).not.toHaveBeenCalled();
+    notes.toggleNote(0);
+    notes.reset();
+    expect(notes.state.labelType).toBe('octave');
+    expect(notes.state.selection).toEqual([]);
+    stop.mockRestore();
+  });
+});

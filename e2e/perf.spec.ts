@@ -512,3 +512,79 @@ test.describe('instrument change latency (SC-001)', () => {
     expect(median(times)).toBeLessThanOrEqual(300);
   });
 });
+
+test.describe('remembered preferences (SC-006, SC-008)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  const record = JSON.stringify({
+    version: 1,
+    tuning: 'DROP-D',
+    frets: 15,
+    muted: true,
+    volume: 0.5,
+    lastTool: 'triads',
+    labels: { notes: 'interval', triads: 'name' }
+  });
+
+  test('seeded record: home usable ≤ 3 s, no AudioContext at startup, control change ≤ 100 ms', async ({
+    page
+  }) => {
+    await page.addInitScript((r) => {
+      localStorage.setItem('fretboard-master:prefs', r);
+      const w = globalThis as unknown as { __ctxCount: number; AudioContext: typeof AudioContext };
+      w.__ctxCount = 0;
+      const Native = w.AudioContext;
+      if (Native) {
+        w.AudioContext = class extends Native {
+          constructor(...args: ConstructorParameters<typeof AudioContext>) {
+            super(...args);
+            w.__ctxCount++;
+          }
+        };
+      }
+    }, record);
+
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+
+    const start = Date.now();
+    await page.goto('/');
+    await page.getByRole('link', { name: /^Continue: / }).waitFor();
+    expect(Date.now() - start).toBeLessThanOrEqual(3000);
+    expect(
+      await page.evaluate(() => (globalThis as unknown as { __ctxCount: number }).__ctxCount)
+    ).toBe(0);
+
+    // Control change (instrument Confirm) with a remembered record, measured in the page.
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await page.evaluate(() => {
+      const w = globalThis as unknown as { __prefMs: number[]; __prefDown: number | null };
+      w.__prefMs = [];
+      w.__prefDown = null;
+      document.addEventListener('pointerdown', (e) => (w.__prefDown = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__prefDown === null) return;
+        w.__prefMs.push(performance.now() - w.__prefDown);
+        w.__prefDown = null;
+      }).observe(document.querySelector('[role="grid"]') as Element, {
+        subtree: true,
+        childList: true,
+        characterData: true
+      });
+    });
+    const opener = page.getByRole('button', { name: 'Instrument', exact: true });
+    for (const preset of ['Standard', 'Drop D', 'Standard']) {
+      await opener.click();
+      const dialog = page.getByRole('dialog', { name: 'Instrument' });
+      await dialog.getByRole('radio', { name: new RegExp(`^${preset}:`) }).check();
+      await dialog.getByRole('button', { name: 'Confirm' }).click();
+      await expect(dialog).toBeHidden();
+    }
+    const times = await page.evaluate(
+      () => (globalThis as unknown as { __prefMs: number[] }).__prefMs
+    );
+    expect(times.length).toBeGreaterThan(0);
+    expect(median(times)).toBeLessThanOrEqual(100);
+  });
+});

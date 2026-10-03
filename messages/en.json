@@ -245,5 +245,12 @@
   "instrument_badge_label": "Tuning: {name}. Open instrument panel",
   "instrument_summary_standard": "6 strings · standard tuning · right-handed",
   "instrument_summary_preset": "6 strings · {name} · right-handed",
-  "instrument_adjusted": "We adjusted the view to the new instrument"
+  "instrument_adjusted": "We adjusted the view to the new instrument",
+  "prefs_not_remembered": "Preferences won't be remembered on this device.",
+  "home_continue": "Continue",
+  "card_label_continue": "Continue: {name}. {question}",
+  "about_erase": "Erase my preferences",
+  "about_erase_question": "Erase all preferences on this device?",
+  "about_erase_confirm": "Erase",
+  "about_erase_cancel": "Cancel"
 }

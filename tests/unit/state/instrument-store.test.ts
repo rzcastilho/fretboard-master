@@ -166,3 +166,23 @@ describe('adjustedIn lifecycle (US4, R-05)', () => {
     expect(instrument.adjustedIn).toBeNull();
   });
 });
+
+describe('instrument.restore (010)', () => {
+  it('sets active, applies to Notes/Triads, no notice, no stop', () => {
+    const s = spies(true, true);
+    const config = { tuningId: 'AF-3', fretCount: 24 } as const;
+    instrument.restore(config);
+    expect(instrument.active).toEqual(config);
+    expect(instrument.current).toEqual(presetInstrument('AF-3', 24));
+    expect(s.notes).toHaveBeenCalledTimes(1);
+    expect(s.triads).toHaveBeenCalledTimes(1);
+    expect(instrument.adjustedIn).toBeNull();
+    expect(s.stop).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op for the active config', () => {
+    const s = spies();
+    instrument.restore(DEFAULT_CONFIG);
+    expect(s.notes).not.toHaveBeenCalled();
+  });
+});

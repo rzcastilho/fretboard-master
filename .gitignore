@@ -16,3 +16,4 @@ test-results
 *.swp
 .idea/
 Thumbs.db
+.playwright-mcp/

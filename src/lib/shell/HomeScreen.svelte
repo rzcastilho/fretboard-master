@@ -7,6 +7,7 @@
   import { screenTitle } from './screens';
   import { TOOLS } from './tools';
   import ToolCard from './ToolCard.svelte';
+  import { preferences } from '$lib/state/preferences.svelte';
 
   let { notice }: { notice?: Snippet } = $props();
 </script>
@@ -29,7 +30,7 @@
   {/if}
   <ul class="cards">
     {#each TOOLS as tool (tool.id)}
-      <li><ToolCard {tool} /></li>
+      <li><ToolCard {tool} continued={tool.id === preferences.lastTool} /></li>
     {/each}
   </ul>
 </main>

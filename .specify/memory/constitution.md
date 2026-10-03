@@ -1,17 +1,21 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.2.0 (MINOR: mandated font choice changed, per "Changing the
-  stack"; also a PATCH-level clarification of the Principle I merge gate scope)
-- Modified principles: I. Musical Correctness — merge gate clarified: each table/property
-  suite is added by the slice that introduces the theory code it tests and from then on gates
-  every later theory change (no gate removed or weakened)
-- Modified sections: Technology Stack and Constraints ("Fonts" row: self-hosted accidentals
-  subset + system UI stack with tabular numerals; ADR 0006)
+- Version change: 1.2.0 → 1.3.0 (MINOR: performance budget changed, per "Raising a budget
+  requires a constitution amendment")
+- Modified principles: VI. Performance Budgets Are Gates — "Initial JavaScript, gzip" raised
+  from ≤ 80 KB to ≤ 85 KB. Measured 78.9 KB after slice 009 (instrument panel) and 82.2 KB after
+  slice 010 (remembered preferences, incl. Valibot ≈ 1.5 KB); a hand-rolled parser still
+  measured 80.7 KB, so the old cap could not hold without cutting shipped behavior. The gate
+  stays a hard build failure.
+- Modified sections: none
 - Added sections: none
 - Removed sections: none
+- Dependent guidance updated: `scripts/check-bundle-size.mjs` (LIMIT), ADR 0002 consequences,
+  ADR 0013 Valibot note, specs/010-remembered-preferences plan/research/quickstart/tasks
 - Templates: plan-template.md, spec-template.md, tasks-template.md read the constitution at
   runtime; no edits required (✅ not modified per scope guard)
-- Prior amendment: 1.0.0 → 1.1.0 added the mise "Tool installation" row and rule
+- Prior amendment: 1.1.0 → 1.2.0 changed the mandated font choice and clarified the
+  Principle I merge gate scope; 1.0.0 → 1.1.0 added the mise "Tool installation" row and rule
 - Deferred TODOs: none
 -->
 
@@ -123,7 +127,7 @@ enforce these budgets:
 | Control change to fretboard update | ≤ 100 ms |
 | Instrument change | ≤ 300 ms |
 | Tap to sound, after audio unlock | ≤ 100 ms |
-| Initial JavaScript, gzip | ≤ 80 KB |
+| Initial JavaScript, gzip | ≤ 85 KB |
 | Lighthouse mobile performance score | ≥ 90 |
 
 - Sound material MUST NOT block the fretboard from becoming interactive.
@@ -298,4 +302,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-09-30
+**Version**: 1.3.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-03

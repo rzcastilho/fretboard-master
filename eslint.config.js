@@ -83,6 +83,7 @@ export default tseslint.config(
             '$lib/paraglide/*',
             '$lib/fretboard/*',
             '$lib/notation/*',
+            '$lib/prefs/*',
             '$lib/audio/engine'
           ]
         }
@@ -108,6 +109,7 @@ export default tseslint.config(
             '$app/*',
             '$lib/fretboard/*',
             '$lib/instrument/*',
+            '$lib/prefs/*',
             '$lib/audio/engine'
           ]
         }
@@ -145,29 +147,66 @@ export default tseslint.config(
   {
     files: ['src/lib/fretboard/**'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['$lib/audio/*', '$lib/state/*'] }]
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['$lib/audio/*', '$lib/state/*', '$lib/prefs/*'] }
+      ]
     }
   },
   {
     // Only the playback state module may import the engine (contract §4).
-    files: ['src/lib/state/**', 'src/lib/prefs/**'],
-    ignores: ['src/lib/state/playback.svelte.ts'],
+    files: ['src/lib/state/**'],
+    ignores: ['src/lib/state/playback.svelte.ts', 'src/lib/state/preferences.svelte.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['$lib/audio/engine'] }]
+      'no-restricted-imports': ['error', { patterns: ['$lib/audio/engine', '$lib/prefs/*'] }]
+    }
+  },
+  {
+    // playback owns the engine but must not reach into prefs (the preferences store pushes values in).
+    files: ['src/lib/state/playback.svelte.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['$lib/prefs/*'] }]
+    }
+  },
+  {
+    // 010 contracts/preferences-api.md §6 (R-12): prefs is a plain-TS layer. No framework, i18n,
+    // app-state or shell value imports (type-only imports allowed); it never touches the engine.
+    // Only state/preferences.svelte.ts and tests import $lib/prefs/*.
+    files: ['src/lib/prefs/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['svelte', 'svelte/*'], allowTypeImports: true },
+            { group: ['$app/*'], allowTypeImports: true },
+            { group: ['$lib/paraglide/*'], allowTypeImports: true },
+            { group: ['$lib/state/*'], allowTypeImports: true },
+            { group: ['$lib/shell/*'], allowTypeImports: true },
+            { group: ['$lib/audio/engine'] }
+          ]
+        }
+      ]
     }
   },
   {
     // Shell and routes must not compute theory; go through instrument/fretboard.
     files: ['src/lib/shell/**', 'src/routes/**'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['$lib/theory/*', '$lib/audio/engine'] }]
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['$lib/theory/*', '$lib/audio/engine', '$lib/prefs/*'] }
+      ]
     }
   },
   {
     // Tools consume state/instrument/fretboard; they never compute theory or touch the engine.
     files: ['src/lib/tools/**'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['$lib/theory/*', '$lib/audio/engine'] }]
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['$lib/theory/*', '$lib/audio/engine', '$lib/prefs/*'] }
+      ]
     }
   },
   {
@@ -176,7 +215,9 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: ['svelte', 'svelte/*', '$lib/paraglide/*', '$lib/audio/engine'] }
+        {
+          patterns: ['svelte', 'svelte/*', '$lib/paraglide/*', '$lib/audio/engine', '$lib/prefs/*']
+        }
       ],
       'no-restricted-globals': [
         'error',

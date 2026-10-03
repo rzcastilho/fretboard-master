@@ -25,7 +25,8 @@ break or reload itself.
 ## Consequences
 
 - The About screen keeps showing the loaded version until a reload.
-- Initial JS carries all screens; `scripts/check-bundle-size.mjs` caps it at 80 KB gzip.
+- Initial JS carries all screens; `scripts/check-bundle-size.mjs` caps it at 85 KB gzip
+  (80 KB until constitution 1.3.0).
 - Revisit when later slices add heavy tools: code-splitting will need a skew-tolerant strategy.
 
 ## Alternatives considered

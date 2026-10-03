@@ -304,16 +304,17 @@ test.describe('instrument panel US3 (cancel and restore)', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 
-  test('scenario 11: reload resets to Standard/22 with no badge', async ({ page }) => {
+  // Superseded by 010 (remembered preferences): a confirmed instrument survives a reload.
+  test('scenario 11: reload keeps the confirmed instrument (010 US1)', async ({ page }) => {
     await page.goto('/notes');
     const dialog = await openPanel(page);
     await pick(page, 'Drop D').check();
     await dialog.getByRole('button', { name: 'Confirm' }).click();
     await expect(page.getByRole('button', { name: /^Tuning: Drop D/ })).toBeVisible();
     await page.reload();
-    await expect(page.getByRole('button', { name: /^Tuning:/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Tuning: Drop D/ })).toBeVisible();
     const reopened = await openPanel(page);
-    await expect(pick(page, 'Standard')).toBeChecked();
+    await expect(pick(page, 'Drop D')).toBeChecked();
     await expect(reopened.getByRole('spinbutton', { name: 'Frets' })).toHaveAttribute(
       'aria-valuenow',
       '22'

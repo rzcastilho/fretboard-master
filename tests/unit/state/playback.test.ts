@@ -358,3 +358,16 @@ describe('playback.chord and playback.sequence (US6)', () => {
     expect(playback.pulses).toEqual([]);
   });
 });
+
+describe('playback.restore (010)', () => {
+  it('sets muted and volume without unlocking or creating a context', () => {
+    const t = deps();
+    resetPlaybackForTests(t.deps);
+    playback.restore({ muted: true, volume: 35 });
+    expect(playback.muted).toBe(true);
+    expect(playback.volume).toBe(35);
+    expect(playback.availability).toBe('idle');
+    expect(playback.controlState).toBe('muted');
+    expect(t.createContext).not.toHaveBeenCalled();
+  });
+});

@@ -10,6 +10,7 @@ import {
 } from '$lib/audio/engine';
 import type { PulseEvent, TimeMark } from '$lib/audio/types';
 import type { Instrument, Position } from '$lib/instrument/instrument';
+import { preferences } from './preferences.svelte';
 
 type Availability = 'idle' | 'on' | 'unavailable';
 
@@ -126,6 +127,7 @@ export const playback = {
   setMuted(muted: boolean): void {
     state.muted = muted;
     engine.setMuted(muted);
+    preferences.remember({ muted });
     markUnlocked();
   },
 
@@ -134,7 +136,15 @@ export const playback = {
     const v = Number.isFinite(volume) ? Math.min(100, Math.max(0, Math.round(volume / 5) * 5)) : 0;
     state.volume = v;
     engine.setVolume(v);
+    preferences.remember({ volume: v });
     markUnlocked();
+  },
+
+  /** Apply remembered values: no unlock, no AudioContext, no write (010). */
+  restore({ muted, volume }: { muted: boolean; volume: number }): void {
+    state.muted = muted;
+    state.volume = volume;
+    engine.restore(muted, volume);
   },
 
   /** Hide the unavailable notice. It is never shown again this session. */

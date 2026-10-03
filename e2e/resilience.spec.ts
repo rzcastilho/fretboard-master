@@ -79,8 +79,13 @@ test.describe('tool failures', () => {
     expect(await page.evaluate(() => history.length)).toBe(entries);
     expect(logs).toHaveLength(1);
     expect(tracker.requests).toEqual([]);
-    const storage = await page.evaluate(() => localStorage.length + sessionStorage.length);
-    expect(storage).toBe(0);
+    // Only the remembered-preferences record (lastTool) may exist; the failure path stores nothing.
+    const storage = await page.evaluate(() => ({
+      local: Object.keys(localStorage),
+      session: sessionStorage.length
+    }));
+    expect(storage.local.filter((k) => k !== 'fretboard-master:prefs')).toEqual([]);
+    expect(storage.session).toBe(0);
   });
 
   test('persistent fault shows the failure view again after Reset (no loop, not blank)', async ({

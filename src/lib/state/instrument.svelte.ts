@@ -12,6 +12,7 @@ import {
   DEFAULT_CONFIG,
   cancelPanel,
   confirmPanel,
+  equalsConfig,
   instrumentOf,
   openPanel,
   restoreDefault,
@@ -23,6 +24,7 @@ import {
 } from './instrument-config';
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
+import { preferences } from './preferences.svelte';
 import { triads } from './triads.svelte';
 
 let active = $state.raw<InstrumentConfig>(DEFAULT_CONFIG);
@@ -75,11 +77,24 @@ export const instrument = {
     if (!result.changed) return;
     playback.stop('instrument');
     active = result.next;
+    preferences.remember({ tuningId: result.next.tuningId, fretCount: result.next.fretCount });
     const inst = instrumentOf(result.next);
     const adjNotes = notes.applyInstrument(inst);
     const adjTriads = triads.applyInstrument(inst);
     adjustedIn =
       screen === 'notes' && adjNotes ? 'notes' : screen === 'triads' && adjTriads ? 'triads' : null;
+  },
+  /**
+   * Apply a remembered config at startup (010): same path as Confirm, but no notice, no
+   * playback stop and no write.
+   */
+  restore(config: InstrumentConfig): void {
+    if (equalsConfig(config, active)) return;
+    active = config;
+    const inst = instrumentOf(config);
+    notes.applyInstrument(inst);
+    triads.applyInstrument(inst);
+    adjustedIn = null;
   },
   dismissAdjusted(): void {
     adjustedIn = null;

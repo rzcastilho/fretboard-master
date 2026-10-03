@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import HomeScreen from '../../src/lib/shell/HomeScreen.svelte';
 import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
+import { preferences, resetPreferencesForTests } from '../../src/lib/state/preferences.svelte';
+import { TOOLS } from '../../src/lib/shell/tools';
 
-beforeEach(() => resetInstrumentForTests());
+beforeEach(() => {
+  resetInstrumentForTests();
+  resetPreferencesForTests();
+});
 
 describe('HomeScreen', () => {
   it('renders banner with h1 and About link', () => {
@@ -68,5 +73,20 @@ describe('HomeScreen', () => {
     render(HomeScreen);
     await fireEvent.click(screen.getByRole('button', { name: /^6 strings/ }));
     expect(instrument.panel.open).toBe(true);
+  });
+
+  it('marks only the last tool as Continue and keeps TOOLS order', () => {
+    preferences.toolOpened('triads');
+    render(HomeScreen);
+    const links = within(screen.getByRole('list')).getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(TOOLS.map((t) => t.path));
+    expect(links[0].getAttribute('aria-label')).toBe('Fretboard Notes — Where is every note?');
+    expect(links[1].getAttribute('aria-label')).toBe('Continue: Triads. What is a chord made of?');
+    expect(screen.getAllByText('Continue')).toHaveLength(1);
+  });
+
+  it('no Continue badge when there is no last tool', () => {
+    render(HomeScreen);
+    expect(screen.queryByText('Continue')).toBeNull();
   });
 });

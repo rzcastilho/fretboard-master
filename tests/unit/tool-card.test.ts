@@ -52,4 +52,21 @@ describe('ToolCard', () => {
     instrument.confirm('home');
     expect(labels().at(-1)).toBe('D');
   });
+
+  it('continued shows a text badge and the continue accessible name; others keep card_label', () => {
+    const { container } = render(ToolCard, { tool: TOOLS[1], continued: true });
+    const link = screen.getByRole('link', {
+      name: 'Continue: Triads. What is a chord made of?'
+    });
+    expect(link.textContent).toContain('Continue');
+    expect(container.querySelectorAll('a')).toHaveLength(1);
+  });
+
+  it('not continued has no badge', () => {
+    render(ToolCard, { tool: TOOLS[0] });
+    expect(screen.queryByText('Continue')).toBeNull();
+    expect(screen.getByRole('link').getAttribute('aria-label')).toBe(
+      'Fretboard Notes — Where is every note?'
+    );
+  });
 });

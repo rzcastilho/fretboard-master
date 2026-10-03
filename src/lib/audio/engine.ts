@@ -64,6 +64,11 @@ export interface PlaybackEngine {
   setMuted(muted: boolean): void;
   /** 0..100, gain (v/100)², ramped over 10 ms; never stops sources. Also unlocks. */
   setVolume(volume: number): void;
+  /**
+   * Assigns mute and volume (0..100) without unlocking: never creates an AudioContext.
+   * Ramps only when a context already exists. Used to apply remembered preferences.
+   */
+  restore(muted: boolean, volume: number): void;
 }
 
 export type StopReason = 'stop' | 'hidden' | 'navigate' | 'instrument' | 'view';
@@ -333,6 +338,13 @@ export function createPlaybackEngine(
     setVolume(next): void {
       volume = Math.min(100, Math.max(0, Number.isFinite(next) ? next : 0));
       if (!ensureContext()) return;
+      ramp(volumeGain, volumeToGain(volume));
+    },
+
+    restore(nextMuted, nextVolume): void {
+      muted = nextMuted;
+      volume = Math.min(100, Math.max(0, Number.isFinite(nextVolume) ? nextVolume : 0));
+      ramp(muteGain, muted ? 0 : 1);
       ramp(volumeGain, volumeToGain(volume));
     },
 

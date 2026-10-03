@@ -762,3 +762,44 @@ describe('engine E10/E11: chords and sequences (US6)', () => {
     );
   });
 });
+
+describe('engine restore (010)', () => {
+  it('assigns muted and volume and never creates an AudioContext', () => {
+    const createContext = vi.fn(() => new FakeAudioPort());
+    const engine = createPlaybackEngine(events(), { createContext });
+    engine.restore(true, 35);
+    expect(createContext).not.toHaveBeenCalled();
+  });
+
+  it('applies the restored values when the graph is created later', () => {
+    const port = new FakeAudioPort();
+    const engine = createPlaybackEngine(events(), {
+      createContext: () => port,
+      loadSynth: () => Promise.resolve(recordingSynth()),
+      clock: new FakeClock()
+    });
+    engine.restore(true, 40);
+    engine.unlock();
+    const gains = port.gains.map((g) => g.gain.value);
+    expect(gains).toContain((40 / 100) ** 2);
+    expect(gains).toContain(0);
+  });
+});
+
+describe('engine restore with a live context (010)', () => {
+  it('ramps the existing graph', () => {
+    const port = new FakeAudioPort();
+    const engine = createPlaybackEngine(events(), {
+      createContext: () => port,
+      loadSynth: () => Promise.resolve(recordingSynth()),
+      clock: new FakeClock()
+    });
+    engine.unlock();
+    const ramps = () =>
+      port.gains.flatMap((g) => g.gain.calls).filter((c) => c.method === 'setTargetAtTime');
+    const before = ramps().length;
+    engine.restore(true, 20);
+    expect(ramps().length).toBe(before + 2);
+    expect(port.resumeCalls).toBeLessThanOrEqual(1);
+  });
+});
