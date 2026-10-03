@@ -46,6 +46,41 @@ describe('TuningBadge', () => {
   });
 });
 
+describe('TuningBadge (custom tuning, US3)', () => {
+  it('names a matched Half step down in its flat spelling (3.4)', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    for (const n of [6, 5, 4, 3, 2, 1] as const) instrument.stepString(n, -1);
+    instrument.confirm('triads');
+    render(TuningBadge);
+    expect(
+      screen
+        .getByRole('button', { name: 'Tuning: Half step down. Open instrument panel' })
+        .textContent?.trim()
+    ).toBe('Half step down');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-2' });
+  });
+
+  it('shows Custom for an unmatched tuning (3.5)', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(1, 1);
+    instrument.confirm('triads');
+    render(TuningBadge);
+    expect(screen.getByRole('button', { name: /Custom/ }).textContent?.trim()).toBe('Custom');
+  });
+
+  it('is absent when custom offsets are all zero (Standard)', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(1, 1);
+    instrument.stepString(1, -1);
+    instrument.confirm('triads');
+    render(TuningBadge);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
 describe('InstrumentButton', () => {
   it('is always rendered and opens the panel', async () => {
     render(InstrumentButton);

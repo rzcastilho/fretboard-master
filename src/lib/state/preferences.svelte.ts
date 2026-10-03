@@ -4,7 +4,7 @@
  * methods. The only importer of `$lib/prefs/*`.
  */
 import { startSession, type PreferencesPatch, type PrefsSession } from '$lib/prefs/session';
-import { TOOL_IDS } from '$lib/prefs/schema';
+import { TOOL_IDS, tuningOfPreferences } from '$lib/prefs/schema';
 import type { StorageLike } from '$lib/prefs/storage';
 import type { ToolId } from '$lib/shell/tools';
 import { instrument } from './instrument.svelte';
@@ -31,7 +31,7 @@ export const preferences = {
     if (session) return;
     session = startSession(storage);
     const p = session.current;
-    instrument.restore({ tuningId: p.tuningId, fretCount: p.fretCount });
+    instrument.restore({ tuning: tuningOfPreferences(p), fretCount: p.fretCount });
     playback.restore({ muted: p.muted, volume: p.volume });
     notes.restoreLabelType(p.labels.notes);
     triads.restoreLabelType(p.labels.triads);
@@ -63,7 +63,7 @@ export const preferences = {
     session?.erase();
     const d = session?.current;
     if (d) {
-      instrument.restore({ tuningId: d.tuningId, fretCount: d.fretCount });
+      instrument.restore({ tuning: tuningOfPreferences(d), fretCount: d.fretCount });
       playback.restore({ muted: d.muted, volume: d.volume });
       notes.restoreLabelType(d.labels.notes);
       triads.restoreLabelType(d.labels.triads);

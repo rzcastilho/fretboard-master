@@ -2,22 +2,8 @@
 import { m } from '$lib/paraglide/messages.js';
 import { getLocale } from '$lib/paraglide/runtime.js';
 import type { IntervalId } from '../theory/triad';
+import { sharpSpelling } from '../theory/pitch';
 import type { Accidental, Letter, PitchClass, Spelling } from '../theory/pitch';
-
-const SHARP_SPELLINGS: readonly Spelling[] = [
-  { letter: 'C', accidental: 0 },
-  { letter: 'C', accidental: 1 },
-  { letter: 'D', accidental: 0 },
-  { letter: 'D', accidental: 1 },
-  { letter: 'E', accidental: 0 },
-  { letter: 'F', accidental: 0 },
-  { letter: 'F', accidental: 1 },
-  { letter: 'G', accidental: 0 },
-  { letter: 'G', accidental: 1 },
-  { letter: 'A', accidental: 0 },
-  { letter: 'A', accidental: 1 },
-  { letter: 'B', accidental: 0 }
-];
 
 const GLYPH: Readonly<Record<Accidental, string>> = {
   [-2]: '\u{1D12B}',
@@ -29,7 +15,7 @@ const GLYPH: Readonly<Record<Accidental, string>> = {
 
 /** Sharps: C C♯ D D♯ E F F♯ G G♯ A A♯ B. */
 export function defaultSpelling(pc: PitchClass): Spelling {
-  return SHARP_SPELLINGS[((Math.trunc(pc) % 12) + 12) % 12];
+  return sharpSpelling(pc);
 }
 
 /** Flats for altered notes (C♯ → D♭); naturals are unchanged. */

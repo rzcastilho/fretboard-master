@@ -588,3 +588,75 @@ test.describe('remembered preferences (SC-006, SC-008)', () => {
     expect(median(times)).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('custom tuning latency (011 SC-007)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('string step → preview ≤ 100 ms, Confirm → applied instrument ≤ 300 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await page
+      .getByRole('button', { name: /^6 strings|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: /^Custom/ }).check();
+
+    // Time from pointerdown until `ready()` first holds, measured in the page so Playwright
+    // round-trips under throttling are not counted.
+    const timeUntil = async (click: () => Promise<void>, ready: string): Promise<number> => {
+      await page.evaluate((src) => {
+        const w = globalThis as unknown as { __ms: number | null };
+        w.__ms = null;
+        const check = new Function(`return (${src})()`) as () => boolean;
+        let downAt = 0;
+        document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+          capture: true,
+          once: true
+        });
+        const observer = new MutationObserver(() => {
+          if (downAt === 0 || w.__ms !== null || !check()) return;
+          w.__ms = performance.now() - downAt;
+          observer.disconnect();
+        });
+        observer.observe(document.body, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+          attributes: true
+        });
+      }, ready);
+      await click();
+      await page.waitForFunction(
+        () => (globalThis as unknown as { __ms: number | null }).__ms !== null,
+        undefined,
+        { timeout: 5000 }
+      );
+      return page.evaluate(() => (globalThis as unknown as { __ms: number }).__ms);
+    };
+
+    const control: number[] = [];
+    for (const label of ['D♯', 'D', 'C♯']) {
+      control.push(
+        await timeUntil(
+          () => dialog.getByRole('button', { name: 'Lower string 6' }).click(),
+          `() => {
+            const labels = document.querySelectorAll('.fretboard-preview .string-label');
+            return labels[labels.length - 1]?.textContent?.trim() === ${JSON.stringify(label)};
+          }`
+        )
+      );
+    }
+    expect(median(control)).toBeLessThanOrEqual(100);
+
+    const applied = await timeUntil(
+      () => dialog.getByRole('button', { name: 'Confirm' }).click(),
+      `() => document.querySelector('[aria-label^="Tuning:"]') !== null && !document.querySelector('dialog[open]')`
+    );
+    expect(applied).toBeLessThanOrEqual(300);
+  });
+});

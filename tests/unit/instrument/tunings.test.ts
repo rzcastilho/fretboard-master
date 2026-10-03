@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
 import {
@@ -5,14 +6,26 @@ import {
   DEFAULT_TUNING_ID,
   MAX_FRETS,
   MIN_FRETS,
+  STANDARD_TUNING,
   TUNING_PRESETS,
   clampFrets,
+  equalsTuning,
+  isStandard,
   isTuningId,
+  offsetsOfTuning,
   presetInstrument,
+  tuningFromOffsets,
+  tuningInstrument,
   tuningPreset,
+  tuningStrings,
   type TuningId
 } from '../../../src/lib/instrument/tunings';
-import { pitchOfSpelling } from '../../../src/lib/theory/pitch';
+import {
+  matchPreset,
+  presetOffsets,
+  type Offsets
+} from '../../../src/lib/instrument/custom-tuning';
+import { pitchOfSpelling, spellSharp } from '../../../src/lib/theory/pitch';
 
 /** Low → high, e.g. "Eb2". */
 const TABLE: Record<TuningId, string> = {
@@ -123,5 +136,86 @@ describe('clampFrets, constants, guard', () => {
     for (const bad of ['AF-0', 'AF-12', 'af-1', '', 'toString', '__proto__', 1, null, undefined]) {
       expect(isTuningId(bad)).toBe(false);
     }
+  });
+});
+
+const fmt = (s: { letter: string; accidental: number; octave: number }): string =>
+  `${s.letter}${s.accidental === 1 ? '#' : s.accidental === -1 ? 'b' : ''}${s.octave}`;
+
+describe('Tuning union (011)', () => {
+  it('STANDARD_TUNING is the AF-1 preset', () => {
+    expect(STANDARD_TUNING).toEqual({ kind: 'preset', id: 'AF-1' });
+    expect(isStandard(STANDARD_TUNING)).toBe(true);
+    expect(isStandard({ kind: 'preset', id: 'AF-4' })).toBe(false);
+    expect(isStandard({ kind: 'custom', offsets: [1, 0, 0, 0, 0, 0] })).toBe(false);
+  });
+
+  it('tuningFromOffsets is canonical', () => {
+    expect(tuningFromOffsets([-2, 0, 0, 0, 0, 0])).toEqual({ kind: 'preset', id: 'AF-4' });
+    expect(tuningFromOffsets([0, 0, 0, 0, 0, 0])).toEqual(STANDARD_TUNING);
+    const c = tuningFromOffsets([1, 0, 0, 0, 0, 0]);
+    expect(c).toEqual({ kind: 'custom', offsets: [1, 0, 0, 0, 0, 0] });
+  });
+
+  it('offsetsOfTuning', () => {
+    expect(offsetsOfTuning({ kind: 'preset', id: 'AF-3' })).toEqual(presetOffsets('AF-3'));
+    const o: Offsets = [1, 2, 3, 0, 0, -1];
+    expect(offsetsOfTuning({ kind: 'custom', offsets: o })).toBe(o);
+  });
+
+  it('equalsTuning', () => {
+    const a = tuningFromOffsets([1, 0, 0, 0, 0, 0]);
+    expect(equalsTuning(a, tuningFromOffsets([1, 0, 0, 0, 0, 0]))).toBe(true);
+    expect(equalsTuning(a, tuningFromOffsets([2, 0, 0, 0, 0, 0]))).toBe(false);
+    expect(equalsTuning(STANDARD_TUNING, { kind: 'preset', id: 'AF-1' })).toBe(true);
+    expect(equalsTuning(STANDARD_TUNING, { kind: 'preset', id: 'AF-2' })).toBe(false);
+    expect(equalsTuning(STANDARD_TUNING, a)).toBe(false);
+  });
+
+  it('tuningStrings keeps preset spelling and uses sharps otherwise', () => {
+    expect(tuningStrings({ kind: 'preset', id: 'AF-2' }).map(fmt)).toEqual(
+      'Eb2 Ab2 Db3 Gb3 Bb3 Eb4'.split(' ')
+    );
+    expect(tuningStrings(tuningFromOffsets([-1, -1, -1, -1, -1, 1])).map(fmt)).toEqual(
+      'D#2 G#2 C#3 F#3 A#3 F4'.split(' ')
+    );
+  });
+
+  it('tuningInstrument for custom is frozen, ordered string 1 first, memoized', () => {
+    const t = tuningFromOffsets([-1, 0, 0, 0, 0, 2]);
+    const inst = tuningInstrument(t, 20);
+    expect(inst.stringCount).toBe(6);
+    expect(inst.fretCount).toBe(20);
+    expect(Object.isFrozen(inst)).toBe(true);
+    expect(Object.isFrozen(inst.openStrings)).toBe(true);
+    expect(inst.openStrings).toEqual([...tuningStrings(t)].reverse());
+    expect(inst.handedness).toBe('right');
+    expect(inst.orientation).toBe('highest-top');
+    expect(tuningInstrument(tuningFromOffsets([-1, 0, 0, 0, 0, 2]), 20)).toBe(inst);
+    expect(tuningInstrument(t, 21)).not.toBe(inst);
+  });
+
+  it('tuningInstrument delegates presets', () => {
+    expect(tuningInstrument(STANDARD_TUNING, 22)).toBe(STANDARD_GUITAR);
+    expect(tuningInstrument({ kind: 'preset', id: 'AF-3' }, 18)).toBe(presetInstrument('AF-3', 18));
+  });
+
+  it('property: canonical form and round trip', () => {
+    const offsets = fc.tuple(
+      ...Array.from({ length: 6 }, () => fc.integer({ min: -7, max: 4 }))
+    ) as unknown as fc.Arbitrary<Offsets>;
+    fc.assert(
+      fc.property(offsets, (o) => {
+        const t = tuningFromOffsets(o);
+        expect(t.kind === 'custom').toBe(matchPreset(o) === null);
+        expect([...offsetsOfTuning(t)]).toEqual([...o]);
+        for (const [i, s] of tuningStrings(t).entries()) {
+          if (t.kind === 'custom') expect(s).toEqual(spellSharp(pitchOfSpelling(s)));
+          expect(pitchOfSpelling(s)).toBe(
+            pitchOfSpelling(tuningStrings({ kind: 'preset', id: 'AF-1' })[i]) + o[i]
+          );
+        }
+      })
+    );
   });
 });

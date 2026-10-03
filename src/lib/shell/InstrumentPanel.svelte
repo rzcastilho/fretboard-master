@@ -1,23 +1,43 @@
 <script lang="ts">
   import { pushState } from '$app/navigation';
   import { page } from '$app/state';
+  import { tick } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
-  import { TUNING_PRESETS } from '$lib/instrument/tunings';
-  import { noteLabel, spokenNoteList } from '$lib/notation/notation';
+  import { TUNING_PRESETS, offsetsOfTuning } from '$lib/instrument/tunings';
+  import { noteLabel, pitchLabel, spokenNote, spokenNoteList } from '$lib/notation/notation';
+  import { invertedStrings, type StringNumber } from '$lib/instrument/custom-tuning';
   import { instrument } from '$lib/state/instrument.svelte';
   import FretStepper from './FretStepper.svelte';
   import { takeOpener } from './instrument-opener';
   import type { ScreenId } from './screens';
-  import { tuningName } from './tuning-names';
+  import { tuningLabel, tuningName } from './tuning-names';
 
   let { screen = 'home' }: { screen?: ScreenId } = $props();
+
+  // Visual glyphs only; the accessible names come from the catalog.
+  const GLYPH_LOWER = '−';
+  const GLYPH_RAISE = '+';
 
   const uid = $props.id();
   let dialog: HTMLDialogElement | undefined = $state();
   let opener: HTMLElement | null = null;
 
-  const pendingTuning = $derived(instrument.panel.open ? instrument.panel.pending.tuningId : null);
+  const selected = $derived(instrument.selectedRadio);
+  const stringRows = $derived(
+    instrument.rows.map((row) => ({
+      ...row,
+      label: pitchLabel(row.pitch, row.pitch.octave),
+      noteName: m.instrument_string_note({
+        string: row.string,
+        note: spokenNote(row.pitch),
+        octave: row.pitch.octave
+      })
+    }))
+  );
+  const outOfOrder = $derived(
+    instrument.panel.open && invertedStrings(offsetsOfTuning(instrument.panel.pending.tuning))
+  );
   const rows = $derived(
     TUNING_PRESETS.map((preset) => {
       // Stored low → high, the preset's own spelling.
@@ -81,6 +101,18 @@
     if (event.target === dialog) instrument.cancel();
   }
 
+  /** FR-023: a focused step button that just became disabled hands focus to its row's note button. */
+  async function step(event: MouseEvent, string: StringNumber, delta: 1 | -1): Promise<void> {
+    const button = event.currentTarget as HTMLButtonElement;
+    // Read before the update: browsers blur a focused button as soon as it becomes disabled.
+    const hadFocus = document.activeElement === button;
+    if (instrument.stepString(string, delta)) instrument.playString(string);
+    await tick();
+    if (button.disabled && hadFocus) {
+      button.closest('.string-row')?.querySelector<HTMLElement>('.note')?.focus();
+    }
+  }
+
   function confirm(): void {
     instrument.confirm(screen);
   }
@@ -106,7 +138,7 @@
               name="{uid}-tuning"
               value={row.id}
               aria-label={row.label}
-              checked={pendingTuning === row.id}
+              checked={selected === row.id}
               onchange={() => instrument.selectTuning(row.id)}
             />
             <span class="text">
@@ -115,7 +147,58 @@
             </span>
           </label>
         {/each}
+        <label class="preset">
+          <input
+            type="radio"
+            name="{uid}-tuning"
+            value="custom"
+            aria-label={m.instrument_custom_label()}
+            checked={selected === 'custom'}
+            onchange={() => instrument.chooseCustom()}
+          />
+          <span class="text">
+            <span class="name" aria-hidden="true">{m.tuning_custom()}</span>
+          </span>
+        </label>
       </fieldset>
+      {#if instrument.customOpen}
+        <p class="tuning-name" role="status" aria-live="polite">
+          {instrument.panel.open ? tuningLabel(instrument.panel.pending.tuning) : ''}
+          {#if outOfOrder}
+            <span class="order-note">{m.instrument_tuning_order()}</span>
+          {/if}
+        </p>
+        <div class="strings" role="group" aria-label={m.instrument_custom_strings()}>
+          {#each stringRows as row (row.string)}
+            <div class="string-row">
+              <button
+                type="button"
+                class="step"
+                aria-label={m.instrument_string_lower({ string: row.string })}
+                disabled={!row.canLower}
+                onclick={(e) => step(e, row.string, -1)}
+              >
+                <span aria-hidden="true">{GLYPH_LOWER}</span>
+              </button>
+              <button
+                type="button"
+                class="note"
+                aria-label={row.noteName}
+                onclick={() => instrument.playString(row.string)}>{row.label}</button
+              >
+              <button
+                type="button"
+                class="step"
+                aria-label={m.instrument_string_raise({ string: row.string })}
+                disabled={!row.canRaise}
+                onclick={(e) => step(e, row.string, 1)}
+              >
+                <span aria-hidden="true">{GLYPH_RAISE}</span>
+              </button>
+            </div>
+          {/each}
+        </div>
+      {/if}
       <FretStepper />
       {#if instrument.preview}
         <figure class="preview">
@@ -253,6 +336,52 @@
   .notes {
     font-family: var(--font-family-notes);
     color: var(--color-text-muted);
+  }
+
+  .tuning-name {
+    margin: 0;
+    font-weight: var(--font-weight-bold);
+  }
+
+  .order-note {
+    display: block;
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-muted);
+  }
+
+  .strings {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .string-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .string-row button {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-inline: var(--space-3);
+    font: inherit;
+    color: var(--color-text);
+    background: transparent;
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .string-row .note {
+    min-inline-size: calc(var(--target-min) * 2);
+    font-family: var(--font-family-notes);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .string-row button:disabled {
+    color: var(--color-text-muted);
+    cursor: not-allowed;
   }
 
   .preview {

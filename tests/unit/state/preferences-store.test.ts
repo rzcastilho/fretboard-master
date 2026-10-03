@@ -28,7 +28,7 @@ describe('preferences.start', () => {
     preferences.start(s);
     preferences.start(fakeStorage());
     expect(s.calls.get).toBe(reads);
-    expect(instrument.active.tuningId).toBe('AF-3');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-3' });
   });
 
   it('pushes stored values through the restore methods without writing', () => {
@@ -39,7 +39,7 @@ describe('preferences.start', () => {
     const nl = vi.spyOn(notes, 'restoreLabelType');
     const tl = vi.spyOn(triads, 'restoreLabelType');
     preferences.start(s);
-    expect(restore).toHaveBeenCalledWith({ tuningId: 'AF-3', fretCount: 24 });
+    expect(restore).toHaveBeenCalledWith({ tuning: { kind: 'preset', id: 'AF-3' }, fretCount: 24 });
     expect(pb).toHaveBeenCalledWith({ muted: true, volume: 35 });
     expect(nl).toHaveBeenCalledWith('octave');
     expect(tl).toHaveBeenCalledWith('name');
@@ -51,6 +51,27 @@ describe('preferences.start', () => {
     expect(triads.state.labelType).toBe('name');
   });
 
+  it('restores a stored custom tuning (US5)', () => {
+    const restore = vi.spyOn(instrument, 'restore');
+    preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-custom'].raw }));
+    expect(restore).toHaveBeenCalledWith({
+      tuning: { kind: 'custom', offsets: [-2, 0, 0, -1, 0, 0] },
+      fretCount: 24
+    });
+    expect(instrument.active.tuning).toEqual({ kind: 'custom', offsets: [-2, 0, 0, -1, 0, 0] });
+  });
+
+  it('a stored custom tuning matching a preset loads as that preset', () => {
+    preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-custom-drop-d'].raw }));
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-4' });
+  });
+
+  it('a damaged customTuning loads the stored preset with no error', () => {
+    preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['custom-out-of-range'].raw }));
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
+    expect(preferences.noticeVisible).toBe(false);
+  });
+
   it('seeds lastTool from storage', () => {
     expect(preferences.lastTool).toBeNull();
     preferences.start(full());
@@ -59,7 +80,7 @@ describe('preferences.start', () => {
 
   it('empty storage keeps defaults and shows no notice', () => {
     preferences.start(fakeStorage());
-    expect(instrument.active.tuningId).toBe('AF-1');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
     expect(preferences.lastTool).toBeNull();
     expect(preferences.noticeVisible).toBe(false);
   });
@@ -134,14 +155,24 @@ describe('preferences.erase', () => {
     expect(s.data.get('other')).toBe('keep');
     expect(s.calls.set).toBe(writes);
     expect(preferences.lastTool).toBeNull();
-    expect(restore).toHaveBeenCalledWith({ tuningId: 'AF-1', fretCount: 22 });
+    expect(restore).toHaveBeenCalledWith({ tuning: { kind: 'preset', id: 'AF-1' }, fretCount: 22 });
     expect(pb).toHaveBeenCalledWith({ muted: false, volume: 80 });
     expect(nl).toHaveBeenCalledWith('name');
     expect(tl).toHaveBeenCalledWith('interval');
-    expect(instrument.active.tuningId).toBe('AF-1');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
     expect(playback.muted).toBe(false);
     expect(playback.volume).toBe(80);
     expect(preferences.noticeVisible).toBe(false);
+  });
+
+  it('restores Standard after a custom tuning was remembered (US5)', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-custom'].raw });
+    preferences.start(s);
+    expect(instrument.active.tuning.kind).toBe('custom');
+    preferences.erase();
+    expect(s.data.has(PREFS_KEY)).toBe(false);
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
+    expect(instrument.active.fretCount).toBe(22);
   });
 
   it('stops any playing note', () => {

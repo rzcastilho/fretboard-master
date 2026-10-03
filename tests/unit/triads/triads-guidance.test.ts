@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AF_1_12, NC_UNISON } from '../../../src/lib/instrument/fixtures';
+import type { Offsets } from '../../../src/lib/instrument/custom-tuning';
+import { tuningFromOffsets, tuningInstrument } from '../../../src/lib/instrument/tunings';
 import { resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
 import TriadsGuidance from '../../../src/lib/tools/triads/TriadsGuidance.svelte';
@@ -118,5 +120,31 @@ describe('TriadsTool guidance (US8)', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Another set' }));
     expect(triads.state.stringSet).toBe(5);
     expect(screen.queryByRole('button', { name: 'Another set' })).toBeNull();
+  });
+});
+
+describe('Triads tool on a unison custom tuning (011 US4, 4.2–4.4)', () => {
+  it('shows the empty fretboard guidance with Another set and See all notes', async () => {
+    triads.useInstrument(
+      tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0] as unknown as Offsets), 22)
+    );
+    const { container } = render(TriadsTool);
+    expect(
+      screen.getByText('This triad does not close on this string set with the current tuning')
+    ).toBeTruthy();
+    expect(container.querySelectorAll('.marker')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'See all notes' })).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Another set' }));
+    expect(triads.state.stringSet).toBe(5);
+    expect(screen.queryByRole('button', { name: 'Another set' })).toBeNull();
+  });
+
+  it('See all notes switches to All notes', async () => {
+    triads.useInstrument(
+      tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0] as unknown as Offsets), 22)
+    );
+    render(TriadsTool);
+    await fireEvent.click(screen.getByRole('button', { name: 'See all notes' }));
+    expect(triads.state.view).toBe('all-notes');
   });
 });

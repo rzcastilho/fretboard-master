@@ -53,3 +53,33 @@ export function pitchOfSpelling(s: SpelledPitch): Pitch {
 export function frequencyOf(p: Pitch): number {
   return 440 * Math.pow(2, (p - 69) / 12);
 }
+
+const SHARP_SPELLINGS: readonly Spelling[] = Object.freeze(
+  (
+    [
+      ['C', 0],
+      ['C', 1],
+      ['D', 0],
+      ['D', 1],
+      ['E', 0],
+      ['F', 0],
+      ['F', 1],
+      ['G', 0],
+      ['G', 1],
+      ['A', 0],
+      ['A', 1],
+      ['B', 0]
+    ] as const
+  ).map(([letter, accidental]) => Object.freeze({ letter, accidental }))
+);
+
+/** Sharps: C C♯ D D♯ E F F♯ G G♯ A A♯ B. */
+export function sharpSpelling(pc: PitchClass): Spelling {
+  return SHARP_SPELLINGS[((Math.trunc(pc) % 12) + 12) % 12];
+}
+
+/** Sharp spelling of a sounding pitch; the table never yields B♯/C♭, so octave = octaveOf(p). */
+export function spellSharp(p: Pitch): SpelledPitch {
+  const { letter, accidental } = sharpSpelling(pitchClass(p));
+  return Object.freeze({ letter, accidental, octave: octaveOf(p) });
+}

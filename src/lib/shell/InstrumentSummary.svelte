@@ -2,12 +2,13 @@
   import { m } from '$lib/paraglide/messages.js';
   import { instrument } from '$lib/state/instrument.svelte';
   import { rememberOpener } from './instrument-opener';
-  import { tuningName } from './tuning-names';
+  import { isStandard } from '$lib/instrument/tunings';
+  import { tuningLabel } from './tuning-names';
 
   const text = $derived(
-    instrument.active.tuningId === 'AF-1'
+    isStandard(instrument.active.tuning)
       ? m.instrument_summary_standard()
-      : m.instrument_summary_preset({ name: tuningName(instrument.active.tuningId) })
+      : m.instrument_summary_preset({ name: tuningLabel(instrument.active.tuning) })
   );
 
   function open(event: MouseEvent): void {

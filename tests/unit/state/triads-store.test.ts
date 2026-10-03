@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AF_4, NC_UNISON, SHORT_7 } from '../../../src/lib/instrument/fixtures';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import type { Offsets } from '../../../src/lib/instrument/custom-tuning';
+import { tuningFromOffsets, tuningInstrument } from '../../../src/lib/instrument/tunings';
 import { LISTEN_BPM } from '../../../src/lib/state/listen';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
@@ -475,5 +477,55 @@ describe('triads.restoreLabelType (010)', () => {
     expect(triads.state.labelType).toBe('name');
     expect(triads.state.rootPc).toBe(0);
     stop.mockRestore();
+  });
+});
+
+describe('triads store with unusual custom tunings (011 US4)', () => {
+  const tuned = (o: readonly number[]) =>
+    tuningInstrument(tuningFromOffsets(o as unknown as Offsets), 22);
+  /** String 3 raised to string 2's pitch (B3): strings 3 and 2 are in unison. */
+  const UNISON = tuned([0, 0, 0, 4, 0, 0]);
+  /** Several unisons at once: the triad closes on no string set. */
+  const NO_SET = tuned([-7, 0, -7, 0, -7, -7]);
+
+  it('unison 3-2-1: does not close, offers Another set and See all notes (4.2, 4.3)', () => {
+    triads.useInstrument(UNISON);
+    expect(triads.state.stringSet).toBe(3);
+    expect(triads.display.shape.kind).toBe('does-not-close');
+    expect(triads.display.anotherSet).toBe(5);
+    triads.seeAllNotes();
+    expect(triads.state.view).toBe('all-notes');
+  });
+
+  it('Another set moves to the nearest closing set (4.2)', () => {
+    triads.useInstrument(UNISON);
+    triads.anotherSet();
+    expect(triads.state.stringSet).toBe(5);
+    expect(triads.display.shape.kind).toBe('shown');
+  });
+
+  it('no closing set: no Another set offer, See all notes remains (4.4)', () => {
+    triads.useInstrument(NO_SET);
+    expect(triads.display.shape.kind).toBe('does-not-close');
+    expect(triads.display.anotherSet).toBeNull();
+    triads.anotherSet();
+    expect(triads.state.stringSet).toBe(3);
+    triads.seeAllNotes();
+    expect(triads.state.view).toBe('all-notes');
+  });
+
+  it('a tuning change keeps the current set; guidance only where it does not close (4.8)', () => {
+    triads.useInstrument(UNISON);
+    expect(triads.state.stringSet).toBe(3);
+    triads.setStringSet(5);
+    expect(triads.display.shape.kind).toBe('shown');
+    triads.useInstrument(STANDARD_GUITAR);
+    triads.setStringSet(3);
+    triads.useInstrument(UNISON);
+    expect(triads.state.stringSet).toBe(3);
+    triads.setStringSet(5);
+    triads.useInstrument(tuned([0, 0, 0, 4, 0, 0]));
+    expect(triads.state.stringSet).toBe(5);
+    expect(triads.display.shape.kind).toBe('shown');
   });
 });

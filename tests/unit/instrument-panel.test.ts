@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import InstrumentPanel from '../../src/lib/shell/InstrumentPanel.svelte';
 import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
 import { pageState } from './support/page-state.svelte';
-import { playback } from '../../src/lib/state/playback.svelte';
+import { playback, resetPlaybackForTests } from '../../src/lib/state/playback.svelte';
 
 const pushState = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ pushState, afterNavigate: vi.fn(), beforeNavigate: vi.fn() }));
@@ -44,11 +44,11 @@ describe('InstrumentPanel (tuning radio group)', () => {
     expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
   });
 
-  it('lists 11 radios in a Tuning group in preset order with spoken names', async () => {
+  it('lists 11 preset radios plus Custom in a Tuning group in preset order with spoken names', async () => {
     await open();
     const group = screen.getByRole('group', { name: 'Tuning' });
-    const radios = within(group).getAllByRole('radio');
-    expect(radios).toHaveLength(11);
+    const radios = within(group).getAllByRole('radio').slice(0, 11);
+    expect(within(group).getAllByRole('radio')).toHaveLength(12);
     expect(
       radios[0].getAttribute('aria-label') ?? radios[0].closest('label')?.textContent
     ).toBeTruthy();
@@ -83,8 +83,11 @@ describe('InstrumentPanel (tuning radio group)', () => {
       .getAllByRole('radio')
       .find((r) => r.getAttribute('value') === 'AF-4') as HTMLInputElement;
     await fireEvent.click(drop);
-    expect(instrument.panel.open && instrument.panel.pending.tuningId).toBe('AF-4');
-    expect(instrument.active.tuningId).toBe('AF-1');
+    expect(instrument.panel.open && instrument.panel.pending.tuning).toEqual({
+      kind: 'preset',
+      id: 'AF-4'
+    });
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
     expect(stop).not.toHaveBeenCalled();
     expect(drop.checked).toBe(true);
     stop.mockRestore();
@@ -106,7 +109,7 @@ describe('InstrumentPanel (tuning radio group)', () => {
       .find((r) => r.getAttribute('value') === 'AF-4') as HTMLInputElement;
     await fireEvent.click(drop);
     await fireEvent.click(confirm);
-    expect(instrument.active.tuningId).toBe('AF-4');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-4' });
     expect(instrument.panel.open).toBe(false);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -118,7 +121,7 @@ describe('InstrumentPanel (tuning radio group)', () => {
       .find((r) => r.getAttribute('value') === 'AF-4') as HTMLInputElement;
     await fireEvent.click(drop);
     await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(instrument.active.tuningId).toBe('AF-1');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
     expect(instrument.panel.open).toBe(false);
   });
 
@@ -186,7 +189,7 @@ describe('InstrumentPanel (cancel and restore)', () => {
 
   const expectDiscarded = (opener: HTMLElement) => {
     expect(instrument.panel.open).toBe(false);
-    expect(instrument.active.tuningId).toBe('AF-1');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
     expect(instrument.active.fretCount).toBe(22);
     expect(document.activeElement).toBe(opener);
     opener.remove();
@@ -239,13 +242,13 @@ describe('InstrumentPanel (cancel and restore)', () => {
     instrument.open();
     await Promise.resolve();
     await Promise.resolve();
-    expect(instrument.active.tuningId).toBe('AF-4');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-4' });
     await fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
     expect(instrument.panel.open && instrument.panel.pending).toEqual({
-      tuningId: 'AF-1',
+      tuning: { kind: 'preset', id: 'AF-1' },
       fretCount: 22
     });
-    expect(instrument.active.tuningId).toBe('AF-4');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-4' });
     expect(instrument.active.fretCount).toBe(12);
     expect(screen.getByRole('spinbutton', { name: 'Frets' }).getAttribute('aria-valuenow')).toBe(
       '22'
@@ -277,7 +280,7 @@ describe('InstrumentPanel (Back closes the panel, R-07)', () => {
     pageState.value = {};
     flushSync();
     expect(instrument.panel.open).toBe(false);
-    expect(instrument.active.tuningId).toBe('AF-1');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
   });
 
   it('closing any other way removes the entry with history.back()', async () => {
@@ -288,5 +291,354 @@ describe('InstrumentPanel (Back closes the panel, R-07)', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(back).toHaveBeenCalledTimes(1);
     back.mockRestore();
+  });
+});
+
+describe('InstrumentPanel (custom tuning, US1)', () => {
+  const chooseCustom = async () => {
+    await fireEvent.click(screen.getByRole('radio', { name: /Custom/ }));
+  };
+  const btn = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+  const noteText = (n: number) =>
+    screen.getByRole('button', { name: new RegExp(`^String ${n},`) }).textContent?.trim();
+  const press = async (name: string, times = 1) => {
+    for (let i = 0; i < times; i++) await fireEvent.click(btn(name));
+  };
+
+  it('Custom radio is last, after AF-11; rows hidden until chosen (1.1)', async () => {
+    await open();
+    const radios = within(screen.getByRole('group', { name: 'Tuning' })).getAllByRole('radio');
+    expect(radios).toHaveLength(12);
+    expect(radios[11].getAttribute('value')).toBe('custom');
+    expect(radios[10].getAttribute('value')).toBe('AF-11');
+    expect(screen.queryByRole('button', { name: 'Lower string 6' })).toBeNull();
+  });
+
+  it('shows six rows, string 6 first: E2 A2 D3 G3 B3 E4 (1.1)', async () => {
+    await open();
+    await chooseCustom();
+    const group = screen.getByRole('group', { name: 'Custom tuning' });
+    const labels = within(group)
+      .getAllByRole('button', { name: /^String \d,/ })
+      .map((b) => b.textContent?.trim());
+    expect(labels).toEqual(['E2', 'A2', 'D3', 'G3', 'B3', 'E4']);
+    expect(
+      within(group)
+        .getAllByRole('button', { name: /^String \d,/ })
+        .map((b) => b.getAttribute('aria-label'))
+    ).toEqual(
+      [
+        'String 6, E 2',
+        'String 5, A 2',
+        'String 4, D 3',
+        'String 3, G 3',
+        'String 2, B 3',
+        'String 1, E 4'
+      ].map((x) => x.replace(/(\w) (\d)$/, '$1 $2'))
+    );
+  });
+
+  it('lowering string 6 twice shows D2 and the preview follows (1.3, FR-021)', async () => {
+    const { container } = await open();
+    await chooseCustom();
+    await press('Lower string 6', 2);
+    expect(noteText(6)).toBe('D2');
+    expect(instrument.preview?.openStrings[5]).toMatchObject({ letter: 'D', octave: 2 });
+    expect(container.querySelectorAll('svg.fretboard-preview .string-label')).toHaveLength(6);
+  });
+
+  it('limits: string 1 lowered 7× → A3, lower disabled, no error text (1.4)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Lower string 1', 7);
+    expect(noteText(1)).toBe('A3');
+    expect(btn('Lower string 1').disabled).toBe(true);
+    expect(screen.queryByRole('alert')).toBeNull();
+    await fireEvent.click(btn('Lower string 1'));
+    expect(noteText(1)).toBe('A3');
+  });
+
+  it('string 6 raised to G♯2 disables raise (1.4)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Raise string 6', 4);
+    expect(noteText(6)).toBe('G♯2');
+    expect(btn('Raise string 6').disabled).toBe(true);
+  });
+
+  it('sharps spelling: F2 then F♯2 (1.6)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Raise string 6');
+    expect(noteText(6)).toBe('F2');
+    await press('Raise string 6');
+    expect(noteText(6)).toBe('F♯2');
+    expect(screen.getByRole('button', { name: 'String 6, F sharp 2' })).toBeTruthy();
+  });
+
+  it('Half step down then lower string 6 → D2, rest sharps (1.7)', async () => {
+    await open();
+    await fireEvent.click(screen.getByRole('radio', { name: /^Half step down:/ }));
+    await chooseCustom();
+    expect([6, 5, 4, 3, 2, 1].map((n) => noteText(n))).toEqual([
+      'E♭2',
+      'A♭2',
+      'D♭3',
+      'G♭3',
+      'B♭3',
+      'E♭4'
+    ]);
+    await press('Lower string 6');
+    expect([6, 5, 4, 3, 2, 1].map((n) => noteText(n))).toEqual([
+      'D2',
+      'G♯2',
+      'C♯3',
+      'F♯3',
+      'A♯3',
+      'D♯4'
+    ]);
+  });
+
+  it('Restore default → Standard selected, rows hidden, frets 22 (1.8)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Lower string 6');
+    await fireEvent.keyDown(screen.getByRole('spinbutton', { name: 'Frets' }), { key: 'Home' });
+    await fireEvent.click(btn('Restore default'));
+    const checked = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    expect(checked?.getAttribute('value')).toBe('AF-1');
+    expect(screen.queryByRole('button', { name: 'Lower string 6' })).toBeNull();
+    expect(screen.getByRole('spinbutton', { name: 'Frets' }).getAttribute('aria-valuenow')).toBe(
+      '22'
+    );
+  });
+
+  it('opening on a custom active tuning checks Custom and shows rows (1.9)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Raise string 1');
+    await fireEvent.click(btn('Confirm'));
+    instrument.open();
+    await Promise.resolve();
+    await Promise.resolve();
+    const checked = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    expect(checked?.getAttribute('value')).toBe('custom');
+    expect(noteText(1)).toBe('F4');
+  });
+
+  it('opening on a preset hides rows and checks the preset (1.10)', async () => {
+    await open();
+    await pickPreset('AF-4');
+    await fireEvent.click(btn('Confirm'));
+    instrument.open();
+    await Promise.resolve();
+    await Promise.resolve();
+    const checked = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    expect(checked?.getAttribute('value')).toBe('AF-4');
+    expect(screen.queryByRole('button', { name: 'Lower string 6' })).toBeNull();
+  });
+
+  it('has accessible names Lower/Raise string n (1.8 a11y)', async () => {
+    await open();
+    await chooseCustom();
+    for (const n of [1, 2, 3, 4, 5, 6]) {
+      expect(btn(`Lower string ${n}`)).toBeTruthy();
+      expect(btn(`Raise string ${n}`)).toBeTruthy();
+    }
+  });
+
+  it('focus moves to the row note button when a focused step button becomes disabled (FR-023)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Lower string 1', 6);
+    const lower = btn('Lower string 1');
+    lower.focus();
+    await fireEvent.click(lower);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(lower.disabled).toBe(true);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^String 1,/ }));
+  });
+
+  it('rapid repeated presses never pass the limit (FR-023)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Lower string 6', 20);
+    expect(noteText(6)).toBe('A1');
+    await press('Raise string 6', 20);
+    expect(noteText(6)).toBe('G♯2');
+  }, 30000);
+});
+
+describe('InstrumentPanel (known tuning name, US3)', () => {
+  const chooseCustom = async () => {
+    await fireEvent.click(screen.getByRole('radio', { name: /Custom/ }));
+  };
+  const btn = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+  const press = async (name: string, times = 1) => {
+    for (let i = 0; i < times; i++) await fireEvent.click(btn(name));
+  };
+  const nameLine = () => screen.getByRole('status');
+
+  it('name line is a polite status region reading the matched preset (3.1)', async () => {
+    await open();
+    await chooseCustom();
+    expect(nameLine().getAttribute('aria-live')).toBe('polite');
+    expect(nameLine().textContent?.trim()).toBe('Standard');
+    await press('Lower string 6', 2);
+    expect(nameLine().textContent?.trim()).toBe('Drop D');
+    expect((screen.getByRole('radio', { name: /Custom/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('group', { name: 'Custom tuning' })).toBeTruthy();
+  });
+
+  it('reads Custom when unmatched, Standard when all offsets are 0 (3.2)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Lower string 6', 2);
+    await press('Raise string 6');
+    expect(nameLine().textContent?.trim()).toBe('Custom');
+    await press('Raise string 6');
+    expect(nameLine().textContent?.trim()).toBe('Standard');
+  });
+
+  it('matching ignores spelling: all strings down one shows Half step down (3.1)', async () => {
+    await open();
+    await chooseCustom();
+    for (const n of [6, 5, 4, 3, 2, 1]) await press(`Lower string ${n}`);
+    expect(nameLine().textContent?.trim()).toBe('Half step down');
+    expect(screen.getByRole('button', { name: /^String 6,/ }).textContent?.trim()).toBe('E♭2');
+  });
+
+  it('reopening after a matched confirm selects the preset, rows hidden (3.3)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Lower string 6', 2);
+    await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    flushSync(() => instrument.open());
+    expect((screen.getByRole('radio', { name: /^Drop D:/ }) as HTMLInputElement).checked).toBe(
+      true
+    );
+    expect(screen.queryByRole('group', { name: 'Custom tuning' })).toBeNull();
+  });
+
+  it('reopening after an unmatched confirm selects Custom with confirmed values (3.3)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Raise string 1');
+    await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    flushSync(() => instrument.open());
+    expect((screen.getByRole('radio', { name: /Custom/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('button', { name: /^String 1,/ }).textContent?.trim()).toBe('F4');
+    expect(nameLine().textContent?.trim()).toBe('Custom');
+  });
+});
+
+describe('InstrumentPanel (hear each string, US2)', () => {
+  const chooseCustom = async () => {
+    await fireEvent.click(screen.getByRole('radio', { name: /Custom/ }));
+  };
+  const btn = (name: string | RegExp) => screen.getByRole('button', { name }) as HTMLButtonElement;
+  let note: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    note = vi.spyOn(playback, 'note').mockReturnValue([]);
+  });
+
+  it('note button plays its string without changing state (2.1)', async () => {
+    await open();
+    await chooseCustom();
+    await fireEvent.click(btn('Lower string 6'));
+    await fireEvent.click(btn('Lower string 6'));
+    note.mockClear();
+    await fireEvent.click(btn(/^String 6,/));
+    expect(note).toHaveBeenCalledTimes(1);
+    expect(note.mock.calls[0][0]).toEqual({ string: 6, fret: 0 });
+    expect(btn(/^String 6,/).textContent?.trim()).toBe('D2');
+  });
+
+  it('lower/raise plays the new pitch when it changed (2.2, 2.3)', async () => {
+    await open();
+    await chooseCustom();
+    await fireEvent.click(btn('Raise string 2'));
+    expect(note).toHaveBeenCalledTimes(1);
+    expect(note.mock.calls[0][0]).toEqual({ string: 2, fret: 0 });
+    expect(note.mock.calls[0][1].openStrings[1]).toBeDefined();
+    await fireEvent.click(btn('Lower string 2'));
+    expect(note).toHaveBeenCalledTimes(2);
+  });
+
+  it('a disabled step button plays nothing (2.4)', async () => {
+    await open();
+    await chooseCustom();
+    for (let i = 0; i < 7; i++) await fireEvent.click(btn('Lower string 1'));
+    note.mockClear();
+    expect(btn('Lower string 1').disabled).toBe(true);
+    await fireEvent.click(btn('Lower string 1'));
+    expect(note).not.toHaveBeenCalled();
+  });
+
+  it('muted or locked audio leaves the panel working (2.5)', async () => {
+    note.mockRestore();
+    resetPlaybackForTests({
+      createContext: () => {
+        throw new Error('locked');
+      }
+    });
+    playback.setMuted(true);
+    await open();
+    await chooseCustom();
+    await fireEvent.click(btn('Lower string 6'));
+    expect(btn(/^String 6,/).textContent?.trim()).toBe('D♯2');
+    await fireEvent.click(btn(/^String 6,/));
+    expect(screen.getByRole('dialog', { name: 'Instrument' })).toBeTruthy();
+  });
+
+  it('note button is a native button: Enter and Space activate it (2.6)', async () => {
+    await open();
+    await chooseCustom();
+    const b = btn(/^String 3,/);
+    expect(b.tagName).toBe('BUTTON');
+    expect(b.type).toBe('button');
+    expect(b.disabled).toBe(false);
+    note.mockClear();
+    await fireEvent.click(b); // native <button> maps Enter/Space to click
+    expect(note).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('InstrumentPanel (unusual set-ups, US4)', () => {
+  const ORDER = 'The strings are not in order from low to high';
+  const chooseCustom = async () => {
+    await fireEvent.click(screen.getByRole('radio', { name: /Custom/ }));
+  };
+  const btn = (name: string) => screen.getByRole('button', { name }) as HTMLButtonElement;
+  const press = async (name: string, times = 1) => {
+    for (let i = 0; i < times; i++) await fireEvent.click(btn(name));
+  };
+
+  it('unison is accepted: no error, no order note, Confirm enabled (4.1)', async () => {
+    await open();
+    await chooseCustom();
+    await press('Raise string 3', 4); // G3 → B3, same as string 2
+    expect(screen.getByRole('button', { name: /^String 3,/ }).textContent?.trim()).toBe('B3');
+    expect(screen.queryByText(ORDER)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(btn('Confirm').disabled).toBe(false);
+  });
+
+  it('inverted strings show a muted, non-blocking order note in the status region (4.5, 4.6)', async () => {
+    await open();
+    await chooseCustom();
+    expect(screen.queryByText(ORDER)).toBeNull();
+    await press('Lower string 3', 6); // G3 → C♯3, below string 4 (D3)
+    const note = screen.getByText(ORDER);
+    expect(note.closest('[role="status"]')?.getAttribute('aria-live')).toBe('polite');
+    expect(note.closest('[role="status"]')).toBe(screen.getByRole('status'));
+    expect(note.tagName).toBe('SPAN');
+    expect(note.getAttribute('class') ?? '').toMatch(/order-note/);
+    expect(note.outerHTML).not.toMatch(/error|danger/i);
+    expect(note.textContent?.trim()).toBe(ORDER);
+    expect(btn('Confirm').disabled).toBe(false);
+    await press('Raise string 3', 1); // D3 = string 4: equal, not inverted
+    expect(screen.queryByText(ORDER)).toBeNull();
   });
 });

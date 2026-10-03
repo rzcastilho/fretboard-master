@@ -27,7 +27,7 @@ describe('remember on change (FR-019)', () => {
     expect(remember).not.toHaveBeenCalled(); // pending panel edits are not written
     instrument.confirm('home');
     expect(remember).toHaveBeenCalledTimes(1);
-    expect(remember).toHaveBeenCalledWith({ tuningId: 'AF-4', fretCount: 16 });
+    expect(remember).toHaveBeenCalledWith({ tuningId: 'AF-4', customTuning: null, fretCount: 16 });
   });
 
   it('cancelling the panel writes nothing', () => {
@@ -57,7 +57,7 @@ describe('remember on change (FR-019)', () => {
     triads.restoreLabelType('name');
     notes.restoreLabelType('name');
     playback.restore({ muted: true, volume: 20 });
-    instrument.restore({ tuningId: 'AF-4', fretCount: 12 });
+    instrument.restore({ tuning: { kind: 'preset', id: 'AF-4' }, fretCount: 12 });
     expect(remember).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,7 @@ import {
   type StorageLike
 } from './storage';
 
+/** Any preference field, including `customTuning` (011); `null` clears it. */
 export type PreferencesPatch = Partial<Omit<Preferences, 'labels'>> & {
   labels?: Partial<Preferences['labels']>;
 };

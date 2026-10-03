@@ -1,0 +1,1 @@
+{"version":1,"tuning":"AF-2","customTuning":[0,0,0.5,0,0,0]}

@@ -1,0 +1,1 @@
+{"version":1,"tuning":"AF-1","customTuning":[0,0,0,0,0,5],"muted":true}

@@ -2,9 +2,10 @@
   import { m } from '$lib/paraglide/messages.js';
   import { instrument } from '$lib/state/instrument.svelte';
   import { rememberOpener } from './instrument-opener';
-  import { tuningName } from './tuning-names';
+  import { isStandard } from '$lib/instrument/tunings';
+  import { tuningLabel } from './tuning-names';
 
-  const name = $derived(tuningName(instrument.active.tuningId));
+  const name = $derived(tuningLabel(instrument.active.tuning));
 
   function open(event: MouseEvent): void {
     rememberOpener(event.currentTarget as HTMLElement);
@@ -12,7 +13,7 @@
   }
 </script>
 
-{#if instrument.active.tuningId !== 'AF-1'}
+{#if !isStandard(instrument.active.tuning)}
   <button
     type="button"
     class="tuning-badge"

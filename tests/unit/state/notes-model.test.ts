@@ -21,6 +21,8 @@ import {
   type NotesViewState
 } from '../../../src/lib/state/notes-view';
 import type { Marker } from '../../../src/lib/fretboard/types';
+import { tuningFromOffsets, tuningInstrument } from '../../../src/lib/instrument/tunings';
+import { pitchClass } from '../../../src/lib/theory/pitch';
 
 const INIT = initialNotesView(STANDARD_GUITAR);
 const NATURALS = new Set([0, 2, 4, 5, 7, 9, 11]);
@@ -465,5 +467,26 @@ describe('Listen (US5, FR-012)', () => {
 
   it('exposes listenSteps on the display', () => {
     expect(build(select(9)).listenSteps).toEqual(listenSteps(select(9), STANDARD_GUITAR));
+  });
+});
+
+describe('buildNotesModel with a unison tuning (011 US4, scenario 4.7)', () => {
+  const unison = tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0]), 22);
+
+  it('strings 3 and 2 share a pitch: every note shows on every string', () => {
+    const positions = allPositions(unison);
+    expect(positionPitch(unison, { string: 3, fret: 0 })).toEqual(
+      positionPitch(unison, { string: 2, fret: 0 })
+    );
+    for (const pc of [0, 4, 7, 11] as const) {
+      const s = toggleNote(initialNotesView(unison), pc);
+      const markers = buildNotesModel(s, unison).model.markers;
+      expect(markers).toHaveLength(positions.length);
+      const expected = positions.filter((p) => pitchClass(positionPitch(unison, p)) === pc);
+      const highlighted = markers.filter((mk) => mk.emphasis === 'highlighted');
+      expect(highlighted.map((mk) => `${mk.string}:${mk.fret}`).sort()).toEqual(
+        expected.map((p) => `${p.string}:${p.fret}`).sort()
+      );
+    }
   });
 });

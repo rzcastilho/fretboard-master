@@ -402,3 +402,47 @@ test.describe('remembered preferences: US4', () => {
     await expect(muteButton(page)).toHaveAttribute('aria-pressed', 'true');
   });
 });
+
+test.describe('remembered preferences: custom tuning (011 US5)', () => {
+  const customSummary = (page: Page) =>
+    page.getByRole('button', { name: '6 strings · Custom · right-handed' });
+
+  test('AS 5.1: a confirmed custom tuning survives a reload with the same notes', async ({
+    page
+  }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: /^6 strings/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: 'Custom' }).check();
+    await dialog.getByRole('button', { name: 'Lower string 6' }).click();
+    await dialog.getByRole('button', { name: 'Lower string 4' }).click();
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+    await expect(customSummary(page)).toBeVisible();
+
+    await page.reload();
+    await expect(customSummary(page)).toBeVisible();
+    await page.getByRole('button', { name: /^6 strings/ }).click();
+    const reopened = page.getByRole('dialog', { name: 'Instrument' });
+    await expect(reopened.getByRole('radio', { name: 'Custom' })).toBeChecked();
+    await expect(reopened.getByRole('button', { name: 'String 6, D sharp 2' })).toBeVisible();
+    await expect(reopened.getByRole('button', { name: 'String 4, C sharp 3' })).toBeVisible();
+  });
+
+  test('AS 5.3: a damaged customTuning loads Standard with no error screen', async ({ page }) => {
+    await seed(page, '{"version":1,"tuning":"AF-1","customTuning":[0,0,0,0,0,9]}');
+    await page.goto('/');
+    await expect(standardSummary(page)).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('AS 5.5: erasing preferences resets a custom tuning to Standard', async ({ page }) => {
+    await seed(page, '{"version":1,"tuning":"AF-1","customTuning":[-2,0,0,-1,0,0]}');
+    await page.goto('/');
+    await expect(customSummary(page)).toBeVisible();
+    await page.goto('/about');
+    await page.getByRole('button', { name: 'Erase my preferences' }).click();
+    await page.getByRole('button', { name: 'Erase', exact: true }).click();
+    await expect(page).toHaveURL('/');
+    await expect(standardSummary(page)).toBeVisible();
+  });
+});

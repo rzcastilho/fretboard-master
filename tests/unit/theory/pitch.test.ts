@@ -6,6 +6,8 @@ import {
   pitchClass,
   pitchClassOfSpelling,
   pitchOfSpelling,
+  sharpSpelling,
+  spellSharp,
   transpose
 } from '../../../src/lib/theory/pitch';
 
@@ -119,5 +121,26 @@ describe('frequencyOf (12-TET, A4 = 440 Hz)', () => {
         expect(frequencyOf(p + 12) / frequencyOf(p)).toBeCloseTo(2, 9);
       })
     );
+  });
+});
+
+describe('sharpSpelling / spellSharp (011 R-03)', () => {
+  it('spells the 12 pitch classes with sharps', () => {
+    const names = Array.from({ length: 12 }, (_, pc) => {
+      const s = sharpSpelling(pc);
+      return `${s.letter}${s.accidental === 1 ? '#' : ''}`;
+    });
+    expect(names).toEqual(['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']);
+  });
+
+  it('uses the sounding octave and preserves pitch across B/C', () => {
+    expect(spellSharp(59)).toEqual({ letter: 'B', accidental: 0, octave: 3 });
+    expect(spellSharp(60)).toEqual({ letter: 'C', accidental: 0, octave: 4 });
+    expect(spellSharp(41)).toEqual({ letter: 'F', accidental: 0, octave: 2 });
+    for (let p = 21; p <= 96; p++) {
+      const s = spellSharp(p);
+      expect(s.octave).toBe(octaveOf(p));
+      expect(pitchOfSpelling(s)).toBe(p);
+    }
   });
 });

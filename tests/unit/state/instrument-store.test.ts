@@ -5,7 +5,10 @@ import { DEFAULT_CONFIG } from '../../../src/lib/state/instrument-config';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
+import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
+import { PREFS_KEY } from '../../../src/lib/prefs/storage';
+import { fakeStorage } from '../prefs/support';
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -76,7 +79,7 @@ describe('instrument store (contracts §3)', () => {
     const inst = presetInstrument('AF-4', 22);
     expect(s.notes).toHaveBeenCalledWith(inst);
     expect(s.triads).toHaveBeenCalledWith(inst);
-    expect(instrument.active).toEqual({ tuningId: 'AF-4', fretCount: 22 });
+    expect(instrument.active).toEqual({ tuning: { kind: 'preset', id: 'AF-4' }, fretCount: 22 });
     expect(instrument.current).toBe(inst);
     expect(instrument.adjustedIn).toBeNull();
   });
@@ -170,7 +173,7 @@ describe('adjustedIn lifecycle (US4, R-05)', () => {
 describe('instrument.restore (010)', () => {
   it('sets active, applies to Notes/Triads, no notice, no stop', () => {
     const s = spies(true, true);
-    const config = { tuningId: 'AF-3', fretCount: 24 } as const;
+    const config = { tuning: { kind: 'preset', id: 'AF-3' }, fretCount: 24 } as const;
     instrument.restore(config);
     expect(instrument.active).toEqual(config);
     expect(instrument.current).toEqual(presetInstrument('AF-3', 24));
@@ -184,5 +187,205 @@ describe('instrument.restore (010)', () => {
     const s = spies();
     instrument.restore(DEFAULT_CONFIG);
     expect(s.notes).not.toHaveBeenCalled();
+  });
+});
+
+describe('custom tuning (011 US1)', () => {
+  it('chooseCustom + stepString: returns true iff the pitch changed', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    expect(instrument.stepString(6, -1)).toBe(true);
+    expect(instrument.stepString(6, 1)).toBe(true);
+    for (let i = 0; i < 7; i++) instrument.stepString(6, -1);
+    expect(instrument.stepString(6, -1)).toBe(false);
+    expect(instrument.panel.open && instrument.panel.customOpen).toBe(true);
+  });
+
+  it('stepString on a closed panel returns false', () => {
+    expect(instrument.stepString(6, -1)).toBe(false);
+  });
+
+  it('preview follows the pending pitches', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(6, -1);
+    instrument.stepString(6, -1);
+    expect(instrument.preview?.openStrings[5]).toMatchObject({
+      letter: 'D',
+      accidental: 0,
+      octave: 2
+    });
+  });
+
+  it('confirm applies the custom tuning to Notes and Triads (AS 1.2)', () => {
+    const s = spies();
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(1, 1);
+    instrument.confirm('notes');
+    const inst = instrument.current;
+    expect(instrument.active.tuning).toEqual({ kind: 'custom', offsets: [0, 0, 0, 0, 0, 1] });
+    expect(s.notes).toHaveBeenCalledWith(inst);
+    expect(s.triads).toHaveBeenCalledWith(inst);
+  });
+
+  it('close without confirm keeps the previous instrument (AS 1.5)', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(6, -1);
+    instrument.cancel();
+    expect(instrument.active).toEqual(DEFAULT_CONFIG);
+    expect(instrument.current).toBe(STANDARD_GUITAR);
+  });
+
+  it('confirm with identical pitches rewrites nothing and shows no notice', () => {
+    const s = spies(true, true);
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(6, -1);
+    instrument.stepString(6, 1);
+    instrument.confirm('notes');
+    expect(s.stop).not.toHaveBeenCalled();
+    expect(s.notes).not.toHaveBeenCalled();
+    expect(instrument.adjustedIn).toBeNull();
+  });
+});
+
+describe('instrument store: playString (US2, FR-7.9)', () => {
+  const note = () => vi.spyOn(playback, 'note').mockReturnValue([]);
+
+  it('plays the open string of the pending preview instrument', () => {
+    const n = note();
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(6, -1);
+    instrument.stepString(6, -1);
+    instrument.playString(6);
+    expect(n).toHaveBeenCalledTimes(1);
+    expect(n).toHaveBeenCalledWith({ string: 6, fret: 0 }, instrument.preview);
+    expect(instrument.preview?.openStrings[5]).toEqual(
+      instrument.rows.find((r) => r.string === 6)?.pitch
+    );
+  });
+
+  it('is a no-op when the panel is closed', () => {
+    const n = note();
+    instrument.playString(3);
+    expect(n).not.toHaveBeenCalled();
+  });
+
+  it('every new request goes through playback.note (engine replaces the previous sound)', () => {
+    const n = note();
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.playString(6);
+    instrument.playString(5);
+    expect(n).toHaveBeenCalledTimes(2);
+    expect(n.mock.calls[1][0]).toEqual({ string: 5, fret: 0 });
+  });
+
+  it('does not change pending, mute or volume', () => {
+    note();
+    instrument.open();
+    instrument.chooseCustom();
+    const before = instrument.panel;
+    instrument.playString(2);
+    expect(instrument.panel).toBe(before);
+    expect(playback.muted).toBe(false);
+  });
+
+  it('plays the pitch shown for all 72 positions (SC-002)', () => {
+    const n = note();
+    for (const string of [1, 2, 3, 4, 5, 6] as const) {
+      for (const dir of [-1, 1] as const) {
+        resetInstrumentForTests();
+        instrument.open();
+        instrument.chooseCustom();
+        instrument.playString(string);
+        while (instrument.stepString(string, dir)) instrument.playString(string);
+      }
+    }
+    expect(n.mock.calls.length).toBeGreaterThan(0);
+    for (const [pos, inst] of n.mock.calls) {
+      expect(pos.fret).toBe(0);
+      expect(inst.openStrings[pos.string - 1]).toBeDefined();
+    }
+  });
+});
+
+describe('instrument store: remembering a custom tuning (011 US5)', () => {
+  const stored = (s: ReturnType<typeof fakeStorage>) =>
+    JSON.parse(s.data.get(PREFS_KEY) as string) as Record<string, unknown>;
+
+  beforeEach(() => {
+    resetPreferencesForTests();
+  });
+
+  it('confirming an unmatched tuning writes AF-1 and customTuning', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(6, -1);
+    instrument.stepString(4, -1);
+    instrument.confirm('notes');
+    const r = stored(s);
+    expect(r.tuning).toBe('AF-1');
+    expect(r.customTuning).toEqual([-1, 0, -1, 0, 0, 0]);
+  });
+
+  it('confirming a matched tuning writes the preset id and no customTuning', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(6, -1);
+    instrument.stepString(6, -1);
+    instrument.confirm('notes');
+    const r = stored(s);
+    expect(r.tuning).toBe('AF-4');
+    expect(r).not.toHaveProperty('customTuning');
+  });
+
+  it('going from custom back to a preset drops customTuning', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(6, -1);
+    instrument.confirm('notes');
+    expect(stored(s)).toHaveProperty('customTuning');
+    instrument.open();
+    instrument.selectTuning('AF-3');
+    instrument.confirm('notes');
+    const r = stored(s);
+    expect(r.tuning).toBe('AF-3');
+    expect(r).not.toHaveProperty('customTuning');
+  });
+
+  it('confirming Standard writes AF-1 and no customTuning', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(1, 1);
+    instrument.confirm('notes');
+    instrument.open();
+    instrument.restoreDefault();
+    instrument.confirm('notes');
+    const r = stored(s);
+    expect(r.tuning).toBe('AF-1');
+    expect(r).not.toHaveProperty('customTuning');
+  });
+
+  it('blocked storage still applies the tuning for the session (AS 5.6)', () => {
+    const s = fakeStorage();
+    s.fail.set = true;
+    preferences.start(s);
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(2, 1);
+    expect(() => instrument.confirm('notes')).not.toThrow();
+    expect(instrument.active.tuning).toEqual({ kind: 'custom', offsets: [0, 0, 0, 0, 1, 0] });
   });
 });

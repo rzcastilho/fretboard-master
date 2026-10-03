@@ -3,11 +3,14 @@
  * Pure: no DOM, Svelte or storage. `parsePreferences` is total; each field falls back on its own.
  */
 import * as v from 'valibot';
+import { isOffsets, type Offsets } from '$lib/instrument/custom-tuning';
 import {
   DEFAULT_FRETS,
   MAX_FRETS,
   MIN_FRETS,
   isTuningId,
+  tuningFromOffsets,
+  type Tuning,
   type TuningId
 } from '$lib/instrument/tunings';
 import type { LabelType } from '$lib/state/notes-view';
@@ -16,6 +19,8 @@ import type { ToolId } from '$lib/shell/tools';
 
 export interface Preferences {
   readonly tuningId: TuningId;
+  /** Per-string semitone offsets (strings 6 → 1) of an unmatched custom tuning, else null. */
+  readonly customTuning: Offsets | null;
   /** Integer 12–24. */
   readonly fretCount: number;
   readonly muted: boolean;
@@ -33,6 +38,7 @@ export const TOOL_IDS = ['notes', 'triads'] as const satisfies readonly ToolId[]
 
 export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   tuningId: 'AF-1',
+  customTuning: null,
   fretCount: DEFAULT_FRETS,
   muted: false,
   volume: 80,
@@ -58,6 +64,7 @@ const volumeSchema = v.fallback(
 
 const recordSchema = v.object({
   tuning: v.fallback(v.custom<TuningId>(isTuningId), d.tuningId),
+  customTuning: v.fallback(v.nullable(v.custom<Offsets>(isOffsets)), null),
   frets: v.fallback(
     v.pipe(v.number(), v.integer(), v.minValue(MIN_FRETS), v.maxValue(MAX_FRETS)),
     d.fretCount
@@ -87,6 +94,7 @@ export function parsePreferences(raw: string | null): Preferences {
     const r = v.parse(recordSchema, parsed);
     return {
       tuningId: r.tuning,
+      customTuning: r.customTuning,
       fretCount: r.frets,
       muted: r.muted,
       volume: r.volume,
@@ -98,11 +106,19 @@ export function parsePreferences(raw: string | null): Preferences {
   }
 }
 
-/** v1 record, stable key order; `lastTool` omitted when null. */
+/** Valid `customTuning` wins; it is canonicalized (a preset match loads as that preset). */
+export function tuningOfPreferences(p: Preferences): Tuning {
+  return p.customTuning !== null
+    ? tuningFromOffsets(p.customTuning)
+    : { kind: 'preset', id: p.tuningId };
+}
+
+/** v1 record, stable key order; `customTuning` and `lastTool` omitted when null. */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
     version: PREFS_VERSION,
     tuning: p.tuningId,
+    ...(p.customTuning === null ? {} : { customTuning: p.customTuning }),
     frets: p.fretCount,
     muted: p.muted,
     volume: p.volume / 100,

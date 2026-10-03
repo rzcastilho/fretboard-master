@@ -7,10 +7,12 @@ import {
   TOOL_IDS,
   parsePreferences,
   serializePreferences,
+  tuningOfPreferences,
   type Preferences
 } from '../../../src/lib/prefs/schema';
+import { OFFSET_MAX, OFFSET_MIN, type Offsets } from '../../../src/lib/instrument/custom-tuning';
 import { TOOLS } from '../../../src/lib/shell/tools';
-import { TUNING_PRESETS } from '../../../src/lib/instrument/tunings';
+import { TUNING_PRESETS, tuningFromOffsets } from '../../../src/lib/instrument/tunings';
 import { FIXTURES } from './fixtures';
 
 const rec = (o: unknown): string => JSON.stringify(o);
@@ -22,6 +24,7 @@ describe('constants and defaults (FR-018)', () => {
     expect(Object.isFrozen(DEFAULT_PREFERENCES)).toBe(true);
     expect(DEFAULT_PREFERENCES).toEqual({
       tuningId: 'AF-1',
+      customTuning: null,
       fretCount: 22,
       muted: false,
       volume: 80,
@@ -42,6 +45,43 @@ describe('constants and defaults (FR-018)', () => {
 describe('fixture table', () => {
   it.each(FIXTURES.map((f) => [f.name, f] as const))('%s', (_n, f) => {
     expect(parsePreferences(f.raw)).toEqual(f.expected);
+  });
+  it.each(FIXTURES.map((f) => [f.name, f] as const))('%s loads as the expected tuning', (_n, f) => {
+    expect(tuningOfPreferences(parsePreferences(f.raw))).toEqual(f.tuning);
+  });
+});
+
+describe('customTuning (011, FR-017)', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+  it('records without customTuning load with null', () => {
+    expect(p({ tuning: 'AF-3' }).customTuning).toBeNull();
+    expect(tuningOfPreferences(p({ tuning: 'AF-3' }))).toEqual({ kind: 'preset', id: 'AF-3' });
+  });
+  it.each([
+    'x',
+    [0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 5],
+    [0, 0, 0, 0, 0, -8],
+    [0, 0, 0.5, 0, 0, 0],
+    [0, 0, '0', 0, 0, 0],
+    [0, 0, null, 0, 0, 0],
+    {}
+  ])('invalid %j is ignored and keeps other fields', (bad) => {
+    const r = p({ tuning: 'AF-2', customTuning: bad, frets: 18 });
+    expect(r.customTuning).toBeNull();
+    expect(r.tuningId).toBe('AF-2');
+    expect(r.fretCount).toBe(18);
+  });
+  it('limits are accepted', () => {
+    expect(p({ customTuning: [-7, -7, -7, -7, -7, -7] }).customTuning).toEqual([
+      -7, -7, -7, -7, -7, -7
+    ]);
+    expect(p({ customTuning: [4, 4, 4, 4, 4, 4] }).customTuning).toEqual([4, 4, 4, 4, 4, 4]);
+  });
+  it('valid customTuning wins over tuning', () => {
+    const r = p({ tuning: 'AF-3', customTuning: [-2, 0, 0, -1, 0, 0] });
+    expect(tuningOfPreferences(r)).toEqual({ kind: 'custom', offsets: [-2, 0, 0, -1, 0, 0] });
   });
 });
 
@@ -96,9 +136,23 @@ describe('raw handling', () => {
 });
 
 describe('serializePreferences', () => {
+  it('writes customTuning after tuning when present, in contract order', () => {
+    const p: Preferences = {
+      ...DEFAULT_PREFERENCES,
+      customTuning: [-2, 0, 0, -1, 0, 0],
+      lastTool: 'notes'
+    };
+    expect(serializePreferences(p)).toBe(
+      '{"version":1,"tuning":"AF-1","customTuning":[-2,0,0,-1,0,0],"frets":22,"muted":false,"volume":0.8,"lastTool":"notes","labels":{"notes":"name","triads":"interval"}}'
+    );
+  });
+  it('omits customTuning when null', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('customTuning');
+  });
   it('writes exact key order and volume / 100', () => {
     const p: Preferences = {
       tuningId: 'AF-3',
+      customTuning: null,
       fretCount: 24,
       muted: true,
       volume: 35,
@@ -116,8 +170,13 @@ describe('serializePreferences', () => {
   });
 });
 
+const arbOffsets: fc.Arbitrary<Offsets> = fc
+  .tuple(...Array.from({ length: 6 }, () => fc.integer({ min: OFFSET_MIN, max: OFFSET_MAX })))
+  .map((a) => a as unknown as Offsets);
+
 const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   tuningId: fc.constantFrom(...TUNING_PRESETS.map((t) => t.id)),
+  customTuning: fc.option(arbOffsets, { nil: null }),
   fretCount: fc.integer({ min: 12, max: 24 }),
   muted: fc.boolean(),
   volume: fc.integer({ min: 0, max: 20 }).map((n) => n * 5),
@@ -143,6 +202,18 @@ function isValid(p: Preferences): boolean {
 }
 
 describe('properties', () => {
+  it('serialize → parse round-trips the Tuning of every valid Offsets', () => {
+    fc.assert(
+      fc.property(arbOffsets, (o) => {
+        const t = tuningFromOffsets(o);
+        const prefs: Preferences =
+          t.kind === 'preset'
+            ? { ...DEFAULT_PREFERENCES, tuningId: t.id }
+            : { ...DEFAULT_PREFERENCES, customTuning: t.offsets };
+        expect(tuningOfPreferences(parsePreferences(serializePreferences(prefs)))).toEqual(t);
+      })
+    );
+  });
   it('parsePreferences is total and valid for every string', () => {
     fc.assert(
       fc.property(fc.string(), (x) => {

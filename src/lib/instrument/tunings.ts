@@ -2,8 +2,9 @@
  * Preset tunings and fret-count rules (data-model §1, contracts/instrument-config-api.md §1).
  * Pure: no DOM, Svelte or i18n. Spelling is stored per preset, never re-derived (FR-005).
  */
-import type { Accidental, Letter, SpelledPitch } from '../theory/pitch';
+import { spellSharp, type Accidental, type Letter, type SpelledPitch } from '../theory/pitch';
 import { STANDARD_GUITAR, type Instrument } from './instrument';
+import { matchPreset, offsetPitches, presetOffsets, type Offsets } from './custom-tuning';
 
 export type TuningId =
   | 'AF-1'
@@ -90,5 +91,60 @@ export function presetInstrument(id: TuningId, fretCount: number): Instrument {
           orientation: 'highest-top'
         });
   cache.set(key, made);
+  return made;
+}
+
+/** A preset, or six per-string offsets that match no preset (canonical form, 011 R-01). */
+export type Tuning =
+  | { readonly kind: 'preset'; readonly id: TuningId }
+  | { readonly kind: 'custom'; readonly offsets: Offsets };
+
+export const STANDARD_TUNING: Tuning = Object.freeze({ kind: 'preset', id: DEFAULT_TUNING_ID });
+
+/** The only constructor of `custom`: a matching preset wins. */
+export function tuningFromOffsets(o: Offsets): Tuning {
+  const id = matchPreset(o);
+  return id !== null
+    ? Object.freeze({ kind: 'preset', id })
+    : Object.freeze({ kind: 'custom', offsets: o });
+}
+
+export function offsetsOfTuning(t: Tuning): Offsets {
+  return t.kind === 'preset' ? presetOffsets(t.id) : t.offsets;
+}
+
+export function equalsTuning(a: Tuning, b: Tuning): boolean {
+  if (a.kind === 'preset') return b.kind === 'preset' && a.id === b.id;
+  return b.kind === 'custom' && a.offsets.every((v, i) => v === b.offsets[i]);
+}
+
+export function isStandard(t: Tuning): boolean {
+  return t.kind === 'preset' && t.id === DEFAULT_TUNING_ID;
+}
+
+/** Low → high. Presets keep their own spelling; custom tunings use sharps (R-03). */
+export function tuningStrings(t: Tuning): readonly SpelledPitch[] {
+  return t.kind === 'preset'
+    ? tuningPreset(t.id).strings
+    : offsetPitches(t.offsets).map(spellSharp);
+}
+
+const customCache = new Map<string, Instrument>();
+
+/** Memoized and frozen; string 1 (highest) first. */
+export function tuningInstrument(t: Tuning, fretCount: number): Instrument {
+  if (t.kind === 'preset') return presetInstrument(t.id, fretCount);
+  const frets = clampFrets(fretCount);
+  const key = `${t.offsets.join(',')}|${frets}`;
+  const hit = customCache.get(key);
+  if (hit) return hit;
+  const made: Instrument = Object.freeze({
+    stringCount: 6,
+    fretCount: frets,
+    openStrings: Object.freeze([...tuningStrings(t)].reverse()),
+    handedness: 'right',
+    orientation: 'highest-top'
+  });
+  customCache.set(key, made);
   return made;
 }

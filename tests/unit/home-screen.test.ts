@@ -69,6 +69,26 @@ describe('HomeScreen', () => {
     expect(button.textContent).not.toMatch(/16|fret/i);
   });
 
+  it('summary reads "Custom" for an unmatched tuning (3.5)', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    instrument.stepString(1, 1);
+    instrument.confirm('home');
+    render(HomeScreen);
+    expect(screen.getByRole('button', { name: '6 strings · Custom · right-handed' })).toBeTruthy();
+  });
+
+  it('summary names a matched custom tuning by its preset (3.4)', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    for (const n of [6, 5, 4, 3, 2, 1] as const) instrument.stepString(n, -1);
+    instrument.confirm('home');
+    render(HomeScreen);
+    expect(
+      screen.getByRole('button', { name: '6 strings · Half step down · right-handed' })
+    ).toBeTruthy();
+  });
+
   it('activating the summary opens the panel', async () => {
     render(HomeScreen);
     await fireEvent.click(screen.getByRole('button', { name: /^6 strings/ }));

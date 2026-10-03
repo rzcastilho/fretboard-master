@@ -1,5 +1,5 @@
 import { m } from '$lib/paraglide/messages.js';
-import type { TuningId } from '$lib/instrument/tunings';
+import type { Tuning, TuningId } from '$lib/instrument/tunings';
 
 const NAMES: Readonly<Record<TuningId, () => string>> = {
   'AF-1': () => m.tuning_af1(),
@@ -18,4 +18,9 @@ const NAMES: Readonly<Record<TuningId, () => string>> = {
 /** Localized preset name. */
 export function tuningName(id: TuningId): string {
   return NAMES[id]();
+}
+
+/** Preset name, or "Custom" for an unmatched tuning. */
+export function tuningLabel(t: Tuning): string {
+  return t.kind === 'preset' ? tuningName(t.id) : m.tuning_custom();
 }
