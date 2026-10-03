@@ -7,8 +7,11 @@
 
   const text = $derived(
     isStandard(instrument.active.tuning)
-      ? m.instrument_summary_standard()
-      : m.instrument_summary_preset({ name: tuningLabel(instrument.active.tuning) })
+      ? m.instrument_summary_standard({ count: instrument.active.stringCount })
+      : m.instrument_summary_preset({
+          count: instrument.active.stringCount,
+          name: tuningLabel(instrument.active.tuning)
+        })
   );
 
   function open(event: MouseEvent): void {

@@ -660,3 +660,98 @@ test.describe('custom tuning latency (011 SC-007)', () => {
     expect(applied).toBeLessThanOrEqual(300);
   });
 });
+
+test.describe('seven strings × 24 frets (US5, quickstart §4)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('Confirm → board ≤ 300 ms, control change ≤ 100 ms at 4× CPU throttle', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-1', frets: 24 })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    const board = page.getByRole('grid', { name: 'Fretboard' });
+    await board.waitFor();
+    await expect(board.getByRole('row')).toHaveCount(6);
+
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: '7 strings' }).check();
+    // Measured in the page: Confirm pointerdown → seven rows in the DOM.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as { __boardMs: number | null };
+      w.__boardMs = null;
+      let downAt = 0;
+      document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+        capture: true,
+        once: true
+      });
+      new MutationObserver((_, obs) => {
+        if (document.querySelectorAll('[role="grid"] [role="row"]').length !== 7) return;
+        w.__boardMs = performance.now() - downAt;
+        obs.disconnect();
+      }).observe(document.body, { subtree: true, childList: true });
+    });
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __boardMs: number | null }).__boardMs !== null
+    );
+    const boardMs = await page.evaluate(
+      () => (globalThis as unknown as { __boardMs: number }).__boardMs
+    );
+    expect(boardMs).toBeLessThanOrEqual(300);
+
+    await expect(board.getByRole('row')).toHaveCount(7);
+    await expect(board.locator('.cell')).toHaveCount(7 * 25);
+
+    // Control change on the seven-string board.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as { __selectMs: number | null; __downAt: number | null };
+      w.__selectMs = null;
+      w.__downAt = null;
+      const grid = document.querySelector('[role="grid"]');
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || !grid?.querySelector('.marker.highlighted')) return;
+        w.__selectMs = performance.now() - w.__downAt;
+        w.__downAt = null;
+      }).observe(grid as Element, { subtree: true, childList: true, attributes: true });
+    });
+    await page
+      .getByRole('group', { name: 'Choose notes' })
+      .getByRole('button', { name: 'G', exact: true })
+      .click();
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __selectMs: number | null }).__selectMs !== null
+    );
+    const selectMs = await page.evaluate(
+      () => (globalThis as unknown as { __selectMs: number }).__selectMs
+    );
+    expect(selectMs).toBeLessThanOrEqual(100);
+
+    // Scroll/drag smoothness: scrolling the board across 24 frets stays inside .scroller.
+    const scroller = page.locator('.scroller').first();
+    const scrolled = await scroller.evaluate(async (el) => {
+      const frames: number[] = [];
+      let last = performance.now();
+      el.scrollLeft = 0;
+      for (let i = 1; i <= 20; i++) {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) * (i / 20);
+        await new Promise((r) => requestAnimationFrame(r));
+        const now = performance.now();
+        frames.push(now - last);
+        last = now;
+      }
+      return { worst: Math.max(...frames), moved: el.scrollLeft };
+    });
+    expect(scrolled.moved).toBeGreaterThan(0);
+    expect(scrolled.worst).toBeLessThanOrEqual(100);
+  });
+});

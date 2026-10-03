@@ -790,3 +790,107 @@ test.describe('notes tool: keyboard only (scenario 29, SC-005)', () => {
     await expect(page.getByRole('button', { name: 'Reset tool', exact: true })).toBeVisible();
   });
 });
+
+const PANEL_ADJUSTED = 'We adjusted the view to the new instrument';
+
+const openInstrumentPanel = async (page: Page) => {
+  await page
+    .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Instrument' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+};
+
+const chooseStrings = async (page: Page, count: 6 | 7) => {
+  const dialog = await openInstrumentPanel(page);
+  await dialog.getByRole('radio', { name: `${count} strings` }).check();
+  await dialog.getByRole('button', { name: 'Confirm' }).click();
+  await expect(dialog).toBeHidden();
+};
+
+test.describe('notes tool: seven strings (012 US2)', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('Q7: 7-string standard, all notes, frets 0–5 → string 7 shows B C C♯ D D♯ E', async ({
+    page
+  }) => {
+    await page.goto('/notes');
+    await chooseStrings(page, 7);
+    await page
+      .getByRole('radiogroup', { name: 'Show' })
+      .getByRole('radio', { name: 'All notes' })
+      .click();
+    await endFret(page).focus();
+    await endFret(page).press('Home');
+    for (let i = 0; i < 5; i++) await endFret(page).press('ArrowUp');
+    await expect(endFret(page)).toHaveAttribute('aria-valuenow', '5');
+    const row7 = board(page).locator('.marker.normal[data-key^="7:"]');
+    await expect(row7).toHaveCount(6);
+    await expect(row7.locator('text.marker-label')).toHaveText(['B', 'C', 'C♯', 'D', 'D♯', 'E']);
+    await expect(stringBtn(page, 'String 7, B')).toBeVisible();
+    await runAxe(page);
+  });
+
+  test('Q8: Drop A, card on string 7 fret 12 → unisons on string 6 fret 5 and string 5 fret 0', async ({
+    page
+  }) => {
+    await page.goto('/notes');
+    const dialog = await openInstrumentPanel(page);
+    await dialog.getByRole('radio', { name: '7 strings' }).check();
+    await dialog
+      .locator('.preset', { has: page.getByRole('radio', { name: /^Drop A:/ }) })
+      .locator('input')
+      .check();
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+    await expect(dialog).toBeHidden();
+    await board(page).locator('.cell[data-string="7"][data-fret="12"]').click();
+    for (const key of ['7:12', '6:5', '5:0']) {
+      await expect(board(page).locator(`.marker.highlighted[data-key="${key}"]`)).toHaveCount(1);
+    }
+    await expect(markers(page, 'highlighted')).toHaveCount(3);
+    await expect(description(page)).toContainText('string 7, fret 12');
+    await runAxe(page);
+  });
+
+  test('Q9: strings 1–3 only → 7 strings → string 7 stays off, no notice', async ({ page }) => {
+    await page.goto('/notes');
+    for (const n of ['String 4, D', 'String 5, A', 'String 6, E']) {
+      await stringBtn(page, n).click();
+    }
+    await chooseStrings(page, 7);
+    for (const n of ['String 1, E', 'String 2, B', 'String 3, G']) {
+      await expect(stringBtn(page, n)).toHaveAttribute('aria-pressed', 'true');
+    }
+    for (const n of ['String 4, D', 'String 5, A', 'String 6, E', 'String 7, B']) {
+      await expect(stringBtn(page, n)).toHaveAttribute('aria-pressed', 'false');
+    }
+    await expect(page.getByText(PANEL_ADJUSTED)).toHaveCount(0);
+  });
+
+  test('Q10: only string 7 on → 6 strings → all six on, with the adjusted notice', async ({
+    page
+  }) => {
+    await page.goto('/notes');
+    await chooseStrings(page, 7);
+    for (const n of [
+      'String 1, E',
+      'String 2, B',
+      'String 3, G',
+      'String 4, D',
+      'String 5, A',
+      'String 6, E'
+    ]) {
+      await stringBtn(page, n).click();
+    }
+    await expect(stringBtn(page, 'String 7, B')).toHaveAttribute('aria-pressed', 'true');
+    await chooseStrings(page, 6);
+    const status = page.getByRole('status').filter({ hasText: PANEL_ADJUSTED });
+    await expect(status).toBeVisible();
+    await expect(strings(page).getByRole('button')).toHaveCount(6);
+    for (const b of await strings(page).getByRole('button').all()) {
+      await expect(b).toHaveAttribute('aria-pressed', 'true');
+    }
+  });
+});

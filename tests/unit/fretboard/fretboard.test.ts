@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { readFileSync } from 'node:fs';
 import { tick } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_METRICS, layoutFretboard } from '../../../src/lib/fretboard/geometry';
+import { DEFAULT_METRICS, layoutFretboard, screenOrder } from '../../../src/lib/fretboard/geometry';
 import Fretboard from '../../../src/lib/fretboard/Fretboard.svelte';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
@@ -75,7 +75,7 @@ describe('Fretboard (thumbnail)', () => {
 describe('Fretboard (preview)', () => {
   it('draws pending frets and open-string labels in the preset spelling, inert and hidden', () => {
     const { container } = render(Fretboard, {
-      instrument: presetInstrument('AF-2', 24),
+      instrument: presetInstrument('AF-2', 6, 24),
       variant: 'preview'
     });
     const svg = container.querySelector('svg.fretboard-preview');
@@ -91,7 +91,7 @@ describe('Fretboard (preview)', () => {
 
   it('shows sharps for open tunings', () => {
     const { container } = render(Fretboard, {
-      instrument: presetInstrument('AF-11', 22),
+      instrument: presetInstrument('AF-11', 6, 22),
       variant: 'preview'
     });
     const labels = [...container.querySelectorAll('.string-label')].map((n) => n.textContent);
@@ -1487,5 +1487,63 @@ describe('Fretboard marker motion (007 US5)', () => {
       expect(n.isConnected).toBe(true);
     }
     for (const n of before) expect(n.isConnected).toBe(false);
+  });
+});
+
+describe('Fretboard (seven strings, US5)', () => {
+  const seven = presetInstrument('AF-21', 7, 24);
+  const tokens = readFileSync('src/lib/styles/tokens.css', 'utf8');
+  const rem = (name: string): number => {
+    const m = tokens.match(new RegExp(`${name}:\\s*([\\d.]+)rem`));
+    if (!m) throw new Error(`missing token ${name}`);
+    return Number(m[1]);
+  };
+
+  it('renders 7 string rows with a .string-7 line and 7 string labels', () => {
+    const { container } = render(Fretboard, { instrument: seven });
+    const grid = screen.getByRole('grid', { name: 'Fretboard' });
+    expect(within(grid).getAllByRole('row')).toHaveLength(7);
+    expect(container.querySelectorAll('.string')).toHaveLength(7);
+    expect(container.querySelector('.string-7')).toBeTruthy();
+    const labels = [...container.querySelectorAll('.string-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['1 E', '2 B', '3 G', '4 D', '5 A', '6 E', '7 B']);
+  });
+
+  it('stroke widths increase from string 1 to string 7 through tokens only', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    const widths: number[] = [];
+    for (let n = 1; n <= 7; n++) {
+      expect(src).toMatch(
+        new RegExp(`\\.string-${n}\\s*\\{\\s*stroke-width:\\s*var\\(--fb-string-width-${n}\\);`)
+      );
+      widths.push(rem(`--fb-string-width-${n}`));
+    }
+    for (let i = 1; i < widths.length; i++) expect(widths[i]).toBeGreaterThan(widths[i - 1]);
+    expect(widths[6]).toBe(0.375);
+  });
+
+  it('keeps row pitch at least as large as the root marker plus a gap', () => {
+    expect(rem('--fb-row')).toBe(2.75);
+    expect(rem('--fb-row')).toBeGreaterThanOrEqual(rem('--marker-root') + 0.25);
+  });
+
+  it('lays out 7 rows at the row pitch', () => {
+    const layout = layoutFretboard(seven, DEFAULT_METRICS, 1200, 'interactive');
+    expect(layout.rows).toHaveLength(7);
+  });
+
+  it('screenOrder lists string 7 last for every handedness/orientation', () => {
+    for (const handedness of ['right', 'left'] as const) {
+      for (const orientation of ['highest-top', 'lowest-top'] as const) {
+        const { rows } = screenOrder({ ...seven, handedness, orientation });
+        expect(rows).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      }
+    }
+  });
+
+  it('labels string 7 cells with spoken note', () => {
+    render(Fretboard, { instrument: seven });
+    expect(screen.getByRole('gridcell', { name: 'B, string 7, open' })).toBeTruthy();
+    expect(screen.getByRole('gridcell', { name: 'F sharp, string 7, fret 7' })).toBeTruthy();
   });
 });

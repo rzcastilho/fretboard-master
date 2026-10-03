@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 import type { Synth } from '../../../src/lib/audio/types';
 import { FakeAudioPort, FakeClock } from '../audio/support/fake-audio';
 
@@ -58,6 +59,27 @@ describe('playback.note', () => {
     expect(playback.availability).toBe('on');
     await flush();
     expect(d.rendered).toEqual([48]);
+  });
+});
+
+describe('playback.note on string 7 (012 FR-014, R-12)', () => {
+  it.each([
+    ['AF-21', 35],
+    ['AF-23', 33]
+  ] as const)('open string 7 in %s requests MIDI pitch %i', async (id, midi) => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.note({ string: 7, fret: 0 }, presetInstrument(id, 7, 22));
+    await flush();
+    expect(d.rendered).toEqual([midi]);
+  });
+
+  it('string 7 fret 12 in AF-23 sounds an octave above the open string', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.note({ string: 7, fret: 12 }, presetInstrument('AF-23', 7, 22));
+    await flush();
+    expect(d.rendered).toEqual([45]);
   });
 });
 

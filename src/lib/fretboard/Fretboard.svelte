@@ -967,6 +967,9 @@
   .string-6 {
     stroke-width: var(--fb-string-width-6);
   }
+  .string-7 {
+    stroke-width: var(--fb-string-width-7);
+  }
 
   .nut {
     fill: var(--color-nut);

@@ -6,10 +6,15 @@ import * as v from 'valibot';
 import { isOffsets, type Offsets } from '$lib/instrument/custom-tuning';
 import {
   DEFAULT_FRETS,
+  DEFAULT_STRING_COUNT,
   MAX_FRETS,
   MIN_FRETS,
+  isStringCount,
   isTuningId,
+  normalizePresetId,
+  standardTuningId,
   tuningFromOffsets,
+  type StringCount,
   type Tuning,
   type TuningId
 } from '$lib/instrument/tunings';
@@ -18,8 +23,10 @@ import type { TriadsLabelType } from '$lib/state/triads-view';
 import type { ToolId } from '$lib/shell/tools';
 
 export interface Preferences {
+  /** 6 or 7 (012); absent or invalid in a stored record → 6. */
+  readonly stringCount: StringCount;
   readonly tuningId: TuningId;
-  /** Per-string semitone offsets (strings 6 → 1) of an unmatched custom tuning, else null. */
+  /** Per-string semitone offsets (strings count → 1) of an unmatched custom tuning, else null. */
   readonly customTuning: Offsets | null;
   /** Integer 12–24. */
   readonly fretCount: number;
@@ -37,6 +44,7 @@ export const MAX_RAW_LENGTH = 16_384 as const;
 export const TOOL_IDS = ['notes', 'triads'] as const satisfies readonly ToolId[];
 
 export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
+  stringCount: DEFAULT_STRING_COUNT,
   tuningId: 'AF-1',
   customTuning: null,
   fretCount: DEFAULT_FRETS,
@@ -63,8 +71,11 @@ const volumeSchema = v.fallback(
 );
 
 const recordSchema = v.object({
+  strings: v.fallback(v.custom<StringCount>(isStringCount), d.stringCount),
+  // Normalized for the read count below (reader rule 11).
   tuning: v.fallback(v.custom<TuningId>(isTuningId), d.tuningId),
-  customTuning: v.fallback(v.nullable(v.custom<Offsets>(isOffsets)), null),
+  // Length is checked against the read count below (reader rule 12).
+  customTuning: v.fallback(v.nullable(v.unknown()), null),
   frets: v.fallback(
     v.pipe(v.number(), v.integer(), v.minValue(MIN_FRETS), v.maxValue(MAX_FRETS)),
     d.fretCount
@@ -92,9 +103,12 @@ export function parsePreferences(raw: string | null): Preferences {
     const parsed: unknown = JSON.parse(raw);
     if (!isPlainObject(parsed)) return DEFAULT_PREFERENCES;
     const r = v.parse(recordSchema, parsed);
+    const count = r.strings;
+    const hasTuning = isTuningId(parsed.tuning);
     return {
-      tuningId: r.tuning,
-      customTuning: r.customTuning,
+      stringCount: count,
+      tuningId: hasTuning ? normalizePresetId(r.tuning, count) : standardTuningId(count),
+      customTuning: isOffsets(r.customTuning, count) ? r.customTuning : null,
       fretCount: r.frets,
       muted: r.muted,
       volume: r.volume,
@@ -106,17 +120,24 @@ export function parsePreferences(raw: string | null): Preferences {
   }
 }
 
-/** Valid `customTuning` wins; it is canonicalized (a preset match loads as that preset). */
+/**
+ * Valid `customTuning` wins; it is canonicalized against the count's presets (a match loads as
+ * that preset). Otherwise the preset id, normalized for the string count.
+ */
 export function tuningOfPreferences(p: Preferences): Tuning {
-  return p.customTuning !== null
+  return p.customTuning !== null && isOffsets(p.customTuning, p.stringCount)
     ? tuningFromOffsets(p.customTuning)
-    : { kind: 'preset', id: p.tuningId };
+    : { kind: 'preset', id: normalizePresetId(p.tuningId, p.stringCount) };
 }
 
-/** v1 record, stable key order; `customTuning` and `lastTool` omitted when null. */
+/**
+ * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
+ * 011), `customTuning` and `lastTool` omitted when null.
+ */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
     version: PREFS_VERSION,
+    ...(p.stringCount === 6 ? {} : { strings: p.stringCount }),
     tuning: p.tuningId,
     ...(p.customTuning === null ? {} : { customTuning: p.customTuning }),
     frets: p.fretCount,

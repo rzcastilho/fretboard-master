@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { describeView, positionName } from '../../../src/lib/fretboard/description';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 
 const marker = (over: Partial<Marker>): Marker => ({
   string: 1,
@@ -126,5 +127,15 @@ describe('positionName comparison suffix (F8)', () => {
     const named = positionName(STANDARD_GUITAR, { string: 2, fret: 4 }, marker);
     expect(named).toBe(`${plain}, comparison`);
     expect(plain).not.toContain('comparison');
+  });
+});
+
+describe('seven-string descriptions (FR-018)', () => {
+  const seven = presetInstrument('AF-21', 7, 24);
+  it('names string 7 positions with accidentals in full', () => {
+    expect(positionName(seven, { string: 7, fret: 0 })).toBe('B, string 7, open');
+    expect(positionName(seven, { string: 7, fret: 7 })).toBe('F sharp, string 7, fret 7');
+    expect(positionName(seven, { string: 7, fret: 1 })).toBe('C, string 7, fret 1');
+    expect(positionName(seven, { string: 7, fret: 3 })).toBe('D, string 7, fret 3');
   });
 });

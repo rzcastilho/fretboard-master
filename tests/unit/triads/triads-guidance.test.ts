@@ -126,7 +126,7 @@ describe('TriadsTool guidance (US8)', () => {
 describe('Triads tool on a unison custom tuning (011 US4, 4.2–4.4)', () => {
   it('shows the empty fretboard guidance with Another set and See all notes', async () => {
     triads.useInstrument(
-      tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0] as unknown as Offsets), 22)
+      tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0] as unknown as Offsets), 6, 22)
     );
     const { container } = render(TriadsTool);
     expect(
@@ -141,7 +141,7 @@ describe('Triads tool on a unison custom tuning (011 US4, 4.2–4.4)', () => {
 
   it('See all notes switches to All notes', async () => {
     triads.useInstrument(
-      tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0] as unknown as Offsets), 22)
+      tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0] as unknown as Offsets), 6, 22)
     );
     render(TriadsTool);
     await fireEvent.click(screen.getByRole('button', { name: 'See all notes' }));

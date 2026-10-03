@@ -1,0 +1,1 @@
+{"version":1,"strings":6,"tuning":"AF-21","frets":18}

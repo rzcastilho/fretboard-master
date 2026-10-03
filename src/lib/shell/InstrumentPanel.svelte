@@ -4,7 +4,7 @@
   import { tick } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
-  import { TUNING_PRESETS, offsetsOfTuning } from '$lib/instrument/tunings';
+  import { offsetsOfTuning, type StringCount } from '$lib/instrument/tunings';
   import { noteLabel, pitchLabel, spokenNote, spokenNoteList } from '$lib/notation/notation';
   import { invertedStrings, type StringNumber } from '$lib/instrument/custom-tuning';
   import { instrument } from '$lib/state/instrument.svelte';
@@ -35,18 +35,25 @@
       })
     }))
   );
+  const COUNTS: readonly StringCount[] = [6, 7];
   const outOfOrder = $derived(
-    instrument.panel.open && invertedStrings(offsetsOfTuning(instrument.panel.pending.tuning))
+    instrument.panel.open &&
+      invertedStrings(
+        offsetsOfTuning(instrument.panel.pending.tuning, instrument.panel.pending.stringCount)
+      )
   );
   const rows = $derived(
-    TUNING_PRESETS.map((preset) => {
+    instrument.presets.map(({ id, strings }) => {
       // Stored low → high, the preset's own spelling.
-      const name = tuningName(preset.id);
+      const name = tuningName(id);
       return {
-        id: preset.id,
+        id,
         name,
-        glyphs: preset.strings.map(noteLabel).join(' '),
-        label: m.instrument_preset_label({ name, notes: spokenNoteList(preset.strings) })
+        // Seven-string rows carry octaves (B1 E2 …); 6-string rows stay as before (FR-019).
+        glyphs: strings
+          .map((p) => (strings.length === 7 ? pitchLabel(p, p.octave) : noteLabel(p)))
+          .join(' '),
+        label: m.instrument_preset_label({ name, notes: spokenNoteList(strings) })
       };
     })
   );
@@ -57,7 +64,7 @@
     if (instrument.panel.open && !el.open) {
       opener = takeOpener() ?? (document.activeElement as HTMLElement | null);
       el.showModal();
-      el.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.focus();
+      el.querySelector<HTMLInputElement>('input[name$="-tuning"]:checked')?.focus();
     } else if (!instrument.panel.open && el.open) {
       el.close();
     }
@@ -129,6 +136,21 @@
   {#if instrument.panel.open}
     <div class="body">
       <h2 id="{uid}-title">{m.instrument_panel_title()}</h2>
+      <fieldset>
+        <legend>{m.instrument_strings_legend()}</legend>
+        {#each COUNTS as count (count)}
+          <label class="count-option">
+            <input
+              type="radio"
+              name="{uid}-strings"
+              value={count}
+              checked={instrument.stringCount === count}
+              onchange={() => instrument.setStringCount(count)}
+            />
+            <span class="text">{m.instrument_strings_option({ count })}</span>
+          </label>
+        {/each}
+      </fieldset>
       <fieldset>
         <legend>{m.instrument_tuning_legend()}</legend>
         {#each rows as row (row.id)}
@@ -299,7 +321,8 @@
     font-weight: var(--font-weight-bold);
   }
 
-  .preset {
+  .preset,
+  .count-option {
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -310,12 +333,14 @@
     cursor: pointer;
   }
 
-  .preset:has(input:checked) {
+  .preset:has(input:checked),
+  .count-option:has(input:checked) {
     background: var(--color-surface-raised);
     border-width: calc(var(--border-width) * 2);
   }
 
-  .preset input {
+  .preset input,
+  .count-option input {
     flex: none;
     inline-size: var(--space-5);
     block-size: var(--space-5);

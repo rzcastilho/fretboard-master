@@ -39,7 +39,11 @@ describe('preferences.start', () => {
     const nl = vi.spyOn(notes, 'restoreLabelType');
     const tl = vi.spyOn(triads, 'restoreLabelType');
     preferences.start(s);
-    expect(restore).toHaveBeenCalledWith({ tuning: { kind: 'preset', id: 'AF-3' }, fretCount: 24 });
+    expect(restore).toHaveBeenCalledWith({
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-3' },
+      fretCount: 24
+    });
     expect(pb).toHaveBeenCalledWith({ muted: true, volume: 35 });
     expect(nl).toHaveBeenCalledWith('octave');
     expect(tl).toHaveBeenCalledWith('name');
@@ -55,6 +59,7 @@ describe('preferences.start', () => {
     const restore = vi.spyOn(instrument, 'restore');
     preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-custom'].raw }));
     expect(restore).toHaveBeenCalledWith({
+      stringCount: 6,
       tuning: { kind: 'custom', offsets: [-2, 0, 0, -1, 0, 0] },
       fretCount: 24
     });
@@ -155,7 +160,11 @@ describe('preferences.erase', () => {
     expect(s.data.get('other')).toBe('keep');
     expect(s.calls.set).toBe(writes);
     expect(preferences.lastTool).toBeNull();
-    expect(restore).toHaveBeenCalledWith({ tuning: { kind: 'preset', id: 'AF-1' }, fretCount: 22 });
+    expect(restore).toHaveBeenCalledWith({
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-1' },
+      fretCount: 22
+    });
     expect(pb).toHaveBeenCalledWith({ muted: false, volume: 80 });
     expect(nl).toHaveBeenCalledWith('name');
     expect(tl).toHaveBeenCalledWith('interval');

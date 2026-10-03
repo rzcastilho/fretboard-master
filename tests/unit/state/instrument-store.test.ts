@@ -39,9 +39,9 @@ describe('instrument store (contracts §3)', () => {
     instrument.open();
     expect(instrument.preview).toBe(STANDARD_GUITAR);
     instrument.selectTuning('AF-4');
-    expect(instrument.preview).toBe(presetInstrument('AF-4', 22));
+    expect(instrument.preview).toBe(presetInstrument('AF-4', 6, 22));
     instrument.stepFrets(-1);
-    expect(instrument.preview).toBe(presetInstrument('AF-4', 21));
+    expect(instrument.preview).toBe(presetInstrument('AF-4', 6, 21));
     instrument.setFrets(12);
     expect(instrument.preview?.fretCount).toBe(12);
     instrument.restoreDefault();
@@ -76,10 +76,14 @@ describe('instrument store (contracts §3)', () => {
     instrument.confirm('triads');
     expect(s.stop).toHaveBeenCalledTimes(1);
     expect(s.stop).toHaveBeenCalledWith('instrument');
-    const inst = presetInstrument('AF-4', 22);
+    const inst = presetInstrument('AF-4', 6, 22);
     expect(s.notes).toHaveBeenCalledWith(inst);
     expect(s.triads).toHaveBeenCalledWith(inst);
-    expect(instrument.active).toEqual({ tuning: { kind: 'preset', id: 'AF-4' }, fretCount: 22 });
+    expect(instrument.active).toEqual({
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-4' },
+      fretCount: 22
+    });
     expect(instrument.current).toBe(inst);
     expect(instrument.adjustedIn).toBeNull();
   });
@@ -173,10 +177,14 @@ describe('adjustedIn lifecycle (US4, R-05)', () => {
 describe('instrument.restore (010)', () => {
   it('sets active, applies to Notes/Triads, no notice, no stop', () => {
     const s = spies(true, true);
-    const config = { tuning: { kind: 'preset', id: 'AF-3' }, fretCount: 24 } as const;
+    const config = {
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-3' },
+      fretCount: 24
+    } as const;
     instrument.restore(config);
     expect(instrument.active).toEqual(config);
-    expect(instrument.current).toEqual(presetInstrument('AF-3', 24));
+    expect(instrument.current).toEqual(presetInstrument('AF-3', 6, 24));
     expect(s.notes).toHaveBeenCalledTimes(1);
     expect(s.triads).toHaveBeenCalledTimes(1);
     expect(instrument.adjustedIn).toBeNull();
@@ -387,5 +395,174 @@ describe('instrument store: remembering a custom tuning (011 US5)', () => {
     instrument.stepString(2, 1);
     expect(() => instrument.confirm('notes')).not.toThrow();
     expect(instrument.active.tuning).toEqual({ kind: 'custom', offsets: [0, 0, 0, 0, 1, 0] });
+  });
+});
+
+describe('instrument store: string count (012 US1)', () => {
+  const stored = (s: ReturnType<typeof fakeStorage>) =>
+    JSON.parse(s.data.get(PREFS_KEY) as string) as Record<string, unknown>;
+
+  beforeEach(() => {
+    resetPreferencesForTests();
+  });
+
+  it('stringCount getter follows the active config, and pending while open', () => {
+    expect(instrument.stringCount).toBe(6);
+    instrument.open();
+    expect(instrument.stringCount).toBe(6);
+    instrument.setStringCount(7);
+    expect(instrument.stringCount).toBe(7);
+    expect(instrument.active.stringCount).toBe(6);
+    instrument.cancel();
+    expect(instrument.stringCount).toBe(6);
+  });
+
+  it('setStringCount re-canonicalizes the pending tuning and drives the preview', () => {
+    instrument.open();
+    instrument.setStringCount(7);
+    expect(instrument.panel.open && instrument.panel.pending.tuning).toEqual({
+      kind: 'preset',
+      id: 'AF-21'
+    });
+    expect(instrument.preview?.stringCount).toBe(7);
+    expect(instrument.selectedRadio).toBe('AF-21');
+  });
+
+  it('setStringCount is a no-op while closed, for an invalid n, and for the same count', () => {
+    instrument.setStringCount(7);
+    expect(instrument.panel).toEqual({ open: false });
+    instrument.open();
+    const before = instrument.panel;
+    instrument.setStringCount(8);
+    instrument.setStringCount(6);
+    expect(instrument.panel).toBe(before);
+  });
+
+  it('presets: 11 rows on 6 strings, 12 on 7 with the 7-string spelling', () => {
+    instrument.open();
+    expect(instrument.presets).toHaveLength(11);
+    expect(instrument.presets[0].id).toBe('AF-1');
+    expect(instrument.presets[0].strings).toHaveLength(6);
+    instrument.setStringCount(7);
+    expect(instrument.presets.map((p) => p.id)).toEqual([
+      'AF-21',
+      'AF-22',
+      'AF-23',
+      'AF-3',
+      'AF-4',
+      'AF-5',
+      'AF-6',
+      'AF-7',
+      'AF-8',
+      'AF-9',
+      'AF-10',
+      'AF-11'
+    ]);
+    expect(instrument.presets.every((p) => p.strings.length === 7)).toBe(true);
+    expect(instrument.presets[0].strings[0]).toMatchObject({ letter: 'B', octave: 1 });
+  });
+
+  it('presets is empty while the panel is closed', () => {
+    expect(instrument.presets).toEqual([]);
+  });
+
+  it('rows are ordered [count … 1] and include string 7 on 7 strings', () => {
+    instrument.open();
+    instrument.chooseCustom();
+    expect(instrument.rows.map((r) => r.string)).toEqual([6, 5, 4, 3, 2, 1]);
+    instrument.setStringCount(7);
+    expect(instrument.rows.map((r) => r.string)).toEqual([7, 6, 5, 4, 3, 2, 1]);
+    expect(instrument.rows[0].pitch).toMatchObject({ letter: 'B', accidental: 0, octave: 1 });
+  });
+
+  it('string 7 limits: lower disabled at E1, raise disabled at D♯2', () => {
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.chooseCustom();
+    expect(instrument.rows[0]).toMatchObject({ string: 7, canLower: true, canRaise: true });
+    for (let i = 0; i < 7; i++) expect(instrument.stepString(7, -1)).toBe(true);
+    expect(instrument.rows[0].canLower).toBe(false);
+    expect(instrument.stepString(7, -1)).toBe(false);
+    for (let i = 0; i < 11; i++) expect(instrument.stepString(7, 1)).toBe(true);
+    expect(instrument.rows[0].canRaise).toBe(false);
+    expect(instrument.stepString(7, 1)).toBe(false);
+  });
+
+  it('string 7 plays through the preview instrument', () => {
+    const n = vi.spyOn(playback, 'note').mockReturnValue([]);
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.playString(7);
+    expect(n).toHaveBeenCalledWith({ string: 7, fret: 0 }, instrument.preview);
+  });
+
+  it('confirm applies 7 strings and remembers the count with the canonical preset', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.confirm('notes');
+    expect(instrument.active).toEqual({
+      stringCount: 7,
+      tuning: { kind: 'preset', id: 'AF-21' },
+      fretCount: 22
+    });
+    expect(instrument.current.stringCount).toBe(7);
+    const r = stored(s);
+    expect(r.strings).toBe(7);
+    expect(r.tuning).toBe('AF-21');
+    expect(r).not.toHaveProperty('customTuning');
+  });
+
+  it('confirm of an unmatched 7-string custom writes the AF-21 placeholder and 7 offsets', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.chooseCustom();
+    for (let i = 0; i < 3; i++) instrument.stepString(7, -1);
+    instrument.confirm('notes');
+    const r = stored(s);
+    expect(r.strings).toBe(7);
+    expect(r.tuning).toBe('AF-21');
+    expect(r.customTuning).toEqual([-3, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it('confirming back to 6 strings drops the strings key', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.confirm('notes');
+    instrument.open();
+    instrument.setStringCount(6);
+    instrument.confirm('notes');
+    expect(stored(s)).not.toHaveProperty('strings');
+    expect(stored(s).tuning).toBe('AF-1');
+  });
+
+  it('restore(config) with a count applies it without notice, stop or write', () => {
+    const s = spies();
+    const config = {
+      stringCount: 7,
+      tuning: { kind: 'preset', id: 'AF-23' },
+      fretCount: 24
+    } as const;
+    instrument.restore(config);
+    expect(instrument.active).toEqual(config);
+    expect(instrument.current).toEqual(presetInstrument('AF-23', 7, 24));
+    expect(s.notes).toHaveBeenCalledTimes(1);
+    expect(s.stop).not.toHaveBeenCalled();
+    expect(instrument.adjustedIn).toBeNull();
+  });
+
+  it('close without confirm discards the pending count (EC-2.7)', () => {
+    const s = spies();
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.cancel();
+    expect(instrument.active).toEqual(DEFAULT_CONFIG);
+    expect(instrument.current).toBe(STANDARD_GUITAR);
+    expect(s.notes).not.toHaveBeenCalled();
   });
 });

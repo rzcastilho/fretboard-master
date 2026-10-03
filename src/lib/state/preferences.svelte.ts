@@ -31,7 +31,11 @@ export const preferences = {
     if (session) return;
     session = startSession(storage);
     const p = session.current;
-    instrument.restore({ tuning: tuningOfPreferences(p), fretCount: p.fretCount });
+    instrument.restore({
+      stringCount: p.stringCount,
+      tuning: tuningOfPreferences(p),
+      fretCount: p.fretCount
+    });
     playback.restore({ muted: p.muted, volume: p.volume });
     notes.restoreLabelType(p.labels.notes);
     triads.restoreLabelType(p.labels.triads);
@@ -63,7 +67,11 @@ export const preferences = {
     session?.erase();
     const d = session?.current;
     if (d) {
-      instrument.restore({ tuning: tuningOfPreferences(d), fretCount: d.fretCount });
+      instrument.restore({
+        stringCount: d.stringCount,
+        tuning: tuningOfPreferences(d),
+        fretCount: d.fretCount
+      });
       playback.restore({ muted: d.muted, volume: d.volume });
       notes.restoreLabelType(d.labels.notes);
       triads.restoreLabelType(d.labels.triads);

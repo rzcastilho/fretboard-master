@@ -12,7 +12,10 @@ const NAMES: Readonly<Record<TuningId, () => string>> = {
   'AF-8': () => m.tuning_af8(),
   'AF-9': () => m.tuning_af9(),
   'AF-10': () => m.tuning_af10(),
-  'AF-11': () => m.tuning_af11()
+  'AF-11': () => m.tuning_af11(),
+  'AF-21': () => m.tuning_af21(),
+  'AF-22': () => m.tuning_af22(),
+  'AF-23': () => m.tuning_af23()
 };
 
 /** Localized preset name. */

@@ -13,6 +13,8 @@ import type { ToolId } from '$lib/shell/tools';
  * file does not depend on the codec it exercises.
  */
 export interface ExpectedPreferences {
+  /** String count (012): 6 or 7; absent/invalid in a record → 6. */
+  readonly stringCount: 6 | 7;
   readonly tuningId: TuningId;
   /** Parsed `customTuning` field (011); null when absent or invalid. */
   readonly customTuning: readonly number[] | null;
@@ -38,6 +40,7 @@ export interface PrefsFixture {
 }
 
 const defaults: ExpectedPreferences = {
+  stringCount: 6,
   tuningId: 'AF-1',
   customTuning: null,
   fretCount: 22,
@@ -66,6 +69,7 @@ function fixture(
 
 export const FIXTURES: readonly PrefsFixture[] = [
   fixture('v1-full', {
+    stringCount: 6,
     tuningId: 'AF-3',
     customTuning: null,
     fretCount: 24,
@@ -98,7 +102,34 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('custom-wrong-length', { ...defaults, tuningId: 'AF-3', fretCount: 20 }),
   fixture('custom-out-of-range', { ...defaults, muted: true }),
   fixture('custom-non-integer', { ...defaults, tuningId: 'AF-2' }),
-  fixture('custom-non-array', { ...defaults, volume: 50 })
+  fixture('custom-non-array', { ...defaults, volume: 50 }),
+  // 012 seven-strings (contracts/storage-format.md)
+  fixture('v1-seven-standard', {
+    ...defaults,
+    stringCount: 7,
+    tuningId: 'AF-21',
+    fretCount: 24
+  }),
+  fixture('v1-seven-drop-a', { ...defaults, stringCount: 7, tuningId: 'AF-23' }),
+  fixture('v1-seven-drop-d', { ...defaults, stringCount: 7, tuningId: 'AF-4' }),
+  fixture(
+    'v1-seven-custom',
+    { ...defaults, stringCount: 7, tuningId: 'AF-21', customTuning: [-3, 0, 0, 0, 0, 0, 0] },
+    { kind: 'custom', offsets: [-3, 0, 0, 0, 0, 0, 0] }
+  ),
+  fixture(
+    'v1-seven-custom-drop-a',
+    { ...defaults, stringCount: 7, tuningId: 'AF-21', customTuning: [-2, 0, 0, 0, 0, 0, 0] },
+    { kind: 'preset', id: 'AF-23' }
+  ),
+  fixture('seven-af1', { ...defaults, stringCount: 7, tuningId: 'AF-21' }),
+  fixture('seven-af2', { ...defaults, stringCount: 7, tuningId: 'AF-22', fretCount: 20 }),
+  fixture('six-af21', { ...defaults, stringCount: 6, tuningId: 'AF-1', fretCount: 18 }),
+  fixture('strings-absent-af23', { ...defaults, tuningId: 'AF-1' }),
+  fixture('strings-invalid', { ...defaults, tuningId: 'AF-4', muted: true }),
+  fixture('strings-string', { ...defaults, tuningId: 'AF-1' }),
+  fixture('seven-custom-six-long', { ...defaults, stringCount: 7, tuningId: 'AF-23' }),
+  fixture('six-custom-seven-long', { ...defaults, tuningId: 'AF-3' })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

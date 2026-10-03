@@ -19,13 +19,18 @@ import {
   restoreDefault,
   selectTuning,
   setFrets,
+  setStringCount,
   stepFrets,
   stepString,
   type InstrumentConfig,
   type PanelState
 } from '../../../src/lib/state/instrument-config';
 
-const drop: InstrumentConfig = { tuning: { kind: 'preset', id: 'AF-4' }, fretCount: 20 };
+const drop: InstrumentConfig = {
+  stringCount: 6,
+  tuning: { kind: 'preset', id: 'AF-4' },
+  fretCount: 20
+};
 const open = (c: InstrumentConfig = DEFAULT_CONFIG): PanelState => openPanel(CLOSED, c);
 const pendingOf = (p: PanelState): InstrumentConfig => {
   if (!p.open) throw new Error('closed');
@@ -33,6 +38,7 @@ const pendingOf = (p: PanelState): InstrumentConfig => {
 };
 
 const customCfg: InstrumentConfig = {
+  stringCount: 6,
   tuning: tuningFromOffsets([1, 0, 0, 0, 0, 0]),
   fretCount: 20
 };
@@ -63,20 +69,24 @@ describe('customOpen transitions (011 data-model §3)', () => {
   });
 
   it('instrumentOf uses tuningInstrument', () => {
-    expect(instrumentOf(customCfg)).toBe(tuningInstrument(customCfg.tuning, 20));
+    expect(instrumentOf(customCfg)).toBe(tuningInstrument(customCfg.tuning, 6, 20));
   });
 });
 
 describe('instrument-config transitions (data-model §3)', () => {
   it('DEFAULT_CONFIG and CLOSED', () => {
-    expect(DEFAULT_CONFIG).toEqual({ tuning: { kind: 'preset', id: 'AF-1' }, fretCount: 22 });
+    expect(DEFAULT_CONFIG).toEqual({
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-1' },
+      fretCount: 22
+    });
     expect(CLOSED).toEqual({ open: false });
   });
 
   it('equalsConfig / instrumentOf', () => {
     expect(equalsConfig(drop, { ...drop })).toBe(true);
     expect(equalsConfig(drop, DEFAULT_CONFIG)).toBe(false);
-    expect(instrumentOf(drop)).toBe(presetInstrument('AF-4', 20));
+    expect(instrumentOf(drop)).toBe(presetInstrument('AF-4', 6, 20));
   });
 
   it('openPanel: closed → open with pending = active; open → same object', () => {
@@ -109,6 +119,7 @@ describe('instrument-config transitions (data-model §3)', () => {
   it('restoreDefault', () => {
     const p = open(drop);
     expect(pendingOf(restoreDefault(p))).toEqual({
+      stringCount: 6,
       tuning: { kind: 'preset', id: 'AF-1' },
       fretCount: 22
     });
@@ -128,7 +139,11 @@ describe('instrument-config transitions (data-model §3)', () => {
     const p = selectTuning(open(), 'AF-8');
     const r = confirmPanel(p, DEFAULT_CONFIG);
     expect(r.panel).toEqual({ open: false });
-    expect(r.next).toEqual({ tuning: { kind: 'preset', id: 'AF-8' }, fretCount: 22 });
+    expect(r.next).toEqual({
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-8' },
+      fretCount: 22
+    });
     expect(r.changed).toBe(true);
     const same = confirmPanel(open(drop), drop);
     expect(same.changed).toBe(false);
@@ -172,13 +187,17 @@ describe('instrument-config transitions (data-model §3)', () => {
 
 describe('US1 custom transitions (011 data-model §3)', () => {
   const strings = [6, 5, 4, 3, 2, 1] as const;
-  const offsetsOf = (p: PanelState) => offsetsOfTuning(pendingOf(p).tuning);
+  const offsetsOf = (p: PanelState) => offsetsOfTuning(pendingOf(p).tuning, 6);
 
   it('chooseCustom sets customOpen and keeps pending pitches (Standard and Half step down)', () => {
     const s = chooseCustom(open());
     expect(s.open && s.customOpen).toBe(true);
     expect(pendingOf(s)).toEqual(DEFAULT_CONFIG);
-    const half: InstrumentConfig = { tuning: { kind: 'preset', id: 'AF-2' }, fretCount: 22 };
+    const half: InstrumentConfig = {
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-2' },
+      fretCount: 22
+    };
     const h = chooseCustom(open(half));
     expect(h.open && h.customOpen).toBe(true);
     expect(pendingOf(h).tuning).toEqual({ kind: 'preset', id: 'AF-2' });
@@ -234,7 +253,7 @@ describe('US1 custom transitions (011 data-model §3)', () => {
     expect(s.open && s.customOpen).toBe(false);
     expect(pendingOf(s).tuning).toEqual({ kind: 'preset', id: 'AF-3' });
     s = chooseCustom(s);
-    expect(offsetsOf(s)).toEqual(presetOffsets('AF-3'));
+    expect(offsetsOf(s)).toEqual(presetOffsets('AF-3', 6));
   });
 
   it('cancelPanel discards; confirmPanel changed is false for identical pitches', () => {
@@ -244,10 +263,124 @@ describe('US1 custom transitions (011 data-model §3)', () => {
     const back = stepString(s, 6, 1);
     expect(confirmPanel(back, DEFAULT_CONFIG).changed).toBe(false);
     const active: InstrumentConfig = {
+      stringCount: 6,
       tuning: tuningFromOffsets([1, 0, 0, 0, 0, 0]),
       fretCount: 22
     };
     const same = stepString(chooseCustom(open(DEFAULT_CONFIG)), 6, 1);
     expect(confirmPanel(same, active).changed).toBe(false);
+  });
+});
+
+describe('string count transitions (012 data-model §4)', () => {
+  const cfg = (
+    stringCount: 6 | 7,
+    tuning: InstrumentConfig['tuning'],
+    fretCount = 22
+  ): InstrumentConfig => ({ stringCount, tuning, fretCount });
+  const preset = (id: 'AF-1') => ({ kind: 'preset' as const, id });
+  const to = (c: InstrumentConfig, n: number): InstrumentConfig =>
+    pendingOf(setStringCount(open(c), n));
+
+  it('DEFAULT_CONFIG is 6 strings, AF-1, 22 frets', () => {
+    expect(DEFAULT_CONFIG).toEqual({ stringCount: 6, tuning: preset('AF-1'), fretCount: 22 });
+  });
+
+  it('6/AF-1 → 7/AF-21', () => {
+    const r = to(DEFAULT_CONFIG, 7);
+    expect(r.stringCount).toBe(7);
+    expect(r.tuning).toEqual({ kind: 'preset', id: 'AF-21' });
+  });
+
+  it('6/AF-2 → 7/AF-22', () => {
+    const r = to(cfg(6, { kind: 'preset', id: 'AF-2' }), 7);
+    expect(r.tuning).toEqual({ kind: 'preset', id: 'AF-22' });
+  });
+
+  it('6/AF-4 → 7/AF-4', () => {
+    const r = to(cfg(6, { kind: 'preset', id: 'AF-4' }), 7);
+    expect(r.tuning).toEqual({ kind: 'preset', id: 'AF-4' });
+    expect(r.stringCount).toBe(7);
+  });
+
+  it('6/custom → 7/custom with string 7 copying string 6', () => {
+    const r = to(cfg(6, tuningFromOffsets([-2, 0, 0, -1, 0, 0])), 7);
+    expect(r.tuning).toEqual({ kind: 'custom', offsets: [-2, -2, 0, 0, -1, 0, 0] });
+  });
+
+  it('7/AF-21 → 6/AF-1; 7/AF-23 → 6/AF-1; 7/AF-22 → 6/AF-2', () => {
+    expect(to(cfg(7, { kind: 'preset', id: 'AF-21' }), 6).tuning).toEqual(preset('AF-1'));
+    expect(to(cfg(7, { kind: 'preset', id: 'AF-23' }), 6).tuning).toEqual(preset('AF-1'));
+    expect(to(cfg(7, { kind: 'preset', id: 'AF-22' }), 6).tuning).toEqual({
+      kind: 'preset',
+      id: 'AF-2'
+    });
+    expect(to(cfg(7, { kind: 'preset', id: 'AF-21' }), 6).stringCount).toBe(6);
+  });
+
+  it('7/AF-21 custom open: lowering string 7 twice reaches AF-23', () => {
+    let p = chooseCustom(open(cfg(7, { kind: 'preset', id: 'AF-21' })));
+    p = stepString(p, 7, -1);
+    expect(pendingOf(p).tuning.kind).toBe('custom');
+    p = stepString(p, 7, -1);
+    expect(pendingOf(p).tuning).toEqual({ kind: 'preset', id: 'AF-23' });
+  });
+
+  it('7/AF-23 custom open: lowering string 7 once gives custom [-3,0,…]', () => {
+    let p = chooseCustom(open(cfg(7, { kind: 'preset', id: 'AF-23' })));
+    p = stepString(p, 7, -1);
+    expect(pendingOf(p).tuning).toEqual({ kind: 'custom', offsets: [-3, 0, 0, 0, 0, 0, 0] });
+  });
+
+  it('Restore default → 6/AF-1/22 frets', () => {
+    const p = restoreDefault(open(cfg(7, { kind: 'preset', id: 'AF-23' }, 15)));
+    expect(pendingOf(p)).toEqual(DEFAULT_CONFIG);
+  });
+
+  it('setStringCount returns the same object when closed, invalid or same count', () => {
+    expect(setStringCount(CLOSED, 7)).toBe(CLOSED);
+    const p = open();
+    expect(setStringCount(p, 6)).toBe(p);
+    expect(setStringCount(p, 8)).toBe(p);
+    expect(setStringCount(p, 5)).toBe(p);
+    expect(setStringCount(p, 6.5)).toBe(p);
+    expect(setStringCount(p, NaN)).toBe(p);
+  });
+
+  it('fretCount and customOpen are preserved', () => {
+    const p = chooseCustom(open(cfg(6, tuningFromOffsets([1, 0, 0, 0, 0, 0]), 17)));
+    const q = setStringCount(p, 7);
+    expect(pendingOf(q).fretCount).toBe(17);
+    expect(q.open && q.customOpen).toBe(true);
+  });
+
+  it('selectTuning refuses ids of the other count', () => {
+    const six = open();
+    expect(selectTuning(six, 'AF-21')).toBe(six);
+    const seven = open(cfg(7, { kind: 'preset', id: 'AF-21' }));
+    expect(selectTuning(seven, 'AF-1')).toBe(seven);
+    expect(pendingOf(selectTuning(seven, 'AF-23')).tuning).toEqual({
+      kind: 'preset',
+      id: 'AF-23'
+    });
+  });
+
+  it('stepString refuses string 7 on 6 strings', () => {
+    const p = chooseCustom(open());
+    expect(stepString(p, 7, -1)).toBe(p);
+  });
+
+  it('equalsConfig compares stringCount; instrumentOf carries it', () => {
+    const a = cfg(7, { kind: 'preset', id: 'AF-4' });
+    const b = cfg(6, { kind: 'preset', id: 'AF-4' });
+    expect(equalsConfig(a, b)).toBe(false);
+    expect(equalsConfig(a, { ...a })).toBe(true);
+    expect(instrumentOf(a).stringCount).toBe(7);
+    expect(instrumentOf(b)).toBe(presetInstrument('AF-4', 6, 22));
+  });
+
+  it('confirm reports a count change as changed', () => {
+    const p = setStringCount(open(), 7);
+    expect(confirmPanel(p, DEFAULT_CONFIG).changed).toBe(true);
   });
 });

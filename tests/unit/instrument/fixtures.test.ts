@@ -28,10 +28,10 @@ describe('instrument fixtures (contracts/test-hooks.md)', () => {
   });
 
   it('AF-4 and AF-7 are the presets at 22 frets (R-13), values unchanged', () => {
-    expect(AF_4).toBe(presetInstrument('AF-4', 22));
-    expect(AF_7).toBe(presetInstrument('AF-7', 22));
-    expect(AF_4.openStrings).toEqual(presetInstrument('AF-4', 22).openStrings);
-    expect(AF_7.openStrings).toEqual(presetInstrument('AF-7', 22).openStrings);
+    expect(AF_4).toBe(presetInstrument('AF-4', 6, 22));
+    expect(AF_7).toBe(presetInstrument('AF-7', 6, 22));
+    expect(AF_4.openStrings).toEqual(presetInstrument('AF-4', 6, 22).openStrings);
+    expect(AF_7.openStrings).toEqual(presetInstrument('AF-7', 6, 22).openStrings);
     expect(names(AF_4)).toEqual(['E4', 'B3', 'G3', 'D3', 'A2', 'D2']);
     expect(names(AF_7)).toEqual(['D4', 'A3', 'G3', 'D3', 'A2', 'D2']);
   });
@@ -83,8 +83,7 @@ describe('instrument fixtures (contracts/test-hooks.md)', () => {
     resetNotesForTests();
     notes.toggleNote(2);
     notes.useInstrument(AF_21);
-    expect(notes.state.activeStrings).toEqual([1, 2, 3, 4, 5, 6]);
-    notes.toggleString(7);
+    // 012 data-model §6: every string on → string 7 turns on with the new count
     expect(notes.state.activeStrings).toEqual([1, 2, 3, 4, 5, 6, 7]);
     notes.useInstrument(STANDARD_GUITAR);
     expect(notes.state.activeStrings).toEqual([1, 2, 3, 4, 5, 6]);

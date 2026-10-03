@@ -76,6 +76,46 @@ describe('T6 shape invariants (NFR-9.3)', () => {
   });
 });
 
+describe('T6b shape invariants on random 7-string tunings (012, NFR-9.3)', () => {
+  const sevenStrings = fc
+    .array(fc.integer({ min: 24, max: 70 }), { minLength: 7, maxLength: 7 })
+    .chain((pitches) => fc.tuple(fc.constant(pitches), fc.integer({ min: 3, max: 7 })));
+
+  it('holds on any three adjacent strings that rise strictly', () => {
+    fc.assert(
+      fc.property(sevenStrings, root, quality, inversion, ([strings1to7, set], pc, q, inv) => {
+        // strings1to7 is indexed by string number − 1; the set's bass string is `set`.
+        const open: readonly [Pitch, Pitch, Pitch] = [
+          strings1to7[set - 1],
+          strings1to7[set - 2],
+          strings1to7[set - 3]
+        ];
+        const t = spellTriad(SPELL_FOR_PC[pc], q);
+        const r = triadShape(open, t, inv);
+        if (!(open[0] < open[1] && open[1] < open[2])) {
+          expect(r).toEqual({ kind: 'does-not-close' });
+          return;
+        }
+        expect(r.kind).toBe('shape');
+        if (r.kind !== 'shape') return;
+        const sounding = r.frets.map((f, i) => open[i] + f);
+        expect(r.frets.every((f) => Number.isInteger(f) && f >= 0)).toBe(true);
+        expect(sounding[1]).toBeGreaterThan(sounding[0]);
+        expect(sounding[2]).toBeGreaterThan(sounding[1]);
+        expect(sounding[2] - sounding[0]).toBeLessThan(12);
+        const order = INVERSION_ORDER[inv];
+        const pcOf = {
+          root: t.pitchClasses[0],
+          third: t.pitchClasses[1],
+          fifth: t.pitchClasses[2]
+        };
+        sounding.forEach((p, i) => expect(pitchClass(p)).toBe(pcOf[order[i]]));
+      }),
+      RUNS
+    );
+  });
+});
+
 describe('T7 non-rising open pitches', () => {
   it('never close', () => {
     fc.assert(

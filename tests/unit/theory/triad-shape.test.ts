@@ -119,3 +119,69 @@ describe('T9 span and does-not-close', () => {
     expect(triadShape([50, 59, 55], t, 'second')).toEqual({ kind: 'does-not-close' });
   });
 });
+
+/** TM-5.5 (012): root C on 7-6-5 in AF-21 (B1 E2 A2 = 35 40 45), by quality × inversion. */
+const SET_765_AF21: Record<Quality, Record<Inversion, string>> = {
+  major: { root: '13-12-10', first: '5-3-3', second: '8-8-7' },
+  minor: { root: '13-11-10', first: '4-3-3', second: '8-8-6' },
+  diminished: { root: '13-11-9', first: '4-2-3', second: '7-8-6' },
+  augmented: { root: '13-12-11', first: '5-4-3', second: '9-8-7' }
+};
+/** Drop A: string 7 lowered to A1 (33). Only the bass fret changes, by +2. */
+const SET_765_DROP_A: Record<Quality, Record<Inversion, string>> = {
+  major: { root: '15-12-10', first: '7-3-3', second: '10-8-7' },
+  minor: { root: '15-11-10', first: '6-3-3', second: '10-8-6' },
+  diminished: { root: '15-11-9', first: '6-2-3', second: '9-8-6' },
+  augmented: { root: '15-12-11', first: '7-4-3', second: '11-8-7' }
+};
+
+describe('TM-5.5 set 7-6-5 on 7-string standard (12 shapes, root C)', () => {
+  for (const q of QUALITIES) {
+    for (const inv of INVERSIONS) {
+      it(`C ${q} ${inv}`, () => {
+        const r = triadShape([35, 40, 45], spellTriad(C, q), inv);
+        expect(r.kind).toBe('shape');
+        if (r.kind === 'shape') {
+          expect(r.frets.join('-')).toBe(SET_765_AF21[q][inv]);
+          expect(r.functions).toEqual(INVERSION_ORDER[inv]);
+        }
+      });
+    }
+  }
+  it('C major root is 13-12-10 and E minor root is 5-3-2 (TM-9 view 13)', () => {
+    expect(triadShape([35, 40, 45], spellTriad(C, 'major'), 'root')).toMatchObject({
+      frets: [13, 12, 10]
+    });
+    const E = { letter: 'E', accidental: 0 } as const;
+    expect(triadShape([35, 40, 45], spellTriad(E, 'minor'), 'root')).toMatchObject({
+      kind: 'shape',
+      frets: [5, 3, 2]
+    });
+  });
+});
+
+describe('Drop A 7-6-5 is computed from the real pitches', () => {
+  for (const q of QUALITIES) {
+    for (const inv of INVERSIONS) {
+      it(`C ${q} ${inv}`, () => {
+        const r = triadShape([33, 40, 45], spellTriad(C, q), inv);
+        expect(r.kind === 'shape' && r.frets.join('-')).toBe(SET_765_DROP_A[q][inv]);
+      });
+    }
+  }
+});
+
+describe('EC-5.1 7-string tuning where the triad cannot close', () => {
+  it('string 7 equal to string 6 does not close on 7-6-5', () => {
+    for (const inv of INVERSIONS) {
+      expect(triadShape([40, 40, 45], spellTriad(C, 'major'), inv)).toEqual({
+        kind: 'does-not-close'
+      });
+    }
+  });
+  it('string 7 above string 6 does not close', () => {
+    expect(triadShape([42, 40, 45], spellTriad(C, 'minor'), 'root')).toEqual({
+      kind: 'does-not-close'
+    });
+  });
+});

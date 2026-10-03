@@ -23,6 +23,7 @@ describe('constants and defaults (FR-018)', () => {
     expect(MAX_RAW_LENGTH).toBe(16_384);
     expect(Object.isFrozen(DEFAULT_PREFERENCES)).toBe(true);
     expect(DEFAULT_PREFERENCES).toEqual({
+      stringCount: 6,
       tuningId: 'AF-1',
       customTuning: null,
       fretCount: 22,
@@ -151,6 +152,7 @@ describe('serializePreferences', () => {
   });
   it('writes exact key order and volume / 100', () => {
     const p: Preferences = {
+      stringCount: 6,
       tuningId: 'AF-3',
       customTuning: null,
       fretCount: 24,
@@ -170,12 +172,102 @@ describe('serializePreferences', () => {
   });
 });
 
-const arbOffsets: fc.Arbitrary<Offsets> = fc
-  .tuple(...Array.from({ length: 6 }, () => fc.integer({ min: OFFSET_MIN, max: OFFSET_MAX })))
-  .map((a) => a as unknown as Offsets);
+describe('seven strings: writer rules 1–4 (012)', () => {
+  it('rule 1: 6 strings writes no strings key, byte-identical to slice 011', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('strings');
+  });
+  it('rule 2: 7 strings + preset writes strings then tuning, no customTuning', () => {
+    const p: Preferences = { ...DEFAULT_PREFERENCES, stringCount: 7, tuningId: 'AF-23' };
+    expect(serializePreferences(p)).toBe(
+      '{"version":1,"strings":7,"tuning":"AF-23","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+  });
+  it('rule 3: 7 strings + unmatched custom writes AF-21 placeholder and 7 offsets', () => {
+    const p: Preferences = {
+      ...DEFAULT_PREFERENCES,
+      stringCount: 7,
+      tuningId: 'AF-21',
+      customTuning: [-3, 0, 0, 0, 0, 0, 0]
+    };
+    expect(serializePreferences(p)).toBe(
+      '{"version":1,"strings":7,"tuning":"AF-21","customTuning":[-3,0,0,0,0,0,0],"frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+  });
+  it('field order is version, strings, tuning, customTuning, frets, muted, volume, lastTool, labels', () => {
+    const p: Preferences = {
+      stringCount: 7,
+      tuningId: 'AF-21',
+      customTuning: [-3, 0, 0, 0, 0, 0, 0],
+      fretCount: 24,
+      muted: true,
+      volume: 35,
+      lastTool: 'triads',
+      labels: { notes: 'octave', triads: 'name' }
+    };
+    expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
+      'version',
+      'strings',
+      'tuning',
+      'customTuning',
+      'frets',
+      'muted',
+      'volume',
+      'lastTool',
+      'labels'
+    ]);
+  });
+  it('rule 4: erase is unchanged (no strings in defaults)', () => {
+    expect(parsePreferences(null).stringCount).toBe(6);
+  });
+});
+
+describe('seven strings: reader rules 10–14 (012)', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+  it.each([8, 6.5, '7', null, true, [], 0, -7])('rule 10: strings %j → 6', (bad) => {
+    expect(p({ strings: bad, tuning: 'AF-4' }).stringCount).toBe(6);
+  });
+  it('rule 11: 7 normalizes AF-1/AF-2; 6 normalizes AF-21/22/23 to AF-1', () => {
+    expect(p({ strings: 7, tuning: 'AF-1' }).tuningId).toBe('AF-21');
+    expect(p({ strings: 7, tuning: 'AF-2' }).tuningId).toBe('AF-22');
+    expect(p({ strings: 6, tuning: 'AF-22' }).tuningId).toBe('AF-1');
+    expect(p({ tuning: 'AF-23' }).tuningId).toBe('AF-1');
+    expect(p({ strings: 7, tuning: 'nope' }).tuningId).toBe('AF-21');
+  });
+  it('rule 12: customTuning valid only when length equals the read count', () => {
+    expect(p({ strings: 7, customTuning: [0, 0, 0, 0, 0, 0] }).customTuning).toBeNull();
+    expect(p({ customTuning: [0, 0, 0, 0, 0, 0, 0] }).customTuning).toBeNull();
+    expect(p({ strings: 7, customTuning: [0, 0, 0, 0, 0, 0, 5] }).customTuning).toBeNull();
+  });
+  it('rule 13: a valid customTuning is canonicalized against the count presets', () => {
+    expect(
+      tuningOfPreferences(p({ strings: 7, tuning: 'AF-21', customTuning: [-2, 0, 0, 0, 0, 0, 0] }))
+    ).toEqual({ kind: 'preset', id: 'AF-23' });
+    expect(
+      tuningOfPreferences(p({ strings: 7, customTuning: [-1, -1, -1, -1, -1, -1, -1] }))
+    ).toEqual({ kind: 'preset', id: 'AF-22' });
+  });
+  it('rule 14: records without strings load as 6 strings', () => {
+    expect(p({ tuning: 'AF-3', frets: 20 }).stringCount).toBe(6);
+  });
+});
+
+const arbOffsetsOf = (n: 6 | 7): fc.Arbitrary<Offsets> =>
+  fc
+    .tuple(...Array.from({ length: n }, () => fc.integer({ min: OFFSET_MIN, max: OFFSET_MAX })))
+    .map((a) => a as unknown as Offsets);
+
+const arbOffsets: fc.Arbitrary<Offsets> = arbOffsetsOf(6);
 
 const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
-  tuningId: fc.constantFrom(...TUNING_PRESETS.map((t) => t.id)),
+  stringCount: fc.constant(6 as const),
+  tuningId: fc.constantFrom(
+    ...TUNING_PRESETS.map((t) => t.id).filter(
+      (id) => id !== 'AF-21' && id !== 'AF-22' && id !== 'AF-23'
+    )
+  ),
   customTuning: fc.option(arbOffsets, { nil: null }),
   fretCount: fc.integer({ min: 12, max: 24 }),
   muted: fc.boolean(),
@@ -189,6 +281,7 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
 
 function isValid(p: Preferences): boolean {
   return (
+    (p.stringCount === 6 || p.stringCount === 7) &&
     TUNING_PRESETS.some((t) => t.id === p.tuningId) &&
     Number.isInteger(p.fretCount) &&
     p.fretCount >= 12 &&
@@ -228,6 +321,31 @@ describe('properties', () => {
       })
     );
   });
+  it.each([6, 7] as const)(
+    'serialize → parse round-trips the count and Tuning of every valid %i-string Offsets',
+    (count) => {
+      fc.assert(
+        fc.property(arbOffsetsOf(count), (o) => {
+          const t = tuningFromOffsets(o);
+          const prefs: Preferences =
+            t.kind === 'preset'
+              ? { ...DEFAULT_PREFERENCES, stringCount: count, tuningId: t.id }
+              : {
+                  ...DEFAULT_PREFERENCES,
+                  stringCount: count,
+                  tuningId: count === 7 ? 'AF-21' : 'AF-1',
+                  customTuning: t.offsets
+                };
+          const raw = serializePreferences(prefs);
+          if (count === 6) expect(raw).not.toContain('"strings"');
+          else expect(raw).toContain('"strings":7');
+          const back = parsePreferences(raw);
+          expect(back.stringCount).toBe(count);
+          expect(tuningOfPreferences(back)).toEqual(t);
+        })
+      );
+    }
+  );
   it('round-trips every valid Preferences', () => {
     fc.assert(
       fc.property(arbPrefs, (p) => {

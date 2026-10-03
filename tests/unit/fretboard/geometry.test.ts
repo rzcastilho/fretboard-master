@@ -182,13 +182,13 @@ describe('visibleColumnCount', () => {
 });
 
 describe('preview layout', () => {
-  const wide = presetInstrument('AF-1', 24);
+  const wide = presetInstrument('AF-1', 6, 24);
   const l = layoutFretboard(wide, DEFAULT_METRICS, 500, 'preview');
 
   it('draws every pending fret (24 is not capped at the thumbnail 12)', () => {
     expect(l.columns).toHaveLength(25);
     expect(
-      layoutFretboard(presetInstrument('AF-1', 12), DEFAULT_METRICS, 500, 'preview').columns
+      layoutFretboard(presetInstrument('AF-1', 6, 12), DEFAULT_METRICS, 500, 'preview').columns
     ).toHaveLength(13);
   });
 
@@ -202,7 +202,12 @@ describe('preview layout', () => {
 });
 
 describe('trailingEdgeScroll', () => {
-  const layout = layoutFretboard(presetInstrument('AF-1', 12), DEFAULT_METRICS, 0, 'interactive');
+  const layout = layoutFretboard(
+    presetInstrument('AF-1', 6, 12),
+    DEFAULT_METRICS,
+    0,
+    'interactive'
+  );
 
   it('puts the last fret at the trailing edge', () => {
     const vw = 360;

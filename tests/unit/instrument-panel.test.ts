@@ -28,6 +28,12 @@ beforeEach(() => {
   pageState.value = {};
 });
 
+/** Checked radio of the Tuning group (the Strings group has its own checked radio). */
+const checkedTuning = () =>
+  within(screen.getByRole('group', { name: 'Tuning' }))
+    .getAllByRole('radio')
+    .find((r) => (r as HTMLInputElement).checked);
+
 const open = async () => {
   const utils = render(InstrumentPanel);
   instrument.open();
@@ -71,7 +77,7 @@ describe('InstrumentPanel (tuning radio group)', () => {
 
   it('checks the pending tuning and focuses it on open', async () => {
     await open();
-    const standard = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    const standard = checkedTuning();
     expect(standard?.getAttribute('value')).toBe('AF-1');
     expect(document.activeElement).toBe(standard);
   });
@@ -142,7 +148,7 @@ describe('InstrumentPanel (tuning radio group)', () => {
 describe('InstrumentPanel (fret count)', () => {
   it('opens with Standard checked, 6 strings and 22 frets (US2-3)', async () => {
     const { container } = await open();
-    const standard = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    const standard = checkedTuning();
     expect(standard?.getAttribute('value')).toBe('AF-1');
     expect(screen.getByRole('spinbutton', { name: 'Frets' }).getAttribute('aria-valuenow')).toBe(
       '22'
@@ -230,7 +236,7 @@ describe('InstrumentPanel (cancel and restore)', () => {
     instrument.open();
     await Promise.resolve();
     await Promise.resolve();
-    const checked = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    const checked = checkedTuning();
     expect(checked?.getAttribute('value')).toBe('AF-4');
   });
 
@@ -245,6 +251,7 @@ describe('InstrumentPanel (cancel and restore)', () => {
     expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-4' });
     await fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
     expect(instrument.panel.open && instrument.panel.pending).toEqual({
+      stringCount: 6,
       tuning: { kind: 'preset', id: 'AF-1' },
       fretCount: 22
     });
@@ -405,7 +412,7 @@ describe('InstrumentPanel (custom tuning, US1)', () => {
     await press('Lower string 6');
     await fireEvent.keyDown(screen.getByRole('spinbutton', { name: 'Frets' }), { key: 'Home' });
     await fireEvent.click(btn('Restore default'));
-    const checked = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    const checked = checkedTuning();
     expect(checked?.getAttribute('value')).toBe('AF-1');
     expect(screen.queryByRole('button', { name: 'Lower string 6' })).toBeNull();
     expect(screen.getByRole('spinbutton', { name: 'Frets' }).getAttribute('aria-valuenow')).toBe(
@@ -421,7 +428,7 @@ describe('InstrumentPanel (custom tuning, US1)', () => {
     instrument.open();
     await Promise.resolve();
     await Promise.resolve();
-    const checked = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    const checked = checkedTuning();
     expect(checked?.getAttribute('value')).toBe('custom');
     expect(noteText(1)).toBe('F4');
   });
@@ -433,7 +440,7 @@ describe('InstrumentPanel (custom tuning, US1)', () => {
     instrument.open();
     await Promise.resolve();
     await Promise.resolve();
-    const checked = screen.getAllByRole('radio').find((r) => (r as HTMLInputElement).checked);
+    const checked = checkedTuning();
     expect(checked?.getAttribute('value')).toBe('AF-4');
     expect(screen.queryByRole('button', { name: 'Lower string 6' })).toBeNull();
   });
@@ -640,5 +647,146 @@ describe('InstrumentPanel (unusual set-ups, US4)', () => {
     expect(btn('Confirm').disabled).toBe(false);
     await press('Raise string 3', 1); // D3 = string 4: equal, not inverted
     expect(screen.queryByText(ORDER)).toBeNull();
+  });
+});
+
+describe('InstrumentPanel (seven strings, 012 US1)', () => {
+  const chooseStrings = async (n: 6 | 7) =>
+    fireEvent.click(screen.getByRole('radio', { name: `${n} strings` }));
+  const presetOrder = () =>
+    within(screen.getByRole('group', { name: 'Tuning' }))
+      .getAllByRole('radio')
+      .map((r) => r.getAttribute('value'));
+
+  it('has a Strings fieldset first with 6 strings / 7 strings radios (6 checked)', async () => {
+    await open();
+    const dialog = screen.getByRole('dialog', { name: 'Instrument' });
+    const groups = within(dialog).getAllByRole('group');
+    expect(groups[0].getAttribute('aria-labelledby') ?? groups[0].textContent).toBeTruthy();
+    const strings = screen.getByRole('group', { name: 'Strings' });
+    expect(groups[0]).toBe(strings);
+    const radios = within(strings).getAllByRole('radio') as HTMLInputElement[];
+    expect(radios.map((r) => r.closest('label')?.textContent?.trim())).toEqual([
+      '6 strings',
+      '7 strings'
+    ]);
+    expect(radios.map((r) => r.checked)).toEqual([true, false]);
+  });
+
+  it('lists the 7-string presets in FR-003 order without Standard / Half step down', async () => {
+    await open();
+    await chooseStrings(7);
+    expect(presetOrder()).toEqual([
+      'AF-21',
+      'AF-22',
+      'AF-23',
+      'AF-3',
+      'AF-4',
+      'AF-5',
+      'AF-6',
+      'AF-7',
+      'AF-8',
+      'AF-9',
+      'AF-10',
+      'AF-11',
+      'custom'
+    ]);
+    const group = screen.getByRole('group', { name: 'Tuning' });
+    const names = within(group)
+      .getAllByRole('radio')
+      .map((r) => r.closest('label')?.querySelector('.name')?.textContent);
+    expect(names).not.toContain('Standard');
+    expect(names).not.toContain('Half step down');
+    expect(names.slice(0, 3)).toEqual(['7-string standard', '7-string half step down', 'Drop A']);
+  });
+
+  it('shows the 7-string notes lowest → highest (Drop D = A1 D2 A2 D3 G3 B3 E4)', async () => {
+    const { container } = await open();
+    await chooseStrings(7);
+    const rows = [...container.querySelectorAll('.preset')];
+    const drop = rows.find((r) => r.querySelector('input')?.getAttribute('value') === 'AF-4');
+    expect(drop?.querySelector('.notes')?.textContent).toBe('A1 D2 A2 D3 G3 B3 E4');
+    const std = rows.find((r) => r.querySelector('input')?.getAttribute('value') === 'AF-21');
+    expect(std?.querySelector('.notes')?.textContent).toBe('B1 E2 A2 D3 G3 B3 E4');
+  });
+
+  it('Standard becomes 7-string standard on 6 → 7; Drop D stays checked', async () => {
+    await open();
+    await chooseStrings(7);
+    expect((checkedTuning() as HTMLElement).getAttribute('value')).toBe('AF-21');
+    await chooseStrings(6);
+    await pickPreset('AF-4');
+    await chooseStrings(7);
+    expect(
+      (
+        screen
+          .getAllByRole('radio')
+          .find((r) => (r as HTMLInputElement).value === 'AF-4') as HTMLInputElement
+      ).checked
+    ).toBe(true);
+  });
+
+  it('focus stays on the strings radio and the preview shows seven strings', async () => {
+    const { container } = await open();
+    const seven = screen.getByRole('radio', { name: '7 strings' });
+    seven.focus();
+    await fireEvent.click(seven);
+    expect(document.activeElement).toBe(seven);
+    expect(container.querySelectorAll('svg.fretboard-preview .string-label')).toHaveLength(7);
+    expect(instrument.active.stringCount).toBe(6);
+  });
+
+  it('Custom rows: string 7 first, "Lower string 7" / "Raise string 7" / "String 7, B 1"', async () => {
+    await open();
+    await chooseStrings(7);
+    await fireEvent.click(screen.getByRole('radio', { name: /Custom/ }));
+    expect(screen.getByRole('button', { name: 'Lower string 7' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Raise string 7' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'String 7, B 1' })).toBeTruthy();
+    const lowers = screen.getAllByRole('button', { name: /^Lower string/ });
+    expect(lowers[0].getAttribute('aria-label')).toBe('Lower string 7');
+    expect(lowers).toHaveLength(7);
+  });
+
+  it('string 7 limits disable the step buttons with no error text', async () => {
+    await open();
+    await chooseStrings(7);
+    await fireEvent.click(screen.getByRole('radio', { name: /Custom/ }));
+    const lower = screen.getByRole('button', { name: 'Lower string 7' }) as HTMLButtonElement;
+    for (let i = 0; i < 7; i++) await fireEvent.click(lower);
+    expect(lower.disabled).toBe(true);
+    expect(screen.queryByRole('alert')).toBeNull();
+    const raise = screen.getByRole('button', { name: 'Raise string 7' }) as HTMLButtonElement;
+    for (let i = 0; i < 11; i++) await fireEvent.click(raise);
+    expect(raise.disabled).toBe(true);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('name line reads "Drop A" at A1 and "Custom" at G♯1', async () => {
+    const { container } = await open();
+    await chooseStrings(7);
+    await fireEvent.click(screen.getByRole('radio', { name: /Custom/ }));
+    const lower = screen.getByRole('button', { name: 'Lower string 7' });
+    await fireEvent.click(lower);
+    await fireEvent.click(lower);
+    expect(container.textContent).toContain('Drop A');
+    await fireEvent.click(lower);
+    const line = container.querySelector('[role="status"]');
+    expect(line?.textContent).toContain('Custom');
+    expect(line?.textContent).not.toContain('Drop A');
+  });
+
+  it('Confirm applies 7 strings; close without confirm keeps 6', async () => {
+    await open();
+    await chooseStrings(7);
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(instrument.active.stringCount).toBe(6);
+    instrument.open();
+    await Promise.resolve();
+    await Promise.resolve();
+    await chooseStrings(7);
+    await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    expect(instrument.active.stringCount).toBe(7);
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-21' });
   });
 });

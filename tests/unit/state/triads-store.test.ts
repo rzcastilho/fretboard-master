@@ -482,7 +482,7 @@ describe('triads.restoreLabelType (010)', () => {
 
 describe('triads store with unusual custom tunings (011 US4)', () => {
   const tuned = (o: readonly number[]) =>
-    tuningInstrument(tuningFromOffsets(o as unknown as Offsets), 22);
+    tuningInstrument(tuningFromOffsets(o as unknown as Offsets), 6, 22);
   /** String 3 raised to string 2's pitch (B3): strings 3 and 2 are in unison. */
   const UNISON = tuned([0, 0, 0, 4, 0, 0]);
   /** Several unisons at once: the triad closes on no string set. */

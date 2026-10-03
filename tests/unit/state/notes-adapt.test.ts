@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD_GUITAR, type Instrument } from '../../../src/lib/instrument/instrument';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 import {
   adaptNotesView,
   initialNotesView,
@@ -94,5 +95,73 @@ describe('adaptNotesView (data-model §5.1)', () => {
     expect(r.view.background).toBe('all');
     expect(r.view.hideNames).toBe(true);
     expect(r.view.activeStrings).toEqual(s.activeStrings);
+  });
+});
+
+describe('adaptNotesView string-count step (data-model §6)', () => {
+  const six: Instrument = presetInstrument('AF-1', 6, 22);
+  const seven: Instrument = presetInstrument('AF-21', 7, 22);
+  const all = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+  const only = (s: NotesViewState, keep: number[], i: Instrument): NotesViewState => ({
+    ...s,
+    activeStrings: all(i.stringCount).filter((n) => keep.includes(n))
+  });
+
+  it('6 → 7 with every string on turns string 7 on, not adjusted', () => {
+    const r = adaptNotesView(initialNotesView(six), six, seven);
+    expect(r.view.activeStrings).toEqual(all(7));
+    expect(r.adjusted).toBe(false);
+  });
+
+  it('6 → 7 with a subset leaves the subset (7 off), not adjusted', () => {
+    const s = only(initialNotesView(six), [1, 2, 3], six);
+    const r = adaptNotesView(s, six, seven);
+    expect(r.view.activeStrings).toEqual([1, 2, 3]);
+    expect(r.adjusted).toBe(false);
+  });
+
+  it('7 → 6 with other strings on drops string 7 silently', () => {
+    const r = adaptNotesView(initialNotesView(seven), seven, six);
+    expect(r.view.activeStrings).toEqual(all(6));
+    expect(r.adjusted).toBe(false);
+    const s = only(initialNotesView(seven), [2, 7], seven);
+    const r2 = adaptNotesView(s, seven, six);
+    expect(r2.view.activeStrings).toEqual([2]);
+    expect(r2.adjusted).toBe(false);
+  });
+
+  it('7 → 6 with only string 7 on turns all six on and adjusts', () => {
+    const s = only(initialNotesView(seven), [7], seven);
+    const r = adaptNotesView(s, seven, six);
+    expect(r.view.activeStrings).toEqual(all(6));
+    expect(r.adjusted).toBe(true);
+  });
+
+  it('same count leaves strings unchanged and does not adjust', () => {
+    const s = only(initialNotesView(seven), [3, 7], seven);
+    const r = adaptNotesView(s, seven, seven);
+    expect(r.view.activeStrings).toEqual([3, 7]);
+    expect(r.adjusted).toBe(false);
+  });
+
+  it('a card on string 7 closes on 7 → 6 and adjusts', () => {
+    const s = openCard(initialNotesView(seven), { string: 7, fret: 3 });
+    const r = adaptNotesView(s, seven, six);
+    expect(r.view.card).toBeNull();
+    expect(r.adjusted).toBe(true);
+  });
+
+  it('a card on string 7 closes with a non-whole region too', () => {
+    const s = openCard(withRegion(initialNotesView(seven), 0, 10), { string: 7, fret: 3 });
+    const r = adaptNotesView(s, seven, six);
+    expect(r.view.card).toBeNull();
+    expect(r.adjusted).toBe(true);
+  });
+
+  it('a silent string-7 drop does not raise the notice', () => {
+    const s = withRegion(initialNotesView(seven), 2, 8);
+    const r = adaptNotesView(s, seven, six);
+    expect(r.view.activeStrings).toEqual(all(6));
+    expect(r.adjusted).toBe(false);
   });
 });

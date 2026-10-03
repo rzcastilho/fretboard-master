@@ -5,7 +5,15 @@
  */
 import { canStep, type StringNumber } from '$lib/instrument/custom-tuning';
 import type { Instrument } from '$lib/instrument/instrument';
-import { offsetsOfTuning, tuningStrings, type TuningId } from '$lib/instrument/tunings';
+import {
+  offsetsOfTuning,
+  presetStrings,
+  presetsFor,
+  standardTuningId,
+  tuningStrings,
+  type StringCount,
+  type TuningId
+} from '$lib/instrument/tunings';
 import type { SpelledPitch } from '$lib/theory/pitch';
 import type { ScreenId } from '$lib/shell/screens';
 import type { ToolId } from '$lib/shell/tools';
@@ -21,6 +29,7 @@ import {
   restoreDefault,
   selectTuning,
   setFrets,
+  setStringCount,
   stepFrets,
   stepString,
   type InstrumentConfig,
@@ -38,7 +47,7 @@ let adjustedIn = $state.raw<ToolId | null>(null);
 const current = $derived<Instrument>(instrumentOf(active));
 const preview = $derived<Instrument | null>(panel.open ? instrumentOf(panel.pending) : null);
 
-/** One row of the custom tuning editor (string 6 first). */
+/** One row of the custom tuning editor (string `count` first, string 1 last). */
 export interface StringRow {
   readonly string: StringNumber;
   readonly pitch: SpelledPitch;
@@ -46,19 +55,36 @@ export interface StringRow {
   readonly canRaise: boolean;
 }
 
-const ROW_ORDER: readonly StringNumber[] = [6, 5, 4, 3, 2, 1];
+/** One preset row of the tuning list: id and its open strings, lowest → highest. */
+export interface PresetRow {
+  readonly id: TuningId;
+  readonly strings: readonly SpelledPitch[];
+}
+
+const presetRows = $derived<readonly PresetRow[]>(
+  panel.open
+    ? (() => {
+        const count = panel.pending.stringCount;
+        return presetsFor(count).map((id) => ({ id, strings: presetStrings(id, count) }));
+      })()
+    : []
+);
 
 const customRows = $derived<readonly StringRow[]>(
   panel.open && panel.customOpen
     ? (() => {
-        const offsets = offsetsOfTuning(panel.pending.tuning);
-        const spelled = tuningStrings(panel.pending.tuning);
-        return ROW_ORDER.map((string, i) => ({
-          string,
-          pitch: spelled[i],
-          canLower: canStep(offsets, string, -1),
-          canRaise: canStep(offsets, string, 1)
-        }));
+        const offsets = offsetsOfTuning(panel.pending.tuning, panel.pending.stringCount);
+        const spelled = tuningStrings(panel.pending.tuning, panel.pending.stringCount);
+        // Stored lowest → highest, which is string `count` → 1.
+        return spelled.map((pitch, i) => {
+          const string = (spelled.length - i) as StringNumber;
+          return {
+            string,
+            pitch,
+            canLower: canStep(offsets, string, -1),
+            canRaise: canStep(offsets, string, 1)
+          };
+        });
       })()
     : []
 );
@@ -89,12 +115,23 @@ export const instrument = {
     if (panel.customOpen) return 'custom';
     return panel.pending.tuning.kind === 'preset' ? panel.pending.tuning.id : 'custom';
   },
+  /** Pending string count while the panel is open, else the active one. */
+  get stringCount(): StringCount {
+    return panel.open ? panel.pending.stringCount : active.stringCount;
+  },
+  /** Preset rows for the pending string count; empty while closed. */
+  get presets(): readonly PresetRow[] {
+    return presetRows;
+  },
   get rows(): readonly StringRow[] {
     return customRows;
   },
   /** Panel state only; opener focus is handled by the component. */
   open(): void {
     panel = openPanel(panel, active);
+  },
+  setStringCount(n: number): void {
+    panel = setStringCount(panel, n);
   },
   selectTuning(id: TuningId): void {
     panel = selectTuning(panel, id);
@@ -136,7 +173,8 @@ export const instrument = {
     active = result.next;
     const tuning = result.next.tuning;
     preferences.remember({
-      tuningId: tuning.kind === 'preset' ? tuning.id : 'AF-1',
+      stringCount: result.next.stringCount,
+      tuningId: tuning.kind === 'preset' ? tuning.id : standardTuningId(result.next.stringCount),
       customTuning: tuning.kind === 'custom' ? tuning.offsets : null,
       fretCount: result.next.fretCount
     });

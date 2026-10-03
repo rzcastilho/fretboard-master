@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it } from 'vitest';
 import InstrumentButton from '../../src/lib/shell/InstrumentButton.svelte';
+import InstrumentSummary from '../../src/lib/shell/InstrumentSummary.svelte';
 import TuningBadge from '../../src/lib/shell/TuningBadge.svelte';
+import type { TuningId } from '../../src/lib/instrument/tunings';
 import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
 
 const applyTuning = (id: 'AF-4' | 'AF-1', frets?: number) => {
@@ -78,6 +80,69 @@ describe('TuningBadge (custom tuning, US3)', () => {
     instrument.confirm('triads');
     render(TuningBadge);
     expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+describe('TuningBadge and summary (seven strings, 012)', () => {
+  const apply = (id: TuningId) => {
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.selectTuning(id);
+    instrument.confirm('triads');
+  };
+
+  it('is hidden for 6-string standard and for 7-string standard', () => {
+    render(TuningBadge);
+    expect(screen.queryByRole('button')).toBeNull();
+    apply('AF-21');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it.each([
+    ['AF-22', '7-string half step down'],
+    ['AF-23', 'Drop A'],
+    ['AF-4', 'Drop D'],
+    ['AF-11', 'Open A']
+  ] as const)('is shown for 7-string %s as "%s"', (id, name) => {
+    apply(id);
+    render(TuningBadge);
+    expect(
+      screen
+        .getByRole('button', { name: `Tuning: ${name}. Open instrument panel` })
+        .textContent?.trim()
+    ).toBe(name);
+  });
+
+  it('shows Custom for an unmatched 7-string tuning', () => {
+    instrument.open();
+    instrument.setStringCount(7);
+    instrument.chooseCustom();
+    for (let i = 0; i < 3; i++) instrument.stepString(7, -1);
+    instrument.confirm('triads');
+    render(TuningBadge);
+    expect(screen.getByRole('button', { name: /Custom/ }).textContent?.trim()).toBe('Custom');
+  });
+
+  it('summary: "7 strings · standard tuning · right-handed" and with a name', () => {
+    apply('AF-21');
+    const { unmount } = render(InstrumentSummary);
+    expect(screen.getByRole('button').textContent?.trim()).toBe(
+      '7 strings · standard tuning · right-handed'
+    );
+    unmount();
+    resetInstrumentForTests();
+    apply('AF-23');
+    render(InstrumentSummary);
+    expect(screen.getByRole('button').textContent?.trim()).toBe(
+      '7 strings · Drop A · right-handed'
+    );
+  });
+
+  it('summary keeps the 6-string text byte-identical', () => {
+    render(InstrumentSummary);
+    expect(screen.getByRole('button').textContent?.trim()).toBe(
+      '6 strings · standard tuning · right-handed'
+    );
   });
 });
 
