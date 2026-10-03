@@ -232,3 +232,25 @@ export function revalidate(s: NotesViewState, i: Instrument): NotesViewState {
   }
   return { ...s, activeStrings: strings, region: { start, end }, card };
 }
+
+/**
+ * Adapt the view to a new instrument (data-model §5.1). A whole-neck region follows the new fret
+ * count; otherwise `revalidate` clamps it. `adjusted` is true only when the view had to change
+ * beyond a whole-neck follow: a clamped region or a card that no longer exists.
+ */
+export function adaptNotesView(
+  s: NotesViewState,
+  prev: Instrument,
+  next: Instrument
+): { view: NotesViewState; adjusted: boolean } {
+  const whole = s.region.start === 0 && s.region.end === prev.fretCount;
+  if (!whole) {
+    const view = revalidate(s, next);
+    return { view, adjusted: view !== s };
+  }
+  const base = { ...s, region: { start: 0, end: next.fretCount } };
+  const view = revalidate(base, next);
+  const cardClosed = s.card !== null && view.card === null;
+  const unchanged = equalsNotesView(view, s);
+  return { view: unchanged ? s : view, adjusted: cardClosed };
+}

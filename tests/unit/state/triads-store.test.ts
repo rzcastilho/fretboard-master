@@ -400,3 +400,66 @@ describe('triads store Listen to comparison (007 US6)', () => {
     stop.mockRestore();
   });
 });
+
+describe('triads store applyInstrument (009 foundational)', () => {
+  it('keeps the whole view and reports no adjustment when nothing needs clamping', () => {
+    triads.selectRoot(7);
+    triads.setQuality('minor');
+    triads.setInversion('first');
+    triads.setStringSet(4);
+    triads.setLabelType('name');
+    triads.setCompare(true);
+    const before = triads.state;
+    const adjusted = triads.applyInstrument(AF_4);
+    expect(adjusted).toBe(false);
+    expect(triads.instrument).toBe(AF_4);
+    expect(triads.state).toEqual(before);
+  });
+
+  it('returns false when next === instrument', () => {
+    const before = triads.state;
+    expect(triads.applyInstrument(STANDARD_GUITAR)).toBe(false);
+    expect(triads.state).toBe(before);
+  });
+
+  it('clamps occurrence to the highest remaining one and returns true', () => {
+    while (triads.display.octave.up) triads.octaveUp();
+    const high = triads.state.occurrence;
+    expect(high).toBeGreaterThan(0);
+    const adjusted = triads.applyInstrument(SHORT_7);
+    const max = Math.max(0, triads.display.octave.count - 1);
+    expect(triads.state.occurrence).toBeLessThanOrEqual(max);
+    expect(adjusted).toBe(triads.state.occurrence !== high);
+    expect(adjusted).toBe(true);
+  });
+
+  it('never calls playback.stop', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    triads.applyInstrument(AF_4);
+    triads.applyInstrument(SHORT_7);
+    expect(stop).not.toHaveBeenCalled();
+    stop.mockRestore();
+  });
+
+  it('SC-003: Drop D C major root 6-5-4 is 10-7-5 wide stretch; Standard is 8-7-5', () => {
+    triads.setStringSet(6);
+    const frets = () => {
+      const s = triads.display.shape;
+      return s.kind === 'shown' ? [...s.frets].sort((a, b) => b - a) : [];
+    };
+    expect(frets()).toEqual([8, 7, 5]);
+    triads.applyInstrument(AF_4);
+    expect(frets()).toEqual([10, 7, 5]);
+    const s = triads.display.shape;
+    expect(s.kind === 'shown' && s.wideStretch).toBe(true);
+    expect(triads.display.model.summary).toContain('Wide stretch.');
+  });
+
+  it('useInstrument stops playback with reason instrument then delegates', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    triads.useInstrument(AF_4);
+    expect(stop).toHaveBeenCalledWith('instrument');
+    expect(triads.instrument).toBe(AF_4);
+    stop.mockRestore();
+  });
+});

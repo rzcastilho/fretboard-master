@@ -7,6 +7,7 @@
   import type { DisplayModel } from '$lib/fretboard/types';
   import type { Position } from '$lib/instrument/instrument';
   import { defaultSpelling, noteList } from '$lib/notation/notation';
+  import { instrument } from '$lib/state/instrument.svelte';
   import Notice from '$lib/shell/Notice.svelte';
   import NoteSelector from '$lib/tools/NoteSelector.svelte';
   import DetectedTriad from '$lib/tools/notes/DetectedTriad.svelte';
@@ -46,6 +47,11 @@
   $effect(() => {
     if (missing.length === 0) noticeDismissed = false;
   });
+  const ownNotice = $derived(missing.length > 0 && !noticeDismissed);
+  // R-05: one notice line at a time; the tool's own notice wins and clears the adjustment notice.
+  $effect(() => {
+    if (ownNotice && instrument.adjustedIn === 'notes') instrument.dismissAdjusted();
+  });
   const noticeMessage = $derived(
     missing.length > 3
       ? m.notes_notice_missing_count({ count: missing.length })
@@ -83,7 +89,10 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions (Escape closes the card; cells are the interactive stops) -->
 <section class="c" aria-labelledby="notes-zone-c" {onkeydown}>
   <h2 id="notes-zone-c">{m.notes_zone_fretboard()}</h2>
-  {#if missing.length > 0 && !noticeDismissed}
+  {#if instrument.adjustedIn === 'notes' && !ownNotice}
+    <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
+  {/if}
+  {#if ownNotice}
     <Notice
       message={noticeMessage}
       ondismiss={() => (noticeDismissed = true)}

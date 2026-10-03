@@ -9,6 +9,7 @@ import {
   fixtureInstrument
 } from '../../../src/lib/instrument/fixtures';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 
@@ -24,6 +25,15 @@ describe('instrument fixtures (contracts/test-hooks.md)', () => {
     expect(names(AF_7)).toEqual(['D4', 'A3', 'G3', 'D3', 'A2', 'D2']);
     expect(AF_7.stringCount).toBe(6);
     expect(AF_7.fretCount).toBe(22);
+  });
+
+  it('AF-4 and AF-7 are the presets at 22 frets (R-13), values unchanged', () => {
+    expect(AF_4).toBe(presetInstrument('AF-4', 22));
+    expect(AF_7).toBe(presetInstrument('AF-7', 22));
+    expect(AF_4.openStrings).toEqual(presetInstrument('AF-4', 22).openStrings);
+    expect(AF_7.openStrings).toEqual(presetInstrument('AF-7', 22).openStrings);
+    expect(names(AF_4)).toEqual(['E4', 'B3', 'G3', 'D3', 'A2', 'D2']);
+    expect(names(AF_7)).toEqual(['D4', 'A3', 'G3', 'D3', 'A2', 'D2']);
   });
 
   it('AF-21 is 7-string standard with 22 frets', () => {

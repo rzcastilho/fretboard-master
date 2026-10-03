@@ -11,6 +11,7 @@ import {
   octaveDown,
   octaveUp,
   resetTriads,
+  revalidate,
   selectRoot,
   seeAllNotes,
   selectShape,
@@ -146,13 +147,24 @@ export const triads = {
   octaveDown(): void {
     apply(octaveDown(view, instrument));
   },
-  /** Switch instrument: revalidate nothing yet (later stories); playback stops iff it changed. */
+  /**
+   * Apply an instrument: keep the whole view, revalidate (clamp occurrence / string set).
+   * Returns whether the view changed. Never stops playback (the orchestrator does).
+   */
+  applyInstrument(next: Instrument): boolean {
+    if (next === instrument) return false;
+    instrument = next;
+    const revalidated = revalidate(view, next);
+    const adjusted = revalidated !== view;
+    view = revalidated;
+    if (adjusted) notice = null;
+    return adjusted;
+  },
+  /** Test-hook switch: stop playback (reason `instrument`), then apply. */
   useInstrument(next: Instrument): void {
     if (next === instrument) return;
     playback.stop('instrument');
-    instrument = next;
-    view = initialTriadsView(next);
-    notice = null;
+    this.applyInstrument(next);
   },
   /** Sound the shape low → mid → high, then the block (new `sequence` interrupts; no `stop`). */
   listen(): void {

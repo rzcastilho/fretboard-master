@@ -1,11 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const linkTools = vi.hoisted(() => vi.fn());
 vi.mock('../../src/lib/state/links.svelte', () => ({ linkTools }));
 
 import ToolCard from '../../src/lib/shell/ToolCard.svelte';
 import { TOOLS } from '../../src/lib/shell/tools';
+import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
+
+beforeEach(() => resetInstrumentForTests());
 
 describe('ToolCard', () => {
   it('is a single link with card_label name, visible name and question, no truncation', () => {
@@ -36,5 +39,17 @@ describe('ToolCard', () => {
     await fireEvent.click(link);
     document.removeEventListener('click', stop);
     expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('thumbnail follows the active instrument: Drop D shows D on string 6', () => {
+    const labels = () =>
+      [...render(ToolCard, { tool: TOOLS[0] }).container.querySelectorAll('.string-label')].map(
+        (n) => n.textContent
+      );
+    expect(labels().at(-1)).toBe('E');
+    instrument.open();
+    instrument.selectTuning('AF-4');
+    instrument.confirm('home');
+    expect(labels().at(-1)).toBe('D');
   });
 });

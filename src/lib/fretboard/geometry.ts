@@ -62,7 +62,7 @@ export interface FretboardLayout {
   scrolls: boolean;
 }
 
-export type FretboardVariant = 'interactive' | 'thumbnail';
+export type FretboardVariant = 'interactive' | 'thumbnail' | 'preview';
 
 export const INLAY_FRETS: readonly number[] = [3, 5, 7, 9, 15, 17, 19, 21];
 export const DOUBLE_INLAY_FRETS: readonly number[] = [12, 24];
@@ -97,20 +97,22 @@ export function layoutFretboard(
   variant: FretboardVariant
 ): FretboardLayout {
   const thumb = variant === 'thumbnail';
+  // Preview: compact like the thumbnail, but every pending fret and a label column.
+  const compact = thumb || variant === 'preview';
   const fretCount = thumb ? Math.min(THUMBNAIL_FRETS, instrument.fretCount) : instrument.fretCount;
-  const labelCol = thumb ? 0 : metrics.labelCol;
-  const rowH = thumb ? metrics.thumbRow : metrics.row;
-  const numbersRow = thumb ? 0 : metrics.numbersRow;
+  const labelCol = metrics.labelCol;
+  const rowH = variant === 'preview' ? metrics.markerSmall : thumb ? metrics.thumbRow : metrics.row;
+  const numbersRow = compact ? 0 : metrics.numbersRow;
 
-  const widths: number[] = [thumb ? metrics.thumbOpenCol : metrics.openCol];
+  const widths: number[] = [compact ? metrics.thumbOpenCol : metrics.openCol];
   for (let f = 1; f <= fretCount; f++) {
-    widths.push(thumb ? metrics.thumbFret : fretWidth(metrics, f, instrument.fretCount));
+    widths.push(compact ? metrics.thumbFret : fretWidth(metrics, f, instrument.fretCount));
   }
   const columnsNatural = widths.reduce((a, b) => a + b, 0);
   const naturalWidth = labelCol + columnsNatural;
 
   let scale = 1;
-  if (!thumb && containerWidth > naturalWidth) {
+  if (!compact && containerWidth > naturalWidth) {
     scale = (containerWidth - labelCol) / columnsNatural;
   }
 
@@ -139,7 +141,7 @@ export function layoutFretboard(
     nutX: columns[0].end,
     boardTop: 0,
     boardBottom,
-    scrolls: !thumb && naturalWidth > containerWidth
+    scrolls: !compact && naturalWidth > containerWidth
   };
 }
 
@@ -193,4 +195,13 @@ export function visibleColumnCount(
     if (overlap > 0) total += overlap / w;
   }
   return total;
+}
+
+/**
+ * `scrollLeft` that puts the last fret at the trailing edge of a viewport `viewportWidth` wide.
+ * Never negative; 0 when the content fits (R-11).
+ */
+export function trailingEdgeScroll(layout: FretboardLayout, viewportWidth: number): number {
+  const last = layout.columns[layout.columns.length - 1];
+  return Math.max(0, last.end - viewportWidth);
 }

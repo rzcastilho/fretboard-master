@@ -1,11 +1,31 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { notes } from '../../src/lib/state/notes.svelte';
 import { triads } from '../../src/lib/state/triads.svelte';
+import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
 import ToolLayout from '../../src/lib/shell/ToolLayout.svelte';
 
 describe('ToolLayout', () => {
+  beforeEach(() => resetInstrumentForTests());
+
+  it('zone A always has the Instrument button and the badge only for non-Standard tuning', () => {
+    const { unmount } = render(ToolLayout, { tool: 'notes' });
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('button', { name: 'Instrument' })).toBeTruthy();
+    expect(within(banner).queryByRole('button', { name: /^Tuning:/ })).toBeNull();
+    unmount();
+    instrument.open();
+    instrument.selectTuning('AF-4');
+    instrument.confirm('notes');
+    render(ToolLayout, { tool: 'triads' });
+    const banner2 = screen.getByRole('banner');
+    expect(within(banner2).getByRole('button', { name: 'Instrument' })).toBeTruthy();
+    expect(
+      within(banner2).getByRole('button', { name: 'Tuning: Drop D. Open instrument panel' })
+    ).toBeTruthy();
+  });
+
   it('renders application bar with navigation', () => {
     render(ToolLayout, { tool: 'triads' });
     const banner = screen.getByRole('banner');

@@ -9,6 +9,7 @@ import { LISTEN_BPM } from './listen';
 import { carrySelection } from './links';
 import { buildNotesModel, type NotesDisplay } from './notes-model';
 import {
+  adaptNotesView,
   addNote,
   clear,
   closeCard,
@@ -16,7 +17,6 @@ import {
   initialNotesView,
   openCard,
   reset,
-  revalidate,
   setBackground,
   setHideNames,
   setLabelType,
@@ -100,12 +100,22 @@ export const notes = {
   reset(): void {
     apply(reset(instrument));
   },
-  /** Switch instrument: revalidate the view; playback stops (reason `instrument`) iff it changed. */
+  /**
+   * Apply an instrument: revalidate the view. Returns whether the view was adjusted.
+   * Never stops playback (the orchestrator does).
+   */
+  applyInstrument(next: Instrument): boolean {
+    if (next === instrument) return false;
+    const { view: result, adjusted } = adaptNotesView(view, instrument, next);
+    instrument = next;
+    view = result;
+    return adjusted;
+  },
+  /** Test-hook switch: stop playback (reason `instrument`), then apply. */
   useInstrument(next: Instrument): void {
     if (next === instrument) return;
     playback.stop('instrument');
-    instrument = next;
-    view = revalidate(view, next);
+    this.applyInstrument(next);
   },
   /** Play the position and open its card. `note` interrupts playback itself (no `stop`). */
   activate(p: Position): void {

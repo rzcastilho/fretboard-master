@@ -3,6 +3,7 @@
   import { m } from '$lib/paraglide/messages.js';
   import SoundControl from './SoundControl.svelte';
   import StopButton from './StopButton.svelte';
+  import InstrumentSummary from './InstrumentSummary.svelte';
   import { screenTitle } from './screens';
   import { TOOLS } from './tools';
   import ToolCard from './ToolCard.svelte';
@@ -33,7 +34,7 @@
   </ul>
 </main>
 
-<div class="bottom" data-zone="bottom"></div>
+<div class="bottom" data-zone="bottom"><InstrumentSummary /></div>
 
 <style>
   .top {
@@ -78,5 +79,6 @@
 
   .bottom {
     min-block-size: var(--space-6);
+    padding: var(--space-4);
   }
 </style>

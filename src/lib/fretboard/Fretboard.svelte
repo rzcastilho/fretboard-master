@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { fade } from 'svelte/transition';
   import { defaultSpelling, intervalLabel, noteLabel, pitchLabel } from '../notation/notation';
   import { octaveOf, pitchClass } from '../theory/pitch';
@@ -17,7 +17,8 @@
     INLAY_FRETS,
     layoutFretboard,
     nearestPosition,
-    type FretboardMetrics
+    type FretboardMetrics,
+    trailingEdgeScroll
   } from './geometry';
   import {
     autoScrollTarget,
@@ -52,6 +53,9 @@
 
   const uid = $props.id();
   const thumb = $derived(variant === 'thumbnail');
+  const preview = $derived(variant === 'preview');
+  /** Decorative variants: no markers, tags, band, arrows, scrolling or handlers. */
+  const compact = $derived(thumb || preview);
 
   let metrics: FretboardMetrics = $state(DEFAULT_METRICS);
   let containerWidth = $state(0);
@@ -118,10 +122,58 @@
   const doubleY = $derived([layout.rows[1].bottom, layout.rows[3].bottom]);
   const fretNumbers = $derived(layout.columns.filter((c) => c.fret >= 1));
   const numbersY = $derived(layout.boardBottom + metrics.numbersRow / 2);
-  const inlayRadius = $derived(thumb ? metrics.thumbRow * 0.3 : metrics.row * 0.14);
-  const nutWidth = $derived(thumb ? metrics.thumbRow / 3 : metrics.nutWidth);
+  const inlayRadius = $derived(compact ? metrics.thumbRow * 0.3 : metrics.row * 0.14);
+  const nutWidth = $derived(compact ? metrics.thumbRow / 3 : metrics.nutWidth);
   const stringsFrom = $derived(layout.columns[0].center);
   const viewBox = $derived(`0 0 ${layout.width} ${layout.height}`);
+
+  /**
+   * Fret-count change (R-11): the browser clamps `scrollLeft` instantly when the board shrinks.
+   * Record the old position and width before the DOM updates; afterwards, if the old offset is
+   * past the new maximum, hold the content at its old width for one animation and glide to the
+   * trailing edge. Reduced motion (`0s` token) applies no hold. Never raises a notice (FR-014).
+   */
+  let seenFretCount = untrack(() => instrument.fretCount);
+  let pendingScroll: { left: number; width: number } | null = null;
+  let holdWidth: number | null = $state(null);
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect.pre(() => {
+    const n = instrument.fretCount;
+    if (n === seenFretCount) return;
+    seenFretCount = n;
+    untrack(() => {
+      if (!scroller || compact) return;
+      pendingScroll = { left: scroller.scrollLeft, width: scroller.scrollWidth };
+    });
+  });
+
+  $effect(() => {
+    const current = layout;
+    const el = scroller;
+    if (!el || compact || pendingScroll === null) return;
+    const pending = pendingScroll;
+    pendingScroll = null;
+    untrack(() => {
+      const viewport = el.clientWidth;
+      if (pending.left <= Math.max(0, current.width - viewport)) return;
+      const target = trailingEdgeScroll(current, viewport);
+      const duration = scrollDuration();
+      stopAutoScroll();
+      clearTimeout(holdTimer);
+      if (duration <= 0) {
+        holdWidth = null;
+        el.scrollLeft = target;
+        return;
+      }
+      holdWidth = pending.width;
+      void tick().then(() => {
+        el.scrollLeft = pending.left;
+        cancelScroll = animateScroll(el, target, duration, browserClock);
+        holdTimer = setTimeout(() => (holdWidth = null), duration + 50);
+      });
+    });
+  });
 
   /** Sorted "s:f" list of highlighted, valid positions; auto-scroll fires when it changes. */
   const highlightKey = $derived(
@@ -164,7 +216,7 @@
 
   // Shape tags (Full neck): measured widths feed the pure layout; absent tags reserve nothing.
   const TAG_GAP = 4;
-  const tags = $derived(thumb ? [] : (model.tags ?? []));
+  const tags = $derived(compact ? [] : (model.tags ?? []));
   let tagEls: HTMLElement[] = $state([]);
   let tagWidths: number[] = $state([]);
   const tagMin = $derived(metrics.row);
@@ -197,7 +249,7 @@
   /** Region clamped to the board, or null when the model has none. */
   const band = $derived.by(() => {
     const r = model.region;
-    if (!r || thumb || !Number.isFinite(r.start) || !Number.isFinite(r.end)) return null;
+    if (!r || compact || !Number.isFinite(r.start) || !Number.isFinite(r.end)) return null;
     const clamp = (v: number) => Math.min(lastFret, Math.max(0, Math.round(v)));
     const start = clamp(Math.min(r.start, r.end));
     const end = clamp(Math.max(r.start, r.end));
@@ -270,7 +322,7 @@
    * Invalid arrows are dropped; the thumbnail draws none (F15).
    */
   const drawnArrows = $derived.by(() => {
-    if (thumb) return [];
+    if (compact) return [];
     const head = metrics.arrowHead;
     const inset = metrics.markerMedium / 2 + 2;
     const validFret = (f: number) => Number.isInteger(f) && f >= 0 && f <= instrument.fretCount;
@@ -577,6 +629,26 @@
     preserveAspectRatio="xMidYMid meet"
   >
     {@render drawing()}
+    {#each layout.rows as row (row.string)}
+      <text class="string-label" x={layout.columns[0].start / 2} y={row.center}
+        >{openLabel(row.string)}</text
+      >
+    {/each}
+  </svg>
+{:else if preview}
+  <svg
+    class="fretboard-preview"
+    aria-hidden="true"
+    focusable="false"
+    {viewBox}
+    preserveAspectRatio="xMinYMid meet"
+  >
+    {@render drawing()}
+    {#each layout.rows as row (row.string)}
+      <text class="string-label" x={layout.columns[0].start / 2} y={row.center}
+        >{openLabel(row.string)}</text
+      >
+    {/each}
   </svg>
 {:else}
   <div class="fretboard" data-variant="interactive" bind:this={root}>
@@ -756,6 +828,9 @@
           </g>
         {/each}
       </svg>
+      {#if holdWidth !== null}
+        <div class="hold" aria-hidden="true" style:inline-size={`${holdWidth}px`}></div>
+      {/if}
     </div>
     <div class="sr-only" aria-live="polite" aria-atomic="true">{liveText}</div>
     <button
@@ -785,6 +860,11 @@
 
   .tags {
     position: relative;
+  }
+
+  /* Keeps the old scroll extent for one animation after the board shrinks (R-11). */
+  .hold {
+    block-size: 0;
   }
 
   .tag {
@@ -837,6 +917,13 @@
     fill: var(--color-hint-text);
     font-size: var(--marker-label-min-size);
     font-weight: 700;
+  }
+
+  .fretboard-preview {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    pointer-events: none;
   }
 
   .fretboard-thumbnail {

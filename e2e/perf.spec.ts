@@ -447,3 +447,68 @@ test.describe('linked-tools carry latency (SC-005, FR-017)', () => {
     expect(median(times)).toBeLessThanOrEqual(300);
   });
 });
+
+test.describe('instrument change latency (SC-001)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median Confirm → fretboard with the new open-string label ≤ 300 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+
+    // Measured in the page (pointerdown on Confirm → string 6 label changed), so Playwright
+    // round-trips under throttling are not counted.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as {
+        __instrTimes: number[];
+        __downAt: number | null;
+        __expect: RegExp | null;
+      };
+      w.__instrTimes = [];
+      w.__downAt = null;
+      w.__expect = null;
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || w.__expect === null) return;
+        const labels = [...document.querySelectorAll('[role="grid"] .string-label')];
+        if (!labels.some((n) => w.__expect?.test(n.textContent?.trim() ?? ''))) return;
+        w.__instrTimes.push(performance.now() - w.__downAt);
+        w.__downAt = null;
+      }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    });
+    const arm = (source: string) =>
+      page.evaluate((s) => {
+        const w = globalThis as unknown as { __expect: RegExp; __downAt: number | null };
+        w.__expect = new RegExp(s);
+        w.__downAt = null;
+      }, source);
+
+    const opener = page.getByRole('button', { name: 'Instrument', exact: true });
+    const radio = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}:`) });
+    const samples = 5;
+    for (let i = 0; i < samples; i++) {
+      for (const [preset, label] of [
+        ['Drop D', /^6\s*D$/],
+        ['Standard', /^6\s*E$/]
+      ] as const) {
+        await opener.click();
+        const dialog = page.getByRole('dialog', { name: 'Instrument' });
+        await radio(preset).check();
+        await arm(label.source);
+        await dialog.getByRole('button', { name: 'Confirm' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(
+          page.locator('[role="grid"] .string-label').filter({ hasText: label })
+        ).toHaveCount(1);
+      }
+    }
+    const times = await page.evaluate(
+      () => (globalThis as unknown as { __instrTimes: number[] }).__instrTimes
+    );
+    expect(times.length).toBeGreaterThanOrEqual(samples * 2);
+    expect(median(times)).toBeLessThanOrEqual(300);
+  });
+});

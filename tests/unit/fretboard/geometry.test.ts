@@ -5,10 +5,12 @@ import {
   INLAY_FRETS,
   layoutFretboard,
   nearestPosition,
+  trailingEdgeScroll,
   screenOrder,
   visibleColumnCount
 } from '../../../src/lib/fretboard/geometry';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 
 describe('layoutFretboard (interactive)', () => {
   const layout = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 0, 'interactive');
@@ -95,9 +97,9 @@ describe('inlays', () => {
 describe('thumbnail layout', () => {
   const l = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 500, 'thumbnail');
 
-  it('covers frets 0–12 with no label column and no numbers row', () => {
+  it('covers frets 0–12 with a label column and no numbers row', () => {
     expect(l.columns).toHaveLength(13);
-    expect(l.columns[0].start).toBe(0);
+    expect(l.columns[0].start).toBe(DEFAULT_METRICS.labelCol);
     expect(l.height).toBe(l.boardBottom);
     expect(l.rows).toHaveLength(6);
     expect(l.scale).toBe(1);
@@ -176,5 +178,42 @@ describe('visibleColumnCount', () => {
   it('counts a whole board as 23 columns when it fits', () => {
     const wide = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 2560, 'interactive');
     expect(visibleColumnCount(wide, 0, 2560)).toBeCloseTo(23, 5);
+  });
+});
+
+describe('preview layout', () => {
+  const wide = presetInstrument('AF-1', 24);
+  const l = layoutFretboard(wide, DEFAULT_METRICS, 500, 'preview');
+
+  it('draws every pending fret (24 is not capped at the thumbnail 12)', () => {
+    expect(l.columns).toHaveLength(25);
+    expect(
+      layoutFretboard(presetInstrument('AF-1', 12), DEFAULT_METRICS, 500, 'preview').columns
+    ).toHaveLength(13);
+  });
+
+  it('reserves a label column, has no numbers row, never scrolls or scales', () => {
+    expect(l.columns[0].start).toBe(DEFAULT_METRICS.labelCol);
+    expect(l.height).toBe(l.boardBottom);
+    expect(l.rows).toHaveLength(6);
+    expect(l.scale).toBe(1);
+    expect(l.scrolls).toBe(false);
+  });
+});
+
+describe('trailingEdgeScroll', () => {
+  const layout = layoutFretboard(presetInstrument('AF-1', 12), DEFAULT_METRICS, 0, 'interactive');
+
+  it('puts the last fret at the trailing edge', () => {
+    const vw = 360;
+    const s = trailingEdgeScroll(layout, vw);
+    expect(s).toBeGreaterThan(0);
+    expect(s + vw).toBeCloseTo(layout.columns[layout.columns.length - 1].end);
+  });
+
+  it('is never negative and is 0 when the content fits', () => {
+    expect(trailingEdgeScroll(layout, layout.width + 100)).toBe(0);
+    expect(trailingEdgeScroll(layout, layout.width)).toBe(0);
+    expect(trailingEdgeScroll(layout, 10)).toBeGreaterThanOrEqual(0);
   });
 });

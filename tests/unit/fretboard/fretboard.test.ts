@@ -6,6 +6,7 @@ import { DEFAULT_METRICS, layoutFretboard } from '../../../src/lib/fretboard/geo
 import Fretboard from '../../../src/lib/fretboard/Fretboard.svelte';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 
 describe('Fretboard (interactive)', () => {
   it('renders a grid named Fretboard with 6 rows and 138 cells', () => {
@@ -53,14 +54,48 @@ describe('Fretboard (interactive)', () => {
 });
 
 describe('Fretboard (thumbnail)', () => {
-  it('renders a decorative svg with no cells, text, or listeners', () => {
+  it('renders a decorative svg with only open-string labels, no cells or listeners', () => {
     const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, variant: 'thumbnail' });
     const svg = container.querySelector('svg.fretboard-thumbnail');
     expect(svg).toBeTruthy();
     expect(svg?.getAttribute('aria-hidden')).toBe('true');
     expect(svg?.getAttribute('focusable')).toBe('false');
-    expect(container.querySelectorAll('[role], text, button, [tabindex]')).toHaveLength(0);
-    expect(container.textContent).toBe('');
+    expect(container.querySelectorAll('[role], button, [tabindex]')).toHaveLength(0);
+    expect([...container.querySelectorAll('text')].map((t) => t.textContent)).toEqual([
+      'E',
+      'B',
+      'G',
+      'D',
+      'A',
+      'E'
+    ]);
+  });
+});
+
+describe('Fretboard (preview)', () => {
+  it('draws pending frets and open-string labels in the preset spelling, inert and hidden', () => {
+    const { container } = render(Fretboard, {
+      instrument: presetInstrument('AF-2', 24),
+      variant: 'preview'
+    });
+    const svg = container.querySelector('svg.fretboard-preview');
+    expect(svg).toBeTruthy();
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelectorAll('.fret-line')).toHaveLength(24);
+    const labels = [...container.querySelectorAll('.string-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['E♭', 'B♭', 'G♭', 'D♭', 'A♭', 'E♭']);
+    expect(container.querySelectorAll('.marker')).toHaveLength(0);
+    expect(container.querySelectorAll('[role], button, [tabindex], .cell')).toHaveLength(0);
+    expect(container.querySelector('.description, [aria-live]')).toBeNull();
+  });
+
+  it('shows sharps for open tunings', () => {
+    const { container } = render(Fretboard, {
+      instrument: presetInstrument('AF-11', 22),
+      variant: 'preview'
+    });
+    const labels = [...container.querySelectorAll('.string-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['E', 'C♯', 'A', 'E', 'A', 'E']);
   });
 });
 

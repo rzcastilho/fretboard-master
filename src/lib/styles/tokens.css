@@ -131,6 +131,10 @@
   --pulse-scale: 1.25;
   --pulse-opacity-peak: 0.85;
   --sound-panel-width: 16rem;
+  /* Instrument panel */
+  --instrument-panel-width: 22rem;
+  --instrument-sheet-max-block-size: 90dvh;
+  --color-backdrop: rgb(0 0 0 / 0.5);
   --icon-size: 1.5rem;
   --color-sound-panel-border: var(--color-border);
   --card-min-inline: 16rem;

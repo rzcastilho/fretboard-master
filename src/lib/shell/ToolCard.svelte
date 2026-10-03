@@ -1,7 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
-  import { STANDARD_GUITAR } from '$lib/instrument/instrument';
+  import { instrument } from '$lib/state/instrument.svelte';
   import type { Tool } from './tools';
 
   let { tool }: { tool: Tool } = $props();
@@ -15,7 +15,7 @@
 >
   <span class="name">{tool.name()}</span>
   <span class="question">{tool.question()}</span>
-  <span class="thumb"><Fretboard variant="thumbnail" instrument={STANDARD_GUITAR} /></span>
+  <span class="thumb"><Fretboard variant="thumbnail" instrument={instrument.current} /></span>
 </a>
 
 <!-- eslint-enable svelte/no-navigation-without-resolve -->

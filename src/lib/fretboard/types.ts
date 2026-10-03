@@ -100,7 +100,7 @@ export interface DrawnMarker extends Marker {
 export interface FretboardProps {
   instrument: Instrument;
   model?: DisplayModel;
-  variant?: 'interactive' | 'thumbnail';
+  variant?: 'interactive' | 'thumbnail' | 'preview';
   onactivate?: (position: Position) => void;
   /** Positions sounding now; drawn as a pulse, never announced. */
   pulses?: readonly Pulse[];
