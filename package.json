@@ -15,6 +15,8 @@
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:nojs": "playwright test --project=nojs",
+    "test:e2e:fast": "playwright test -c pw.local.config.ts --project=desktop",
+    "verify": "pnpm check && pnpm lint && pnpm format:check && pnpm test:unit --coverage && pnpm build && node scripts/check-bundle-size.mjs build && pnpm build:test && pnpm test:e2e:fast",
     "lhci": "lhci autorun",
     "fonts:accidentals": "node scripts/subset-accidentals-font.mjs"
   },
