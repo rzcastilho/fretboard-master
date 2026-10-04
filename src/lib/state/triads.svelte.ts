@@ -11,6 +11,7 @@ import {
   octaveDown,
   octaveUp,
   resetTriads,
+  revalidate,
   selectRoot,
   seeAllNotes,
   selectShape,
@@ -32,10 +33,19 @@ import type { Inversion } from '$lib/theory/triad-shape';
 import type { StringSetId } from '$lib/instrument/string-sets';
 import { carryRoot, carryTriad } from './links';
 import { playback } from './playback.svelte';
+import { preferences } from './preferences.svelte';
 import type { SpellingOverride } from './triads-view';
 import { LISTEN_BPM } from './listen';
 
-let view = $state<TriadsViewState>(initialTriadsView(STANDARD_GUITAR));
+/** Remembered label type: part of the initial view and of `reset()` (010). */
+let preferredLabel: TriadsLabelType = 'interval';
+
+const initialView = (i: Instrument): TriadsViewState => ({
+  ...initialTriadsView(i),
+  labelType: preferredLabel
+});
+
+let view = $state<TriadsViewState>(initialView(STANDARD_GUITAR));
 let instrument = $state.raw<Instrument>(STANDARD_GUITAR);
 
 /** One-line, non-blocking message about the last applied change (A2). */
@@ -126,11 +136,17 @@ export const triads = {
   },
   /** Reset tool: back to the initial state, view isolated (C14). */
   reset(): void {
-    apply(resetTriads(instrument));
+    apply({ ...resetTriads(instrument), labelType: preferredLabel });
     notice = null;
   },
   setLabelType(t: TriadsLabelType): void {
     apply(setLabelType(view, t));
+    preferences.remember({ labels: { triads: t } });
+  },
+  /** Apply a remembered label type: no playback stop, no write (010). */
+  restoreLabelType(t: TriadsLabelType): void {
+    preferredLabel = t;
+    view = setLabelType(view, t);
   },
   /** Compare on/off (S2, S3). */
   setCompare(on: boolean): void {
@@ -146,13 +162,24 @@ export const triads = {
   octaveDown(): void {
     apply(octaveDown(view, instrument));
   },
-  /** Switch instrument: revalidate nothing yet (later stories); playback stops iff it changed. */
+  /**
+   * Apply an instrument: keep the whole view, revalidate (clamp occurrence / string set).
+   * Returns whether the view changed. Never stops playback (the orchestrator does).
+   */
+  applyInstrument(next: Instrument): boolean {
+    if (next === instrument) return false;
+    instrument = next;
+    const revalidated = revalidate(view, next);
+    const adjusted = revalidated !== view;
+    view = revalidated;
+    if (adjusted) notice = null;
+    return adjusted;
+  },
+  /** Test-hook switch: stop playback (reason `instrument`), then apply. */
   useInstrument(next: Instrument): void {
     if (next === instrument) return;
     playback.stop('instrument');
-    instrument = next;
-    view = initialTriadsView(next);
-    notice = null;
+    this.applyInstrument(next);
   },
   /** Sound the shape low → mid → high, then the block (new `sequence` interrupts; no `stop`). */
   listen(): void {
@@ -176,6 +203,7 @@ export const triads = {
 /** Test seam: restore the initial view for `instrument` (Vitest only). */
 export function resetTriadsForTests(next: Instrument = STANDARD_GUITAR): void {
   instrument = next;
-  view = initialTriadsView(next);
+  preferredLabel = 'interval';
+  view = initialView(next);
   notice = null;
 }

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { runAxe } from './support/helpers';
+
 /** TM-9 screenshot views 1–5 (contracts/test-hooks.md). Semantic facts are asserted too. */
 
 const selector = (page: Page) => page.getByRole('group', { name: 'Choose notes' });
@@ -80,6 +82,7 @@ test.describe('TM-9 views', () => {
     await expect(description(page)).toContainText('strings 1 to 7');
     // 7 strings × frets 0–5 = 42 labeled markers
     await expect(board(page).locator('.marker.normal text.marker-label')).toHaveCount(42);
+    await runAxe(page);
     await expect(page).toHaveScreenshot('tm9-view-4.png');
   });
 

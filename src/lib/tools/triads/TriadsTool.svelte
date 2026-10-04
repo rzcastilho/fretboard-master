@@ -10,6 +10,7 @@
   import { triads } from '$lib/state/triads.svelte';
   import { noteLabel } from '$lib/notation/notation';
   import { qualityName } from '$lib/state/triads-model';
+  import { instrument } from '$lib/state/instrument.svelte';
   import Notice from '$lib/shell/Notice.svelte';
   import { onMount } from 'svelte';
   import CompositionPanel from './CompositionPanel.svelte';
@@ -46,6 +47,11 @@
     triads.activate(p);
     if (__FM_FAULT_INJECTION__) (globalThis.__fmFretboardEvents ??= []).push({ ...p });
   }
+
+  // R-05: the tool's own notice wins and clears the adjustment notice.
+  $effect(() => {
+    if (triads.notice !== null && instrument.adjustedIn === 'triads') instrument.dismissAdjusted();
+  });
 </script>
 
 <section class="b" aria-labelledby="triads-zone-b">
@@ -86,6 +92,9 @@
 </div>
 <section class="e" aria-labelledby="triads-zone-e">
   <h2 id="triads-zone-e">{m.zone_actions()}</h2>
+  {#if instrument.adjustedIn === 'triads' && triads.notice === null}
+    <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
+  {/if}
   {#if triads.notice?.kind === 'compare-swapped'}
     {#key triads.notice}
       <Notice

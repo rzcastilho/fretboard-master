@@ -1,0 +1,350 @@
+- generic [ref=e2]:
+  - dialog [ref=e299]:
+    - generic [ref=e300]:
+      - heading "Instrument" [level=2] [ref=e301]
+      - group "Tuning" [ref=e302]:
+        - generic [ref=e304] [cursor=pointer]:
+          - 'radio "Standard: E, A, D, G, B, and E" [ref=e305]'
+          - generic [ref=e306]:
+            - generic [aria-hidden] [ref=e307]: Standard
+            - generic [aria-hidden] [ref=e308]: E A D G B E
+        - generic [ref=e309] [cursor=pointer]:
+          - 'radio "Half step down: E flat, A flat, D flat, G flat, B flat, and E flat" [ref=e310]'
+          - generic [ref=e311]:
+            - generic [aria-hidden] [ref=e312]: Half step down
+            - generic [aria-hidden] [ref=e313]: E♭ A♭ D♭ G♭ B♭ E♭
+        - generic [ref=e314] [cursor=pointer]:
+          - 'radio "Whole step down: D, G, C, F, A, and D" [ref=e315]'
+          - generic [ref=e316]:
+            - generic [aria-hidden] [ref=e317]: Whole step down
+            - generic [aria-hidden] [ref=e318]: D G C F A D
+        - generic [ref=e319] [cursor=pointer]:
+          - 'radio "Drop D: D, A, D, G, B, and E" [checked] [active] [ref=e320]'
+          - generic [ref=e321]:
+            - generic [aria-hidden] [ref=e322]: Drop D
+            - generic [aria-hidden] [ref=e323]: D A D G B E
+        - generic [ref=e324] [cursor=pointer]:
+          - 'radio "Drop C: C, G, C, F, A, and D" [ref=e325]'
+          - generic [ref=e326]:
+            - generic [aria-hidden] [ref=e327]: Drop C
+            - generic [aria-hidden] [ref=e328]: C G C F A D
+        - generic [ref=e329] [cursor=pointer]:
+          - 'radio "Double Drop D: D, A, D, G, B, and D" [ref=e330]'
+          - generic [ref=e331]:
+            - generic [aria-hidden] [ref=e332]: Double Drop D
+            - generic [aria-hidden] [ref=e333]: D A D G B D
+        - generic [ref=e334] [cursor=pointer]:
+          - 'radio "DADGAD: D, A, D, G, A, and D" [ref=e335]'
+          - generic [ref=e336]:
+            - generic [aria-hidden] [ref=e337]: DADGAD
+            - generic [aria-hidden] [ref=e338]: D A D G A D
+        - generic [ref=e339] [cursor=pointer]:
+          - 'radio "Open G: D, G, D, G, B, and D" [ref=e340]'
+          - generic [ref=e341]:
+            - generic [aria-hidden] [ref=e342]: Open G
+            - generic [aria-hidden] [ref=e343]: D G D G B D
+        - generic [ref=e344] [cursor=pointer]:
+          - 'radio "Open D: D, A, D, F sharp, A, and D" [ref=e345]'
+          - generic [ref=e346]:
+            - generic [aria-hidden] [ref=e347]: Open D
+            - generic [aria-hidden] [ref=e348]: D A D F♯ A D
+        - generic [ref=e349] [cursor=pointer]:
+          - 'radio "Open E: E, B, E, G sharp, B, and E" [ref=e350]'
+          - generic [ref=e351]:
+            - generic [aria-hidden] [ref=e352]: Open E
+            - generic [aria-hidden] [ref=e353]: E B E G♯ B E
+        - generic [ref=e354] [cursor=pointer]:
+          - 'radio "Open A: E, A, E, A, C sharp, and E" [ref=e355]'
+          - generic [ref=e356]:
+            - generic [aria-hidden] [ref=e357]: Open A
+            - generic [aria-hidden] [ref=e358]: E A E A C♯ E
+      - generic [ref=e359]:
+        - generic [ref=e360]: Frets
+        - generic [ref=e361]:
+          - button "Fewer frets" [ref=e362] [cursor=pointer]: −
+          - spinbutton "Frets" [ref=e363]: "22"
+          - button "More frets" [ref=e364] [cursor=pointer]: +
+      - figure "Preview" [ref=e365]:
+        - img [aria-hidden]:
+          - generic: E
+          - generic: B
+          - generic: G
+          - generic: D
+          - generic: A
+          - generic: D
+      - generic [ref=e367]:
+        - button "Restore default" [ref=e368] [cursor=pointer]
+        - button "Confirm" [ref=e369] [cursor=pointer]
+        - button "Close" [ref=e370] [cursor=pointer]
+  - banner "Application bar" [ref=e3]:
+    - navigation "Tools" [ref=e4]:
+      - list [ref=e5]:
+        - listitem [ref=e6]:
+          - link "Home" [ref=e7] [cursor=pointer]:
+            - /url: /
+        - listitem [ref=e8]:
+          - link "Fretboard Notes" [ref=e9] [cursor=pointer]:
+            - /url: /notes
+        - listitem [ref=e10]:
+          - link "Triads" [ref=e11] [cursor=pointer]:
+            - /url: /triads
+        - listitem [ref=e12]:
+          - link "About" [ref=e13] [cursor=pointer]:
+            - /url: /about
+    - button "Instrument" [ref=e14] [cursor=pointer]
+    - group "Sound" [ref=e15]:
+      - button "Mute sound" [ref=e16] [cursor=pointer]
+      - button "Sound settings" [ref=e21] [cursor=pointer]
+      - generic [ref=e27]: Sound on
+  - main [ref=e28]:
+    - heading "Triads" [level=1] [ref=e29]
+    - generic [ref=e30]:
+      - region [ref=e31]:
+        - heading "Main controls" [level=2] [ref=e32]
+        - generic [ref=e33]:
+          - radiogroup "View" [ref=e34]:
+            - generic [aria-hidden] [ref=e35]: View
+            - radio "Isolated" [checked] [ref=e36] [cursor=pointer]
+            - radio "Full neck" [ref=e37] [cursor=pointer]
+            - radio "All notes" [ref=e38] [cursor=pointer]
+          - group "Root" [ref=e39]:
+            - button "C" [pressed] [ref=e40] [cursor=pointer]
+            - button "C sharp or D flat" [ref=e41] [cursor=pointer]: C♯ / D♭
+            - button "D" [ref=e42] [cursor=pointer]
+            - button "D sharp or E flat" [ref=e43] [cursor=pointer]: D♯ / E♭
+            - button "E" [ref=e44] [cursor=pointer]
+            - button "F" [ref=e45] [cursor=pointer]
+            - button "F sharp or G flat" [ref=e46] [cursor=pointer]: F♯ / G♭
+            - button "G" [ref=e47] [cursor=pointer]
+            - button "G sharp or A flat" [ref=e48] [cursor=pointer]: G♯ / A♭
+            - button "A" [ref=e49] [cursor=pointer]
+            - button "A sharp or B flat" [ref=e50] [cursor=pointer]: A♯ / B♭
+            - button "B" [ref=e51] [cursor=pointer]
+          - radiogroup "Quality" [ref=e52]:
+            - generic [aria-hidden] [ref=e53]: Quality
+            - radio "major" [checked] [ref=e54] [cursor=pointer]
+            - radio "minor" [ref=e55] [cursor=pointer]
+            - radio "diminished" [ref=e56] [cursor=pointer]
+            - radio "augmented" [ref=e57] [cursor=pointer]
+          - radiogroup "Inversion" [ref=e58]:
+            - generic [aria-hidden] [ref=e59]: Inversion
+            - radio "Root position" [checked] [ref=e60] [cursor=pointer]
+            - radio "1st inversion" [ref=e61] [cursor=pointer]
+            - radio "2nd inversion" [ref=e62] [cursor=pointer]
+          - radiogroup "String set" [ref=e63]:
+            - generic [aria-hidden] [ref=e64]: String set
+            - radio "6-5-4" [ref=e65] [cursor=pointer]
+            - radio "5-4-3" [ref=e66] [cursor=pointer]
+            - radio "4-3-2" [ref=e67] [cursor=pointer]
+            - radio "3-2-1" [checked] [ref=e68] [cursor=pointer]
+      - region [ref=e69]:
+        - heading "Fretboard" [level=2] [ref=e70]
+        - generic [ref=e71]:
+          - grid "Fretboard" [ref=e73]:
+            - generic [aria-hidden] [ref=e74]:
+              - generic [ref=e87]: 1 E
+              - generic [ref=e88]: 2 B
+              - generic [ref=e89]: 3 G
+              - generic [ref=e90]: 4 D
+              - generic [ref=e91]: 5 A
+              - generic [ref=e92]: 6 E
+              - generic [ref=e93]: "1"
+              - generic [ref=e94]: "2"
+              - generic [ref=e95]: "3"
+              - generic [ref=e96]: "4"
+              - generic [ref=e97]: "5"
+              - generic [ref=e98]: "6"
+              - generic [ref=e99]: "7"
+              - generic [ref=e100]: "8"
+              - generic [ref=e101]: "9"
+              - generic [ref=e102]: "10"
+              - generic [ref=e103]: "11"
+              - generic [ref=e104]: "12"
+              - generic [ref=e105]: "13"
+              - generic [ref=e106]: "14"
+              - generic [ref=e107]: "15"
+              - generic [ref=e108]: "16"
+              - generic [ref=e109]: "17"
+              - generic [ref=e110]: "18"
+              - generic [ref=e111]: "19"
+              - generic [ref=e112]: "20"
+              - generic [ref=e113]: "21"
+              - generic [ref=e114]: "22"
+            - generic [aria-hidden] [ref=e115]:
+              - generic: R
+              - generic: "3"
+              - generic: "5"
+            - row [ref=e116]:
+              - gridcell "E, string 1, open" [ref=e117]
+              - gridcell "F, string 1, fret 1" [ref=e118]
+              - gridcell "F sharp, string 1, fret 2" [ref=e119]
+              - gridcell "G, string 1, fret 3, fifth" [ref=e120]
+              - gridcell "G sharp, string 1, fret 4" [ref=e121]
+              - gridcell "A, string 1, fret 5" [ref=e122]
+              - gridcell "A sharp, string 1, fret 6" [ref=e123]
+              - gridcell "B, string 1, fret 7" [ref=e124]
+              - gridcell "C, string 1, fret 8" [ref=e125]
+              - gridcell "C sharp, string 1, fret 9" [ref=e126]
+              - gridcell "D, string 1, fret 10" [ref=e127]
+              - gridcell "D sharp, string 1, fret 11" [ref=e128]
+              - gridcell "E, string 1, fret 12" [ref=e129]
+              - gridcell "F, string 1, fret 13" [ref=e130]
+              - gridcell "F sharp, string 1, fret 14" [ref=e131]
+              - gridcell "G, string 1, fret 15" [ref=e132]
+              - gridcell "G sharp, string 1, fret 16" [ref=e133]
+              - gridcell "A, string 1, fret 17" [ref=e134]
+              - gridcell "A sharp, string 1, fret 18" [ref=e135]
+              - gridcell "B, string 1, fret 19" [ref=e136]
+              - gridcell "C, string 1, fret 20" [ref=e137]
+              - gridcell "C sharp, string 1, fret 21" [ref=e138]
+              - gridcell "D, string 1, fret 22" [ref=e139]
+            - row [ref=e140]:
+              - gridcell "B, string 2, open" [ref=e141]
+              - gridcell "C, string 2, fret 1" [ref=e142]
+              - gridcell "C sharp, string 2, fret 2" [ref=e143]
+              - gridcell "D, string 2, fret 3" [ref=e144]
+              - gridcell "D sharp, string 2, fret 4" [ref=e145]
+              - gridcell "E, string 2, fret 5, third" [ref=e146]
+              - gridcell "F, string 2, fret 6" [ref=e147]
+              - gridcell "F sharp, string 2, fret 7" [ref=e148]
+              - gridcell "G, string 2, fret 8" [ref=e149]
+              - gridcell "G sharp, string 2, fret 9" [ref=e150]
+              - gridcell "A, string 2, fret 10" [ref=e151]
+              - gridcell "A sharp, string 2, fret 11" [ref=e152]
+              - gridcell "B, string 2, fret 12" [ref=e153]
+              - gridcell "C, string 2, fret 13" [ref=e154]
+              - gridcell "C sharp, string 2, fret 14" [ref=e155]
+              - gridcell "D, string 2, fret 15" [ref=e156]
+              - gridcell "D sharp, string 2, fret 16" [ref=e157]
+              - gridcell "E, string 2, fret 17" [ref=e158]
+              - gridcell "F, string 2, fret 18" [ref=e159]
+              - gridcell "F sharp, string 2, fret 19" [ref=e160]
+              - gridcell "G, string 2, fret 20" [ref=e161]
+              - gridcell "G sharp, string 2, fret 21" [ref=e162]
+              - gridcell "A, string 2, fret 22" [ref=e163]
+            - row [ref=e164]:
+              - gridcell "G, string 3, open" [ref=e165]
+              - gridcell "G sharp, string 3, fret 1" [ref=e166]
+              - gridcell "A, string 3, fret 2" [ref=e167]
+              - gridcell "A sharp, string 3, fret 3" [ref=e168]
+              - gridcell "B, string 3, fret 4" [ref=e169]
+              - gridcell "C, string 3, fret 5, root" [ref=e170]
+              - gridcell "C sharp, string 3, fret 6" [ref=e171]
+              - gridcell "D, string 3, fret 7" [ref=e172]
+              - gridcell "D sharp, string 3, fret 8" [ref=e173]
+              - gridcell "E, string 3, fret 9" [ref=e174]
+              - gridcell "F, string 3, fret 10" [ref=e175]
+              - gridcell "F sharp, string 3, fret 11" [ref=e176]
+              - gridcell "G, string 3, fret 12" [ref=e177]
+              - gridcell "G sharp, string 3, fret 13" [ref=e178]
+              - gridcell "A, string 3, fret 14" [ref=e179]
+              - gridcell "A sharp, string 3, fret 15" [ref=e180]
+              - gridcell "B, string 3, fret 16" [ref=e181]
+              - gridcell "C, string 3, fret 17" [ref=e182]
+              - gridcell "C sharp, string 3, fret 18" [ref=e183]
+              - gridcell "D, string 3, fret 19" [ref=e184]
+              - gridcell "D sharp, string 3, fret 20" [ref=e185]
+              - gridcell "E, string 3, fret 21" [ref=e186]
+              - gridcell "F, string 3, fret 22" [ref=e187]
+            - row [ref=e188]:
+              - gridcell "D, string 4, open" [ref=e189]
+              - gridcell "D sharp, string 4, fret 1" [ref=e190]
+              - gridcell "E, string 4, fret 2" [ref=e191]
+              - gridcell "F, string 4, fret 3" [ref=e192]
+              - gridcell "F sharp, string 4, fret 4" [ref=e193]
+              - gridcell "G, string 4, fret 5" [ref=e194]
+              - gridcell "G sharp, string 4, fret 6" [ref=e195]
+              - gridcell "A, string 4, fret 7" [ref=e196]
+              - gridcell "A sharp, string 4, fret 8" [ref=e197]
+              - gridcell "B, string 4, fret 9" [ref=e198]
+              - gridcell "C, string 4, fret 10" [ref=e199]
+              - gridcell "C sharp, string 4, fret 11" [ref=e200]
+              - gridcell "D, string 4, fret 12" [ref=e201]
+              - gridcell "D sharp, string 4, fret 13" [ref=e202]
+              - gridcell "E, string 4, fret 14" [ref=e203]
+              - gridcell "F, string 4, fret 15" [ref=e204]
+              - gridcell "F sharp, string 4, fret 16" [ref=e205]
+              - gridcell "G, string 4, fret 17" [ref=e206]
+              - gridcell "G sharp, string 4, fret 18" [ref=e207]
+              - gridcell "A, string 4, fret 19" [ref=e208]
+              - gridcell "A sharp, string 4, fret 20" [ref=e209]
+              - gridcell "B, string 4, fret 21" [ref=e210]
+              - gridcell "C, string 4, fret 22" [ref=e211]
+            - row [ref=e212]:
+              - gridcell "A, string 5, open" [ref=e213]
+              - gridcell "A sharp, string 5, fret 1" [ref=e214]
+              - gridcell "B, string 5, fret 2" [ref=e215]
+              - gridcell "C, string 5, fret 3" [ref=e216]
+              - gridcell "C sharp, string 5, fret 4" [ref=e217]
+              - gridcell "D, string 5, fret 5" [ref=e218]
+              - gridcell "D sharp, string 5, fret 6" [ref=e219]
+              - gridcell "E, string 5, fret 7" [ref=e220]
+              - gridcell "F, string 5, fret 8" [ref=e221]
+              - gridcell "F sharp, string 5, fret 9" [ref=e222]
+              - gridcell "G, string 5, fret 10" [ref=e223]
+              - gridcell "G sharp, string 5, fret 11" [ref=e224]
+              - gridcell "A, string 5, fret 12" [ref=e225]
+              - gridcell "A sharp, string 5, fret 13" [ref=e226]
+              - gridcell "B, string 5, fret 14" [ref=e227]
+              - gridcell "C, string 5, fret 15" [ref=e228]
+              - gridcell "C sharp, string 5, fret 16" [ref=e229]
+              - gridcell "D, string 5, fret 17" [ref=e230]
+              - gridcell "D sharp, string 5, fret 18" [ref=e231]
+              - gridcell "E, string 5, fret 19" [ref=e232]
+              - gridcell "F, string 5, fret 20" [ref=e233]
+              - gridcell "F sharp, string 5, fret 21" [ref=e234]
+              - gridcell "G, string 5, fret 22" [ref=e235]
+            - row [ref=e236]:
+              - gridcell "E, string 6, open" [ref=e237]
+              - gridcell "F, string 6, fret 1" [ref=e238]
+              - gridcell "F sharp, string 6, fret 2" [ref=e239]
+              - gridcell "G, string 6, fret 3" [ref=e240]
+              - gridcell "G sharp, string 6, fret 4" [ref=e241]
+              - gridcell "A, string 6, fret 5" [ref=e242]
+              - gridcell "A sharp, string 6, fret 6" [ref=e243]
+              - gridcell "B, string 6, fret 7" [ref=e244]
+              - gridcell "C, string 6, fret 8" [ref=e245]
+              - gridcell "C sharp, string 6, fret 9" [ref=e246]
+              - gridcell "D, string 6, fret 10" [ref=e247]
+              - gridcell "D sharp, string 6, fret 11" [ref=e248]
+              - gridcell "E, string 6, fret 12" [ref=e249]
+              - gridcell "F, string 6, fret 13" [ref=e250]
+              - gridcell "F sharp, string 6, fret 14" [ref=e251]
+              - gridcell "G, string 6, fret 15" [ref=e252]
+              - gridcell "G sharp, string 6, fret 16" [ref=e253]
+              - gridcell "A, string 6, fret 17" [ref=e254]
+              - gridcell "A sharp, string 6, fret 18" [ref=e255]
+              - gridcell "B, string 6, fret 19" [ref=e256]
+              - gridcell "C, string 6, fret 20" [ref=e257]
+              - gridcell "C sharp, string 6, fret 21" [ref=e258]
+              - gridcell "D, string 6, fret 22" [ref=e259]
+          - button "Show text description" [ref=e261] [cursor=pointer]
+      - region [ref=e263]:
+        - heading "Composition" [level=2] [ref=e264]
+        - paragraph [ref=e265]: C major — Root position
+        - heading "Notes" [level=3] [ref=e266]
+        - list "Notes" [ref=e267]:
+          - listitem "C, root" [ref=e268]:
+            - generic [aria-hidden] [ref=e271]: C
+          - listitem "E, third" [ref=e272]:
+            - generic [aria-hidden] [ref=e275]: E
+          - listitem "G, fifth" [ref=e276]:
+            - generic [aria-hidden] [ref=e279]: G
+        - heading "Intervals" [level=3] [ref=e280]
+        - paragraph [ref=e281]: R – 3 – 5
+        - heading "Stacking" [level=3] [ref=e282]
+        - paragraph [ref=e283]: major third + minor third
+        - heading "Low to high" [level=3] [ref=e284]
+        - paragraph [ref=e285]: C (root), E (third), G (fifth)
+      - region [ref=e286]:
+        - heading "Actions" [level=2] [ref=e287]
+        - button "Compare" [ref=e289] [cursor=pointer]
+        - generic [ref=e290]:
+          - radiogroup "Labels" [ref=e291]:
+            - generic [aria-hidden] [ref=e292]: Labels
+            - radio "Intervals" [checked] [ref=e293] [cursor=pointer]
+            - radio "Note names" [ref=e294] [cursor=pointer]
+          - button "Octave down" [disabled] [ref=e295]
+          - button "Octave up" [ref=e296] [cursor=pointer]
+          - button "Listen" [ref=e297] [cursor=pointer]
+          - button "Reset tool" [ref=e298] [cursor=pointer]

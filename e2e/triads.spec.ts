@@ -510,3 +510,135 @@ test.describe('triads cross-cutting (T067)', () => {
     await runAxe(wide);
   });
 });
+
+test.describe('triads on seven strings (012 US3)', () => {
+  const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.__fmInstrument = 'AF-21';
+    });
+  });
+
+  test('Q11: 7-6-5 first in the set selector; C major root 13-12-10; E minor root 5-3-2', async ({
+    page
+  }) => {
+    await page.goto('/triads');
+    const sets = page.getByRole('radiogroup', { name: /string set/i });
+    await expect(sets.getByRole('radio')).toHaveText(['7-6-5', '6-5-4', '5-4-3', '4-3-2', '3-2-1']);
+    await sets.getByRole('radio', { name: '7-6-5' }).click();
+    await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
+    await expect(page.locator('.description')).toContainText(/frets 13,? ?12,? ?10/);
+    await expect(board(page).locator('.marker.normal, .marker').first()).toBeVisible();
+
+    await page
+      .getByRole('group', { name: 'Root' })
+      .getByRole('button', { name: 'E', exact: true })
+      .click();
+    await page.getByRole('radio', { name: 'minor' }).click();
+    await expect(page.getByText('E minor — Root position', { exact: true })).toBeVisible();
+    await expect(page.locator('.description')).toContainText(/frets 5,? ?3,? ?2/);
+    await runAxe(page);
+  });
+
+  test('Q11: the notes sound at their calculated pitches (C3 E3 G3 on 7-6-5)', async ({ page }) => {
+    await page.goto('/triads');
+    await page
+      .getByRole('radiogroup', { name: /string set/i })
+      .getByRole('radio', { name: '7-6-5' })
+      .click();
+    await page.getByRole('button', { name: 'Listen', exact: true }).click();
+    await expect
+      .poll(async () => (await readAudioLog(page)).filter((e) => e.type === 'step').length)
+      .toBeGreaterThanOrEqual(4);
+    const steps = (await readAudioLog(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    // B1 35 + 13 = 48 (C3), E2 40 + 12 = 52 (E3), A2 45 + 10 = 55 (G3)
+    expect(steps.slice(0, 4).map((e) => [...e.pitches].sort((a, b) => a - b))).toEqual([
+      [48],
+      [52],
+      [55],
+      [48, 52, 55]
+    ]);
+  });
+
+  test('Q14: with 12 frets, 7-6-5 C major root shows the beyond-fret-12 guidance', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      globalThis.__fmInstrument = undefined;
+    });
+    await page.goto('/triads');
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: '7 strings' }).check();
+    const spin = dialog.getByRole('spinbutton', { name: 'Frets' });
+    await spin.focus();
+    await page.keyboard.press('Home');
+    await expect(spin).toHaveAttribute('aria-valuenow', '12');
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    await page
+      .getByRole('radiogroup', { name: /string set/i })
+      .getByRole('radio', { name: '7-6-5' })
+      .click();
+    await expect(page.getByText('This shape lies beyond fret 12', { exact: true })).toBeVisible();
+    await expect(page.getByText(/does not close/)).toHaveCount(0);
+    await runAxe(page);
+  });
+});
+
+test.describe('triads: string-count change (012 US4)', () => {
+  const ADJUSTED = 'We adjusted the view to the new instrument';
+  const sets = (page: Page) => page.getByRole('radiogroup', { name: /string set/i });
+
+  const chooseStrings = async (page: Page, count: 6 | 7) => {
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: `${count} strings` }).check();
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    await expect(dialog).toBeHidden();
+  };
+
+  test('Q12: 7-6-5 → 6 strings lands on 6-5-4 with a polite notice that can be dismissed', async ({
+    page
+  }) => {
+    await page.goto('/triads');
+    await chooseStrings(page, 7);
+    await sets(page).getByRole('radio', { name: '7-6-5' }).click();
+    await expect(sets(page).getByRole('radio', { name: '7-6-5' })).toBeChecked();
+
+    await chooseStrings(page, 6);
+    const status = page.getByRole('status').filter({ hasText: ADJUSTED });
+    await expect(status).toBeVisible();
+    await expect(status).toHaveAttribute('aria-live', 'polite');
+    await expect(sets(page).getByRole('radio')).toHaveText(['6-5-4', '5-4-3', '4-3-2', '3-2-1']);
+    await expect(sets(page).getByRole('radio', { name: '6-5-4' })).toBeChecked();
+    await expect(page.locator('.description')).toContainText(/6/);
+    await runAxe(page);
+
+    await status.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(page.getByText(ADJUSTED)).toHaveCount(0);
+  });
+
+  test('Q13: 7 → 6 strings on another set shows no notice and keeps the set', async ({ page }) => {
+    await page.goto('/triads');
+    await chooseStrings(page, 7);
+    await sets(page).getByRole('radio', { name: '5-4-3' }).click();
+    await chooseStrings(page, 6);
+    await expect(sets(page).getByRole('radio', { name: '5-4-3' })).toBeChecked();
+    await expect(page.getByText(ADJUSTED)).toHaveCount(0);
+  });
+
+  test('6 → 7 strings keeps the view with no notice', async ({ page }) => {
+    await page.goto('/triads');
+    await sets(page).getByRole('radio', { name: '6-5-4' }).click();
+    await chooseStrings(page, 7);
+    await expect(sets(page).getByRole('radio', { name: '6-5-4' })).toBeChecked();
+    await expect(page.getByText(ADJUSTED)).toHaveCount(0);
+  });
+});

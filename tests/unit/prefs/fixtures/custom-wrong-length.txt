@@ -1,0 +1,1 @@
+{"version":1,"tuning":"AF-3","customTuning":[0,0,0,0,0],"frets":20}

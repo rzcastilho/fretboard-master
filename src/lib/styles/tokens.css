@@ -61,6 +61,7 @@
   --fb-string-width-4: 0.1875rem;
   --fb-string-width-5: 0.25rem;
   --fb-string-width-6: 0.3125rem;
+  --fb-string-width-7: 0.375rem;
   --fb-thumb-row: 0.5rem;
   --fb-thumb-open-col: 0.5rem;
   --fb-thumb-fret: 0.75rem;
@@ -131,6 +132,10 @@
   --pulse-scale: 1.25;
   --pulse-opacity-peak: 0.85;
   --sound-panel-width: 16rem;
+  /* Instrument panel */
+  --instrument-panel-width: 22rem;
+  --instrument-sheet-max-block-size: 90dvh;
+  --color-backdrop: rgb(0 0 0 / 0.5);
   --icon-size: 1.5rem;
   --color-sound-panel-border: var(--color-border);
   --card-min-inline: 16rem;

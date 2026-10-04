@@ -460,3 +460,80 @@ test.describe('accessibility and responsive (US5)', () => {
     await expectNoHorizontalScroll(page);
   });
 });
+
+// US5 / Q18: seven strings × 24 frets stay legible and reachable.
+test.describe('seven-string fretboard (US5, Q18)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      if (localStorage.getItem('__seeded7') === null) {
+        localStorage.setItem(
+          'fretboard-master:prefs',
+          JSON.stringify({ version: 1, tuning: 'AF-21', strings: 7, frets: 24 })
+        );
+        localStorage.setItem('__seeded7', '1');
+      }
+    });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+  });
+
+  test('ArrowDown from string 6 reaches string 7 and it is announced', async ({ page }) => {
+    const grid = page.getByRole('grid', { name: 'Fretboard' });
+    await expect(grid.getByRole('row')).toHaveCount(7);
+    await grid.locator('.cell[data-string="6"][data-fret="0"]').focus();
+    await page.keyboard.press('ArrowDown');
+    const focused = page.locator('.cell:focus');
+    await expect(focused).toHaveAttribute('data-string', '7');
+    await expect(focused).toHaveAccessibleName(/^B, string 7, open/);
+    await expect(grid.locator('.string-label').last()).toHaveText('7 B');
+  });
+
+  test('string 7 is the thickest line, drawn from the token', async ({ page }) => {
+    const width = (n: number) =>
+      page
+        .locator(`.string-${n}`)
+        .first()
+        .evaluate((el) => parseFloat(getComputedStyle(el).strokeWidth));
+    expect(await width(7)).toBeGreaterThan(await width(6));
+    expect(await width(7)).toBeCloseTo(6, 0); // 0.375rem at 16px
+  });
+
+  test('cells keep 44×44 px targets at 1280 and at 320 px with 24 frets', async ({ page }) => {
+    for (const width of [1280, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/notes');
+      await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+      const box = await page.locator('.cell[data-string="7"][data-fret="1"]').boundingBox();
+      if (!box) throw new Error('missing box');
+      expect(box.width).toBeGreaterThanOrEqual(43.5);
+      expect(box.height).toBeGreaterThanOrEqual(43.5);
+      await expectNoHorizontalScroll(page);
+    }
+  });
+
+  test('root markers on neighbouring strings at the same fret do not intersect', async ({
+    page
+  }) => {
+    await page
+      .getByRole('radiogroup', { name: 'Show' })
+      .getByRole('radio', { name: 'All notes' })
+      .click();
+    const grid = page.getByRole('grid', { name: 'Fretboard' });
+    const box = async (key: string) => {
+      const b = await grid.locator(`.marker[data-key="${key}"]`).boundingBox();
+      if (!b) throw new Error(`missing marker ${key}`);
+      return b;
+    };
+    for (const fret of [0, 1, 5, 12, 24]) {
+      const a = await box(`6:${fret}`);
+      const b = await box(`7:${fret}`);
+      const overlap =
+        a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      expect(overlap, `fret ${fret}`).toBe(false);
+    }
+  });
+
+  test('axe clean with the seven-string board', async ({ page }) => {
+    await runAxe(page);
+  });
+});

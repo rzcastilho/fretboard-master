@@ -447,3 +447,418 @@ test.describe('linked-tools carry latency (SC-005, FR-017)', () => {
     expect(median(times)).toBeLessThanOrEqual(300);
   });
 });
+
+test.describe('instrument change latency (SC-001)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median Confirm → fretboard with the new open-string label ≤ 300 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+
+    // Measured in the page (pointerdown on Confirm → string 6 label changed), so Playwright
+    // round-trips under throttling are not counted.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as {
+        __instrTimes: number[];
+        __downAt: number | null;
+        __expect: RegExp | null;
+      };
+      w.__instrTimes = [];
+      w.__downAt = null;
+      w.__expect = null;
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || w.__expect === null) return;
+        const labels = [...document.querySelectorAll('[role="grid"] .string-label')];
+        if (!labels.some((n) => w.__expect?.test(n.textContent?.trim() ?? ''))) return;
+        w.__instrTimes.push(performance.now() - w.__downAt);
+        w.__downAt = null;
+      }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    });
+    const arm = (source: string) =>
+      page.evaluate((s) => {
+        const w = globalThis as unknown as { __expect: RegExp; __downAt: number | null };
+        w.__expect = new RegExp(s);
+        w.__downAt = null;
+      }, source);
+
+    const opener = page.getByRole('button', { name: 'Instrument', exact: true });
+    const radio = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}:`) });
+    const samples = 5;
+    for (let i = 0; i < samples; i++) {
+      for (const [preset, label] of [
+        ['Drop D', /^6\s*D$/],
+        ['Standard', /^6\s*E$/]
+      ] as const) {
+        await opener.click();
+        const dialog = page.getByRole('dialog', { name: 'Instrument' });
+        await radio(preset).check();
+        await arm(label.source);
+        await dialog.getByRole('button', { name: 'Confirm' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(
+          page.locator('[role="grid"] .string-label').filter({ hasText: label })
+        ).toHaveCount(1);
+      }
+    }
+    const times = await page.evaluate(
+      () => (globalThis as unknown as { __instrTimes: number[] }).__instrTimes
+    );
+    expect(times.length).toBeGreaterThanOrEqual(samples * 2);
+    expect(median(times)).toBeLessThanOrEqual(300);
+  });
+});
+
+test.describe('remembered preferences (SC-006, SC-008)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  const record = JSON.stringify({
+    version: 1,
+    tuning: 'DROP-D',
+    frets: 15,
+    muted: true,
+    volume: 0.5,
+    lastTool: 'triads',
+    labels: { notes: 'interval', triads: 'name' }
+  });
+
+  test('seeded record: home usable ≤ 3 s, no AudioContext at startup, control change ≤ 100 ms', async ({
+    page
+  }) => {
+    await page.addInitScript((r) => {
+      localStorage.setItem('fretboard-master:prefs', r);
+      const w = globalThis as unknown as { __ctxCount: number; AudioContext: typeof AudioContext };
+      w.__ctxCount = 0;
+      const Native = w.AudioContext;
+      if (Native) {
+        w.AudioContext = class extends Native {
+          constructor(...args: ConstructorParameters<typeof AudioContext>) {
+            super(...args);
+            w.__ctxCount++;
+          }
+        };
+      }
+    }, record);
+
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+
+    const start = Date.now();
+    await page.goto('/');
+    await page.getByRole('link', { name: /^Continue: / }).waitFor();
+    expect(Date.now() - start).toBeLessThanOrEqual(3000);
+    expect(
+      await page.evaluate(() => (globalThis as unknown as { __ctxCount: number }).__ctxCount)
+    ).toBe(0);
+
+    // Control change (instrument Confirm) with a remembered record, measured in the page.
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await page.evaluate(() => {
+      const w = globalThis as unknown as { __prefMs: number[]; __prefDown: number | null };
+      w.__prefMs = [];
+      w.__prefDown = null;
+      document.addEventListener('pointerdown', (e) => (w.__prefDown = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__prefDown === null) return;
+        w.__prefMs.push(performance.now() - w.__prefDown);
+        w.__prefDown = null;
+      }).observe(document.querySelector('[role="grid"]') as Element, {
+        subtree: true,
+        childList: true,
+        characterData: true
+      });
+    });
+    const opener = page.getByRole('button', { name: 'Instrument', exact: true });
+    for (const preset of ['Standard', 'Drop D', 'Standard']) {
+      await opener.click();
+      const dialog = page.getByRole('dialog', { name: 'Instrument' });
+      await dialog.getByRole('radio', { name: new RegExp(`^${preset}:`) }).check();
+      await dialog.getByRole('button', { name: 'Confirm' }).click();
+      await expect(dialog).toBeHidden();
+    }
+    const times = await page.evaluate(
+      () => (globalThis as unknown as { __prefMs: number[] }).__prefMs
+    );
+    expect(times.length).toBeGreaterThan(0);
+    expect(median(times)).toBeLessThanOrEqual(100);
+  });
+});
+
+test.describe('custom tuning latency (011 SC-007)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('string step → preview ≤ 100 ms, Confirm → applied instrument ≤ 300 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await page
+      .getByRole('button', { name: /^6 strings|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: /^Custom/ }).check();
+
+    // Time from pointerdown until `ready()` first holds, measured in the page so Playwright
+    // round-trips under throttling are not counted.
+    const timeUntil = async (click: () => Promise<void>, ready: string): Promise<number> => {
+      await page.evaluate((src) => {
+        const w = globalThis as unknown as { __ms: number | null };
+        w.__ms = null;
+        const check = new Function(`return (${src})()`) as () => boolean;
+        let downAt = 0;
+        document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+          capture: true,
+          once: true
+        });
+        const observer = new MutationObserver(() => {
+          if (downAt === 0 || w.__ms !== null || !check()) return;
+          w.__ms = performance.now() - downAt;
+          observer.disconnect();
+        });
+        observer.observe(document.body, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+          attributes: true
+        });
+      }, ready);
+      await click();
+      await page.waitForFunction(
+        () => (globalThis as unknown as { __ms: number | null }).__ms !== null,
+        undefined,
+        { timeout: 5000 }
+      );
+      return page.evaluate(() => (globalThis as unknown as { __ms: number }).__ms);
+    };
+
+    const control: number[] = [];
+    for (const label of ['D♯', 'D', 'C♯']) {
+      control.push(
+        await timeUntil(
+          () => dialog.getByRole('button', { name: 'Lower string 6' }).click(),
+          `() => {
+            const labels = document.querySelectorAll('.fretboard-preview .string-label');
+            return labels[labels.length - 1]?.textContent?.trim() === ${JSON.stringify(label)};
+          }`
+        )
+      );
+    }
+    expect(median(control)).toBeLessThanOrEqual(100);
+
+    const applied = await timeUntil(
+      () => dialog.getByRole('button', { name: 'Confirm' }).click(),
+      `() => document.querySelector('[aria-label^="Tuning:"]') !== null && !document.querySelector('dialog[open]')`
+    );
+    expect(applied).toBeLessThanOrEqual(300);
+  });
+});
+
+test.describe('seven strings × 24 frets (US5, quickstart §4)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('Confirm → board ≤ 300 ms, control change ≤ 100 ms at 4× CPU throttle', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-1', frets: 24 })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    const board = page.getByRole('grid', { name: 'Fretboard' });
+    await board.waitFor();
+    await expect(board.getByRole('row')).toHaveCount(6);
+
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: '7 strings' }).check();
+    // Measured in the page: Confirm pointerdown → seven rows in the DOM.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as { __boardMs: number | null };
+      w.__boardMs = null;
+      let downAt = 0;
+      document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+        capture: true,
+        once: true
+      });
+      new MutationObserver((_, obs) => {
+        if (document.querySelectorAll('[role="grid"] [role="row"]').length !== 7) return;
+        w.__boardMs = performance.now() - downAt;
+        obs.disconnect();
+      }).observe(document.body, { subtree: true, childList: true });
+    });
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __boardMs: number | null }).__boardMs !== null
+    );
+    const boardMs = await page.evaluate(
+      () => (globalThis as unknown as { __boardMs: number }).__boardMs
+    );
+    expect(boardMs).toBeLessThanOrEqual(300);
+
+    await expect(board.getByRole('row')).toHaveCount(7);
+    await expect(board.locator('.cell')).toHaveCount(7 * 25);
+
+    // Control change on the seven-string board.
+    await page.evaluate(() => {
+      const w = globalThis as unknown as { __selectMs: number | null; __downAt: number | null };
+      w.__selectMs = null;
+      w.__downAt = null;
+      const grid = document.querySelector('[role="grid"]');
+      document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      new MutationObserver(() => {
+        if (w.__downAt === null || !grid?.querySelector('.marker.highlighted')) return;
+        w.__selectMs = performance.now() - w.__downAt;
+        w.__downAt = null;
+      }).observe(grid as Element, { subtree: true, childList: true, attributes: true });
+    });
+    await page
+      .getByRole('group', { name: 'Choose notes' })
+      .getByRole('button', { name: 'G', exact: true })
+      .click();
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __selectMs: number | null }).__selectMs !== null
+    );
+    const selectMs = await page.evaluate(
+      () => (globalThis as unknown as { __selectMs: number }).__selectMs
+    );
+    expect(selectMs).toBeLessThanOrEqual(100);
+
+    // Scroll/drag smoothness: scrolling the board across 24 frets stays inside .scroller.
+    const scroller = page.locator('.scroller').first();
+    const scrolled = await scroller.evaluate(async (el) => {
+      const frames: number[] = [];
+      let last = performance.now();
+      el.scrollLeft = 0;
+      for (let i = 1; i <= 20; i++) {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) * (i / 20);
+        await new Promise((r) => requestAnimationFrame(r));
+        const now = performance.now();
+        frames.push(now - last);
+        last = now;
+      }
+      return { worst: Math.max(...frames), moved: el.scrollLeft };
+    });
+    expect(scrolled.moved).toBeGreaterThan(0);
+    expect(scrolled.worst).toBeLessThanOrEqual(100);
+  });
+});
+
+test.describe('handedness and orientation (013 SC-006)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  const openPanel = async (page: Page) => {
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  };
+
+  /** Confirm pointerdown → first cell geometry showing `ready` appears, in the page. */
+  const timeConfirm = async (page: Page, ready: 'mirrored' | 'lowest-top'): Promise<number> => {
+    // No `new Function`/eval here: the app's CSP has no 'unsafe-eval'.
+    await page.evaluate((kind) => {
+      const w = globalThis as unknown as { __hMs: number | null };
+      w.__hMs = null;
+      let downAt = 0;
+      document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+        capture: true,
+        once: true
+      });
+      const isReady = () => {
+        if (kind === 'mirrored') {
+          const s = document.querySelector('.cell[data-string="1"][data-fret="0"]');
+          const t = document.querySelector('.cell[data-string="1"][data-fret="1"]');
+          return !!s && !!t && s.getBoundingClientRect().left > t.getBoundingClientRect().left;
+        }
+        const first = document.querySelector('[role="grid"] [role="row"] .cell');
+        return first?.getAttribute('data-string') === '6';
+      };
+      const check = () => {
+        if (w.__hMs !== null || !isReady()) return;
+        w.__hMs = performance.now() - downAt;
+        observer.disconnect(); // a later timeConfirm must not see this one's result
+      };
+      const observer = new MutationObserver(check);
+      observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true
+      });
+    }, ready);
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __hMs: number | null }).__hMs !== null
+    );
+    return page.evaluate(() => (globalThis as unknown as { __hMs: number }).__hMs);
+  };
+
+  test('switching handedness or orientation updates the board ≤ 100 ms at 4× throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+
+    let dialog = await openPanel(page);
+    await dialog.getByRole('radio', { name: 'Left-handed' }).check();
+    const handMs = await timeConfirm(page, 'mirrored');
+    expect(handMs).toBeLessThanOrEqual(100);
+
+    dialog = await openPanel(page);
+    await dialog.getByRole('radio', { name: 'Lowest string on top' }).check();
+    const topMs = await timeConfirm(page, 'lowest-top');
+    expect(topMs).toBeLessThanOrEqual(100);
+  });
+
+  test('left-handed 7 strings × 24 frets scrolls smoothly inside .scroller', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, strings: 7, tuning: 'AF-21', frets: 24, handedness: 'left' })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    const board = page.getByRole('grid', { name: 'Fretboard' });
+    await board.waitFor();
+    await expect(board.getByRole('row')).toHaveCount(7);
+    const scrolled = await page
+      .locator('.scroller')
+      .first()
+      .evaluate(async (el) => {
+        const frames: number[] = [];
+        let last = performance.now();
+        const max = el.scrollWidth - el.clientWidth;
+        el.scrollLeft = max;
+        for (let i = 1; i <= 20; i++) {
+          el.scrollLeft = max * (1 - i / 20);
+          await new Promise((r) => requestAnimationFrame(r));
+          const now = performance.now();
+          frames.push(now - last);
+          last = now;
+        }
+        return { worst: Math.max(...frames), start: max, end: el.scrollLeft };
+      });
+    expect(scrolled.start).toBeGreaterThan(0);
+    expect(scrolled.end).toBe(0);
+    expect(scrolled.worst).toBeLessThanOrEqual(100);
+  });
+});

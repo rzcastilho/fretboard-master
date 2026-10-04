@@ -19,7 +19,12 @@ declare global {
   var __fmInstrument:
     'AF-7' | 'AF-21' | 'AF-4' | 'AF-1-12' | 'NC-UNISON' | 'AF-8' | 'SHORT-7' | undefined;
 
-  namespace App {}
+  namespace App {
+    /** Shallow-routing state: the instrument panel owns one temporary history entry (R-07). */
+    interface PageState {
+      instrumentPanel?: boolean;
+    }
+  }
 }
 
 export {};

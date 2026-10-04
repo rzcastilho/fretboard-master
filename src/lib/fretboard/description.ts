@@ -39,7 +39,7 @@ export function positionName(instrument: Instrument, position: Position, marker?
   return name;
 }
 
-/** Positions are listed string 6→1, then fret ascending (data-model §8). */
+/** Positions are listed from the lowest string (highest number) to string 1, then fret ascending (data-model §8). */
 export function describeView(instrument: Instrument, model: DisplayModel): string {
   const seen = new Set<string>();
   const entries = model.markers

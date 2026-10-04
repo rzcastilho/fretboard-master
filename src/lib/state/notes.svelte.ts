@@ -9,6 +9,7 @@ import { LISTEN_BPM } from './listen';
 import { carrySelection } from './links';
 import { buildNotesModel, type NotesDisplay } from './notes-model';
 import {
+  adaptNotesView,
   addNote,
   clear,
   closeCard,
@@ -16,7 +17,6 @@ import {
   initialNotesView,
   openCard,
   reset,
-  revalidate,
   setBackground,
   setHideNames,
   setLabelType,
@@ -32,8 +32,17 @@ import {
   type RegionShortcut
 } from './notes-view';
 import { playback } from './playback.svelte';
+import { preferences } from './preferences.svelte';
 
-let view = $state<NotesViewState>(initialNotesView(STANDARD_GUITAR));
+/** Remembered label type: part of the initial view and of `reset()` (010). */
+let preferredLabel: LabelType = 'name';
+
+const initialView = (i: Instrument): NotesViewState => ({
+  ...initialNotesView(i),
+  labelType: preferredLabel
+});
+
+let view = $state<NotesViewState>(initialView(STANDARD_GUITAR));
 let instrument = $state.raw<Instrument>(STANDARD_GUITAR);
 
 const display = $derived<NotesDisplay>(buildNotesModel(view, instrument));
@@ -82,6 +91,12 @@ export const notes = {
   },
   setLabelType(t: LabelType): void {
     apply(setLabelType(view, t));
+    preferences.remember({ labels: { notes: t } });
+  },
+  /** Apply a remembered label type: no playback stop, no write (010). */
+  restoreLabelType(t: LabelType): void {
+    preferredLabel = t;
+    view = setLabelType(view, t);
   },
   setBackground(b: Background): void {
     apply(setBackground(view, b));
@@ -98,14 +113,24 @@ export const notes = {
     apply(clear(view, instrument));
   },
   reset(): void {
-    apply(reset(instrument));
+    apply({ ...reset(instrument), labelType: preferredLabel });
   },
-  /** Switch instrument: revalidate the view; playback stops (reason `instrument`) iff it changed. */
+  /**
+   * Apply an instrument: revalidate the view. Returns whether the view was adjusted.
+   * Never stops playback (the orchestrator does).
+   */
+  applyInstrument(next: Instrument): boolean {
+    if (next === instrument) return false;
+    const { view: result, adjusted } = adaptNotesView(view, instrument, next);
+    instrument = next;
+    view = result;
+    return adjusted;
+  },
+  /** Test-hook switch: stop playback (reason `instrument`), then apply. */
   useInstrument(next: Instrument): void {
     if (next === instrument) return;
     playback.stop('instrument');
-    instrument = next;
-    view = revalidate(view, next);
+    this.applyInstrument(next);
   },
   /** Play the position and open its card. `note` interrupts playback itself (no `stop`). */
   activate(p: Position): void {
@@ -120,5 +145,6 @@ export const notes = {
 /** Test seam: restore the initial view for `instrument` (Vitest only). */
 export function resetNotesForTests(next: Instrument = STANDARD_GUITAR): void {
   instrument = next;
-  view = initialNotesView(next);
+  preferredLabel = 'name';
+  view = initialView(next);
 }

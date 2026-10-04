@@ -124,7 +124,7 @@ test.describe('sound control (US3)', () => {
     await expect(page.locator('.marker.pulse')).toHaveCount(1);
   });
 
-  test('settings last for the session only (US3-4)', async ({ page }) => {
+  test('settings are remembered across a reload (010 US1)', async ({ page }) => {
     await page.goto('/notes');
     await page.getByRole('button', { name: 'Sound settings' }).click();
     await page.getByRole('slider', { name: 'Volume' }).fill('40');
@@ -136,10 +136,10 @@ test.describe('sound control (US3)', () => {
     await page.reload();
     await expect(page.getByRole('button', { name: 'Mute sound' })).toHaveAttribute(
       'aria-pressed',
-      'false'
+      'true'
     );
     await page.getByRole('button', { name: 'Sound settings' }).click();
-    await expect(page.getByRole('slider', { name: 'Volume' })).toHaveValue('80');
+    await expect(page.getByRole('slider', { name: 'Volume' })).toHaveValue('40');
   });
 
   for (const path of ['/', '/about', '/notes', '/triads']) {

@@ -260,7 +260,8 @@ test.describe('linked tools: session memory and Reset tool (US4)', () => {
     await radio(page, 'minor').click();
     await page.getByRole('button', { name: 'Reset tool', exact: true }).click();
     await nav(page).getByRole('link', { name: 'Home' }).click();
-    await page.getByRole('link', { name: /^Triads/ }).click();
+    // Triads is the last tool, so its card reads "Continue: Triads…" (010 US1-2).
+    await page.getByRole('link', { name: /^(Continue: )?Triads/ }).click();
     await expect(radio(page, 'major')).toHaveAttribute('aria-checked', 'true');
     await nav(page).getByRole('link', { name: 'Home' }).click();
     await page.getByRole('link', { name: /^Fretboard Notes/ }).click();

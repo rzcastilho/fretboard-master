@@ -1,0 +1,1 @@
+{"tuning":null,"frets":"24","muted":"true","lastTool":"caged","labels":{"triads":"octave"}}

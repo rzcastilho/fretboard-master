@@ -1,21 +1,24 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
-  import { STANDARD_GUITAR } from '$lib/instrument/instrument';
+  import { instrument } from '$lib/state/instrument.svelte';
   import type { Tool } from './tools';
 
-  let { tool }: { tool: Tool } = $props();
+  let { tool, continued = false }: { tool: Tool; continued?: boolean } = $props();
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- /notes, /triads routes (typed by resolve) land in US2 -->
 <a
   class="card"
   href={tool.path}
-  aria-label={m.card_label({ name: tool.name(), question: tool.question() })}
+  aria-label={continued
+    ? m.card_label_continue({ name: tool.name(), question: tool.question() })
+    : m.card_label({ name: tool.name(), question: tool.question() })}
 >
+  {#if continued}<span class="continue">{m.home_continue()}</span>{/if}
   <span class="name">{tool.name()}</span>
   <span class="question">{tool.question()}</span>
-  <span class="thumb"><Fretboard variant="thumbnail" instrument={STANDARD_GUITAR} /></span>
+  <span class="thumb"><Fretboard variant="thumbnail" instrument={instrument.current} /></span>
 </a>
 
 <!-- eslint-enable svelte/no-navigation-without-resolve -->
@@ -41,6 +44,17 @@
   .name {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-bold);
+  }
+
+  .continue {
+    align-self: flex-start;
+    padding: var(--space-1) var(--space-2);
+    border: var(--border-width) solid var(--color-accent);
+    border-radius: var(--radius-md);
+    color: var(--color-accent);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+    overflow-wrap: anywhere;
   }
 
   .thumb {

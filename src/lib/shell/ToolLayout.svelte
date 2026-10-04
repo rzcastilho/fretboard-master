@@ -1,6 +1,8 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import AppNav from './AppNav.svelte';
+  import InstrumentButton from './InstrumentButton.svelte';
+  import TuningBadge from './TuningBadge.svelte';
   import FailureView from './FailureView.svelte';
   import { recordFailure } from './failure';
   import NotesTool from '$lib/tools/notes/NotesTool.svelte';
@@ -23,6 +25,8 @@
 
 <header aria-label={m.zone_app_bar()}>
   <AppNav current={tool} />
+  <InstrumentButton />
+  <TuningBadge />
   <StopButton />
   <SoundControl />
 </header>

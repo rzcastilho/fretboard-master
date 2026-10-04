@@ -1,0 +1,1 @@
+{"version":1,"handedness":"LEFT","orientation":"lowest-top","tuning":"AF-2"}

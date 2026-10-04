@@ -1,12 +1,18 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  fourthBelow,
   frequencyOf,
   octaveOf,
   pitchClass,
   pitchClassOfSpelling,
   pitchOfSpelling,
-  transpose
+  sharpSpelling,
+  spellSharp,
+  transpose,
+  type Accidental,
+  type Letter,
+  type SpelledPitch
 } from '../../../src/lib/theory/pitch';
 
 describe('pitchOfSpelling golden values (TM-1)', () => {
@@ -118,6 +124,69 @@ describe('frequencyOf (12-TET, A4 = 440 Hz)', () => {
       fc.property(fc.integer({ min: 20, max: 100 }), (p) => {
         expect(frequencyOf(p + 12) / frequencyOf(p)).toBeCloseTo(2, 9);
       })
+    );
+  });
+});
+
+describe('sharpSpelling / spellSharp (011 R-03)', () => {
+  it('spells the 12 pitch classes with sharps', () => {
+    const names = Array.from({ length: 12 }, (_, pc) => {
+      const s = sharpSpelling(pc);
+      return `${s.letter}${s.accidental === 1 ? '#' : ''}`;
+    });
+    expect(names).toEqual(['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']);
+  });
+
+  it('uses the sounding octave and preserves pitch across B/C', () => {
+    expect(spellSharp(59)).toEqual({ letter: 'B', accidental: 0, octave: 3 });
+    expect(spellSharp(60)).toEqual({ letter: 'C', accidental: 0, octave: 4 });
+    expect(spellSharp(41)).toEqual({ letter: 'F', accidental: 0, octave: 2 });
+    for (let p = 21; p <= 96; p++) {
+      const s = spellSharp(p);
+      expect(s.octave).toBe(octaveOf(p));
+      expect(pitchOfSpelling(s)).toBe(p);
+    }
+  });
+});
+
+describe('fourthBelow (012 data-model §2)', () => {
+  const sp = (letter: Letter, accidental: Accidental, octave: number): SpelledPitch => ({
+    letter,
+    accidental,
+    octave
+  });
+  const table: [SpelledPitch, SpelledPitch][] = [
+    [sp('E', 0, 2), sp('B', 0, 1)],
+    [sp('D', 0, 2), sp('A', 0, 1)],
+    [sp('C', 0, 3), sp('G', 0, 2)],
+    [sp('E', -1, 2), sp('B', -1, 1)],
+    [sp('B', 0, 3), sp('F', 1, 3)],
+    [sp('F', 0, 3), sp('C', 0, 3)]
+  ];
+  it.each(table)('%j → %j', (input, expected) => {
+    expect(fourthBelow(input)).toEqual(expected);
+  });
+
+  it('returns null when the accidental would leave −2…+2 (B𝄪)', () => {
+    expect(fourthBelow(sp('B', 2, 3))).toBeNull();
+  });
+
+  const LETTERS: Letter[] = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+  it('is exactly 5 semitones down and 3 letters down (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...LETTERS),
+        fc.constantFrom<Accidental>(-1, 0, 1),
+        fc.integer({ min: 1, max: 6 }),
+        (letter, accidental, octave) => {
+          const s = sp(letter, accidental, octave);
+          const r = fourthBelow(s);
+          if (r === null) throw new Error('fourthBelow returned null');
+          expect(pitchOfSpelling(r)).toBe(pitchOfSpelling(s) - 5);
+          const diff = (LETTERS.indexOf(letter) - LETTERS.indexOf(r.letter) + 7) % 7;
+          expect(diff).toBe(3);
+        }
+      )
     );
   });
 });

@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AF_1_12, AF_4 } from '../../../src/lib/instrument/fixtures';
+import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
 import NotesTool from '../../../src/lib/tools/notes/NotesTool.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
@@ -224,6 +226,63 @@ describe('notes store (US5)', () => {
     expect(seq).toHaveBeenCalledWith(notes.display.listenSteps, 120, notes.instrument);
     expect(stop).not.toHaveBeenCalled();
     seq.mockRestore();
+    stop.mockRestore();
+  });
+});
+
+describe('notes store applyInstrument (009 foundational)', () => {
+  it('sets the instrument; returns false when same or when the view stays valid', () => {
+    expect(notes.applyInstrument(STANDARD_GUITAR)).toBe(false);
+    expect(notes.applyInstrument(AF_4)).toBe(false);
+    expect(notes.instrument).toBe(AF_4);
+  });
+
+  it('returns true when the view had to change', () => {
+    notes.activate({ string: 3, fret: 20 });
+    expect(notes.applyInstrument(AF_1_12)).toBe(true);
+    expect(notes.instrument).toBe(AF_1_12);
+    expect(notes.state.card).toBeNull();
+  });
+
+  it('keeps a whole-neck region whole on 22 → 12 frets without adjusted (US4)', () => {
+    expect(notes.applyInstrument(AF_1_12)).toBe(false);
+    expect(notes.state.region).toEqual({ start: 0, end: 12 });
+  });
+
+  it('returns true for region 10–14 → 10–12 (US4)', () => {
+    notes.setRegionShortcut('10-14');
+    expect(notes.state.region).toEqual({ start: 10, end: 14 });
+    expect(notes.applyInstrument(AF_1_12)).toBe(true);
+    expect(notes.state.region).toEqual({ start: 10, end: 12 });
+  });
+
+  it('never calls playback.stop', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    notes.applyInstrument(AF_4);
+    notes.applyInstrument(AF_1_12);
+    expect(stop).not.toHaveBeenCalled();
+    stop.mockRestore();
+  });
+
+  it('useInstrument stops playback with reason instrument then delegates', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    notes.useInstrument(AF_4);
+    expect(stop).toHaveBeenCalledWith('instrument');
+    expect(notes.instrument).toBe(AF_4);
+    stop.mockRestore();
+  });
+});
+
+describe('notes.restoreLabelType (010)', () => {
+  it('sets the label type without stopping playback and keeps it through reset()', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    notes.restoreLabelType('octave');
+    expect(notes.state.labelType).toBe('octave');
+    expect(stop).not.toHaveBeenCalled();
+    notes.toggleNote(0);
+    notes.reset();
+    expect(notes.state.labelType).toBe('octave');
+    expect(notes.state.selection).toEqual([]);
     stop.mockRestore();
   });
 });

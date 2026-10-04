@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
 import StringFilter from '../../../src/lib/tools/notes/StringFilter.svelte';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 
 const props = (active: number[], ontoggle = () => {}) => ({
   instrument: STANDARD_GUITAR,
@@ -51,5 +52,38 @@ describe('StringFilter', () => {
     );
     await fireEvent.click(only);
     expect(ontoggle).not.toHaveBeenCalled();
+  });
+});
+
+describe('StringFilter with seven strings (012)', () => {
+  it('renders seven toggle buttons, string 7 named "String 7, B"', () => {
+    render(StringFilter, {
+      instrument: presetInstrument('AF-21', 7, 22),
+      active: [1, 2, 3, 4, 5, 6, 7],
+      ontoggle: () => {}
+    });
+    const group = screen.getByRole('group', { name: 'Strings' });
+    const buttons = within(group).getAllByRole('button');
+    expect(buttons.map((b) => b.textContent?.trim())).toEqual([
+      '1 E',
+      '2 B',
+      '3 G',
+      '4 D',
+      '5 A',
+      '6 E',
+      '7 B'
+    ]);
+    expect(screen.getByRole('button', { name: 'String 7, B' })).toBeTruthy();
+  });
+
+  it('toggling string 7 reports 7', async () => {
+    const ontoggle = vi.fn();
+    render(StringFilter, {
+      instrument: presetInstrument('AF-21', 7, 22),
+      active: [1, 7],
+      ontoggle
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'String 7, B' }));
+    expect(ontoggle).toHaveBeenCalledWith(7);
   });
 });

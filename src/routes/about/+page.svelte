@@ -1,6 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import AppNav from '$lib/shell/AppNav.svelte';
+  import ErasePreferences from '$lib/shell/ErasePreferences.svelte';
   import SoundControl from '$lib/shell/SoundControl.svelte';
   import StopButton from '$lib/shell/StopButton.svelte';
   import { screenTitle } from '$lib/shell/screens';
@@ -20,6 +21,7 @@
   <h1 tabindex="-1">{m.about_heading()}</h1>
   <p>{m.about_description()}</p>
   <p>{m.about_version({ version: __APP_VERSION__ })}</p>
+  <ErasePreferences />
 </main>
 
 <style>

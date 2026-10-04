@@ -1,0 +1,1 @@
+{"version":1,"strings":7,"tuning":"AF-21","frets":24,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}

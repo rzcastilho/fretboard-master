@@ -14,6 +14,7 @@ import {
 import {
   initialNotesView,
   openCard,
+  setBackground,
   setHideNames,
   setRegionShortcut,
   toggleString,
@@ -21,6 +22,10 @@ import {
   type NotesViewState
 } from '../../../src/lib/state/notes-view';
 import type { Marker } from '../../../src/lib/fretboard/types';
+import { tuningFromOffsets, tuningInstrument } from '../../../src/lib/instrument/tunings';
+import { pitchClass } from '../../../src/lib/theory/pitch';
+import { defaultSpelling, noteLabel } from '../../../src/lib/notation/notation';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 
 const INIT = initialNotesView(STANDARD_GUITAR);
 const NATURALS = new Set([0, 2, 4, 5, 7, 9, 11]);
@@ -465,5 +470,100 @@ describe('Listen (US5, FR-012)', () => {
 
   it('exposes listenSteps on the display', () => {
     expect(build(select(9)).listenSteps).toEqual(listenSteps(select(9), STANDARD_GUITAR));
+  });
+});
+
+describe('buildNotesModel with a unison tuning (011 US4, scenario 4.7)', () => {
+  const unison = tuningInstrument(tuningFromOffsets([0, 0, 0, 4, 0, 0]), 6, 22);
+
+  it('strings 3 and 2 share a pitch: every note shows on every string', () => {
+    const positions = allPositions(unison);
+    expect(positionPitch(unison, { string: 3, fret: 0 })).toEqual(
+      positionPitch(unison, { string: 2, fret: 0 })
+    );
+    for (const pc of [0, 4, 7, 11] as const) {
+      const s = toggleNote(initialNotesView(unison), pc);
+      const markers = buildNotesModel(s, unison).model.markers;
+      expect(markers).toHaveLength(positions.length);
+      const expected = positions.filter((p) => pitchClass(positionPitch(unison, p)) === pc);
+      const highlighted = markers.filter((mk) => mk.emphasis === 'highlighted');
+      expect(highlighted.map((mk) => `${mk.string}:${mk.fret}`).sort()).toEqual(
+        expected.map((p) => `${p.string}:${p.fret}`).sort()
+      );
+    }
+  });
+});
+
+describe('seven strings (012, US2)', () => {
+  const SEVEN = presetInstrument('AF-21', 7, 22);
+  const DROP_A = presetInstrument('AF-23', 7, 22);
+  const base = initialNotesView(SEVEN);
+  const keys = (ps: readonly { string: number; fret: number }[]) =>
+    ps.map((p) => `${p.string}:${p.fret}`);
+  const open = (i: typeof SEVEN, string: number, fret: number) =>
+    openCard(initialNotesView(i), { string, fret });
+
+  it('string 7 at frets 0–5 in AF-21 is B C C♯ D D♯ E, all shown with Show all', () => {
+    const s = setBackground({ ...base, region: { start: 0, end: 5 } }, 'all');
+    const markers = byKey(buildNotesModel(s, SEVEN).model.markers);
+    const names = ['B', 'C', 'C♯', 'D', 'D♯', 'E'];
+    for (let fret = 0; fret <= 5; fret++) {
+      const mk = markers.get(`7:${fret}`);
+      expect(mk?.emphasis).toBe('normal');
+      expect(pitchClass(positionPitch(SEVEN, { string: 7, fret }))).toBe([11, 0, 1, 2, 3, 4][fret]);
+      expect(noteLabel(mk?.spelling ?? defaultSpelling(pitchClass(35 + fret)))).toBe(names[fret]);
+    }
+  });
+
+  it('note filter highlights string 7 occurrences', () => {
+    const m = byKey(buildNotesModel(toggleNote(base, 11), SEVEN).model.markers); // B
+    expect(m.get('7:0')?.emphasis).toBe('highlighted');
+    expect(m.get('7:12')?.emphasis).toBe('highlighted');
+    expect(m.get('6:7')?.emphasis).toBe('highlighted');
+  });
+
+  it('string filter hides or keeps string 7', () => {
+    const sel = toggleNote(base, 11);
+    const off = byKey(buildNotesModel(toggleString(sel, 7, SEVEN), SEVEN).model.markers);
+    expect(off.get('7:0')?.emphasis).not.toBe('highlighted');
+    const only7 = [1, 2, 3, 4, 5, 6].reduce((s, n) => toggleString(s, n, SEVEN), sel);
+    expect(only7.activeStrings).toEqual([7]);
+    const on = byKey(buildNotesModel(only7, SEVEN).model.markers);
+    expect(on.get('7:0')?.emphasis).toBe('highlighted');
+    expect(on.get('6:7')?.emphasis).not.toBe('highlighted');
+  });
+
+  it('region filter includes string 7', () => {
+    const s = toggleNote(setRegionShortcut(base, '5-9', SEVEN), 11);
+    const m = byKey(buildNotesModel(s, SEVEN).model.markers);
+    expect(m.get('7:0')?.emphasis).not.toBe('highlighted');
+    expect(m.get('7:12')?.emphasis).not.toBe('highlighted');
+    expect(m.get('6:7')?.emphasis).toBe('highlighted');
+    const e = toggleNote(setRegionShortcut(base, '10-14', SEVEN), 11);
+    expect(byKey(buildNotesModel(e, SEVEN).model.markers).get('7:12')?.emphasis).toBe(
+      'highlighted'
+    );
+  });
+
+  it('Drop A: string 7 fret 12 (A2) = string 6 fret 5 and string 5 fret 0', () => {
+    const info = cardInfo(open(DROP_A, 7, 12), DROP_A);
+    expect(keys(info?.unisons ?? [])).toEqual(['5:0', '6:5']);
+  });
+
+  it('Drop A reverse: string 5 fret 0 lists string 7 fret 12', () => {
+    const info = cardInfo(open(DROP_A, 5, 0), DROP_A);
+    expect(keys(info?.unisons ?? [])).toContain('7:12');
+  });
+
+  it('B1 (string 7) and B3 (string 2) are not unisons', () => {
+    const info = cardInfo(open(SEVEN, 7, 0), SEVEN);
+    expect(keys(info?.unisons ?? [])).not.toContain('2:0');
+    expect(info?.octave).toBe(1);
+  });
+
+  it('description says strings 1 to 7', () => {
+    expect(buildNotesModel(base, SEVEN).model.description).toBe(
+      'Showing natural notes, strings 1 to 7, frets 0 to 22.'
+    );
   });
 });

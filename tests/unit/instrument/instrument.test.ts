@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HANDEDNESS,
+  ORIENTATIONS,
   STANDARD_GUITAR,
   allPositions,
+  equalsMusicalInstrument,
+  withPresentation,
   isValidPosition,
   lowestPositionOfPitch,
   positionKey,
@@ -143,5 +147,49 @@ describe('lowestPositionOfPitch (feature 006)', () => {
   it('is null when the pitch is not on the board', () => {
     expect(lowestPositionOfPitch(STANDARD_GUITAR, 39)).toBeNull();
     expect(lowestPositionOfPitch(STANDARD_GUITAR, 64 + 22 + 1)).toBeNull();
+  });
+});
+
+describe('withPresentation (contracts/orientation-api §1)', () => {
+  it('lists the value sets', () => {
+    expect(HANDEDNESS).toEqual(['right', 'left']);
+    expect(ORIENTATIONS).toEqual(['highest-top', 'lowest-top']);
+  });
+
+  it('default arguments return base itself', () => {
+    expect(withPresentation(STANDARD_GUITAR, 'right', 'highest-top')).toBe(STANDARD_GUITAR);
+  });
+
+  it('non-default is frozen, keeps musical fields, and is memoized', () => {
+    const left = withPresentation(STANDARD_GUITAR, 'left', 'highest-top');
+    expect(left).not.toBe(STANDARD_GUITAR);
+    expect(Object.isFrozen(left)).toBe(true);
+    expect(left.handedness).toBe('left');
+    expect(left.orientation).toBe('highest-top');
+    expect(equalsMusicalInstrument(left, STANDARD_GUITAR)).toBe(true);
+    expect(withPresentation(STANDARD_GUITAR, 'left', 'highest-top')).toBe(left);
+    expect(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top')).not.toBe(left);
+  });
+
+  it('positionPitch is identical for every position in all four combinations', () => {
+    for (const h of HANDEDNESS) {
+      for (const o of ORIENTATIONS) {
+        const inst = withPresentation(STANDARD_GUITAR, h, o);
+        for (const p of allPositions(STANDARD_GUITAR)) {
+          expect(positionPitch(inst, p)).toBe(positionPitch(STANDARD_GUITAR, p));
+        }
+      }
+    }
+  });
+
+  it('equalsMusicalInstrument detects musical differences only', () => {
+    const shorter = { ...STANDARD_GUITAR, fretCount: 12 };
+    expect(equalsMusicalInstrument(STANDARD_GUITAR, shorter)).toBe(false);
+    expect(
+      equalsMusicalInstrument(
+        STANDARD_GUITAR,
+        withPresentation(STANDARD_GUITAR, 'left', 'lowest-top')
+      )
+    ).toBe(true);
   });
 });

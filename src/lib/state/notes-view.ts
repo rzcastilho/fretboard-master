@@ -232,3 +232,48 @@ export function revalidate(s: NotesViewState, i: Instrument): NotesViewState {
   }
   return { ...s, activeStrings: strings, region: { start, end }, card };
 }
+
+/**
+ * String filter step for a change of string count (data-model §6, R-09). 6 → 7 turns string 7 on
+ * only when every string was on; 7 → 6 drops string 7 silently, unless it was the only active
+ * string, in which case every string turns on and the change is `forced` (notice).
+ */
+function adaptStrings(
+  s: NotesViewState,
+  prev: Instrument,
+  next: Instrument
+): { strings: readonly number[]; forced: boolean } {
+  const all = (n: number) => Array.from({ length: n }, (_, k) => k + 1);
+  if (next.stringCount === prev.stringCount) return { strings: s.activeStrings, forced: false };
+  if (next.stringCount > prev.stringCount) {
+    const everyOn = sameList(s.activeStrings, all(prev.stringCount));
+    return { strings: everyOn ? all(next.stringCount) : s.activeStrings, forced: false };
+  }
+  const kept = s.activeStrings.filter((n) => n <= next.stringCount);
+  return kept.length === 0
+    ? { strings: all(next.stringCount), forced: true }
+    : { strings: kept, forced: false };
+}
+
+/**
+ * Adapt the view to a new instrument (data-model §5.1, §6). A whole-neck region follows the new
+ * fret count; otherwise `revalidate` clamps it. `adjusted = regionClamped || cardClosed ||
+ * filterForced`: a clamped region, a card that no longer exists, or a string filter that had to
+ * be reset. A whole-neck follow and a silent string-count change never adjust.
+ */
+export function adaptNotesView(
+  s: NotesViewState,
+  prev: Instrument,
+  next: Instrument
+): { view: NotesViewState; adjusted: boolean } {
+  const { strings, forced: filterForced } = adaptStrings(s, prev, next);
+  const stringsStep = sameList(strings, s.activeStrings) ? s : { ...s, activeStrings: strings };
+  const whole = s.region.start === 0 && s.region.end === prev.fretCount;
+  const base = whole ? { ...stringsStep, region: { start: 0, end: next.fretCount } } : stringsStep;
+  const view = revalidate(base, next);
+  const cardClosed = s.card !== null && view.card === null;
+  const regionClamped =
+    !whole && (view.region.start !== s.region.start || view.region.end !== s.region.end);
+  const adjusted = regionClamped || cardClosed || filterForced;
+  return { view: equalsNotesView(view, s) ? s : view, adjusted };
+}

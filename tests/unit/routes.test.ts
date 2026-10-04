@@ -2,19 +2,22 @@ import { createRawSnippet } from 'svelte';
 import { render, screen, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-type NavCallback = (nav: { type: string }) => void;
+type Nav = { type?: string; from?: unknown; to?: unknown };
+type NavCallback = (nav: Nav) => void;
+const nav = (path: string) => ({ url: new URL(path, 'http://localhost') });
 let navCallback: NavCallback | undefined;
-let beforeNavCallback: (() => void) | undefined;
+let beforeNavCallback: ((nav: Nav) => void) | undefined;
 const replaceState = vi.fn();
 
 vi.mock('$app/navigation', () => ({
   afterNavigate: (cb: NavCallback) => {
     navCallback = cb;
   },
-  beforeNavigate: (cb: () => void) => {
+  beforeNavigate: (cb: (nav: unknown) => void) => {
     beforeNavCallback = cb;
   },
   goto: vi.fn(),
+  pushState: vi.fn(),
   replaceState: (...args: unknown[]) => replaceState(...args)
 }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
@@ -124,7 +127,23 @@ describe('layout playback navigation (US4-4)', () => {
     const stop = vi.spyOn(playback, 'stop');
     render(Layout, { children: child });
     expect(beforeNavCallback).toBeTypeOf('function');
-    beforeNavCallback?.();
+    beforeNavCallback?.({ from: nav('/notes'), to: nav('/triads') });
     expect(stop).toHaveBeenCalledWith('navigate');
+  });
+
+  it('beforeNavigate ignores shallow pops that keep the same path', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    render(Layout, { children: child });
+    beforeNavCallback?.({ from: nav('/notes'), to: nav('/notes') });
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('afterNavigate does not move focus to h1 on a shallow pop', () => {
+    render(Layout, { children: child });
+    const h1 = screen.getByRole('heading', { name: 'Child' });
+    navCallback?.({ type: 'popstate', from: nav('/notes'), to: nav('/notes') });
+    expect(document.activeElement).not.toBe(h1);
+    navCallback?.({ type: 'popstate', from: nav('/notes'), to: nav('/triads') });
+    expect(document.activeElement).toBe(h1);
   });
 });

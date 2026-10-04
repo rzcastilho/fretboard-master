@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
-import { AF_1_12 } from '../../../src/lib/instrument/fixtures';
+import { stringSets } from '../../../src/lib/instrument/string-sets';
+import { buildTriadsModel } from '../../../src/lib/state/triads-model';
+import { AF_1_12, AF_21 } from '../../../src/lib/instrument/fixtures';
 import {
   equalsTriadsView,
   initialTriadsView,
@@ -491,5 +493,78 @@ describe('Compare quality swap (007 US4: S5)', () => {
     const off = setCompare(on, false, STANDARD_GUITAR);
     const next = setQuality(off, 'minor');
     expect(next.compare).toEqual({ on: false, quality: 'minor' });
+  });
+});
+
+describe('Triads on seven strings (012 US3)', () => {
+  it('offers 7-6-5 first on 7 strings and 6-5-4 first on 6', () => {
+    expect(stringSets(AF_21)).toEqual([7, 6, 5, 4, 3]);
+    expect(stringSets(STANDARD_GUITAR)).toEqual([6, 5, 4, 3]);
+  });
+
+  it('setStringSet accepts set 7 on 7 strings and refuses it on 6', () => {
+    const s = initialTriadsView(AF_21);
+    expect(s.stringSet).toBe(3);
+    expect(setStringSet(s, 7, AF_21).stringSet).toBe(7);
+    const s6 = initialTriadsView(STANDARD_GUITAR);
+    expect(setStringSet(s6, 7, STANDARD_GUITAR)).toBe(s6);
+  });
+
+  it('7-6-5 C major root on AF-21 shows 13-12-10 on strings 7, 6, 5', () => {
+    const s = setStringSet(initialTriadsView(AF_21), 7, AF_21);
+    const d = buildTriadsModel(s, AF_21);
+    expect(d.shape).toMatchObject({
+      kind: 'shown',
+      frets: [13, 12, 10],
+      positions: [
+        { string: 7, fret: 13 },
+        { string: 6, fret: 12 },
+        { string: 5, fret: 10 }
+      ]
+    });
+  });
+
+  it('sets 6-5-4 … 3-2-1 on 7 strings equal a 6-string instrument with the same six higher strings (US3-7)', () => {
+    for (const set of [6, 5, 4, 3]) {
+      const s6 = setStringSet(initialTriadsView(STANDARD_GUITAR), set, STANDARD_GUITAR);
+      const s7 = setStringSet(initialTriadsView(AF_21), set, AF_21);
+      const a = buildTriadsModel(s6, STANDARD_GUITAR);
+      const b = buildTriadsModel(s7, AF_21);
+      expect(b.shape).toEqual(a.shape);
+      expect(b.model.markers).toEqual(a.model.markers);
+    }
+  });
+
+  it('12-fret 7-6-5 C major root is "beyond fret 12", not "does not close"', () => {
+    const short = { ...AF_21, fretCount: 12 };
+    const s = setStringSet(initialTriadsView(short), 7, short);
+    const d = buildTriadsModel(s, short);
+    expect(d.shape).toEqual({ kind: 'beyond', fretCount: 12 });
+    expect(d.model.markers).toEqual([]);
+  });
+});
+
+describe('string-count change (012 US4: Q12, Q13)', () => {
+  const on765 = setStringSet(initialTriadsView(AF_21), 7, AF_21);
+
+  it('7→6 on 7-6-5 lands on 6-5-4 and reports an adjustment', () => {
+    const next = revalidate(on765, STANDARD_GUITAR);
+    expect(next.stringSet).toBe(6);
+    expect(next).not.toBe(on765);
+    expect(equalsTriadsView(next, on765)).toBe(false);
+  });
+
+  it('7→6 on any other set is not adjusted (same object)', () => {
+    for (const set of [6, 5, 4, 3]) {
+      const s = setStringSet(initialTriadsView(AF_21), set, AF_21);
+      expect(revalidate(s, STANDARD_GUITAR)).toBe(s);
+    }
+  });
+
+  it('6→7 never adjusts and keeps the set', () => {
+    for (const set of [6, 5, 4, 3]) {
+      const s = setStringSet(initialTriadsView(STANDARD_GUITAR), set, STANDARD_GUITAR);
+      expect(revalidate(s, AF_21)).toBe(s);
+    }
   });
 });

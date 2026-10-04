@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { readAudioLog, runAxe } from './support/helpers';
+
 /**
  * TM-9 screenshot views 7, 8, 11, 12 (specs/005-triads-isolated-view/contracts/test-hooks.md)
  * and 6, 9, 14 (specs/006-full-neck-and-all-notes/contracts/test-hooks.md).
@@ -12,7 +14,7 @@ const root = (page: Page, name: string | RegExp) =>
     .getByRole('group', { name: 'Root' })
     .getByRole('button', { name, exact: typeof name === 'string' });
 
-async function open(page: Page, instrument?: 'AF-4' | 'AF-8') {
+async function open(page: Page, instrument?: 'AF-4' | 'AF-8' | 'AF-21') {
   if (instrument) {
     await page.addInitScript((i) => {
       globalThis.__fmInstrument = i;
@@ -88,6 +90,21 @@ test.describe('TM-9 triads views', () => {
     await expect(page).toHaveScreenshot('tm9-view-6.png');
   });
 
+  test('view 22: view 6 left-handed → nut right, tags root → 1st → 2nd right to left', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('fretboard-master:prefs', '{"version":1,"handedness":"left"}');
+    });
+    await open(page);
+    await root(page, 'A').click();
+    await page.getByRole('radio', { name: 'Full neck' }).click();
+    const tags = page.getByRole('group', { name: 'Shapes' }).getByRole('button');
+    await expect(tags).toHaveCount(6);
+    await expect(tags).toHaveText([/Root position/, /1st/, /2nd/, /Root position/, /1st/, /2nd/]);
+    await expect(page).toHaveScreenshot('tm9-view-22.png');
+  });
+
   test('view 9: A♭ augmented, 6-5-4, Full neck → A♭–C–E, tags relative to A♭', async ({ page }) => {
     await open(page);
     await root(page, /G sharp/).click();
@@ -118,6 +135,34 @@ test.describe('TM-9 triads views', () => {
     await expect(page.getByRole('radio', { name: 'All notes', exact: true })).toBeChecked();
     await expect(board(page).locator('.marker').first()).toBeVisible();
     await expect(page).toHaveScreenshot('tm9-view-14.png');
+  });
+});
+
+test.describe('TM-9 triads on seven strings (feature 012)', () => {
+  test('view 13: AF-21, E minor root position, 7-6-5 → frets 5-3-2, B–E–A strings', async ({
+    page
+  }) => {
+    await open(page, 'AF-21');
+    await root(page, 'E').click();
+    await page.getByRole('radio', { name: 'minor' }).click();
+    await page.getByRole('radio', { name: '7-6-5' }).click();
+    await expect(page.getByText('E minor — Root position', { exact: true })).toBeVisible();
+    await expect(panel(page).getByRole('list', { name: 'Notes' }).getByRole('listitem')).toHaveText(
+      ['E', 'G', 'B']
+    );
+    await expect(page.locator('.description')).toContainText(/frets 5,? ?3,? ?2/);
+    await page.getByRole('button', { name: 'Listen', exact: true }).click();
+    await expect
+      .poll(async () => (await readAudioLog(page)).filter((e) => e.type === 'step').length)
+      .toBeGreaterThanOrEqual(4);
+    const steps = (await readAudioLog(page)).flatMap((e) => (e.type === 'step' ? [e] : []));
+    // B1 35 + 5 = 40 (E2), E2 40 + 3 = 43 (G2), A2 45 + 2 = 47 (B2)
+    expect(steps[0].pitches).toEqual([40]);
+    expect(steps[1].pitches).toEqual([43]);
+    expect(steps[2].pitches).toEqual([47]);
+    await expect(board(page).locator('.marker.pulse')).toHaveCount(0, { timeout: 15000 });
+    await runAxe(page);
+    await expect(page).toHaveScreenshot('tm9-view-13.png');
   });
 });
 
