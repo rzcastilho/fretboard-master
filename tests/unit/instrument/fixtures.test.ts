@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AF_1_12,
+  AF_1_24,
   AF_21,
   AF_4,
   AF_7,
@@ -53,6 +54,12 @@ describe('instrument fixtures (contracts/test-hooks.md)', () => {
     expect(AF_1_12.fretCount).toBe(12);
   });
 
+  it('AF-1-24 is standard tuning with 24 frets', () => {
+    expect(names(AF_1_24)).toEqual(names(STANDARD_GUITAR));
+    expect(AF_1_24.fretCount).toBe(24);
+    expect(fixtureInstrument('AF-1-24')).toBe(AF_1_24);
+  });
+
   it('NC-UNISON repeats B3 on strings 2 and 3, 22 frets', () => {
     expect(names(NC_UNISON)).toEqual(['E4', 'B3', 'B3', 'D3', 'A2', 'E2']);
     expect(NC_UNISON.fretCount).toBe(22);
@@ -69,6 +76,8 @@ describe('instrument fixtures (contracts/test-hooks.md)', () => {
     }
     expect(Object.keys(INSTRUMENT_FIXTURES).sort()).toEqual([
       'AF-1-12',
+      'AF-1-24',
+      'AF-2',
       'AF-21',
       'AF-4',
       'AF-7',

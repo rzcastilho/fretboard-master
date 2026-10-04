@@ -11,6 +11,7 @@ import {
   resetTool,
   viewAsTriad
 } from '../../../src/lib/state/links.svelte';
+import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
@@ -20,6 +21,7 @@ beforeEach(() => {
   resetPlaybackForTests();
   resetNotesForTests();
   resetTriadsForTests();
+  resetCagedForTests();
 });
 
 const select = (...pcs: number[]) => pcs.forEach((pc) => notes.toggleNote(pc));
@@ -239,5 +241,31 @@ describe('session memory and Reset tool (US4)', () => {
     linkTools('triads', 'notes');
     linkTools('notes', 'triads');
     expect(triads.state).toEqual(initial);
+  });
+});
+
+describe('caged is outside the links (US6)', () => {
+  it('linkTools is a no-op when either side is caged', () => {
+    notes.toggleNote(7);
+    triads.setQuality('minor');
+    caged.selectRoot(7);
+    const before = { n: notes.state, t: triads.state, c: caged.state };
+    linkTools('notes', 'caged');
+    linkTools('triads', 'caged');
+    linkTools('caged', 'notes');
+    linkTools('caged', 'triads');
+    expect(notes.state).toBe(before.n);
+    expect(triads.state).toBe(before.t);
+    expect(caged.state).toBe(before.c);
+  });
+
+  it("resetTool('caged') restores CAGED and leaves Notes and Triads untouched", () => {
+    caged.selectRoot(7);
+    caged.setQuality('minor');
+    triads.setQuality('minor');
+    const triadsBefore = triads.state;
+    resetTool('caged');
+    expect(caged.state).toEqual({ rootPc: 0, spellingOverride: 'none', quality: 'major' });
+    expect(triads.state).toBe(triadsBefore);
   });
 });

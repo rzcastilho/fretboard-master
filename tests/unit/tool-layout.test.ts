@@ -2,12 +2,16 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { notes } from '../../src/lib/state/notes.svelte';
+import { caged, resetCagedForTests } from '../../src/lib/state/caged.svelte';
 import { triads } from '../../src/lib/state/triads.svelte';
 import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
 import ToolLayout from '../../src/lib/shell/ToolLayout.svelte';
 
 describe('ToolLayout', () => {
-  beforeEach(() => resetInstrumentForTests());
+  beforeEach(() => {
+    resetInstrumentForTests();
+    resetCagedForTests();
+  });
 
   it('zone A always has the Instrument button and the badge only for non-Standard tuning', () => {
     const { unmount } = render(ToolLayout, { tool: 'notes' });
@@ -47,6 +51,15 @@ describe('ToolLayout', () => {
     const fretboard = screen.getByRole('region', { name: 'Fretboard' });
     expect(within(fretboard).getByRole('grid', { name: 'Fretboard' })).toBeTruthy();
     expect(within(fretboard).getAllByRole('gridcell')).toHaveLength(138);
+    expect(screen.queryByText('Controls will appear here.')).toBeNull();
+  });
+
+  it('caged renders the fretboard and key heading instead of the placeholder', () => {
+    render(ToolLayout, { tool: 'caged' });
+    expect(screen.getByRole('heading', { level: 1, name: 'CAGED' })).toBeTruthy();
+    const fretboard = screen.getByRole('region', { name: 'Fretboard' });
+    expect(within(fretboard).getByRole('grid', { name: 'Fretboard' })).toBeTruthy();
+    expect(screen.getByText('C major')).toBeTruthy();
     expect(screen.queryByText('Controls will appear here.')).toBeNull();
   });
 
@@ -104,6 +117,18 @@ describe('ToolLayout', () => {
       expect(screen.getByRole('region', { name: 'Fretboard' })).toBeTruthy();
       triadsReset.mockRestore();
       notesReset.mockRestore();
+    });
+
+    it('Reset tool resets caged on a failure, then the boundary (US6)', async () => {
+      vi.stubGlobal('__FM_FAULT_INJECTION__', true);
+      globalThis.__fmFault = { caged: 1 };
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const cagedReset = vi.spyOn(caged, 'reset');
+      render(ToolLayout, { tool: 'caged' });
+      await fireEvent.click(screen.getByRole('button', { name: 'Reset tool' }));
+      expect(cagedReset).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('region', { name: 'Fretboard' })).toBeTruthy();
+      cagedReset.mockRestore();
     });
   });
 });

@@ -676,20 +676,32 @@
       style:block-size={`${tagsHeight}px`}
     >
       {#each tags as t, i (t.id)}
-        <button
-          type="button"
-          class="tag"
-          class:pressed={t.pressed}
-          aria-pressed={t.pressed}
-          aria-label={t.name}
-          bind:this={tagEls[i]}
-          style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
-          style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
-          onclick={() => ontag?.(t.id)}
-        >
-          <span>{t.label}</span>
-          {#if t.detail}<span class="detail">{t.detail}</span>{/if}
-        </button>
+        {#if model.tagsInteractive === false}
+          <span
+            class="tag static"
+            bind:this={tagEls[i]}
+            style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
+            style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
+          >
+            <span>{t.label}</span>
+            {#if t.detail}<span class="detail">{t.detail}</span>{/if}
+          </span>
+        {:else}
+          <button
+            type="button"
+            class="tag"
+            class:pressed={t.pressed}
+            aria-pressed={t.pressed}
+            aria-label={t.name}
+            bind:this={tagEls[i]}
+            style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
+            style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
+            onclick={() => ontag?.(t.id)}
+          >
+            <span>{t.label}</span>
+            {#if t.detail}<span class="detail">{t.detail}</span>{/if}
+          </button>
+        {/if}
       {/each}
     </div>
   {/if}
@@ -938,6 +950,11 @@
     border: var(--border-width) solid var(--color-border);
     border-radius: var(--radius-md);
     cursor: pointer;
+  }
+
+  .tag.static {
+    cursor: default;
+    user-select: none;
   }
 
   .tag.pressed {

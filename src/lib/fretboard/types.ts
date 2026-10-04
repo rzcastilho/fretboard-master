@@ -60,6 +60,8 @@ export interface DisplayModel {
   readonly description?: string;
   /** Tappable shape tags above the board (Triads Full neck). Interactive variant only. */
   readonly tags?: readonly FretboardTag[];
+  /** false → tags render as non-focusable text (CAGED). Default true (button tags). */
+  readonly tagsInteractive?: boolean;
   /** Drawn above markers, mirrored with the layout; never announced (the description covers them). */
   readonly arrows?: readonly FretboardArrow[];
   /** Keyed auto-scroll: re-runs only when `key` changes (replaces the highlighted-set trigger). */

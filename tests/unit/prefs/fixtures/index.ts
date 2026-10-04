@@ -90,7 +90,8 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('array', defaults),
   // The reader ignores `version`; the record's fields are read as for v1 (handedness included).
   fixture('future', { ...defaults, tuningId: 'AF-5', handedness: 'left' }),
-  fixture('wrong-types', defaults),
+  fixture('wrong-types', { ...defaults, lastTool: 'caged' }),
+  fixture('last-tool-caged', { ...defaults, lastTool: 'caged' }),
   fixture('markup', defaults),
   // 16 385 × 'a': one over MAX_RAW_LENGTH, so it is never parsed.
   fixture('oversize', defaults),

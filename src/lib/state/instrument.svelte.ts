@@ -40,6 +40,7 @@ import {
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
+import { caged } from './caged.svelte';
 import { triads } from './triads.svelte';
 
 let active = $state.raw<InstrumentConfig>(DEFAULT_CONFIG);
@@ -192,11 +193,13 @@ export const instrument = {
       // Presentation only (FR-017): views and sound untouched, no notice.
       notes.applyInstrument(inst);
       triads.applyInstrument(inst);
+      caged.applyInstrument(inst);
       return;
     }
     playback.stop('instrument');
     const adjNotes = notes.applyInstrument(inst);
     const adjTriads = triads.applyInstrument(inst);
+    caged.applyInstrument(inst);
     adjustedIn =
       screen === 'notes' && adjNotes ? 'notes' : screen === 'triads' && adjTriads ? 'triads' : null;
   },
@@ -210,6 +213,7 @@ export const instrument = {
     const inst = instrumentOf(config);
     notes.applyInstrument(inst);
     triads.applyInstrument(inst);
+    caged.applyInstrument(inst);
     adjustedIn = null;
   },
   dismissAdjusted(): void {

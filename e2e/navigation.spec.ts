@@ -20,6 +20,7 @@ test('nav order and aria-current @smoke', async ({ page }) => {
     'Home',
     'Fretboard Notes',
     'Triads',
+    'CAGED',
     'About'
   ]);
   await expect(nav(page).locator('[aria-current="page"]')).toHaveText('Triads');

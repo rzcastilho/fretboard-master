@@ -3,6 +3,7 @@ import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
 import { presetInstrument } from '../../../src/lib/instrument/tunings';
 import { DEFAULT_CONFIG } from '../../../src/lib/state/instrument-config';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
+import { caged } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -662,6 +663,21 @@ describe('presentation settings (contracts/orientation-api §5)', () => {
     expect(instrument.current.handedness).toBe('left');
     expect(instrument.current.orientation).toBe('lowest-top');
     expect(s.notes).toHaveBeenCalledTimes(1);
+    expect(instrument.adjustedIn).toBeNull();
+  });
+});
+
+describe('instrument store: caged (US4)', () => {
+  it('confirm and restore call caged.applyInstrument', () => {
+    const spy = vi.spyOn(caged, 'applyInstrument');
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('caged');
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0].fretCount).toBe(12);
+    instrument.restore({ ...DEFAULT_CONFIG, fretCount: 15 });
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy.mock.calls[1][0].fretCount).toBe(15);
     expect(instrument.adjustedIn).toBeNull();
   });
 });

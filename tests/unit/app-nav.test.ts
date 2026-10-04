@@ -15,15 +15,23 @@ describe('AppNav', () => {
       'Home',
       'Fretboard Notes',
       'Triads',
+      'CAGED',
       'About'
     ]);
-    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/', '/notes', '/triads', '/about']);
+    expect(links.map((l) => l.getAttribute('href'))).toEqual([
+      '/',
+      '/notes',
+      '/triads',
+      '/caged',
+      '/about'
+    ]);
   });
 
   it.each([
     ['home', 'Home'],
     ['notes', 'Fretboard Notes'],
     ['triads', 'Triads'],
+    ['caged', 'CAGED'],
     ['about', 'About']
   ] as const)('marks only %s as current', (current, name) => {
     render(AppNav, { current });

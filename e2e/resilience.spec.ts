@@ -5,7 +5,7 @@ import { injectFault, runAxe, trackRequests } from './support/helpers';
 const NOTICE = 'We could not find that page';
 
 test.describe('unknown addresses', () => {
-  for (const bad of ['/nope', '/caged', '/triads/x', '/Triads']) {
+  for (const bad of ['/nope', '/caged/x', '/triads/x', '/Triads']) {
     test(`${bad} shows home with notice and the URL becomes /`, async ({ page }) => {
       await page.goto('/');
       await page.goto(bad);

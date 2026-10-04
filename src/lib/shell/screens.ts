@@ -1,10 +1,10 @@
 import { m } from '$lib/paraglide/messages.js';
 
-export type ScreenId = 'home' | 'notes' | 'triads' | 'about';
+export type ScreenId = 'home' | 'notes' | 'triads' | 'caged' | 'about';
 
 export interface Screen {
   id: ScreenId;
-  path: '/' | '/notes' | '/triads' | '/about';
+  path: '/' | '/notes' | '/triads' | '/caged' | '/about';
   heading: () => string;
 }
 
@@ -12,6 +12,7 @@ export const SCREENS: readonly Screen[] = [
   { id: 'home', path: '/', heading: () => m.app_name() },
   { id: 'notes', path: '/notes', heading: () => m.tool_notes_name() },
   { id: 'triads', path: '/triads', heading: () => m.tool_triads_name() },
+  { id: 'caged', path: '/caged', heading: () => m.tool_caged_name() },
   { id: 'about', path: '/about', heading: () => m.about_heading() }
 ];
 
@@ -23,6 +24,7 @@ export function screenTitle(id: ScreenId): string {
   const names: Record<Exclude<ScreenId, 'home'>, () => string> = {
     notes: () => m.tool_notes_name(),
     triads: () => m.tool_triads_name(),
+    caged: () => m.tool_caged_name(),
     about: () => m.nav_about()
   };
   return m.title_screen({ screen: names[id]() });

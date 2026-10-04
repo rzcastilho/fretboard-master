@@ -862,3 +862,109 @@ test.describe('handedness and orientation (013 SC-006)', () => {
     expect(scrolled.worst).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('CAGED latency (014 Q27, SC-004)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  /** Pointerdown → `text` present in the page body, measured in the page. */
+  const armTimer = (page: Page, text: string) =>
+    page.evaluate((t) => {
+      const w = globalThis as unknown as { __cagedMs: number | null };
+      w.__cagedMs = null;
+      let downAt = 0;
+      document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+        capture: true,
+        once: true
+      });
+      new MutationObserver((_, obs) => {
+        if (!document.body.textContent?.includes(t)) return;
+        w.__cagedMs = performance.now() - downAt;
+        obs.disconnect();
+      }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    }, text);
+  const readTimer = async (page: Page) => {
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __cagedMs: number | null }).__cagedMs !== null
+    );
+    return page.evaluate(() => (globalThis as unknown as { __cagedMs: number }).__cagedMs);
+  };
+
+  test('median open CAGED ≤ 300 ms at 4× CPU throttle', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const times: number[] = [];
+    // Like FR-023, a median of five: the first open also fetches the tool's chunk.
+    for (let i = 0; i < 5; i++) {
+      await page.goto('/');
+      const card = page.getByRole('list').getByRole('link', { name: /CAGED/ });
+      await card.waitFor();
+      await armTimer(page, 'C major');
+      await card.click();
+      times.push(await readTimer(page));
+      await expect(page.getByRole('region', { name: 'Fretboard' })).toBeVisible();
+    }
+    expect(median(times)).toBeLessThanOrEqual(300);
+  });
+
+  test('median CAGED key change ≤ 100 ms at 4× CPU throttle', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/caged');
+    await expect(page.getByText('C major', { exact: true })).toBeVisible();
+    const keys = page.getByRole('group', { name: 'Key' }).getByRole('button');
+    const times: number[] = [];
+    for (const [pc, heading] of [
+      [7, 'G major'],
+      [2, 'D major'],
+      [9, 'A major'],
+      [4, 'E major'],
+      [5, 'F major']
+    ] as const) {
+      await armTimer(page, heading);
+      await keys.nth(pc).click();
+      times.push(await readTimer(page));
+    }
+    expect(median(times)).toBeLessThanOrEqual(100);
+  });
+
+  test('7 strings × 24 frets with nine tags: scrolling stays inside .scroller', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-1', frets: 24 })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/caged');
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: '7 strings' }).check();
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await expect(board.locator('.cell')).toHaveCount(7 * 25);
+    await expect(board.locator('.tag.static:visible')).toHaveCount(9);
+
+    const scroller = page.locator('.scroller').first();
+    const scrolled = await scroller.evaluate(async (el) => {
+      const frames: number[] = [];
+      let last = performance.now();
+      el.scrollLeft = 0;
+      for (let i = 1; i <= 20; i++) {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) * (i / 20);
+        await new Promise((r) => requestAnimationFrame(r));
+        const now = performance.now();
+        frames.push(now - last);
+        last = now;
+      }
+      return { worst: Math.max(...frames), moved: el.scrollLeft };
+    });
+    expect(scrolled.moved).toBeGreaterThan(0);
+    expect(scrolled.worst).toBeLessThanOrEqual(100);
+  });
+});

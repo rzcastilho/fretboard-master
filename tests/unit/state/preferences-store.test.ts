@@ -135,8 +135,11 @@ describe('toolOpened / remember', () => {
     expect(preferences.lastTool).toBe('notes');
     expect(JSON.parse(s.data.get(PREFS_KEY) as string).lastTool).toBe('notes');
     // @ts-expect-error unknown id
-    preferences.toolOpened('caged');
+    preferences.toolOpened('scales');
     expect(preferences.lastTool).toBe('notes');
+    preferences.toolOpened('caged');
+    expect(preferences.lastTool).toBe('caged');
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).lastTool).toBe('caged');
   });
 
   it('remember forwards to the session', () => {

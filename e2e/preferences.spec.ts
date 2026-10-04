@@ -6,7 +6,7 @@ const card = (page: Page, name: RegExp) => page.getByRole('list').getByRole('lin
 const muteButton = (page: Page) => page.getByRole('button', { name: 'Mute sound' });
 
 /** `goto` resolves on load, before hydration records the opened tool; wait for that write. */
-async function openTool(page: Page, tool: 'notes' | 'triads'): Promise<void> {
+async function openTool(page: Page, tool: 'notes' | 'triads' | 'caged'): Promise<void> {
   await page.goto(`/${tool}`);
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('fretboard-master:prefs')))
@@ -74,12 +74,23 @@ test.describe('remembered preferences: US1', () => {
     await page.goto('/');
     await page.reload();
     const cards = page.getByRole('list').getByRole('link');
-    await expect(cards).toHaveCount(2);
+    await expect(cards).toHaveCount(3);
     await expect(cards.nth(0)).toHaveAccessibleName('Fretboard Notes — Where is every note?');
     await expect(cards.nth(1)).toHaveAccessibleName('Continue: Triads. What is a chord made of?');
     await expect(page.getByText('Continue', { exact: true })).toHaveCount(1);
     await expectNoHorizontalScroll(page);
     await runAxe(page);
+  });
+
+  test('US1-2b: a stored lastTool of caged marks the CAGED card Continue', async ({ page }) => {
+    await openTool(page, 'caged');
+    await page.goto('/');
+    await page.reload();
+    const cards = page.getByRole('list').getByRole('link');
+    await expect(cards.nth(2)).toHaveAccessibleName(
+      'Continue: CAGED. How does the whole neck connect?'
+    );
+    await expect(page.getByText('Continue', { exact: true })).toHaveCount(1);
   });
 
   test('US1-3: musical selection is not restored (SC-005)', async ({ page }) => {
@@ -246,7 +257,7 @@ test.describe('remembered preferences: US2', () => {
         frets: 99,
         muted: 'true',
         volume: 3,
-        lastTool: 'caged',
+        lastTool: 'home',
         labels: { notes: 'octave', triads: 'octave' }
       })
     );

@@ -7,15 +7,17 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import type { PitchClass } from '$lib/theory/pitch';
 import type { ScreenId } from '$lib/shell/screens';
+import type { ToolId } from '$lib/shell/tools';
+import { caged } from './caged.svelte';
 import { carryFromDetected, carryFromNotes, carryFromTriads } from './links';
 import { notes } from './notes.svelte';
 import { triads } from './triads.svelte';
 
-export type LinkedTool = 'notes' | 'triads';
+export type LinkedTool = ToolId;
 
 /** Apply the carry for a user switch `from → to` (nav link). No-op if `from === to`. */
 export function linkTools(from: ScreenId, to: LinkedTool): void {
-  if (from === to) return;
+  if (from === to || from === 'caged' || to === 'caged') return;
   if (from === 'notes' && to === 'triads') {
     const ctx = carryFromNotes(notes.state);
     if (ctx?.kind === 'root') triads.carryRoot(ctx.rootPc);
@@ -44,5 +46,6 @@ export async function openTriadsFromNote(pc: PitchClass): Promise<void> {
 /** Reset the given tool's store (failure-view Reset tool, EC-1.3). */
 export function resetTool(tool: LinkedTool): void {
   if (tool === 'notes') notes.reset();
-  else triads.reset();
+  else if (tool === 'triads') triads.reset();
+  else caged.reset();
 }

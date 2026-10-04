@@ -1774,3 +1774,91 @@ describe('Fretboard screen-reader parity (013 US3)', () => {
     }
   );
 });
+
+describe('Fretboard non-interactive tags (tagsInteractive: false)', () => {
+  const LEFT = withPresentation(STANDARD_GUITAR, 'left', 'highest-top');
+  const tags = [
+    { id: 'a', start: 0, end: 3, label: 'C shape', name: 'C shape', pressed: false },
+    { id: 'b', start: 3, end: 5, label: 'A shape', name: 'A shape', pressed: false },
+    { id: 'c', start: 5, end: 8, label: 'G shape', name: 'G shape', pressed: false }
+  ];
+  const model = (extra: Partial<DisplayModel> = {}): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    tags,
+    ...extra
+  });
+  const strip = (c: HTMLElement) => c.querySelector('.tags') as HTMLElement;
+  const places = (c: HTMLElement) =>
+    [...c.querySelectorAll<HTMLElement>('.tags .tag')].map((e) => [
+      e.style.insetInlineStart,
+      e.style.insetBlockStart
+    ]);
+
+  it('renders non-button spans with no role, aria-pressed or tab stop', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model({ tagsInteractive: false })
+    });
+    const els = [...container.querySelectorAll<HTMLElement>('.tags .tag')];
+    expect(els).toHaveLength(3);
+    for (const el of els) {
+      expect(el.tagName).toBe('SPAN');
+      expect(el.hasAttribute('aria-pressed')).toBe(false);
+      expect(el.getAttribute('role')).toBeNull();
+      expect(el.hasAttribute('tabindex')).toBe(false);
+    }
+    expect(within(strip(container)).queryAllByRole('button')).toHaveLength(0);
+    expect(els.map((e) => e.textContent?.trim())).toEqual(['C shape', 'A shape', 'G shape']);
+  });
+
+  it('keeps the group role and label', () => {
+    render(Fretboard, { instrument: STANDARD_GUITAR, model: model({ tagsInteractive: false }) });
+    expect(screen.getByRole('group', { name: 'Shapes' })).toBeTruthy();
+  });
+
+  it('places tags exactly like the button variant', () => {
+    const a = render(Fretboard, { instrument: STANDARD_GUITAR, model: model() });
+    const buttons = places(a.container);
+    a.unmount();
+    const b = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model({ tagsInteractive: false })
+    });
+    expect(places(b.container)).toEqual(buttons);
+  });
+
+  it('does not call ontag when a span tag is clicked', async () => {
+    const ontag = vi.fn();
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model({ tagsInteractive: false }),
+      ontag
+    });
+    await fireEvent.click(container.querySelector('.tags .tag') as HTMLElement);
+    expect(ontag).not.toHaveBeenCalled();
+  });
+
+  it('mirrors in left-handed: first tag is rightmost', () => {
+    const { container } = render(Fretboard, {
+      instrument: LEFT,
+      model: model({ tagsInteractive: false })
+    });
+    const lefts = [...container.querySelectorAll<HTMLElement>('.tags .tag')].map((e) =>
+      parseFloat(e.style.insetInlineStart)
+    );
+    expect(lefts[0]).toBeGreaterThan(lefts[1]);
+    expect(lefts[1]).toBeGreaterThan(lefts[2]);
+  });
+
+  it('default (undefined or true) keeps button tags', () => {
+    for (const extra of [{}, { tagsInteractive: true }]) {
+      const { container, unmount } = render(Fretboard, {
+        instrument: STANDARD_GUITAR,
+        model: model(extra)
+      });
+      expect(container.querySelectorAll('.tags button.tag')).toHaveLength(3);
+      unmount();
+    }
+  });
+});

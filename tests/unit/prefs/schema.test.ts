@@ -95,9 +95,10 @@ describe('per-field fallback (US2 scenario 6)', () => {
   it('frets non-integer → 22', () => expect(p({ frets: 13.5 }).fretCount).toBe(22));
   it('unknown tuning → AF-1', () => expect(p({ tuning: 'AF-99' }).tuningId).toBe('AF-1'));
   it('muted wrong type → false', () => expect(p({ muted: 'true' }).muted).toBe(false));
-  it.each(['caged', 'home'])('lastTool %s → null', (v) =>
+  it.each(['home', 'scales'])('lastTool %s → null', (v) =>
     expect(p({ lastTool: v }).lastTool).toBeNull()
   );
+  it('lastTool caged → caged', () => expect(p({ lastTool: 'caged' }).lastTool).toBe('caged'));
   it('labels.triads octave → interval', () =>
     expect(p({ labels: { triads: 'octave' } }).labels.triads).toBe('interval'));
   it('custom-tuning object keeps frets', () => {

@@ -2,7 +2,7 @@ declare global {
   const __APP_VERSION__: string;
   const __FM_FAULT_INJECTION__: boolean;
 
-  var __fmFault: Partial<Record<'notes' | 'triads', number>> | undefined;
+  var __fmFault: Partial<Record<'notes' | 'triads' | 'caged', number>> | undefined;
 
   /** Test-only (`__FM_FAULT_INJECTION__`): name of the fixture the fretboard zone should render. */
   var __fmFretboardFixture:
