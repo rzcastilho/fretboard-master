@@ -755,3 +755,110 @@ test.describe('seven strings × 24 frets (US5, quickstart §4)', () => {
     expect(scrolled.worst).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('handedness and orientation (013 SC-006)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  const openPanel = async (page: Page) => {
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  };
+
+  /** Confirm pointerdown → first cell geometry showing `ready` appears, in the page. */
+  const timeConfirm = async (page: Page, ready: 'mirrored' | 'lowest-top'): Promise<number> => {
+    // No `new Function`/eval here: the app's CSP has no 'unsafe-eval'.
+    await page.evaluate((kind) => {
+      const w = globalThis as unknown as { __hMs: number | null };
+      w.__hMs = null;
+      let downAt = 0;
+      document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+        capture: true,
+        once: true
+      });
+      const isReady = () => {
+        if (kind === 'mirrored') {
+          const s = document.querySelector('.cell[data-string="1"][data-fret="0"]');
+          const t = document.querySelector('.cell[data-string="1"][data-fret="1"]');
+          return !!s && !!t && s.getBoundingClientRect().left > t.getBoundingClientRect().left;
+        }
+        const first = document.querySelector('[role="grid"] [role="row"] .cell');
+        return first?.getAttribute('data-string') === '6';
+      };
+      const check = () => {
+        if (w.__hMs !== null || !isReady()) return;
+        w.__hMs = performance.now() - downAt;
+        observer.disconnect(); // a later timeConfirm must not see this one's result
+      };
+      const observer = new MutationObserver(check);
+      observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true
+      });
+    }, ready);
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __hMs: number | null }).__hMs !== null
+    );
+    return page.evaluate(() => (globalThis as unknown as { __hMs: number }).__hMs);
+  };
+
+  test('switching handedness or orientation updates the board ≤ 100 ms at 4× throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+
+    let dialog = await openPanel(page);
+    await dialog.getByRole('radio', { name: 'Left-handed' }).check();
+    const handMs = await timeConfirm(page, 'mirrored');
+    expect(handMs).toBeLessThanOrEqual(100);
+
+    dialog = await openPanel(page);
+    await dialog.getByRole('radio', { name: 'Lowest string on top' }).check();
+    const topMs = await timeConfirm(page, 'lowest-top');
+    expect(topMs).toBeLessThanOrEqual(100);
+  });
+
+  test('left-handed 7 strings × 24 frets scrolls smoothly inside .scroller', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, strings: 7, tuning: 'AF-21', frets: 24, handedness: 'left' })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    const board = page.getByRole('grid', { name: 'Fretboard' });
+    await board.waitFor();
+    await expect(board.getByRole('row')).toHaveCount(7);
+    const scrolled = await page
+      .locator('.scroller')
+      .first()
+      .evaluate(async (el) => {
+        const frames: number[] = [];
+        let last = performance.now();
+        const max = el.scrollWidth - el.clientWidth;
+        el.scrollLeft = max;
+        for (let i = 1; i <= 20; i++) {
+          el.scrollLeft = max * (1 - i / 20);
+          await new Promise((r) => requestAnimationFrame(r));
+          const now = performance.now();
+          frames.push(now - last);
+          last = now;
+        }
+        return { worst: Math.max(...frames), start: max, end: el.scrollLeft };
+      });
+    expect(scrolled.start).toBeGreaterThan(0);
+    expect(scrolled.end).toBe(0);
+    expect(scrolled.worst).toBeLessThanOrEqual(100);
+  });
+});

@@ -110,3 +110,16 @@ describe('HomeScreen', () => {
     expect(screen.queryByText('Continue')).toBeNull();
   });
 });
+
+describe('HomeScreen summary (handedness)', () => {
+  it('shows left-handed after confirming Left-handed', () => {
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.confirm('home');
+    const { container } = render(HomeScreen);
+    const zone = container.querySelector('[data-zone="bottom"]') as HTMLElement;
+    expect(
+      within(zone).getByRole('button', { name: '6 strings · standard tuning · left-handed' })
+    ).toBeTruthy();
+  });
+});

@@ -18,6 +18,14 @@ export interface Instrument {
   readonly orientation: 'highest-top' | 'lowest-top';
 }
 
+export type Handedness = Instrument['handedness'];
+export type Orientation = Instrument['orientation'];
+export const HANDEDNESS: readonly Handedness[] = Object.freeze(['right', 'left'] as const);
+export const ORIENTATIONS: readonly Orientation[] = Object.freeze([
+  'highest-top',
+  'lowest-top'
+] as const);
+
 /** string 1..stringCount (1 = highest), fret 0..fretCount. */
 export interface Position {
   readonly string: number;
@@ -95,4 +103,41 @@ export function lowestPositionOfPitch(instrument: Instrument, pitch: Pitch): Pos
     if (best === null || fret < best.fret) best = { string, fret };
   }
   return best;
+}
+
+const presentations = new WeakMap<Instrument, Map<string, Instrument>>();
+
+/**
+ * `base` with a presentation applied. Defaults return `base` itself; otherwise a frozen,
+ * memoized copy (same inputs → same object). Musical fields are untouched.
+ */
+export function withPresentation(base: Instrument, h: Handedness, o: Orientation): Instrument {
+  if (h === 'right' && o === 'highest-top' && base.handedness === h && base.orientation === o) {
+    return base;
+  }
+  let byKey = presentations.get(base);
+  if (!byKey) {
+    byKey = new Map();
+    presentations.set(base, byKey);
+  }
+  const key = `${h}|${o}`;
+  let made = byKey.get(key);
+  if (!made) {
+    made = Object.freeze({ ...base, handedness: h, orientation: o });
+    byKey.set(key, made);
+  }
+  return made;
+}
+
+/** Same string count, fret count and open strings; presentation ignored. */
+export function equalsMusicalInstrument(a: Instrument, b: Instrument): boolean {
+  return (
+    a.stringCount === b.stringCount &&
+    a.fretCount === b.fretCount &&
+    a.openStrings.length === b.openStrings.length &&
+    a.openStrings.every((s, i) => {
+      const t = b.openStrings[i];
+      return s.letter === t.letter && s.accidental === t.accidental && s.octave === t.octave;
+    })
+  );
 }

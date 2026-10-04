@@ -30,7 +30,9 @@ describe('constants and defaults (FR-018)', () => {
       muted: false,
       volume: 80,
       lastTool: null,
-      labels: { notes: 'name', triads: 'interval' }
+      labels: { notes: 'name', triads: 'interval' },
+      handedness: 'right',
+      orientation: 'highest-top'
     });
   });
 
@@ -159,7 +161,9 @@ describe('serializePreferences', () => {
       muted: true,
       volume: 35,
       lastTool: 'triads',
-      labels: { notes: 'octave', triads: 'name' }
+      labels: { notes: 'octave', triads: 'name' },
+      handedness: 'right',
+      orientation: 'highest-top'
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -205,7 +209,9 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       muted: true,
       volume: 35,
       lastTool: 'triads',
-      labels: { notes: 'octave', triads: 'name' }
+      labels: { notes: 'octave', triads: 'name' },
+      handedness: 'right',
+      orientation: 'highest-top'
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -254,6 +260,85 @@ describe('seven strings: reader rules 10–14 (012)', () => {
   });
 });
 
+describe('left-handed and orientation (013): reader rules 19–22, writer rules 15–18', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+  const canonical = (name: string) => FIXTURES.find((f) => f.name === name)?.raw ?? '';
+
+  it('rule 15: defaults write neither key, byte-identical to slice 012', () => {
+    const raw = serializePreferences(DEFAULT_PREFERENCES);
+    expect(raw).not.toContain('handedness');
+    expect(raw).not.toContain('orientation');
+    expect(raw).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+  });
+  it('rule 16: each key is written only when non-default, after labels', () => {
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, handedness: 'left' })).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"handedness":"left"}'
+    );
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, orientation: 'lowest-top' })).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"orientation":"lowest-top"}'
+    );
+  });
+  it('left-lowest-full re-serializes byte-identical', () => {
+    const raw = canonical('left-lowest-full');
+    expect(serializePreferences(parsePreferences(raw))).toBe(raw);
+  });
+  it.each(['LEFT', 1, null, true, [], 'Right'])('rule 19: handedness %j → right', (bad) => {
+    expect(p({ handedness: bad }).handedness).toBe('right');
+  });
+  it.each(['lowest', 'LOWEST-TOP', 0, null, {}])('rule 20: orientation %j → highest-top', (bad) => {
+    expect(p({ orientation: bad }).orientation).toBe('highest-top');
+  });
+  it('rule 21: an invalid one never discards the other or other fields', () => {
+    const a = p({ handedness: 'x', orientation: 'lowest-top', frets: 18, tuning: 'AF-3' });
+    expect([a.handedness, a.orientation, a.fretCount, a.tuningId]).toEqual([
+      'right',
+      'lowest-top',
+      18,
+      'AF-3'
+    ]);
+    const b = p({ handedness: 'left', orientation: 'x', frets: 18 });
+    expect([b.handedness, b.orientation, b.fretCount]).toEqual(['left', 'highest-top', 18]);
+  });
+  it('rule 22: records without either key load right / highest-top', () => {
+    const r = p({ tuning: 'AF-3', frets: 20 });
+    expect([r.handedness, r.orientation]).toEqual(['right', 'highest-top']);
+  });
+  it('future version: unchanged handling (fields read as before, fixture covers it)', () => {
+    const raw = FIXTURES.find((f) => f.name === 'future')?.raw ?? '';
+    expect(JSON.parse(raw).version).toBe(7);
+    expect(parsePreferences(raw).tuningId).toBe('AF-5');
+  });
+  it('every pre-013 fixture loads right / highest-top', () => {
+    const pre = FIXTURES.filter(
+      (f) =>
+        ![
+          'future',
+          'left-only',
+          'lowest-only',
+          'bad-handed',
+          'left-lowest-full',
+          'bad-orientation'
+        ].includes(f.name)
+    );
+    expect(pre.length).toBeGreaterThan(20);
+    for (const f of pre) {
+      expect([f.expected.handedness, f.expected.orientation]).toEqual(['right', 'highest-top']);
+    }
+  });
+  it('round-trips both fields; defaults serialize with neither key', () => {
+    fc.assert(
+      fc.property(arbPrefs, (x) => {
+        const raw = serializePreferences(x);
+        expect(parsePreferences(raw)).toEqual(x);
+        expect(raw.includes('"handedness"')).toBe(x.handedness === 'left');
+        expect(raw.includes('"orientation"')).toBe(x.orientation === 'lowest-top');
+      })
+    );
+  });
+});
+
 const arbOffsetsOf = (n: 6 | 7): fc.Arbitrary<Offsets> =>
   fc
     .tuple(...Array.from({ length: n }, () => fc.integer({ min: OFFSET_MIN, max: OFFSET_MAX })))
@@ -276,7 +361,9 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   labels: fc.record({
     notes: fc.constantFrom('name', 'octave', 'none'),
     triads: fc.constantFrom('interval', 'name')
-  })
+  }),
+  handedness: fc.constantFrom('right', 'left'),
+  orientation: fc.constantFrom('highest-top', 'lowest-top')
 });
 
 function isValid(p: Preferences): boolean {

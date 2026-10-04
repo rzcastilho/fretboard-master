@@ -3,6 +3,7 @@
  * Pure: no DOM, Svelte or storage. `parsePreferences` is total; each field falls back on its own.
  */
 import * as v from 'valibot';
+import type { Handedness, Orientation } from '$lib/instrument/instrument';
 import { isOffsets, type Offsets } from '$lib/instrument/custom-tuning';
 import {
   DEFAULT_FRETS,
@@ -35,6 +36,10 @@ export interface Preferences {
   readonly volume: number;
   readonly lastTool: ToolId | null;
   readonly labels: { readonly notes: LabelType; readonly triads: TriadsLabelType };
+  /** 013; absent or invalid in a stored record → 'right'. */
+  readonly handedness: Handedness;
+  /** 013; absent or invalid in a stored record → 'highest-top'. */
+  readonly orientation: Orientation;
 }
 
 export const PREFS_VERSION = 1 as const;
@@ -51,7 +56,9 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   muted: false,
   volume: 80,
   lastTool: null,
-  labels: Object.freeze({ notes: 'name', triads: 'interval' })
+  labels: Object.freeze({ notes: 'name', triads: 'interval' }),
+  handedness: 'right',
+  orientation: 'highest-top'
 });
 
 const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
@@ -89,7 +96,9 @@ const recordSchema = v.object({
       triads: v.fallback(v.picklist(TRIADS_LABELS), d.labels.triads)
     }),
     d.labels
-  )
+  ),
+  handedness: v.fallback(v.picklist(['right', 'left']), d.handedness),
+  orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation)
 });
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -113,7 +122,9 @@ export function parsePreferences(raw: string | null): Preferences {
       muted: r.muted,
       volume: r.volume,
       lastTool: r.lastTool,
-      labels: { notes: r.labels.notes, triads: r.labels.triads }
+      labels: { notes: r.labels.notes, triads: r.labels.triads },
+      handedness: r.handedness,
+      orientation: r.orientation
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -132,7 +143,7 @@ export function tuningOfPreferences(p: Preferences): Tuning {
 
 /**
  * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
- * 011), `customTuning` and `lastTool` omitted when null.
+ * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -144,6 +155,8 @@ export function serializePreferences(p: Preferences): string {
     muted: p.muted,
     volume: p.volume / 100,
     ...(p.lastTool === null ? {} : { lastTool: p.lastTool }),
-    labels: { notes: p.labels.notes, triads: p.labels.triads }
+    labels: { notes: p.labels.notes, triads: p.labels.triads },
+    ...(p.handedness === 'left' ? { handedness: 'left' } : {}),
+    ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {})
   });
 }

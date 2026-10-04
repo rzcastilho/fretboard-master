@@ -90,6 +90,21 @@ test.describe('TM-9 triads views', () => {
     await expect(page).toHaveScreenshot('tm9-view-6.png');
   });
 
+  test('view 22: view 6 left-handed → nut right, tags root → 1st → 2nd right to left', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('fretboard-master:prefs', '{"version":1,"handedness":"left"}');
+    });
+    await open(page);
+    await root(page, 'A').click();
+    await page.getByRole('radio', { name: 'Full neck' }).click();
+    const tags = page.getByRole('group', { name: 'Shapes' }).getByRole('button');
+    await expect(tags).toHaveCount(6);
+    await expect(tags).toHaveText([/Root position/, /1st/, /2nd/, /Root position/, /1st/, /2nd/]);
+    await expect(page).toHaveScreenshot('tm9-view-22.png');
+  });
+
   test('view 9: A♭ augmented, 6-5-4, Full neck → A♭–C–E, tags relative to A♭', async ({ page }) => {
     await open(page);
     await root(page, /G sharp/).click();

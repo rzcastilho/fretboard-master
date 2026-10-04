@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { beforeEach, describe, expect, it } from 'vitest';
 import InstrumentButton from '../../src/lib/shell/InstrumentButton.svelte';
 import InstrumentSummary from '../../src/lib/shell/InstrumentSummary.svelte';
@@ -151,5 +152,26 @@ describe('InstrumentButton', () => {
     render(InstrumentButton);
     await fireEvent.click(screen.getByRole('button', { name: 'Instrument' }));
     expect(instrument.panel.open).toBe(true);
+  });
+});
+
+describe('InstrumentSummary (handedness)', () => {
+  it('ends "left-handed" after confirming Left-handed, default text unchanged', async () => {
+    render(InstrumentSummary);
+    expect(screen.getByRole('button').textContent?.trim()).toBe(
+      '6 strings · standard tuning · right-handed'
+    );
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.confirm('triads');
+    await tick();
+    expect(screen.getByRole('button').textContent?.trim()).toBe(
+      '6 strings · standard tuning · left-handed'
+    );
+    instrument.open();
+    instrument.selectTuning('AF-4');
+    instrument.confirm('triads');
+    await tick();
+    expect(screen.getByRole('button').textContent?.trim()).toBe('6 strings · Drop D · left-handed');
   });
 });

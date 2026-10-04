@@ -17,6 +17,8 @@
     INLAY_FRETS,
     layoutFretboard,
     nearestPosition,
+    rowOf,
+    type FretboardLayout,
     type FretboardMetrics,
     trailingEdgeScroll
   } from './geometry';
@@ -24,7 +26,9 @@
     autoScrollTarget,
     groupScrollTarget,
     moveFocus,
+    nutOffset,
     reduceGesture,
+    scrollForNutOffset,
     scrollIntoViewTarget
   } from './interaction';
   import { layoutTags } from './tags';
@@ -119,12 +123,15 @@
     DOUBLE_INLAY_FRETS.filter((f) => f <= lastFret).map((f) => layout.columns[f].center)
   );
   const inlayY = $derived((layout.boardTop + layout.boardBottom) / 2);
-  const doubleY = $derived([layout.rows[1].bottom, layout.rows[3].bottom]);
+  const doubleY = $derived(layout.doubleInlayY);
   const fretNumbers = $derived(layout.columns.filter((c) => c.fret >= 1));
-  const numbersY = $derived(layout.boardBottom + metrics.numbersRow / 2);
+  const numbersY = $derived(
+    layout.numbersEdge === 'top'
+      ? layout.boardTop - metrics.numbersRow / 2
+      : layout.boardBottom + metrics.numbersRow / 2
+  );
   const inlayRadius = $derived(compact ? metrics.thumbRow * 0.3 : metrics.row * 0.14);
   const nutWidth = $derived(compact ? metrics.thumbRow / 3 : metrics.nutWidth);
-  const stringsFrom = $derived(layout.columns[0].center);
   const viewBox = $derived(`0 0 ${layout.width} ${layout.height}`);
 
   /**
@@ -154,6 +161,9 @@
     if (!el || compact || pendingScroll === null) return;
     const pending = pendingScroll;
     pendingScroll = null;
+    // Mirrored: the shrink happens at the far (left) end, so the nut-offset anchor below keeps
+    // the visible frets without a clamp and there is nothing to glide.
+    if (current.mirrored) return;
     untrack(() => {
       const viewport = el.clientWidth;
       if (pending.left <= Math.max(0, current.width - viewport)) return;
@@ -172,6 +182,44 @@
         cancelScroll = animateScroll(el, target, duration, browserClock);
         holdTimer = setTimeout(() => (holdWidth = null), duration + 50);
       });
+    });
+  });
+
+  /**
+   * Scroll anchor (US1): keep the same nut offset when the layout width or handedness changes,
+   * so a handedness switch shows the same frets and an unscrolled left-handed board starts at
+   * `maxScroll` (nut visible). Instant, no animation. Skipped while a fret-count shrink glide
+   * owns the scroll position, and before the container is measured.
+   */
+  let anchored: FretboardLayout | null = null;
+  let scrollBefore = 0;
+
+  // Runs before the DOM patch, so `scrollLeft` is still the one the old layout produced.
+  $effect.pre(() => {
+    void layout;
+    untrack(() => {
+      scrollBefore = scroller?.scrollLeft ?? 0;
+    });
+  });
+
+  $effect(() => {
+    const current = layout;
+    const el = scroller;
+    if (!el || compact || containerWidth === 0) return;
+    untrack(() => {
+      const prev = anchored;
+      anchored = current;
+      const viewport = el.clientWidth;
+      if (prev === null) {
+        if (current.mirrored) el.scrollLeft = scrollForNutOffset(current, 0, viewport);
+        return;
+      }
+      if (prev.width === current.width && prev.mirrored === current.mirrored) return;
+      if (!prev.mirrored && !current.mirrored) return; // right-handed keeps the browser's own scroll
+      if (holdWidth !== null) return;
+      const offset = nutOffset(prev, scrollBefore, viewport);
+      stopAutoScroll();
+      el.scrollLeft = scrollForNutOffset(current, offset, viewport);
     });
   });
 
@@ -253,12 +301,9 @@
     const clamp = (v: number) => Math.min(lastFret, Math.max(0, Math.round(v)));
     const start = clamp(Math.min(r.start, r.end));
     const end = clamp(Math.max(r.start, r.end));
-    return {
-      start,
-      end,
-      x: layout.columns[start].start,
-      width: layout.columns[end].end - layout.columns[start].start
-    };
+    const left = Math.min(layout.columns[start].start, layout.columns[end].start);
+    const right = Math.max(layout.columns[start].end, layout.columns[end].end);
+    return { start, end, x: left, width: right - left };
   });
   let lastRegionKey: string | undefined;
 
@@ -344,7 +389,7 @@
       if (!Number.isInteger(a.string) || a.string < 1 || a.string > instrument.stringCount)
         return [];
       if (!validFret(a.fromFret)) return [];
-      const row = layout.rows[a.string - 1];
+      const row = rowOf(layout, a.string);
       const from = layout.columns[a.fromFret].center;
       let tip: number;
       let dir: number;
@@ -383,7 +428,7 @@
         key,
         mk,
         x: layout.columns[mk.fret].center,
-        y: layout.rows[mk.string - 1].center,
+        y: rowOf(layout, mk.string).center,
         label: labelText(mk),
         tone: mk.emphasis === 'highlighted' ? mk.tone : undefined,
         badge:
@@ -485,7 +530,7 @@
       mk?.spelling ?? defaultSpelling(pitchClass(positionPitch(instrument, hovered)))
     );
     const col = layout.columns[hovered.fret];
-    const row = layout.rows[hovered.string - 1];
+    const row = rowOf(layout, hovered.string);
     const w = Math.max(metrics.markerSmall + 8, text.length * 12 + 12);
     const h = metrics.markerSmall;
     const above = row.top - h >= 0;
@@ -576,19 +621,19 @@
 {#snippet drawing()}
   <rect
     class="wood"
-    x={layout.columns[0].start}
-    y="0"
-    width={layout.width - layout.columns[0].start}
-    height={layout.boardBottom}
+    x={layout.board.start}
+    y={layout.boardTop}
+    width={layout.board.end - layout.board.start}
+    height={layout.boardBottom - layout.boardTop}
   />
   {#if band}
     <rect
       class="region-band"
       aria-hidden="true"
       x={band.x}
-      y="0"
+      y={layout.boardTop}
       width={band.width}
-      height={layout.boardBottom}
+      height={layout.boardBottom - layout.boardTop}
     />
   {/if}
   {#each singleInlays as cx (cx)}
@@ -600,24 +645,54 @@
     {/each}
   {/each}
   {#each layout.columns.slice(1) as c (c.fret)}
-    <line class="fret-line" x1={c.end} x2={c.end} y1="0" y2={layout.boardBottom} />
+    {@const fx = layout.mirrored ? c.start : c.end}
+    <line class="fret-line" x1={fx} x2={fx} y1={layout.boardTop} y2={layout.boardBottom} />
   {/each}
   <rect
     class="nut"
     x={layout.nutX - nutWidth / 2}
-    y="0"
+    y={layout.boardTop}
     width={nutWidth}
-    height={layout.boardBottom}
+    height={layout.boardBottom - layout.boardTop}
   />
   {#each layout.rows as row (row.string)}
     <line
       class="string string-{row.string}"
-      x1={stringsFrom}
-      x2={layout.width}
+      x1={layout.strings.from}
+      x2={layout.strings.to}
       y1={row.center}
       y2={row.center}
     />
   {/each}
+{/snippet}
+
+{#snippet tagStrip()}
+  {#if tags.length > 0}
+    <div
+      class="tags"
+      role="group"
+      aria-label={m.fretboard_tags_label()}
+      style:inline-size={`${layout.width}px`}
+      style:block-size={`${tagsHeight}px`}
+    >
+      {#each tags as t, i (t.id)}
+        <button
+          type="button"
+          class="tag"
+          class:pressed={t.pressed}
+          aria-pressed={t.pressed}
+          aria-label={t.name}
+          bind:this={tagEls[i]}
+          style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
+          style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
+          onclick={() => ontag?.(t.id)}
+        >
+          <span>{t.label}</span>
+          {#if t.detail}<span class="detail">{t.detail}</span>{/if}
+        </button>
+      {/each}
+    </div>
+  {/if}
 {/snippet}
 
 {#if thumb}
@@ -630,8 +705,7 @@
   >
     {@render drawing()}
     {#each layout.rows as row (row.string)}
-      <text class="string-label" x={layout.columns[0].start / 2} y={row.center}
-        >{openLabel(row.string)}</text
+      <text class="string-label" x={layout.labelCenter} y={row.center}>{openLabel(row.string)}</text
       >
     {/each}
   </svg>
@@ -645,8 +719,7 @@
   >
     {@render drawing()}
     {#each layout.rows as row (row.string)}
-      <text class="string-label" x={layout.columns[0].start / 2} y={row.center}
-        >{openLabel(row.string)}</text
+      <text class="string-label" x={layout.labelCenter} y={row.center}>{openLabel(row.string)}</text
       >
     {/each}
   </svg>
@@ -659,31 +732,8 @@
       onpointerdown={stopAutoScroll}
       onwheel={stopAutoScroll}
     >
-      {#if tags.length > 0}
-        <div
-          class="tags"
-          role="group"
-          aria-label={m.fretboard_tags_label()}
-          style:inline-size={`${layout.width}px`}
-          style:block-size={`${tagsHeight}px`}
-        >
-          {#each tags as t, i (t.id)}
-            <button
-              type="button"
-              class="tag"
-              class:pressed={t.pressed}
-              aria-pressed={t.pressed}
-              aria-label={t.name}
-              bind:this={tagEls[i]}
-              style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
-              style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
-              onclick={() => ontag?.(t.id)}
-            >
-              <span>{t.label}</span>
-              {#if t.detail}<span class="detail">{t.detail}</span>{/if}
-            </button>
-          {/each}
-        </div>
+      {#if layout.numbersEdge === 'bottom'}
+        {@render tagStrip()}
       {/if}
       <!-- svelte-ignore a11y_interactive_supports_focus (cells are the focusable stops) -->
       <svg
@@ -705,7 +755,7 @@
         <g aria-hidden="true" class="drawing">
           {@render drawing()}
           {#each layout.rows as row (row.string)}
-            <text class="string-label" x={layout.columns[0].start / 2} y={row.center}
+            <text class="string-label" x={layout.labelCenter} y={row.center}
               >{row.string} {openLabel(row.string)}</text
             >
           {/each}
@@ -799,9 +849,9 @@
             class="focus-ring"
             aria-hidden="true"
             x={layout.columns[stop.fret].start + 1.5}
-            y={layout.rows[stop.string - 1].top + 1.5}
+            y={rowOf(layout, stop.string).top + 1.5}
             width={layout.columns[stop.fret].end - layout.columns[stop.fret].start - 3}
-            height={layout.rows[stop.string - 1].bottom - layout.rows[stop.string - 1].top - 3}
+            height={rowOf(layout, stop.string).bottom - rowOf(layout, stop.string).top - 3}
             rx="4"
           />
         {/if}
@@ -828,6 +878,9 @@
           </g>
         {/each}
       </svg>
+      {#if layout.numbersEdge === 'top'}
+        {@render tagStrip()}
+      {/if}
       {#if holdWidth !== null}
         <div class="hold" aria-hidden="true" style:inline-size={`${holdWidth}px`}></div>
       {/if}

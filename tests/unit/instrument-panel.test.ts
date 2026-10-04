@@ -253,7 +253,9 @@ describe('InstrumentPanel (cancel and restore)', () => {
     expect(instrument.panel.open && instrument.panel.pending).toEqual({
       stringCount: 6,
       tuning: { kind: 'preset', id: 'AF-1' },
-      fretCount: 22
+      fretCount: 22,
+      handedness: 'right',
+      orientation: 'highest-top'
     });
     expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-4' });
     expect(instrument.active.fretCount).toBe(12);
@@ -788,5 +790,96 @@ describe('InstrumentPanel (seven strings, 012 US1)', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(instrument.active.stringCount).toBe(7);
     expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-21' });
+  });
+});
+
+describe('InstrumentPanel (handedness)', () => {
+  const radios = () =>
+    within(screen.getByRole('group', { name: 'Handedness' })).getAllByRole(
+      'radio'
+    ) as HTMLInputElement[];
+
+  it('has a Handedness fieldset with Right-handed checked and Left-handed', async () => {
+    await open();
+    const [right, left] = radios();
+    expect(right.closest('label')?.textContent).toContain('Right-handed');
+    expect(left.closest('label')?.textContent).toContain('Left-handed');
+    expect(right.checked).toBe(true);
+    expect(left.checked).toBe(false);
+  });
+
+  it('choosing Left changes the preview only; Close discards, Confirm applies', async () => {
+    await open();
+    await fireEvent.click(radios()[1]);
+    expect(instrument.preview?.handedness).toBe('left');
+    expect(instrument.current.handedness).toBe('right');
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(instrument.current.handedness).toBe('right');
+    instrument.open();
+    await Promise.resolve();
+    await fireEvent.click(radios()[1]);
+    await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    expect(instrument.current.handedness).toBe('left');
+  });
+
+  it('Restore default re-checks Right-handed', async () => {
+    await open();
+    await fireEvent.click(radios()[1]);
+    expect(radios()[1].checked).toBe(true);
+    await fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
+    expect(radios()[0].checked).toBe(true);
+  });
+});
+
+describe('InstrumentPanel (strings on top, US2)', () => {
+  const radios = () =>
+    within(screen.getByRole('group', { name: 'Strings on top' })).getAllByRole(
+      'radio'
+    ) as HTMLInputElement[];
+
+  it('has a Strings on top fieldset with Highest checked and Lowest', async () => {
+    await open();
+    const [highest, lowest] = radios();
+    expect(highest.closest('label')?.textContent).toContain('Highest string on top');
+    expect(lowest.closest('label')?.textContent).toContain('Lowest string on top');
+    expect(highest.checked).toBe(true);
+    expect(lowest.checked).toBe(false);
+  });
+
+  it('choosing Lowest changes the preview only; Close discards, Confirm applies', async () => {
+    await open();
+    await fireEvent.click(radios()[1]);
+    expect(instrument.preview?.orientation).toBe('lowest-top');
+    expect(instrument.current.orientation).toBe('highest-top');
+    await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(instrument.current.orientation).toBe('highest-top');
+    instrument.open();
+    await Promise.resolve();
+    await fireEvent.click(radios()[1]);
+    await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    expect(instrument.current.orientation).toBe('lowest-top');
+  });
+
+  it('Restore default re-checks Highest string on top', async () => {
+    await open();
+    await fireEvent.click(radios()[1]);
+    expect(radios()[1].checked).toBe(true);
+    await fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
+    expect(radios()[0].checked).toBe(true);
+  });
+
+  it('is independent of Handedness', async () => {
+    await open();
+    const hand = within(screen.getByRole('group', { name: 'Handedness' })).getAllByRole(
+      'radio'
+    ) as HTMLInputElement[];
+    await fireEvent.click(hand[1]);
+    await fireEvent.click(radios()[1]);
+    expect(instrument.preview?.handedness).toBe('left');
+    expect(instrument.preview?.orientation).toBe('lowest-top');
+    await fireEvent.click(hand[0]);
+    expect(instrument.preview?.handedness).toBe('right');
+    expect(instrument.preview?.orientation).toBe('lowest-top');
+    expect(radios()[1].checked).toBe(true);
   });
 });

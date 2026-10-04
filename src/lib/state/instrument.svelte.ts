@@ -4,7 +4,7 @@
  * to storage or the URL (FR-018).
  */
 import { canStep, type StringNumber } from '$lib/instrument/custom-tuning';
-import type { Instrument } from '$lib/instrument/instrument';
+import type { Handedness, Instrument, Orientation } from '$lib/instrument/instrument';
 import {
   offsetsOfTuning,
   presetStrings,
@@ -29,6 +29,8 @@ import {
   restoreDefault,
   selectTuning,
   setFrets,
+  setHandedness,
+  setOrientation,
   setStringCount,
   stepFrets,
   stepString,
@@ -157,6 +159,12 @@ export const instrument = {
   setFrets(n: number): void {
     panel = setFrets(panel, n);
   },
+  setHandedness(h: Handedness): void {
+    panel = setHandedness(panel, h);
+  },
+  setOrientation(o: Orientation): void {
+    panel = setOrientation(panel, o);
+  },
   restoreDefault(): void {
     panel = restoreDefault(panel);
   },
@@ -169,16 +177,24 @@ export const instrument = {
     panel = result.panel;
     adjustedIn = null; // R-05: a new confirm replaces any earlier notice
     if (!result.changed) return;
-    playback.stop('instrument');
     active = result.next;
+    const inst = instrumentOf(result.next);
     const tuning = result.next.tuning;
     preferences.remember({
       stringCount: result.next.stringCount,
       tuningId: tuning.kind === 'preset' ? tuning.id : standardTuningId(result.next.stringCount),
       customTuning: tuning.kind === 'custom' ? tuning.offsets : null,
-      fretCount: result.next.fretCount
+      fretCount: result.next.fretCount,
+      handedness: result.next.handedness,
+      orientation: result.next.orientation
     });
-    const inst = instrumentOf(result.next);
+    if (!result.musicalChanged) {
+      // Presentation only (FR-017): views and sound untouched, no notice.
+      notes.applyInstrument(inst);
+      triads.applyInstrument(inst);
+      return;
+    }
+    playback.stop('instrument');
     const adjNotes = notes.applyInstrument(inst);
     const adjTriads = triads.applyInstrument(inst);
     adjustedIn =

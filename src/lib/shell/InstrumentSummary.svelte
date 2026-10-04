@@ -5,12 +5,18 @@
   import { isStandard } from '$lib/instrument/tunings';
   import { tuningLabel } from './tuning-names';
 
+  const handedness = $derived(
+    instrument.active.handedness === 'left'
+      ? m.instrument_handedness_left()
+      : m.instrument_handedness_right()
+  );
   const text = $derived(
     isStandard(instrument.active.tuning)
-      ? m.instrument_summary_standard({ count: instrument.active.stringCount })
+      ? m.instrument_summary_standard({ count: instrument.active.stringCount, handedness })
       : m.instrument_summary_preset({
           count: instrument.active.stringCount,
-          name: tuningLabel(instrument.active.tuning)
+          name: tuningLabel(instrument.active.tuning),
+          handedness
         })
   );
 

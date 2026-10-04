@@ -1,14 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_METRICS, layoutFretboard } from '../../../src/lib/fretboard/geometry';
+import {
+  DEFAULT_METRICS,
+  layoutFretboard,
+  trailingEdgeScroll
+} from '../../../src/lib/fretboard/geometry';
 import {
   DRAG_THRESHOLD_PX,
   autoScrollTarget,
   groupScrollTarget,
   moveFocus,
+  nutOffset,
   reduceGesture,
-  scrollIntoViewTarget
+  scrollForNutOffset,
+  scrollIntoViewTarget,
+  spanTarget
 } from '../../../src/lib/fretboard/interaction';
-import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { screenOrder } from '../../../src/lib/fretboard/geometry';
+import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
+import { presetInstrument } from '../../../src/lib/instrument/tunings';
 import type { GestureEvent, GestureState } from '../../../src/lib/fretboard/types';
 
 const idle: GestureState = { kind: 'idle' };
@@ -256,5 +265,158 @@ describe('moveFocus', () => {
     expect(moveFocus(STANDARD_GUITAR, from, ' ')).toBe('activate');
     expect(moveFocus(STANDARD_GUITAR, from, 'a')).toBeNull();
     expect(moveFocus(STANDARD_GUITAR, from, 'Tab')).toBeNull();
+  });
+});
+
+describe('left-handed interaction', () => {
+  const LEFT = withPresentation(STANDARD_GUITAR, 'left', 'highest-top');
+  const from = { string: 3, fret: 5 };
+  const VIEW = 300;
+  const lr = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, VIEW, 'interactive');
+  const ll = layoutFretboard(LEFT, DEFAULT_METRICS, VIEW, 'interactive');
+  const maxScroll = ll.width - VIEW;
+
+  it('moveFocus: ArrowLeft goes up a fret, ArrowRight down, no wrap', () => {
+    expect(moveFocus(LEFT, from, 'ArrowLeft')).toEqual({ string: 3, fret: 6 });
+    expect(moveFocus(LEFT, from, 'ArrowRight')).toEqual({ string: 3, fret: 4 });
+    expect(moveFocus(LEFT, { string: 3, fret: 22 }, 'ArrowLeft')).toEqual({ string: 3, fret: 22 });
+    expect(moveFocus(LEFT, { string: 3, fret: 0 }, 'ArrowRight')).toEqual({ string: 3, fret: 0 });
+  });
+
+  it('nutOffset / scrollForNutOffset round-trip', () => {
+    for (const x of [0, 17, maxScroll / 2, maxScroll]) {
+      expect(scrollForNutOffset(ll, nutOffset(ll, x, VIEW), VIEW)).toBeCloseTo(x);
+      expect(scrollForNutOffset(lr, nutOffset(lr, x, VIEW), VIEW)).toBeCloseTo(x);
+    }
+  });
+
+  it('unscrolled left-handed (nut in view) is scrollLeft = maxScroll', () => {
+    expect(nutOffset(ll, maxScroll, VIEW)).toBe(0);
+    expect(nutOffset(lr, 0, VIEW)).toBe(0);
+    expect(scrollForNutOffset(ll, 0, VIEW)).toBeCloseTo(maxScroll);
+  });
+
+  it('auto-scroll targets are the mirror of the right-handed targets', () => {
+    const hl = [
+      { string: 1, fret: 18 },
+      { string: 2, fret: 19 }
+    ];
+    const r = autoScrollTarget(lr, hl, { scrollLeft: 0, width: VIEW });
+    const l = autoScrollTarget(ll, hl, { scrollLeft: maxScroll, width: VIEW });
+    expect(r).not.toBeNull();
+    expect(l).not.toBeNull();
+    expect(l ?? NaN).toBeCloseTo(maxScroll - (r ?? 0));
+    const g = groupScrollTarget(lr, [hl], { scrollLeft: 0, width: VIEW });
+    const gl = groupScrollTarget(ll, [hl], { scrollLeft: maxScroll, width: VIEW });
+    expect(gl ?? NaN).toBeCloseTo(maxScroll - (g ?? 0));
+    const s = scrollIntoViewTarget(lr, { string: 1, fret: 20 }, { scrollLeft: 0, width: VIEW });
+    const sl = scrollIntoViewTarget(
+      ll,
+      { string: 1, fret: 20 },
+      { scrollLeft: maxScroll, width: VIEW }
+    );
+    expect(sl ?? NaN).toBeCloseTo(maxScroll - (s ?? 0));
+  });
+
+  it('a span wider than the viewport aligns its nut side', () => {
+    const t = spanTarget(ll, 0, ll.width, { scrollLeft: 0, width: 100 });
+    expect(t).toBeCloseTo(ll.width - 100);
+    const tr = spanTarget(lr, 0, lr.width, { scrollLeft: 50, width: 100 });
+    expect(tr).toBe(0);
+  });
+
+  it('trailingEdgeScroll is 0 when mirrored', () => {
+    expect(trailingEdgeScroll(ll, VIEW)).toBe(0);
+    expect(trailingEdgeScroll(lr, VIEW)).toBeGreaterThan(0);
+  });
+
+  it('a handedness switch keeps the same fret interval in view', () => {
+    const scroll = 200;
+    const offset = nutOffset(lr, scroll, VIEW);
+    const switched = scrollForNutOffset(ll, offset, VIEW);
+    expect(switched).toBeCloseTo(maxScroll - scroll);
+  });
+});
+
+describe('lowest-top interaction (US2)', () => {
+  const combos = [
+    ['right', 'highest-top'],
+    ['right', 'lowest-top'],
+    ['left', 'highest-top'],
+    ['left', 'lowest-top']
+  ] as const;
+
+  it('ArrowUp from string 5 goes to 6 and ArrowDown from 6 to 5 when lowest is on top', () => {
+    for (const h of ['right', 'left'] as const) {
+      const inst = withPresentation(STANDARD_GUITAR, h, 'lowest-top');
+      expect(moveFocus(inst, { string: 5, fret: 3 }, 'ArrowUp')).toEqual({ string: 6, fret: 3 });
+      expect(moveFocus(inst, { string: 6, fret: 3 }, 'ArrowDown')).toEqual({ string: 5, fret: 3 });
+    }
+  });
+
+  it('keeps highest-top behaviour: ArrowUp from 5 goes to 4', () => {
+    expect(moveFocus(STANDARD_GUITAR, { string: 5, fret: 3 }, 'ArrowUp')).toEqual({
+      string: 4,
+      fret: 3
+    });
+  });
+
+  it('does not wrap at the top or bottom edge in any combination', () => {
+    for (const [h, o] of combos) {
+      const inst = withPresentation(STANDARD_GUITAR, h, o);
+      const rows = screenOrder(inst).rows;
+      const top = { string: rows[0], fret: 4 };
+      const bottom = { string: rows[rows.length - 1], fret: 4 };
+      expect(moveFocus(inst, top, 'ArrowUp')).toEqual(top);
+      expect(moveFocus(inst, bottom, 'ArrowDown')).toEqual(bottom);
+    }
+  });
+
+  it('handedness and orientation are independent', () => {
+    const a = withPresentation(STANDARD_GUITAR, 'left', 'lowest-top');
+    expect(moveFocus(a, { string: 3, fret: 5 }, 'ArrowLeft')).toEqual({ string: 3, fret: 6 });
+    expect(moveFocus(a, { string: 3, fret: 5 }, 'ArrowUp')).toEqual({ string: 4, fret: 5 });
+    const b = withPresentation(STANDARD_GUITAR, 'right', 'lowest-top');
+    expect(moveFocus(b, { string: 3, fret: 5 }, 'ArrowRight')).toEqual({ string: 3, fret: 6 });
+    expect(moveFocus(b, { string: 3, fret: 5 }, 'ArrowUp')).toEqual({ string: 4, fret: 5 });
+  });
+});
+
+describe('fret-count change when mirrored (US5)', () => {
+  const VIEW = 300;
+  const view = (frets: number, h: 'right' | 'left') =>
+    layoutFretboard(
+      withPresentation(presetInstrument('AF-1', 6, frets), h, 'highest-top'),
+      DEFAULT_METRICS,
+      VIEW,
+      'interactive'
+    );
+
+  it('growing 22 → 24 frets extends the far end and keeps the visible frets', () => {
+    for (const h of ['right', 'left'] as const) {
+      const before = view(22, h);
+      const after = view(24, h);
+      for (const scroll of [0, 40, 120]) {
+        const s0 = h === 'left' ? before.width - VIEW - scroll : scroll;
+        const offset = nutOffset(before, s0, VIEW);
+        const s1 = scrollForNutOffset(after, offset, VIEW);
+        // Distance of each early fret from the nut-side viewport edge is unchanged.
+        const edge = (s: number) => (h === 'left' ? s + VIEW : s);
+        for (const f of [0, 1, 2, 3, 4]) {
+          const d0 = Math.abs(before.columns[f].center - edge(s0));
+          const d1 = Math.abs(after.columns[f].center - edge(s1));
+          expect(Math.abs(d0 - d1)).toBeLessThan(2);
+        }
+      }
+    }
+  });
+
+  it('the mirrored board grows leftward: fret 0 stays at the right edge', () => {
+    const before = view(22, 'left');
+    const after = view(24, 'left');
+    expect(after.width).toBeGreaterThan(before.width);
+    expect(after.width - after.columns[0].center).toBeCloseTo(
+      before.width - before.columns[0].center
+    );
   });
 });

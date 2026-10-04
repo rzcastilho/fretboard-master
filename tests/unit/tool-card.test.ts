@@ -70,3 +70,23 @@ describe('ToolCard', () => {
     );
   });
 });
+
+describe('ToolCard thumbnail (handedness)', () => {
+  it('follows the confirmed handedness: string labels move to the right of the nut', () => {
+    const x = (el: Element | null) => Number(el?.getAttribute('x'));
+    const probe = () => {
+      const { container } = render(ToolCard, { tool: TOOLS[0] });
+      return {
+        label: x(container.querySelector('.string-label')),
+        nut: x(container.querySelector('.nut'))
+      };
+    };
+    const right = probe();
+    expect(right.label).toBeLessThan(right.nut);
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.confirm('home');
+    const left = probe();
+    expect(left.label).toBeGreaterThan(left.nut);
+  });
+});

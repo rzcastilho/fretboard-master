@@ -87,8 +87,32 @@ export interface ScrollViewport {
   width: number;
 }
 
+/**
+ * Distance from the nut-side edge of the viewport to the nut-side edge of the board
+ * (0 when the nut end is flush with the viewport). Orientation-free scroll anchor.
+ */
+export function nutOffset(
+  layout: FretboardLayout,
+  scrollLeft: number,
+  viewportWidth: number
+): number {
+  const maxScroll = Math.max(0, layout.width - viewportWidth);
+  return layout.mirrored ? maxScroll - scrollLeft : scrollLeft;
+}
+
+/** Inverse of `nutOffset`: the `scrollLeft` that realises a nut offset (clamped to the board). */
+export function scrollForNutOffset(
+  layout: FretboardLayout,
+  offset: number,
+  viewportWidth: number
+): number {
+  const maxScroll = Math.max(0, layout.width - viewportWidth);
+  const raw = layout.mirrored ? maxScroll - offset : offset;
+  return Math.min(Math.max(raw, 0), maxScroll);
+}
+
 /** Target for a horizontal span; null when already fully visible or no scroll is possible. */
-function spanTarget(
+export function spanTarget(
   layout: FretboardLayout,
   start: number,
   end: number,
@@ -99,7 +123,7 @@ function spanTarget(
   if (start >= scrollLeft && end <= scrollLeft + width) return null;
   let target: number;
   if (end - start > width)
-    target = start; // does not fit: align the start
+    target = layout.mirrored ? end - width : start; // does not fit: align the nut side
   else if (start < scrollLeft)
     target = start; // minimal move left
   else target = end - width; // minimal move right

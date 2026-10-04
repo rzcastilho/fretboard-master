@@ -446,3 +446,117 @@ test.describe('remembered preferences: custom tuning (011 US5)', () => {
     await expect(standardSummary(page)).toBeVisible();
   });
 });
+
+test.describe('remembered preferences: left-handed and orientation (013 US4)', () => {
+  const summary = (page: Page, handed: 'left' | 'right') =>
+    page.getByRole('button', { name: `6 strings · standard tuning · ${handed}-handed` });
+  const stored = (page: Page) =>
+    page
+      .evaluate((key) => localStorage.getItem(key), PREFS_KEY)
+      .then((r) => (r ? JSON.parse(r) : null));
+
+  async function setLeftLowest(page: Page): Promise<void> {
+    await page.goto('/');
+    await page.getByRole('button', { name: /^6 strings/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: 'Left-handed' }).check();
+    await dialog.getByRole('radio', { name: 'Lowest string on top' }).check();
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+    await expect(dialog).toBeHidden();
+  }
+
+  async function expectPanel(page: Page, handed: string, top: string): Promise<void> {
+    await page.getByRole('button', { name: /^6 strings/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await expect(dialog.getByRole('radio', { name: handed })).toBeChecked();
+    await expect(dialog.getByRole('radio', { name: top })).toBeChecked();
+  }
+
+  test('US4-1/2 (Q14): left + lowest on top survive a reload', async ({ page }) => {
+    await setLeftLowest(page);
+    await expect(summary(page, 'left')).toBeVisible();
+    expect(await stored(page)).toMatchObject({ handedness: 'left', orientation: 'lowest-top' });
+    await page.reload();
+    await expect(summary(page, 'left')).toBeVisible();
+    await expectPanel(page, 'Left-handed', 'Lowest string on top');
+  });
+
+  test('US4-3 (Q15): an invalid handedness falls back alone, no error', async ({ page }) => {
+    await seed(
+      page,
+      '{"version":1,"handedness":"LEFT","orientation":"lowest-top","tuning":"AF-2"}'
+    );
+    await page.goto('/');
+    await expect(
+      page.getByRole('button', { name: /^6 strings · Half step down · right-handed/ })
+    ).toBeVisible();
+    await expectPanel(page, 'Right-handed', 'Lowest string on top');
+    await expect(notice(page)).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('US4-4 (Q16): a pre-013 record loads as before, right / highest', async ({ page }) => {
+    await seed(
+      page,
+      '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
+    );
+    await page.goto('/');
+    await expect(muteButton(page)).toHaveAttribute('aria-pressed', 'true');
+    await expectPanel(page, 'Right-handed', 'Highest string on top');
+    await expect(notice(page)).toHaveCount(0);
+  });
+
+  test('US4-5 (Q17): erase returns both settings to defaults, also after reload', async ({
+    page
+  }) => {
+    await setLeftLowest(page);
+    await page.goto('/about');
+    await page.getByRole('button', { name: 'Erase my preferences' }).click();
+    await page.getByRole('button', { name: 'Erase', exact: true }).click();
+    await expect(page).toHaveURL('/');
+    await expect(summary(page, 'right')).toBeVisible();
+    expect(await stored(page)).toBeNull();
+    await page.reload();
+    await expect(summary(page, 'right')).toBeVisible();
+    await expectPanel(page, 'Right-handed', 'Highest string on top');
+  });
+
+  test('US4-6 (Q18): unavailable storage → applies for the session, existing notice', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', {
+        get() {
+          throw new DOMException('blocked', 'SecurityError');
+        }
+      });
+    });
+    await page.goto('/');
+    await expect(notice(page)).toHaveCount(1);
+    await page.getByRole('button', { name: /^6 strings/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: 'Left-handed' }).check();
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+    await expect(summary(page, 'left')).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('US4-7 (Q19): Restore default + Confirm resets presentation and other defaults', async ({
+    page
+  }) => {
+    await seed(
+      page,
+      '{"version":1,"tuning":"AF-4","frets":16,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"handedness":"left","orientation":"lowest-top"}'
+    );
+    await page.goto('/');
+    await page.getByRole('button', { name: /^6 strings/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('button', { name: 'Restore default' }).click();
+    await dialog.getByRole('button', { name: 'Confirm' }).click();
+    await expect(summary(page, 'right')).toBeVisible();
+    const s = await stored(page);
+    expect(s).toMatchObject({ tuning: 'AF-1', frets: 22 });
+    expect(s).not.toHaveProperty('handedness');
+    expect(s).not.toHaveProperty('orientation');
+  });
+});

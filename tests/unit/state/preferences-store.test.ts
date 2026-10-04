@@ -42,7 +42,9 @@ describe('preferences.start', () => {
     expect(restore).toHaveBeenCalledWith({
       stringCount: 6,
       tuning: { kind: 'preset', id: 'AF-3' },
-      fretCount: 24
+      fretCount: 24,
+      handedness: 'right',
+      orientation: 'highest-top'
     });
     expect(pb).toHaveBeenCalledWith({ muted: true, volume: 35 });
     expect(nl).toHaveBeenCalledWith('octave');
@@ -61,7 +63,9 @@ describe('preferences.start', () => {
     expect(restore).toHaveBeenCalledWith({
       stringCount: 6,
       tuning: { kind: 'custom', offsets: [-2, 0, 0, -1, 0, 0] },
-      fretCount: 24
+      fretCount: 24,
+      handedness: 'right',
+      orientation: 'highest-top'
     });
     expect(instrument.active.tuning).toEqual({ kind: 'custom', offsets: [-2, 0, 0, -1, 0, 0] });
   });
@@ -163,7 +167,9 @@ describe('preferences.erase', () => {
     expect(restore).toHaveBeenCalledWith({
       stringCount: 6,
       tuning: { kind: 'preset', id: 'AF-1' },
-      fretCount: 22
+      fretCount: 22,
+      handedness: 'right',
+      orientation: 'highest-top'
     });
     expect(pb).toHaveBeenCalledWith({ muted: false, volume: 80 });
     expect(nl).toHaveBeenCalledWith('name');
@@ -208,5 +214,70 @@ describe('preferences.erase', () => {
     expect(s.data.has(PREFS_KEY)).toBe(false);
     preferences.remember({ muted: true });
     expect(s.data.has(PREFS_KEY)).toBe(true);
+  });
+});
+
+describe('left-handed and orientation (013, US4)', () => {
+  const raw = () => FIXTURE_BY_NAME['left-lowest-full'].raw;
+
+  it('start passes stored handedness/orientation to instrument.restore', () => {
+    const restore = vi.spyOn(instrument, 'restore');
+    preferences.start(fakeStorage({ [PREFS_KEY]: raw() }));
+    expect(restore).toHaveBeenCalledWith(
+      expect.objectContaining({ handedness: 'left', orientation: 'lowest-top', stringCount: 7 })
+    );
+    expect(instrument.active.handedness).toBe('left');
+    expect(instrument.active.orientation).toBe('lowest-top');
+  });
+
+  it('confirm of a presentation change performs exactly one write with all five fields', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    const writes = s.calls.set;
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.setOrientation('lowest-top');
+    instrument.confirm('notes');
+    expect(s.calls.set).toBe(writes + 1);
+    const stored = JSON.parse(s.data.get(PREFS_KEY) as string);
+    expect(stored).toMatchObject({
+      handedness: 'left',
+      orientation: 'lowest-top',
+      tuning: 'AF-1',
+      frets: 22
+    });
+    expect(stored.strings).toBeUndefined();
+  });
+
+  it('confirming back to defaults drops both keys', () => {
+    const s = fakeStorage({ [PREFS_KEY]: raw() });
+    preferences.start(s);
+    instrument.open();
+    instrument.restoreDefault();
+    instrument.confirm('notes');
+    const stored = JSON.parse(s.data.get(PREFS_KEY) as string);
+    expect(stored.handedness).toBeUndefined();
+    expect(stored.orientation).toBeUndefined();
+  });
+
+  it('erase removes the key and resets both', () => {
+    const s = fakeStorage({ [PREFS_KEY]: raw() });
+    preferences.start(s);
+    const restore = vi.spyOn(instrument, 'restore');
+    preferences.erase();
+    expect(s.data.has(PREFS_KEY)).toBe(false);
+    expect(restore).toHaveBeenCalledWith(
+      expect.objectContaining({ handedness: 'right', orientation: 'highest-top' })
+    );
+    expect(instrument.active.handedness).toBe('right');
+    expect(instrument.active.orientation).toBe('highest-top');
+  });
+
+  it('an invalid stored value in one field keeps the other and all other fields', () => {
+    preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['bad-handed'].raw }));
+    expect(instrument.active.handedness).toBe('right');
+    expect(instrument.active.orientation).toBe('lowest-top');
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-2' });
+    expect(preferences.noticeVisible).toBe(false);
   });
 });

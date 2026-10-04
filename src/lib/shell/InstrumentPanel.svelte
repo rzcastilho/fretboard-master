@@ -4,6 +4,7 @@
   import { tick } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
+  import { HANDEDNESS, ORIENTATIONS } from '$lib/instrument/instrument';
   import { offsetsOfTuning, type StringCount } from '$lib/instrument/tunings';
   import { noteLabel, pitchLabel, spokenNote, spokenNoteList } from '$lib/notation/notation';
   import { invertedStrings, type StringNumber } from '$lib/instrument/custom-tuning';
@@ -222,6 +223,44 @@
         </div>
       {/if}
       <FretStepper />
+      <fieldset>
+        <legend>{m.instrument_handedness_legend()}</legend>
+        {#each HANDEDNESS as value (value)}
+          <label class="count-option">
+            <input
+              type="radio"
+              name="{uid}-handedness"
+              {value}
+              checked={instrument.panel.open && instrument.panel.pending.handedness === value}
+              onchange={() => instrument.setHandedness(value)}
+            />
+            <span class="text"
+              >{value === 'left'
+                ? m.instrument_handedness_left_option()
+                : m.instrument_handedness_right_option()}</span
+            >
+          </label>
+        {/each}
+      </fieldset>
+      <fieldset>
+        <legend>{m.instrument_orientation_legend()}</legend>
+        {#each ORIENTATIONS as value (value)}
+          <label class="count-option">
+            <input
+              type="radio"
+              name="{uid}-orientation"
+              {value}
+              checked={instrument.panel.open && instrument.panel.pending.orientation === value}
+              onchange={() => instrument.setOrientation(value)}
+            />
+            <span class="text"
+              >{value === 'lowest-top'
+                ? m.instrument_orientation_lowest()
+                : m.instrument_orientation_highest()}</span
+            >
+          </label>
+        {/each}
+      </fieldset>
       {#if instrument.preview}
         <figure class="preview">
           <figcaption>{m.instrument_preview_label()}</figcaption>

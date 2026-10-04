@@ -82,7 +82,9 @@ describe('instrument store (contracts §3)', () => {
     expect(instrument.active).toEqual({
       stringCount: 6,
       tuning: { kind: 'preset', id: 'AF-4' },
-      fretCount: 22
+      fretCount: 22,
+      handedness: 'right',
+      orientation: 'highest-top'
     });
     expect(instrument.current).toBe(inst);
     expect(instrument.adjustedIn).toBeNull();
@@ -180,7 +182,9 @@ describe('instrument.restore (010)', () => {
     const config = {
       stringCount: 6,
       tuning: { kind: 'preset', id: 'AF-3' },
-      fretCount: 24
+      fretCount: 24,
+      handedness: 'right',
+      orientation: 'highest-top'
     } as const;
     instrument.restore(config);
     expect(instrument.active).toEqual(config);
@@ -505,7 +509,9 @@ describe('instrument store: string count (012 US1)', () => {
     expect(instrument.active).toEqual({
       stringCount: 7,
       tuning: { kind: 'preset', id: 'AF-21' },
-      fretCount: 22
+      fretCount: 22,
+      handedness: 'right',
+      orientation: 'highest-top'
     });
     expect(instrument.current.stringCount).toBe(7);
     const r = stored(s);
@@ -546,7 +552,9 @@ describe('instrument store: string count (012 US1)', () => {
     const config = {
       stringCount: 7,
       tuning: { kind: 'preset', id: 'AF-23' },
-      fretCount: 24
+      fretCount: 24,
+      handedness: 'right',
+      orientation: 'highest-top'
     } as const;
     instrument.restore(config);
     expect(instrument.active).toEqual(config);
@@ -564,5 +572,96 @@ describe('instrument store: string count (012 US1)', () => {
     expect(instrument.active).toEqual(DEFAULT_CONFIG);
     expect(instrument.current).toBe(STANDARD_GUITAR);
     expect(s.notes).not.toHaveBeenCalled();
+  });
+});
+
+describe('presentation settings (contracts/orientation-api §5)', () => {
+  it('setHandedness / setOrientation change pending only', () => {
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.setOrientation('lowest-top');
+    expect(instrument.active).toEqual(DEFAULT_CONFIG);
+    expect(instrument.current).toBe(STANDARD_GUITAR);
+    expect(instrument.preview?.handedness).toBe('left');
+    expect(instrument.preview?.orientation).toBe('lowest-top');
+  });
+
+  it('presentation-only confirm: no stop, no notice, views untouched, instrument follows', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    const notesView = notes.state;
+    const triadsView = triads.state;
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.confirm('notes');
+    expect(stop).not.toHaveBeenCalled();
+    expect(instrument.adjustedIn).toBeNull();
+    expect(notes.state).toBe(notesView);
+    expect(triads.state).toBe(triadsView);
+    expect(notes.instrument.handedness).toBe('left');
+    expect(triads.instrument.handedness).toBe('left');
+    expect(instrument.active.handedness).toBe('left');
+    expect(instrument.current.handedness).toBe('left');
+
+    instrument.open();
+    instrument.setOrientation('lowest-top');
+    instrument.confirm('triads');
+    expect(stop).not.toHaveBeenCalled();
+    expect(notes.state).toBe(notesView);
+    expect(triads.state).toBe(triadsView);
+    expect(notes.instrument.orientation).toBe('lowest-top');
+  });
+
+  it('presentation-only confirm clears an earlier notice without raising one', () => {
+    spies(true, false);
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('notes');
+    expect(instrument.adjustedIn).toBe('notes');
+    vi.restoreAllMocks();
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.confirm('notes');
+    expect(instrument.adjustedIn).toBeNull();
+  });
+
+  it('musical confirm still stops playback and may raise the notice', () => {
+    const s = spies(true, false);
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.setFrets(12);
+    instrument.confirm('notes');
+    expect(s.stop).toHaveBeenCalledTimes(1);
+    expect(s.stop).toHaveBeenCalledWith('instrument');
+    expect(instrument.adjustedIn).toBe('notes');
+    expect(instrument.active.handedness).toBe('left');
+    expect(instrument.active.fretCount).toBe(12);
+  });
+
+  it('cancel discards pending presentation (EC-2.7)', () => {
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.setOrientation('lowest-top');
+    instrument.cancel();
+    expect(instrument.active).toEqual(DEFAULT_CONFIG);
+    expect(instrument.preview).toBeNull();
+    instrument.open();
+    expect(instrument.preview).toBe(STANDARD_GUITAR);
+  });
+
+  it('restoreDefault resets presentation in the pending config', () => {
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.restoreDefault();
+    expect(instrument.preview).toBe(STANDARD_GUITAR);
+  });
+
+  it('restore accepts both fields without stop or notice', () => {
+    const s = spies();
+    instrument.restore({ ...DEFAULT_CONFIG, handedness: 'left', orientation: 'lowest-top' });
+    expect(s.stop).not.toHaveBeenCalled();
+    expect(instrument.current.handedness).toBe('left');
+    expect(instrument.current.orientation).toBe('lowest-top');
+    expect(s.notes).toHaveBeenCalledTimes(1);
+    expect(instrument.adjustedIn).toBeNull();
   });
 });

@@ -23,6 +23,9 @@ export interface ExpectedPreferences {
   readonly volume: number;
   readonly lastTool: ToolId | null;
   readonly labels: { readonly notes: LabelType; readonly triads: TriadsLabelType };
+  /** 013: absent or invalid in a record → right / highest-top. */
+  readonly handedness: 'right' | 'left';
+  readonly orientation: 'highest-top' | 'lowest-top';
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -47,7 +50,9 @@ const defaults: ExpectedPreferences = {
   muted: false,
   volume: 80,
   lastTool: null,
-  labels: { notes: 'name', triads: 'interval' }
+  labels: { notes: 'name', triads: 'interval' },
+  handedness: 'right',
+  orientation: 'highest-top'
 };
 
 function load(name: string): string {
@@ -76,12 +81,15 @@ export const FIXTURES: readonly PrefsFixture[] = [
     muted: true,
     volume: 35,
     lastTool: 'triads',
-    labels: { notes: 'octave', triads: 'name' }
+    labels: { notes: 'octave', triads: 'name' },
+    handedness: 'right',
+    orientation: 'highest-top'
   }),
   fixture('bad-volume', { ...defaults, tuningId: 'AF-2' }),
   fixture('garbage', defaults),
   fixture('array', defaults),
-  fixture('future', { ...defaults, tuningId: 'AF-5' }),
+  // The reader ignores `version`; the record's fields are read as for v1 (handedness included).
+  fixture('future', { ...defaults, tuningId: 'AF-5', handedness: 'left' }),
   fixture('wrong-types', defaults),
   fixture('markup', defaults),
   // 16 385 × 'a': one over MAX_RAW_LENGTH, so it is never parsed.
@@ -129,7 +137,20 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('strings-invalid', { ...defaults, tuningId: 'AF-4', muted: true }),
   fixture('strings-string', { ...defaults, tuningId: 'AF-1' }),
   fixture('seven-custom-six-long', { ...defaults, stringCount: 7, tuningId: 'AF-23' }),
-  fixture('six-custom-seven-long', { ...defaults, tuningId: 'AF-3' })
+  fixture('six-custom-seven-long', { ...defaults, tuningId: 'AF-3' }),
+  // 013 left-handed and orientation (contracts/storage-format.md)
+  fixture('left-only', { ...defaults, handedness: 'left' }),
+  fixture('lowest-only', { ...defaults, orientation: 'lowest-top' }),
+  fixture('bad-handed', { ...defaults, orientation: 'lowest-top', tuningId: 'AF-2' }),
+  fixture('left-lowest-full', {
+    ...defaults,
+    stringCount: 7,
+    tuningId: 'AF-21',
+    fretCount: 24,
+    handedness: 'left',
+    orientation: 'lowest-top'
+  }),
+  fixture('bad-orientation', { ...defaults, handedness: 'left', fretCount: 18 })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

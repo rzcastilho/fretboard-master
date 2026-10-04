@@ -3,7 +3,14 @@
  * contracts/instrument-config-api.md §2). Pure: no Svelte, i18n or DOM.
  * No-op transitions return the same object.
  */
-import type { Instrument } from '$lib/instrument/instrument';
+import {
+  HANDEDNESS,
+  ORIENTATIONS,
+  withPresentation,
+  type Handedness,
+  type Instrument,
+  type Orientation
+} from '$lib/instrument/instrument';
 import {
   addSeventh,
   canStep,
@@ -34,6 +41,10 @@ export interface InstrumentConfig {
   readonly tuning: Tuning;
   /** Integer, MIN_FRETS ≤ fretCount ≤ MAX_FRETS. */
   readonly fretCount: number;
+  /** Presentation only (013): never changes pitches or positions. */
+  readonly handedness: Handedness;
+  /** Presentation only (013). */
+  readonly orientation: Orientation;
 }
 
 export type PanelState =
@@ -48,7 +59,9 @@ export type PanelState =
 export const DEFAULT_CONFIG: InstrumentConfig = Object.freeze({
   stringCount: DEFAULT_STRING_COUNT,
   tuning: STANDARD_TUNING,
-  fretCount: DEFAULT_FRETS
+  fretCount: DEFAULT_FRETS,
+  handedness: 'right',
+  orientation: 'highest-top'
 });
 
 export const CLOSED: PanelState = Object.freeze({ open: false });
@@ -57,12 +70,27 @@ export function equalsConfig(a: InstrumentConfig, b: InstrumentConfig): boolean 
   return (
     a.stringCount === b.stringCount &&
     equalsTuning(a.tuning, b.tuning) &&
+    a.fretCount === b.fretCount &&
+    a.handedness === b.handedness &&
+    a.orientation === b.orientation
+  );
+}
+
+/** Musical fields only; presentation is ignored. */
+export function equalsMusical(a: InstrumentConfig, b: InstrumentConfig): boolean {
+  return (
+    a.stringCount === b.stringCount &&
+    equalsTuning(a.tuning, b.tuning) &&
     a.fretCount === b.fretCount
   );
 }
 
 export function instrumentOf(c: InstrumentConfig): Instrument {
-  return tuningInstrument(c.tuning, c.stringCount, c.fretCount);
+  return withPresentation(
+    tuningInstrument(c.tuning, c.stringCount, c.fretCount),
+    c.handedness,
+    c.orientation
+  );
 }
 
 export function openPanel(p: PanelState, active: InstrumentConfig): PanelState {
@@ -115,6 +143,16 @@ export function stepFrets(p: PanelState, delta: 1 | -1): PanelState {
   return setFrets(p, p.pending.fretCount + delta);
 }
 
+export function setHandedness(p: PanelState, h: Handedness): PanelState {
+  if (!p.open || !HANDEDNESS.includes(h) || h === p.pending.handedness) return p;
+  return withPending(p, { ...p.pending, handedness: h });
+}
+
+export function setOrientation(p: PanelState, o: Orientation): PanelState {
+  if (!p.open || !ORIENTATIONS.includes(o) || o === p.pending.orientation) return p;
+  return withPending(p, { ...p.pending, orientation: o });
+}
+
 export function restoreDefault(p: PanelState): PanelState {
   return withPending(p, DEFAULT_CONFIG, false);
 }
@@ -126,7 +164,17 @@ export function cancelPanel(p: PanelState): PanelState {
 export function confirmPanel(
   p: PanelState,
   active: InstrumentConfig
-): { readonly panel: PanelState; readonly next: InstrumentConfig; readonly changed: boolean } {
-  if (!p.open) return { panel: p, next: active, changed: false };
-  return { panel: CLOSED, next: p.pending, changed: !equalsConfig(p.pending, active) };
+): {
+  readonly panel: PanelState;
+  readonly next: InstrumentConfig;
+  readonly changed: boolean;
+  readonly musicalChanged: boolean;
+} {
+  if (!p.open) return { panel: p, next: active, changed: false, musicalChanged: false };
+  return {
+    panel: CLOSED,
+    next: p.pending,
+    changed: !equalsConfig(p.pending, active),
+    musicalChanged: !equalsMusical(p.pending, active)
+  };
 }

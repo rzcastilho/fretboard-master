@@ -31,7 +31,9 @@ describe('remember on change (FR-019)', () => {
       stringCount: 6,
       tuningId: 'AF-4',
       customTuning: null,
-      fretCount: 16
+      fretCount: 16,
+      handedness: 'right',
+      orientation: 'highest-top'
     });
   });
 
@@ -62,7 +64,13 @@ describe('remember on change (FR-019)', () => {
     triads.restoreLabelType('name');
     notes.restoreLabelType('name');
     playback.restore({ muted: true, volume: 20 });
-    instrument.restore({ stringCount: 6, tuning: { kind: 'preset', id: 'AF-4' }, fretCount: 12 });
+    instrument.restore({
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-4' },
+      fretCount: 12,
+      handedness: 'right',
+      orientation: 'highest-top'
+    });
     expect(remember).not.toHaveBeenCalled();
   });
 });

@@ -2,10 +2,15 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { readFileSync } from 'node:fs';
 import { tick } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_METRICS, layoutFretboard, screenOrder } from '../../../src/lib/fretboard/geometry';
+import {
+  DEFAULT_METRICS,
+  layoutFretboard,
+  rowOf,
+  screenOrder
+} from '../../../src/lib/fretboard/geometry';
 import Fretboard from '../../../src/lib/fretboard/Fretboard.svelte';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
-import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
 import { presetInstrument } from '../../../src/lib/instrument/tunings';
 
 describe('Fretboard (interactive)', () => {
@@ -1532,12 +1537,14 @@ describe('Fretboard (seven strings, US5)', () => {
     expect(layout.rows).toHaveLength(7);
   });
 
-  it('screenOrder lists string 7 last for every handedness/orientation', () => {
+  it('screenOrder puts string 7 last when highest is on top and first when lowest is', () => {
     for (const handedness of ['right', 'left'] as const) {
-      for (const orientation of ['highest-top', 'lowest-top'] as const) {
-        const { rows } = screenOrder({ ...seven, handedness, orientation });
-        expect(rows).toEqual([1, 2, 3, 4, 5, 6, 7]);
-      }
+      expect(screenOrder({ ...seven, handedness, orientation: 'highest-top' }).rows).toEqual([
+        1, 2, 3, 4, 5, 6, 7
+      ]);
+      expect(screenOrder({ ...seven, handedness, orientation: 'lowest-top' }).rows).toEqual([
+        7, 6, 5, 4, 3, 2, 1
+      ]);
     }
   });
 
@@ -1546,4 +1553,224 @@ describe('Fretboard (seven strings, US5)', () => {
     expect(screen.getByRole('gridcell', { name: 'B, string 7, open' })).toBeTruthy();
     expect(screen.getByRole('gridcell', { name: 'F sharp, string 7, fret 7' })).toBeTruthy();
   });
+});
+
+describe('Fretboard left-handed (US1)', () => {
+  const LEFT = withPresentation(STANDARD_GUITAR, 'left', 'highest-top');
+  const num = (el: Element | null, a: string) => Number(el?.getAttribute(a));
+
+  it('puts the string labels, nut and fret numbers mirrored', () => {
+    const { container } = render(Fretboard, { instrument: LEFT });
+    const cellX = num(container.querySelector('.cell[data-fret="1"]'), 'x');
+    expect(num(container.querySelector('.string-label'), 'x')).toBeGreaterThan(cellX);
+    expect(num(container.querySelector('.nut'), 'x')).toBeGreaterThan(cellX);
+    const fretX = (n: number) =>
+      [...container.querySelectorAll('.fret-number')]
+        .filter((e) => e.textContent === `${n}`)
+        .map((e) => num(e, 'x'))[0];
+    for (let n = 2; n <= 22; n++) expect(fretX(n)).toBeLessThan(fretX(n - 1));
+  });
+
+  it('keeps cell DOM order in fret order and the grid shape', () => {
+    render(Fretboard, { instrument: LEFT });
+    const grid = screen.getByRole('grid', { name: 'Fretboard' });
+    expect(within(grid).getAllByRole('gridcell')).toHaveLength(138);
+    const first = within(grid).getAllByRole('row')[0].querySelectorAll('.cell');
+    expect([...first].map((c) => c.getAttribute('data-fret'))).toEqual(
+      Array.from({ length: 23 }, (_, i) => `${i}`)
+    );
+  });
+
+  it('mirrors the region band onto frets 5–8', () => {
+    const { container } = render(Fretboard, {
+      instrument: LEFT,
+      model: { markers: [], labelMode: 'none', region: { start: 5, end: 8 } }
+    });
+    const layout = layoutFretboard(LEFT, DEFAULT_METRICS, 0, 'interactive');
+    const band = container.querySelector('rect.region-band');
+    const x = num(band, 'x');
+    const w = num(band, 'width');
+    expect(x).toBeCloseTo(layout.columns[8].start, 3);
+    expect(x + w).toBeCloseTo(layout.columns[5].end, 3);
+  });
+
+  it('runs the shape tags root → 1st → 2nd from right to left', () => {
+    const model: DisplayModel = {
+      markers: [],
+      labelMode: 'none',
+      tags: [
+        { id: 'r', start: 2, end: 2, label: 'Root', name: 'Root position', pressed: false },
+        { id: 'f', start: 5, end: 6, label: '1st', name: '1st inversion', pressed: false },
+        { id: 's', start: 9, end: 10, label: '2nd', name: '2nd inversion', pressed: false }
+      ]
+    };
+    render(Fretboard, { instrument: LEFT, model });
+    const lefts = ['Root position', '1st inversion', '2nd inversion'].map((n) =>
+      parseFloat(screen.getByRole('button', { name: n }).style.insetInlineStart)
+    );
+    expect(lefts[0]).toBeGreaterThan(lefts[1]);
+    expect(lefts[1]).toBeGreaterThan(lefts[2]);
+  });
+
+  it('reports { string: 3, fret: 5 } for a tap on that mirrored cell', () => {
+    const onactivate = vi.fn();
+    render(Fretboard, { instrument: LEFT, onactivate });
+    const svg = screen.getByRole('grid');
+    const l = layoutFretboard(LEFT, DEFAULT_METRICS, 0, 'interactive');
+    tap(svg, l.columns[5].center, l.rows[2].center);
+    expect(onactivate).toHaveBeenLastCalledWith({ string: 3, fret: 5 });
+  });
+});
+
+describe('Fretboard lowest-top (US2)', () => {
+  const LOW = withPresentation(STANDARD_GUITAR, 'right', 'lowest-top');
+  const seven = presetInstrument('AF-21', 7, 24);
+  const num = (el: Element | null, a: string) => Number(el?.getAttribute(a));
+
+  it('draws string 6 first (and string 7 first with seven strings)', () => {
+    const a = render(Fretboard, { instrument: LOW });
+    const labels = [...a.container.querySelectorAll('.string-label')].map((e) => e.textContent);
+    expect(labels[0]).toMatch(/^6 /);
+    expect(labels[5]).toMatch(/^1 /);
+    const lines = [...a.container.querySelectorAll('line.string')].map((e) => e.classList[1]);
+    expect(lines[0]).toBe('string-6');
+    a.unmount();
+    const b = render(Fretboard, { instrument: withPresentation(seven, 'right', 'lowest-top') });
+    expect(b.container.querySelector('.string-label')?.textContent).toMatch(/^7 /);
+    expect(b.container.querySelector('line.string')?.classList.contains('string-7')).toBe(true);
+  });
+
+  const tagModel: DisplayModel = {
+    markers: [],
+    labelMode: 'none',
+    tags: [{ id: 'r', start: 2, end: 2, label: 'Root', name: 'Root position', pressed: false }]
+  };
+
+  it('puts the tag strip before the svg for highest-top and after it for lowest-top', () => {
+    const hi = render(Fretboard, { instrument: STANDARD_GUITAR, model: tagModel });
+    const strip = (c: HTMLElement) => c.querySelector('.tags') as Element;
+    const grid = (c: HTMLElement) => c.querySelector('svg[role="grid"]') as Element;
+    expect(
+      strip(hi.container).compareDocumentPosition(grid(hi.container)) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    hi.unmount();
+    const lo = render(Fretboard, { instrument: LOW, model: tagModel });
+    expect(
+      strip(lo.container).compareDocumentPosition(grid(lo.container)) &
+        Node.DOCUMENT_POSITION_PRECEDING
+    ).toBeTruthy();
+  });
+
+  it('puts the fret numbers above the board when lowest-top and below when highest-top', () => {
+    const lo = render(Fretboard, { instrument: LOW });
+    const l = layoutFretboard(LOW, DEFAULT_METRICS, 0, 'interactive');
+    const y = num(lo.container.querySelector('.fret-number'), 'y');
+    expect(y).toBeLessThan(l.boardTop);
+    lo.unmount();
+    const hi = render(Fretboard, { instrument: STANDARD_GUITAR });
+    const h = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 0, 'interactive');
+    expect(num(hi.container.querySelector('.fret-number'), 'y')).toBeGreaterThan(h.boardBottom);
+  });
+
+  it('lands markers, arrows, hover hint and focus ring on the row from rowOf', async () => {
+    const layout = layoutFretboard(LOW, DEFAULT_METRICS, 0, 'interactive');
+    const row = (s: number) => rowOf(layout, s);
+    const model: DisplayModel = {
+      markers: [{ string: 2, fret: 3, emphasis: 'normal', function: 'neutral' } satisfies Marker],
+      labelMode: 'note',
+      arrows: [{ kind: 'move', id: 'a', string: 2, fromFret: 3, toFret: 5, label: '2 frets' }]
+    };
+    const { container } = render(Fretboard, { instrument: LOW, model });
+    const marker = container.querySelector('.marker') as SVGElement;
+    expect(marker.getAttribute('transform')).toContain(`${row(2).center})`);
+    expect(num(container.querySelector('.arrow-line'), 'y1')).toBe(row(2).center);
+    // Focus ring follows the focused cell (string 2, fret 3).
+    const cell = container.querySelector('.cell[data-string="2"][data-fret="3"]') as SVGElement;
+    cell.focus();
+    await fireEvent.focusIn(cell);
+    await tick();
+    expect(num(container.querySelector('.focus-ring'), 'y')).toBeCloseTo(row(2).top + 1.5, 3);
+  });
+});
+
+describe('Fretboard screen-reader parity (013 US3)', () => {
+  const COMBOS = (['right', 'left'] as const).flatMap((h) =>
+    (['highest-top', 'lowest-top'] as const).map((o) => [h, o] as const)
+  );
+  const model: DisplayModel = {
+    markers: [
+      { string: 3, fret: 5, emphasis: 'highlighted', function: 'root' } satisfies Marker,
+      { string: 2, fret: 5, emphasis: 'normal', function: 'neutral' } satisfies Marker
+    ],
+    labelMode: 'note'
+  };
+  const names = (c: HTMLElement) =>
+    [...c.querySelectorAll('[role="gridcell"]')]
+      .map(
+        (el) =>
+          `${el.getAttribute('data-string')}:${el.getAttribute('data-fret')}=${el.getAttribute('aria-label')}`
+      )
+      .sort();
+  const describe_ = (c: HTMLElement) => c.querySelector('.description')?.textContent ?? '';
+
+  it.each(COMBOS)('%s / %s: names and description equal the right/highest-top ones', (h, o) => {
+    const base = render(Fretboard, { instrument: STANDARD_GUITAR, model });
+    const expectedNames = names(base.container);
+    const expectedDescription = describe_(base.container);
+    base.unmount();
+    const { container } = render(Fretboard, {
+      instrument: withPresentation(STANDARD_GUITAR, h, o),
+      model
+    });
+    expect(names(container)).toEqual(expectedNames);
+    expect(describe_(container)).toBe(expectedDescription);
+    expect(expectedDescription.length).toBeGreaterThan(0);
+  });
+
+  it.each(COMBOS)('%s / %s: DOM order is nut → body per row, rows as drawn', (h, o) => {
+    const inst = withPresentation(STANDARD_GUITAR, h, o);
+    const { container } = render(Fretboard, { instrument: inst, model });
+    const rows = [...container.querySelectorAll('[role="row"]')];
+    expect(rows.map((r) => Number(r.getAttribute('data-string')))).toEqual(screenOrder(inst).rows);
+    for (const row of rows) {
+      const frets = [...row.querySelectorAll('[role="gridcell"]')].map((c) =>
+        Number(c.getAttribute('data-fret'))
+      );
+      expect(frets).toEqual(Array.from({ length: 23 }, (_, i) => i));
+    }
+  });
+
+  it.each(COMBOS)('%s / %s: no label, description or announcement says left or right', (h, o) => {
+    const { container } = render(Fretboard, {
+      instrument: withPresentation(STANDARD_GUITAR, h, o),
+      model
+    });
+    const texts = [
+      describe_(container),
+      container.querySelector('[aria-live]')?.textContent ?? '',
+      ...[...container.querySelectorAll('[aria-label]')].map(
+        (e) => e.getAttribute('aria-label') ?? ''
+      )
+    ];
+    for (const t of texts) expect(t).not.toMatch(/\b(left|right)\b/i);
+  });
+
+  it.each(COMBOS)(
+    '%s / %s: live announcement text is identical after a model change',
+    async (h, o) => {
+      const next: DisplayModel = { ...model, markers: [model.markers[0]] };
+      const run = async (inst: typeof STANDARD_GUITAR) => {
+        const r = render(Fretboard, { instrument: inst, model });
+        await r.rerender({ instrument: inst, model: next });
+        await tick();
+        const t = r.container.querySelector('[aria-live]')?.textContent ?? '';
+        r.unmount();
+        return t;
+      };
+      const expected = await run(STANDARD_GUITAR);
+      expect(expected.length).toBeGreaterThan(0);
+      expect(await run(withPresentation(STANDARD_GUITAR, h, o))).toBe(expected);
+    }
+  );
 });

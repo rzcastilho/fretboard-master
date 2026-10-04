@@ -34,7 +34,9 @@ export const preferences = {
     instrument.restore({
       stringCount: p.stringCount,
       tuning: tuningOfPreferences(p),
-      fretCount: p.fretCount
+      fretCount: p.fretCount,
+      handedness: p.handedness,
+      orientation: p.orientation
     });
     playback.restore({ muted: p.muted, volume: p.volume });
     notes.restoreLabelType(p.labels.notes);
@@ -70,7 +72,9 @@ export const preferences = {
       instrument.restore({
         stringCount: d.stringCount,
         tuning: tuningOfPreferences(d),
-        fretCount: d.fretCount
+        fretCount: d.fretCount,
+        handedness: d.handedness,
+        orientation: d.orientation
       });
       playback.restore({ muted: d.muted, volume: d.volume });
       notes.restoreLabelType(d.labels.notes);
