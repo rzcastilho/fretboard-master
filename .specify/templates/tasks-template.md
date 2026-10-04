@@ -96,7 +96,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T016 [US1] Add validation and error handling
 - [ ] T017 [US1] Add logging for user story 1 operations
 
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. Verify with `pnpm vitest run <touched test paths>` and `pnpm test:e2e:fast <spec files added or edited by this story>` (desktop project only; constitution "Verification tiers")
 
 ---
 
@@ -118,7 +118,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T023 [US2] Integrate with User Story 1 components (if needed)
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
+**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. Verify with targeted `pnpm vitest run` and `pnpm test:e2e:fast <spec files>`
 
 ---
 
@@ -139,7 +139,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T027 [US3] Implement [Service] in src/services/[service].py
 - [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
 
-**Checkpoint**: All user stories should now be independently functional
+**Checkpoint**: All user stories should now be independently functional. Verify with targeted `pnpm vitest run` and `pnpm test:e2e:fast <spec files>`
 
 ---
 
@@ -157,6 +157,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
+- [ ] TXXX Run all local gates once: `pnpm verify` (full Playwright matrix — phone, phone-touch, Firefox/WebKit smoke, no-JS, Lighthouse — runs in CI only; do not run `pnpm test:e2e` locally)
 
 ---
 

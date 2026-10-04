@@ -1,23 +1,23 @@
 <!--
 Sync Impact Report
-- Version change: 1.3.0 → 1.4.0 (MINOR: performance budget changed, per "Raising a budget
-  requires a constitution amendment")
-- Modified principles: VI. Performance Budgets Are Gates — "Initial JavaScript, gzip" raised
-  from ≤ 85 KB to ≤ 90 KB. Measured 84.8 KB before slice 013 and 86.1 KB after it (left-handed
-  mode and string orientation: two radio groups, mirrored layout, nut-anchored scrolling,
-  two preference fields ≈ 1.4 KB). The feature diff is already minimal, so the old cap could
-  not hold without cutting shipped behavior; 90 KB leaves room for the next slices of wave 003.
-  The gate stays a hard build failure.
-- Modified sections: none
+- Version change: 1.4.0 → 1.5.0 (MINOR: new "Verification tiers" rule in Development Workflow
+  and Quality Gates)
+- Modified principles: none
+- Modified sections: Development Workflow and Quality Gates — added **Verification tiers**.
+  The merge gate already required its checks to pass in CI; implementation rounds were
+  nonetheless re-running the full multi-browser Playwright matrix locally after every
+  checkpoint, which made each slice slow. Local runs now target the touched specs on one
+  Chromium project, and the full matrix stays a CI-only gate. No gate, budget, or coverage
+  threshold changed.
 - Added sections: none
 - Removed sections: none
-- Dependent guidance updated: `scripts/check-bundle-size.mjs` (LIMIT), ADR 0002 consequences,
-  ADR 0016 consequences, specs/013-left-handed-and-orientation plan/research/quickstart/tasks
-- Templates: plan-template.md, spec-template.md, tasks-template.md read the constitution at
-  runtime; no edits required (✅ not modified per scope guard)
-- Prior amendments: 1.2.0 → 1.3.0 raised the initial JS budget from 80 KB to 85 KB (slice 010,
-  Valibot); 1.1.0 → 1.2.0 changed the mandated font choice and clarified the Principle I merge
-  gate scope; 1.0.0 → 1.1.0 added the mise "Tool installation" row and rule
+- Dependent guidance updated: `package.json` (`test:e2e:fast`, `verify` scripts), `CLAUDE.md`
+  (verification commands), `.specify/templates/tasks-template.md` (checkpoint and polish
+  commands)
+- Prior amendments: 1.3.0 → 1.4.0 raised the initial JS budget from 85 KB to 90 KB (slice 013);
+  1.2.0 → 1.3.0 raised it from 80 KB to 85 KB (slice 010, Valibot); 1.1.0 → 1.2.0 changed the
+  mandated font choice and clarified the Principle I merge gate scope; 1.0.0 → 1.1.0 added the
+  mise "Tool installation" row and rule
 - Deferred TODOs: none
 -->
 
@@ -265,6 +265,17 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
     overall.
   - Playwright on a phone profile (360 px) and a desktop profile, with zero axe violations.
   - Lighthouse budgets and bundle-size check (Principle VI).
+- **Verification tiers:** the merge gate is enforced in CI. Local runs during implementation
+  stay targeted so each slice moves fast.
+  - Per task or checkpoint: typecheck/`svelte-check` and lint when relevant, the unit tests for
+    the touched modules, and only the Playwright specs the slice adds or edits, on the
+    `desktop` project alone (`pnpm test:e2e:fast <spec files>`).
+  - Screenshot baselines are generated for every profile that owns them (phone, phone-touch,
+    desktop), but only for the snapshot tests a task adds or changes (filtered with `-g`).
+  - End of slice, once: `pnpm verify` (check, lint, format, full Vitest with coverage, build,
+    bundle-size check, and the full Playwright suite on `desktop`).
+  - CI runs the full matrix (phone, phone-touch, desktop, Firefox and WebKit smoke, no-JS,
+    Lighthouse). Agents MUST NOT run that matrix locally except to reproduce a CI failure.
 - **Review:** at least one approving review. Reviewers MUST check principle compliance and
   that the change delivers the spec's acceptance scenarios, no more and no less.
 - **Code quality:**
@@ -304,4 +315,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.4.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-03
+**Version**: 1.5.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-04
