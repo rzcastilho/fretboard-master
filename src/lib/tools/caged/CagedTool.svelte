@@ -13,10 +13,13 @@
   import { preferences } from '$lib/state/preferences.svelte';
   import { isPhonePortrait } from '$lib/state/rotate-hint';
   import Notice from '$lib/shell/Notice.svelte';
+  import type { CagedLabelType } from '$lib/state/caged-view';
   import { tick } from 'svelte';
   import { onMount } from 'svelte';
   import CagedControls from './CagedControls.svelte';
   import CagedFocusControls from './CagedFocusControls.svelte';
+  import CagedLayerList from './CagedLayerList.svelte';
+  import ChoiceGroup from '../ChoiceGroup.svelte';
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
   const guard = () => maybeFault('caged');
@@ -43,6 +46,11 @@
       preferences.markRotateHintShown();
     }
   });
+
+  const labels = $derived<readonly { value: CagedLabelType; label: string }[]>([
+    { value: 'interval', label: m.caged_label_intervals() },
+    { value: 'name', label: m.caged_label_note_names() }
+  ]);
 
   async function viewInStandard() {
     caged.viewInStandard();
@@ -103,6 +111,12 @@
 
 <section class="e" aria-labelledby="caged-zone-e">
   <h2 id="caged-zone-e">{m.zone_actions()}</h2>
+  <ChoiceGroup
+    name={m.caged_group_labels()}
+    options={labels}
+    current={caged.state.labelType}
+    onchoose={caged.setLabelType}
+  />
   <div class="steps">
     <button
       type="button"
@@ -126,6 +140,11 @@
 </section>
 
 <div class="d">
+  <CagedLayerList
+    switches={caged.switches}
+    extraSampleShown={caged.display.extraSampleShown}
+    ontoggle={(layer) => caged.toggleLayer(layer)}
+  />
   <button
     type="button"
     class="conn-switch"

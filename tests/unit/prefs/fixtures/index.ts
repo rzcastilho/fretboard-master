@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { TuningId } from '$lib/instrument/tunings';
 import type { LabelType } from '$lib/state/notes-view';
 import type { TriadsLabelType } from '$lib/state/triads-view';
+import type { CagedLabelType } from '$lib/state/caged-view';
 import type { ToolId } from '$lib/shell/tools';
 
 /**
@@ -22,7 +23,12 @@ export interface ExpectedPreferences {
   readonly muted: boolean;
   readonly volume: number;
   readonly lastTool: ToolId | null;
-  readonly labels: { readonly notes: LabelType; readonly triads: TriadsLabelType };
+  readonly labels: {
+    readonly notes: LabelType;
+    readonly triads: TriadsLabelType;
+    /** 017: absent or invalid in a record → 'interval'. */
+    readonly caged: CagedLabelType;
+  };
   /** 013: absent or invalid in a record → right / highest-top. */
   readonly handedness: 'right' | 'left';
   readonly orientation: 'highest-top' | 'lowest-top';
@@ -52,7 +58,7 @@ const defaults: ExpectedPreferences = {
   muted: false,
   volume: 80,
   lastTool: null,
-  labels: { notes: 'name', triads: 'interval' },
+  labels: { notes: 'name', triads: 'interval', caged: 'interval' },
   handedness: 'right',
   orientation: 'highest-top',
   rotateHintShown: false
@@ -84,7 +90,7 @@ export const FIXTURES: readonly PrefsFixture[] = [
     muted: true,
     volume: 35,
     lastTool: 'triads',
-    labels: { notes: 'octave', triads: 'name' },
+    labels: { notes: 'octave', triads: 'name', caged: 'interval' },
     handedness: 'right',
     orientation: 'highest-top',
     rotateHintShown: false
@@ -155,7 +161,12 @@ export const FIXTURES: readonly PrefsFixture[] = [
     handedness: 'left',
     orientation: 'lowest-top'
   }),
-  fixture('bad-orientation', { ...defaults, handedness: 'left', fretCount: 18 })
+  fixture('bad-orientation', { ...defaults, handedness: 'left', fretCount: 18 }),
+  // 017 CAGED label type: written only when 'name'
+  fixture('labels-caged-name', {
+    ...defaults,
+    labels: { notes: 'name', triads: 'interval', caged: 'name' }
+  })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

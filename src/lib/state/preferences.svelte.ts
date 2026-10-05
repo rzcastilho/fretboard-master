@@ -7,6 +7,7 @@ import { startSession, type PreferencesPatch, type PrefsSession } from '$lib/pre
 import { TOOL_IDS, tuningOfPreferences } from '$lib/prefs/schema';
 import type { StorageLike } from '$lib/prefs/storage';
 import type { ToolId } from '$lib/shell/tools';
+import { caged } from './caged.svelte';
 import { instrument } from './instrument.svelte';
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
@@ -46,6 +47,7 @@ export const preferences = {
     playback.restore({ muted: p.muted, volume: p.volume });
     notes.restoreLabelType(p.labels.notes);
     triads.restoreLabelType(p.labels.triads);
+    caged.restoreLabelType(p.labels.caged);
     lastTool = p.lastTool;
     rotateHintShown = p.rotateHintShown;
     if (!session.available && !noticeShown) {
@@ -92,6 +94,7 @@ export const preferences = {
       playback.restore({ muted: d.muted, volume: d.volume });
       notes.restoreLabelType(d.labels.notes);
       triads.restoreLabelType(d.labels.triads);
+      caged.restoreLabelType(d.labels.caged);
     }
     lastTool = null;
     rotateHintShown = false;

@@ -4,6 +4,7 @@
  */
 import type { PitchClass, Spelling } from '../theory/pitch';
 import type { CagedQuality, CagedShapeId } from '../theory/caged';
+import { CHORD_ONLY } from './caged-layers';
 import { choiceOf, effectiveRootSpelling, isAlteredRoot } from '../theory/triad';
 import type { SpellingOverride } from './triads-view';
 
@@ -15,6 +16,17 @@ export interface CagedFocus {
   readonly ordinal: number;
 }
 
+/** Which layers are switched on (FR-002). Never serialized. */
+export interface LayersOn {
+  readonly chord: boolean;
+  readonly arpeggio: boolean;
+  readonly pentatonic: boolean;
+  readonly scale: boolean;
+}
+
+export type CagedLabelType = 'interval' | 'name';
+export const CAGED_LABEL_TYPES: readonly CagedLabelType[] = ['interval', 'name'];
+
 export interface CagedViewState {
   readonly rootPc: PitchClass;
   readonly spellingOverride: SpellingOverride;
@@ -23,13 +35,25 @@ export interface CagedViewState {
   readonly focus: CagedFocus | null;
   /** Show connections (default false). */
   readonly connections: boolean;
+  /** Layer switches; initial `CHORD_ONLY`. */
+  readonly layers: LayersOn;
+  /** Marker label kind; initial = the preferred label. */
+  readonly labelType: CagedLabelType;
 }
 
 export const CAGED_QUALITIES: readonly CagedQuality[] = ['major', 'minor'];
 
-/** FR-002: C major, no spelling override. */
-export function initialCagedView(): CagedViewState {
-  return { rootPc: 0, spellingOverride: 'none', quality: 'major', focus: null, connections: false };
+/** FR-002: C major, no spelling override, Chord layer only. */
+export function initialCagedView(label: CagedLabelType = 'interval'): CagedViewState {
+  return {
+    rootPc: 0,
+    spellingOverride: 'none',
+    quality: 'major',
+    focus: null,
+    connections: false,
+    layers: CHORD_ONLY,
+    labelType: CAGED_LABEL_TYPES.includes(label) ? label : 'interval'
+  };
 }
 
 export function selectRoot(s: CagedViewState, pc: PitchClass): CagedViewState {
@@ -62,8 +86,29 @@ export function setConnections(s: CagedViewState, on: boolean): CagedViewState {
   return s.connections === on ? s : { ...s, connections: on };
 }
 
-export function resetCaged(): CagedViewState {
-  return initialCagedView();
+export function equalsLayers(a: LayersOn, b: LayersOn): boolean {
+  return (
+    a === b ||
+    (a.chord === b.chord &&
+      a.arpeggio === b.arpeggio &&
+      a.pentatonic === b.pentatonic &&
+      a.scale === b.scale)
+  );
+}
+
+/** Same reference when every flag is equal. */
+export function setLayers(s: CagedViewState, l: LayersOn): CagedViewState {
+  return equalsLayers(s.layers, l) ? s : { ...s, layers: l };
+}
+
+/** No-op for an unknown or equal value. */
+export function setLabelType(s: CagedViewState, t: CagedLabelType): CagedViewState {
+  return !CAGED_LABEL_TYPES.includes(t) || t === s.labelType ? s : { ...s, labelType: t };
+}
+
+/** Back to the defaults; layers → `CHORD_ONLY`, label → the preferred one. */
+export function resetCaged(preferredLabel: CagedLabelType = 'interval'): CagedViewState {
+  return initialCagedView(preferredLabel);
 }
 
 export function equalsCagedView(a: CagedViewState, b: CagedViewState): boolean {
@@ -72,7 +117,9 @@ export function equalsCagedView(a: CagedViewState, b: CagedViewState): boolean {
     a.spellingOverride === b.spellingOverride &&
     a.quality === b.quality &&
     equalsFocus(a.focus, b.focus) &&
-    a.connections === b.connections
+    a.connections === b.connections &&
+    equalsLayers(a.layers, b.layers) &&
+    a.labelType === b.labelType
   );
 }
 

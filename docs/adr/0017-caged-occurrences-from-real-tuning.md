@@ -49,3 +49,19 @@ fretCount)` takes the open pitches of strings 6 → 1. It computes `t = pitchCla
 - **Boolean "compatible"** (R-03): slice 002 would need a second function; the three-way enum costs nothing.
 - **CAGED-only tag overlay outside `Fretboard`** (R-06): duplicates the layout and 013 mirroring, and breaks "tools don't draw the fretboard".
 - **Disabled buttons** (R-06): announced as unavailable controls, which misleads.
+
+## Addendum: scale region and real-pitch layer notes (spec 017-caged-layers)
+
+- **Source**: spec 017-caged-layers (research R-01, R-02, R-04, R-05)
+- **Scale region on occurrences.** `ShapeOccurrence` gains `region: { start; end }`, the fret window
+  of the shape's scale pattern. It comes from `SCALE_REGIONS[quality][shape]` plus the same shift and
+  octave offset that place the chord frets. It is not clipped to `0…fretCount`, so a region may
+  start below the nut or end past the last fret; the renderer omits notes outside the neck and the
+  occurrence is still drawn. Chord frets keep their "all inside `0…fretCount`" rule. (R-02)
+- **Layer notes from real pitch.** Within a region, a position belongs to a layer when its real
+  pitch class (open pitch + fret) is in the scale. Arpeggio and Pentatonic are degree filters of the
+  same pattern. Altered string 6 (Drop D) and string 7 of a seven-string instrument need no special
+  code: each uses its own open pitch, so string 7 repeats string 2's frets in standard tuning and
+  string 6 follows its real tuning. (R-01, R-04, R-05)
+- **Boundary.** `src/lib/theory/caged-layers.ts` imports only `./pitch`, `./triad` and `./caged`
+  (Principle I).

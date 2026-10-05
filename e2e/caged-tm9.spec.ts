@@ -78,3 +78,75 @@ test.describe('TM-9 CAGED view 18 (connections)', () => {
     await expect(page).toHaveScreenshot('tm9-view-18.png');
   });
 });
+
+test.describe('TM-9 CAGED layers (017)', () => {
+  test('tm9 view 20 layers: D major, C shape in focus, Chord + Scale, 7 strings', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, strings: 7, tuning: 'AF-21' })
+      );
+    });
+    await page.goto('/caged');
+    await board(page).waitFor();
+    await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(2).click();
+    await expect(page.getByText('D major', { exact: true })).toBeVisible();
+    await page
+      .getByRole('radiogroup', { name: 'Shape' })
+      .getByRole('radio', { name: 'C', exact: true })
+      .click();
+    await page
+      .getByRole('group', { name: 'Layers' })
+      .getByRole('switch', { name: 'Scale', exact: true })
+      .click();
+    await expect(board(page).locator('.marker[data-key^="7:"]').first()).toBeVisible();
+    // Let the reveal finish before the capture.
+    await expect(board(page).locator('.marker.degree').first()).toHaveCSS('opacity', '1');
+    await expect(board(page)).toHaveScreenshot('tm9-caged-20-d-c-scale-7.png');
+  });
+
+  test('tm9 view 16 layers: A minor, Em shape in focus, Chord + Pentatonic, 6 strings', async ({
+    page
+  }) => {
+    await page.goto('/caged');
+    await board(page).waitFor();
+    await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(9).click();
+    await page
+      .getByRole('radiogroup', { name: 'Quality' })
+      .getByRole('radio', { name: /minor/i })
+      .click();
+    await expect(page.getByText('A minor', { exact: true })).toBeVisible();
+    await page
+      .getByRole('radiogroup', { name: 'Shape' })
+      .getByRole('radio', { name: 'E', exact: true })
+      .click();
+    await page
+      .getByRole('group', { name: 'Layers' })
+      .getByRole('switch', { name: 'Pentatonic', exact: true })
+      .click();
+    // Let the reveal finish before the capture.
+    await expect(board(page).locator('.marker.degree').first()).toHaveCSS('opacity', '1');
+    await expect(board(page)).toHaveScreenshot('tm9-caged-16-am-em-pentatonic.png');
+  });
+
+  test('tm9 view 17 layers: G major, E shape in focus, Chord + Arpeggio + Scale', async ({
+    page
+  }) => {
+    await page.goto('/caged');
+    await board(page).waitFor();
+    await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(7).click();
+    await expect(page.getByText('G major', { exact: true })).toBeVisible();
+    await page
+      .getByRole('radiogroup', { name: 'Shape' })
+      .getByRole('radio', { name: 'E', exact: true })
+      .click();
+    const layers = page.getByRole('group', { name: 'Layers' });
+    await layers.getByRole('switch', { name: 'Arpeggio', exact: true }).click();
+    await layers.getByRole('switch', { name: 'Scale', exact: true }).click();
+    // Let the reveal finish before the capture.
+    await expect(board(page).locator('.marker.degree').first()).toHaveCSS('opacity', '1');
+    await expect(board(page)).toHaveScreenshot('tm9-caged-17-g-e-arp-scale.png');
+  });
+});

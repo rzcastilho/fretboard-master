@@ -104,13 +104,32 @@
   const scrollDuration = () => tokenDuration(root);
 
   /**
-   * Fade (F5): only comparison markers and arrows fade; other markers appear instantly.
-   * Arrows fade in after the slide has finished (delay = one token duration).
+   * Intro (F5, 017): comparison markers fade over `--duration-short`. A marker with `appear`
+   * (a layer reveal) starts after `appear × (short − fast)` and fades and scales in over
+   * `--duration-fast`, so the whole sequence fits in `--duration-short`; reduced motion zeroes
+   * both. Every other marker appears at once. Never 0 ms: see `markerOut`.
    */
-  function markerFade(node: Element, comparison: boolean) {
-    // Never 0: Svelte 5 keyed-each outro groups never finish when some items' outros complete
-    // synchronously (duration 0) and others asynchronously, leaving faded-out markers in the DOM.
-    // 1 ms keeps every marker outro asynchronous, which is visually instant.
+  function markerIn(node: Element, mk: { comparison: boolean; appear?: number }) {
+    if (mk.appear !== undefined) {
+      const short = tokenDuration(root);
+      const fast = tokenDuration(root, '--duration-fast');
+      const shape = node.querySelector<SVGGElement>('.shape');
+      return {
+        ...fade(node, {
+          duration: Math.max(1, fast),
+          delay: Math.max(0, mk.appear * (short - fast))
+        }),
+        tick: (t: number) => {
+          if (shape) shape.style.transform = t < 1 ? `scale(${0.6 + 0.4 * t})` : '';
+        }
+      };
+    }
+    // Never 0: Svelte 5 keyed-each groups never finish when some items' transitions complete
+    // synchronously (duration 0) and others asynchronously. 1 ms is visually instant.
+    return fade(node, { duration: Math.max(1, mk.comparison ? tokenDuration(root) : 0) });
+  }
+  /** Outro: comparison markers fade; every other removal is immediate and never staggered. */
+  function markerOut(node: Element, comparison: boolean) {
     return fade(node, { duration: Math.max(1, comparison ? tokenDuration(root) : 0) });
   }
   function arrowFade(node: Element, direction: { in: boolean }) {
@@ -818,13 +837,15 @@
             <g
               class="marker {d.mk.function} {d.mk.emphasis}{d.tone ? ` tone-${d.tone}` : ''}"
               class:comparison={d.mk.variant === 'comparison'}
+              class:layer-arpeggio={d.mk.layer === 'arpeggio'}
               class:pulse={d.mk.pulse !== undefined}
               data-variant={d.mk.variant}
               style:--pulse-duration={d.mk.pulse ? `${d.mk.pulse.durationMs}ms` : undefined}
               data-key={d.key}
               transform="translate({d.x} {d.y})"
               style:transform={mounted ? `translate(${d.x}px, ${d.y}px)` : undefined}
-              transition:markerFade={d.mk.variant === 'comparison'}
+              in:markerIn={{ comparison: d.mk.variant === 'comparison', appear: d.mk.appear }}
+              out:markerOut={d.mk.variant === 'comparison'}
             >
               <g class="shape">
                 {#if d.mk.function === 'root'}
@@ -844,6 +865,9 @@
                   <circle class="glyph ring" r={metrics.markerMedium / 2} />
                 {:else}
                   <circle class="glyph" r={metrics.markerMedium / 2} />
+                {/if}
+                {#if d.mk.extra && d.mk.function === 'degree'}
+                  <circle class="extra-dot" aria-hidden="true" cy={metrics.markerSmall / 2 + 3} />
                 {/if}
                 {#if d.mk.ring}
                   <circle class="connection-ring" aria-hidden="true" style:--ring-base={ringBase} />
@@ -1173,6 +1197,20 @@
     filter: drop-shadow(0 0 var(--marker-elevation-stroke) var(--color-text));
   }
 
+  /* Arpeggio layer: smaller and slightly translucent; shape still carries the function. */
+  .marker.layer-arpeggio .shape {
+    transform: scale(var(--marker-layer-scale));
+    opacity: var(--marker-layer-opacity);
+  }
+
+  .marker.layer-arpeggio.highlighted .shape {
+    transform: scale(calc(var(--marker-layer-scale) * var(--emph-highlight-scale)));
+  }
+
+  .marker .extra-dot {
+    fill: var(--color-text);
+    r: var(--marker-extra-dot);
+  }
   .marker .connection-ring {
     fill: none;
     stroke: var(--connection-ring);

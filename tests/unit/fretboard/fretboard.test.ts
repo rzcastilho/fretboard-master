@@ -115,6 +115,19 @@ const show = (markers: Marker[], labelMode: DisplayModel['labelMode'] = 'note') 
   render(Fretboard, { instrument: STANDARD_GUITAR, model: { markers, labelMode } });
 
 describe('Fretboard markers', () => {
+  it('draws circle.extra-dot inside a degree marker only when extra (017 US5)', () => {
+    const { container } = show([
+      mk({ string: 1, fret: 1, function: 'degree', extra: true }),
+      mk({ string: 2, fret: 1, function: 'degree' }),
+      mk({ string: 3, fret: 1, function: 'root', extra: true })
+    ]);
+    const extra = container.querySelector('.marker.degree[data-key="1:1"]');
+    expect(extra?.querySelector('circle.extra-dot')).not.toBeNull();
+    expect(container.querySelector('.marker[data-key="2:1"] circle.extra-dot')).toBeNull();
+    expect(container.querySelector('.marker[data-key="3:1"] circle.extra-dot')).toBeNull();
+    expect(container.querySelectorAll('circle.extra-dot')).toHaveLength(1);
+  });
+
   it('draws one marker per function with function and emphasis classes', () => {
     const { container } = show([
       mk({ string: 1, fret: 1, function: 'root', emphasis: 'highlighted' }),
@@ -1557,6 +1570,111 @@ describe('Fretboard marker motion (007 US5)', () => {
         cleanup();
       }
     });
+
+    describe('layer reveal intro (017 US1)', () => {
+      const stubTokens = (reduce = false) => {
+        vi.spyOn(globalThis, 'getComputedStyle').mockImplementation(
+          () =>
+            ({
+              getPropertyValue: (t: string) => (t === '--duration-fast' ? '120ms' : '300ms')
+            }) as unknown as CSSStyleDeclaration
+        );
+        vi.stubGlobal('matchMedia', (q: string) => ({
+          matches: reduce && q.includes('reduce'),
+          addEventListener() {}
+        }));
+        proto.animate = (...args: unknown[]) => {
+          animate(...args);
+          return { cancel() {}, finished: Promise.resolve(), onfinish: null, currentTime: 0 };
+        };
+      };
+      const opts = () => animate.mock.calls.map((c) => c[1] as { duration: number; delay: number });
+      const base = () => [id({ string: 3, fret: 0, id: '3:0', function: 'root' })];
+
+      it('holds the intro for appear × (short − fast) before the fast fade', async () => {
+        stubTokens();
+        try {
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model(base())
+          });
+          animate.mockClear();
+          await rerender({
+            instrument: STANDARD_GUITAR,
+            model: model([
+              ...base(),
+              id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.5 })
+            ])
+          });
+          // Svelte holds the node for the delay (one 90 ms animation) before the 120 ms fade.
+          expect(opts().filter((o) => o.duration === 90)).toHaveLength(1);
+        } finally {
+          cleanup();
+        }
+      });
+
+      it('has no delay under reduced motion', async () => {
+        stubTokens(true);
+        try {
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model(base())
+          });
+          animate.mockClear();
+          await rerender({
+            instrument: STANDARD_GUITAR,
+            model: model([
+              ...base(),
+              id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.9 })
+            ])
+          });
+          for (const o of opts()) {
+            expect(o.delay ?? 0).toBe(0);
+            expect(o.duration).toBeLessThanOrEqual(1);
+          }
+        } finally {
+          cleanup();
+        }
+      });
+
+      it('plays only on mount: a marker kept across updates does not animate again', async () => {
+        stubTokens();
+        try {
+          const withAppear = () => [
+            ...base(),
+            id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.5 })
+          ];
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model(base())
+          });
+          await rerender({ instrument: STANDARD_GUITAR, model: model(withAppear()) });
+          animate.mockClear();
+          await rerender({ instrument: STANDARD_GUITAR, model: model(withAppear()) });
+          expect(animate).not.toHaveBeenCalled();
+        } finally {
+          cleanup();
+        }
+      });
+
+      it('removal has no stagger', async () => {
+        stubTokens();
+        try {
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model([
+              ...base(),
+              id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.9 })
+            ])
+          });
+          animate.mockClear();
+          await rerender({ instrument: STANDARD_GUITAR, model: model(base()) });
+          for (const o of opts()) expect(o.delay ?? 0).toBe(0);
+        } finally {
+          cleanup();
+        }
+      });
+    });
   });
 
   it('US5-2: a comparison-quality change slides only the changed comparison note', async () => {
@@ -2019,5 +2137,37 @@ describe('Fretboard string marks (slice 015)', () => {
   it('draws no mark without stringMarks', () => {
     const { container } = render(Fretboard, { instrument: STANDARD_GUITAR });
     expect(container.querySelector('text.string-mark')).toBeNull();
+  });
+});
+
+describe('MarkerSample (US2)', () => {
+  it('draws an aria-hidden 44x44 svg with the function glyph', async () => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const { container } = render(MarkerSample, { fn: 'root' });
+    const svg = container.querySelector('svg.marker-sample') as SVGElement;
+    expect(svg.getAttribute('aria-hidden')).toBe('true');
+    expect(svg.getAttribute('width')).toBe('44');
+    expect(svg.querySelector('rect.glyph')).not.toBeNull();
+  });
+
+  it.each([
+    ['fifth', 'polygon.glyph'],
+    ['degree', 'circle.glyph.outline'],
+    ['third', 'circle.glyph']
+  ] as const)('%s uses %s', async (fn, selector) => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const { container } = render(MarkerSample, { fn });
+    expect(container.querySelector(selector)).not.toBeNull();
+  });
+
+  it('arpeggio layer adds layer-arpeggio and extra adds the extra dot', async () => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const a = render(MarkerSample, { fn: 'root', layer: 'arpeggio' });
+    expect(a.container.querySelector('svg.layer-arpeggio')).not.toBeNull();
+    const e = render(MarkerSample, { fn: 'degree', extra: true });
+    expect(e.container.querySelector('circle.extra-dot')).not.toBeNull();
   });
 });

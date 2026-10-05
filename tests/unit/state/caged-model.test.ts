@@ -706,3 +706,315 @@ describe('buildCagedModel: connections (016 US3)', () => {
     expect(d.model).toBeNull();
   });
 });
+
+describe('buildCagedModel: layer switches (US2)', () => {
+  it('derives switches from the layer rules', () => {
+    const d = build(view, STANDARD_GUITAR, CTX);
+    expect(d.switches.chord).toEqual({ on: true, disabled: 'last-layer' });
+    expect(d.switches.arpeggio).toEqual({ on: false, disabled: null });
+    expect(d.extraSampleShown).toBe(false);
+  });
+
+  it('shows the extra sample only when Pentatonic and Scale are both on', () => {
+    const layers = { chord: true, arpeggio: false, pentatonic: true, scale: false };
+    expect(build({ ...view, layers }, STANDARD_GUITAR, CTX).extraSampleShown).toBe(false);
+    expect(
+      build({ ...view, layers: { ...layers, scale: true } }, STANDARD_GUITAR, CTX).extraSampleShown
+    ).toBe(true);
+  });
+
+  it('forces every switch to no-shapes in a non-compatible tuning and keeps the layers', () => {
+    const v = { ...view, layers: { chord: true, arpeggio: true, pentatonic: false, scale: false } };
+    const d = build(v, AF_8, CTX);
+    expect(d.tuningClass).toBe('non-compatible');
+    for (const s of Object.values(d.switches)) expect(s.disabled).toBe('no-shapes');
+    expect(d.switches.arpeggio.on).toBe(true);
+    expect(d.positions).toEqual([]);
+  });
+
+  it('exposes resolved positions for the layers', () => {
+    const d = build(view, STANDARD_GUITAR, CTX);
+    expect(d.positions.length).toBeGreaterThan(0);
+    expect(new Set(d.positions.map((p) => p.layer))).toEqual(new Set(['chord']));
+  });
+});
+
+describe('buildCagedModel: layer markers and labels (017 US1)', () => {
+  const ALL = { chord: true, arpeggio: false, pentatonic: false, scale: true };
+  const focusE = setFocus(view, { letter: 'E', ordinal: 0 });
+  const scaleView = { ...focusE, layers: ALL };
+  const keyed = (d: ReturnType<typeof buildCagedModel>) =>
+    new Map((d.model?.markers ?? []).map((mk) => [mk.id as string, mk]));
+
+  it('maps scale positions to degree markers with interval, spelling and extra', () => {
+    const d = build(scaleView, STANDARD_GUITAR, CTX);
+    const marks = keyed(d);
+    expect(marks.size).toBe(d.positions.length);
+    for (const p of d.positions) {
+      const mk = marks.get(`${p.string}:${p.fret}`);
+      expect(mk).toBeDefined();
+      expect(mk?.interval).toBe(p.degree);
+      expect(mk?.emphasis).toBe(p.emphasis);
+      if (p.layer === 'scale' || p.layer === 'pentatonic') {
+        expect(mk?.function).toBe('degree');
+        expect(mk?.layer).toBeUndefined();
+      } else {
+        expect(['root', 'third', 'fifth']).toContain(mk?.function);
+      }
+    }
+    // C major E shape: B at s6 f7 is a scale 7th, spelled B.
+    const b = marks.get('6:7');
+    expect(b?.function).toBe('degree');
+    expect(b?.interval).toBe('7');
+    expect(b?.spelling).toEqual({ letter: 'B', accidental: 0 });
+  });
+
+  it('draws chord positions as root, third and fifth in the E shape of C major', () => {
+    const marks = keyed(build(scaleView, STANDARD_GUITAR, CTX));
+    expect(marks.get('6:8')?.function).toBe('root');
+    expect(marks.get('6:8')?.interval).toBe('R');
+  });
+
+  it('marks the arpeggio layer on non-chord arpeggio notes', () => {
+    const v = {
+      ...focusE,
+      layers: { chord: true, arpeggio: true, pentatonic: false, scale: false }
+    };
+    const d = build(v, STANDARD_GUITAR, CTX);
+    const arps = d.positions.filter((p) => p.layer === 'arpeggio');
+    expect(arps.length).toBeGreaterThan(0);
+    const marks = keyed(d);
+    for (const p of arps) expect(marks.get(`${p.string}:${p.fret}`)?.layer).toBe('arpeggio');
+  });
+
+  it('sets labelMode from labelType', () => {
+    expect(build(scaleView, STANDARD_GUITAR, CTX).model?.labelMode).toBe('interval');
+    expect(build({ ...scaleView, labelType: 'name' }, STANDARD_GUITAR, CTX).model?.labelMode).toBe(
+      'note'
+    );
+    expect(build(view, STANDARD_GUITAR, CTX).model?.labelMode).toBe('interval');
+  });
+
+  it('spells scale degrees on consecutive letters in the key (F major B♭)', () => {
+    const v = { ...selectRoot(view, 5), layers: ALL };
+    const f = setFocus(v, { letter: 'E', ordinal: 0 });
+    const d = build(f, STANDARD_GUITAR, CTX);
+    const four = d.model?.markers.find((mk) => mk.interval === '4');
+    expect(four?.spelling).toEqual({ letter: 'B', accidental: -1 });
+  });
+
+  it('staggers appear = i / n only for ids in reveal.ids, in order', () => {
+    const base = build(scaleView, STANDARD_GUITAR, CTX);
+    const ids = base.positions.slice(0, 4).map((p) => `${p.string}:${p.fret}`);
+    const d = build(scaleView, STANDARD_GUITAR, CTX, null, { reveal: { ids }, layerChange: null });
+    const marks = keyed(d);
+    ids.forEach((id, i) => expect(marks.get(id)?.appear).toBeCloseTo(i / ids.length));
+    for (const [id, mk] of marks) if (!ids.includes(id)) expect(mk.appear).toBeUndefined();
+    for (const mk of marks.values()) {
+      if (mk.appear !== undefined) {
+        expect(mk.appear).toBeGreaterThanOrEqual(0);
+        expect(mk.appear).toBeLessThan(1);
+      }
+    }
+  });
+
+  it('no reveal: no marker carries appear', () => {
+    const d = build(scaleView, STANDARD_GUITAR, CTX);
+    expect(d.model?.markers.every((mk) => mk.appear === undefined)).toBe(true);
+  });
+
+  it('rings only positions that have a marker', () => {
+    const v = { ...scaleView, connections: true };
+    const d = build(v, STANDARD_GUITAR, CTX);
+    const ids = new Set((d.model?.markers ?? []).map((mk) => mk.id));
+    const ringed = (d.model?.markers ?? []).filter((mk) => mk.ring);
+    expect(ringed.length).toBeGreaterThan(0);
+    for (const c of d.connections) {
+      const id = `${c.string}:${c.fret}`;
+      expect(ringed.some((mk) => mk.id === id)).toBe(ids.has(id));
+    }
+  });
+
+  it('Drop D, D major, E shape: string 6 is 9, 11, 12 with 12 as Chord', () => {
+    const v = { ...selectRoot(view, 2), layers: ALL };
+    const f = setFocus(v, { letter: 'E', ordinal: 0 });
+    const d = build(f, AF_4, CTX);
+    expect(d.model?.region).toMatchObject({ start: 10, end: 12 });
+    expect(d.focused?.start).toBe(10);
+    const s6 = (d.model?.markers ?? []).filter((mk) => mk.string === 6 && mk.emphasis !== 'dimmed');
+    expect(s6.map((mk) => mk.fret).sort((a, b) => a - b)).toEqual([9, 11, 12]);
+    expect(s6.find((mk) => mk.fret === 12)?.function).toBe('root');
+    expect(s6.find((mk) => mk.fret === 9)?.function).toBe('degree');
+  });
+
+  it('7 strings: string 7 carries layer markers only, no chord markers', () => {
+    const v = { ...selectRoot(view, 2), layers: ALL };
+    const f = setFocus(v, { letter: 'C', ordinal: 0 });
+    const d = build(f, AF_21, CTX);
+    const drawn = (d.model?.markers ?? []).filter((mk) => mk.emphasis !== 'dimmed');
+    const s7 = drawn.filter((mk) => mk.string === 7);
+    expect(s7.length).toBeGreaterThan(0);
+    for (const mk of s7) expect(mk.function).toBe('degree');
+    const s2 = drawn.filter((mk) => mk.string === 2).map((mk) => mk.fret);
+    expect(s7.map((mk) => mk.fret).sort((a, b) => a - b)).toEqual(s2.sort((a, b) => a - b));
+  });
+});
+
+describe('buildCagedModel: extra mark (017 US5)', () => {
+  const focusE = setFocus(view, { letter: 'E', ordinal: 0 });
+  const both = { chord: true, arpeggio: false, pentatonic: true, scale: true };
+
+  it('marks only the 4th and 7th as extra in major and names them', () => {
+    const d = buildCagedModel({ ...focusE, layers: both }, STANDARD_GUITAR);
+    const extra = (d.model?.markers ?? []).filter((mk) => mk.extra);
+    expect(extra.map((mk) => mk.id).sort()).toEqual(['1:7', '3:10', '4:9', '5:8', '6:7'].sort());
+    expect(extra.every((mk) => mk.function === 'degree')).toBe(true);
+    expect(shown(d).description).toContain('Extra mark: F, B.');
+  });
+
+  it('names the 2nd and flat 6th in minor with spoken names', () => {
+    const minor = { ...focusE, rootPc: 9, quality: 'minor' as const, layers: both };
+    const d = buildCagedModel(minor, STANDARD_GUITAR);
+    expect(shown(d).description).toContain('Extra mark: B, F.');
+  });
+
+  it('has no extra markers and no sentence unless both layers are on', () => {
+    for (const layers of [
+      { ...both, pentatonic: false },
+      { ...both, scale: false }
+    ]) {
+      const d = buildCagedModel({ ...focusE, layers }, STANDARD_GUITAR);
+      expect((d.model?.markers ?? []).some((mk) => mk.extra)).toBe(false);
+      expect(shown(d).description).not.toContain('Extra mark');
+    }
+  });
+});
+
+describe('buildCagedModel: arpeggio layer (017 US3)', () => {
+  const arp = { chord: true, arpeggio: true, pentatonic: false, scale: false };
+  const markers = (d: ReturnType<typeof buildCagedModel>) => d.model?.markers ?? [];
+
+  it('no focus: one marker per position; arpeggio markers keep root/third/fifth functions', () => {
+    const d = build({ ...view, layers: arp }, STANDARD_GUITAR, CTX);
+    const ids = markers(d).map((mk) => mk.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const layered = markers(d).filter((mk) => mk.layer === 'arpeggio');
+    expect(layered.length).toBeGreaterThan(0);
+    for (const mk of markers(d)) expect(['root', 'third', 'fifth']).toContain(mk.function);
+    for (const mk of layered) expect(['R', '3', '5']).toContain(mk.interval);
+    expect(markers(d).some((mk) => mk.layer === undefined)).toBe(true);
+    expect(markers(d).every((mk) => mk.emphasis === 'normal')).toBe(true);
+  });
+
+  it('A minor draws R, b3, 5 only', () => {
+    const v = { ...selectRoot(view, 9), quality: 'minor' as const, layers: arp };
+    for (const mk of markers(build(v, STANDARD_GUITAR, CTX)))
+      expect(['R', 'b3', '5']).toContain(mk.interval);
+  });
+
+  it('with focus: arpeggio markers only inside the focused region', () => {
+    const d = build(
+      { ...setFocus(view, { letter: 'E', ordinal: 0 }), layers: arp },
+      STANDARD_GUITAR,
+      CTX
+    );
+    const region = d.focused?.region;
+    const layered = markers(d).filter((mk) => mk.layer === 'arpeggio');
+    expect(layered.length).toBeGreaterThan(0);
+    for (const mk of layered) {
+      expect(mk.fret).toBeGreaterThanOrEqual(region?.start ?? 0);
+      expect(mk.fret).toBeLessThanOrEqual(region?.end ?? 0);
+    }
+  });
+
+  it('Chord off: chord positions drawn as arpeggio, no dimmed markers', () => {
+    const off = { ...arp, chord: false };
+    for (const v of [view, setFocus(view, { letter: 'E', ordinal: 0 })]) {
+      const d = build({ ...v, layers: off }, STANDARD_GUITAR, CTX);
+      expect(markers(d).length).toBeGreaterThan(0);
+      for (const mk of markers(d)) {
+        expect(mk.layer).toBe('arpeggio');
+        expect(mk.emphasis).not.toBe('dimmed');
+      }
+    }
+  });
+
+  it('connection rings sit only on positions that have a marker', () => {
+    const d = build(
+      { ...view, layers: { ...arp, chord: false }, connections: true },
+      STANDARD_GUITAR,
+      CTX
+    );
+    const ids = new Set(markers(d).map((mk) => mk.id));
+    for (const mk of markers(d).filter((x) => x.ring)) expect(ids.has(mk.id)).toBe(true);
+    expect(d.connections.length).toBeGreaterThan(0);
+  });
+});
+
+describe('buildCagedModel: layer description (017 US6)', () => {
+  const focusE = setFocus(view, { letter: 'E', ordinal: 0 });
+  const all = { chord: true, arpeggio: true, pentatonic: true, scale: true };
+  const countOf = (d: ReturnType<typeof buildCagedModel>, layer: string): number =>
+    d.positions.filter((p) => p.layer === layer).length;
+
+  it('chord only, no focus: layers sentence and neck-wide chord count', () => {
+    const d = buildCagedModel(view, STANDARD_GUITAR);
+    const text = shown(d).description;
+    expect(text).toContain(
+      `C major: 9 shapes along the neck. Layers on: Chord. Across the neck: ${countOf(d, 'chord')} chord notes.`
+    );
+  });
+
+  it('all layers with focus: region counts per drawn layer, chord root counted once', () => {
+    const d = buildCagedModel({ ...focusE, layers: all }, STANDARD_GUITAR);
+    const text = shown(d).description;
+    const counts = ['chord', 'arpeggio', 'pentatonic', 'scale']
+      .map((l) => `${countOf(d, l)} ${l} notes`)
+      .join(', ');
+    expect(text).toContain(
+      `Layers on: Chord, Arpeggio, Pentatonic, and Scale. In this region: ${counts}.`
+    );
+    const keys = d.positions.map((p) => `${p.string}:${p.fret}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('names a layer that is on but not drawable without a focus', () => {
+    const d = buildCagedModel(
+      { ...view, layers: { chord: true, arpeggio: false, pentatonic: true, scale: false } },
+      STANDARD_GUITAR
+    );
+    const text = shown(d).description;
+    expect(text).toContain('Pentatonic is on and shows when a shape is in focus.');
+    expect(text).not.toMatch(/\d+ pentatonic notes/);
+  });
+
+  it('orders change · focus · tuning · summary · layers · counts · extra · entries', () => {
+    const d = build({ ...focusE, layers: all }, STANDARD_GUITAR, CTX, null, {
+      reveal: null,
+      layerChange: { layer: 'scale', on: true }
+    });
+    const text = shown(d).description;
+    const marks = [
+      'Scale layer on.',
+      'E shape in focus',
+      'Tuning: Standard.',
+      'C major: 9 shapes',
+      'Layers on:',
+      'In this region:',
+      'Extra mark:',
+      'E shape, frets 8 to 10, roots'
+    ].map((s) => text.indexOf(s));
+    expect(marks.every((i) => i >= 0)).toBe(true);
+    expect([...marks].sort((a, b) => a - b)).toEqual(marks);
+  });
+
+  it('puts waiting sentences after counts and before entries', () => {
+    const d = buildCagedModel(
+      { ...view, layers: { chord: true, arpeggio: false, pentatonic: false, scale: true } },
+      STANDARD_GUITAR
+    );
+    const text = shown(d).description;
+    expect(text.indexOf('Across the neck:')).toBeLessThan(text.indexOf('Scale is on and shows'));
+    expect(text.indexOf('Scale is on and shows')).toBeLessThan(text.indexOf('C shape, frets'));
+  });
+});

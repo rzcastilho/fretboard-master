@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   CAGED_QUALITIES,
   cagedRootSpelling,
+  CAGED_LABEL_TYPES,
   equalsCagedView,
+  equalsLayers,
   initialCagedView,
   resetCaged,
   selectRoot,
   setConnections,
   setFocus,
+  setLabelType,
+  setLayers,
   setQuality,
   switchSpelling,
   type CagedViewState
@@ -25,7 +29,9 @@ describe('caged view state', () => {
       spellingOverride: 'none',
       quality: 'major',
       focus: null,
-      connections: false
+      connections: false,
+      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false },
+      labelType: 'interval'
     });
     expect(CAGED_QUALITIES).toEqual(['major', 'minor']);
   });
@@ -164,5 +170,49 @@ describe('caged view state', () => {
       expect(selectRoot(f, 3).spellingOverride).toBe('none');
       expect(setQuality(f, 'minor').quality).toBe('minor');
     });
+  });
+});
+
+describe('caged view: layers and label type', () => {
+  const all = { chord: true, arpeggio: true, pentatonic: true, scale: true };
+
+  it('CAGED_LABEL_TYPES', () => {
+    expect(CAGED_LABEL_TYPES).toEqual(['interval', 'name']);
+  });
+
+  it('initialCagedView takes the preferred label', () => {
+    expect(initialCagedView('name').labelType).toBe('name');
+    expect(initialCagedView('bogus' as never).labelType).toBe('interval');
+  });
+
+  it('setLayers: same reference when equal, new state otherwise', () => {
+    const s = initialCagedView();
+    expect(setLayers(s, { ...s.layers })).toBe(s);
+    const next = setLayers(s, all);
+    expect(next).not.toBe(s);
+    expect(next.layers).toEqual(all);
+  });
+
+  it('setLabelType: no-op for equal or unknown', () => {
+    const s = initialCagedView();
+    expect(setLabelType(s, 'interval')).toBe(s);
+    expect(setLabelType(s, 'bogus' as never)).toBe(s);
+    expect(setLabelType(s, 'name').labelType).toBe('name');
+  });
+
+  it('resetCaged: layers → chord only, label → preferred, rest default', () => {
+    const dirty = setLabelType(setLayers(selectRoot(initialCagedView(), 5), all), 'name');
+    expect(resetCaged('name')).toEqual(initialCagedView('name'));
+    expect(resetCaged()).toEqual(initialCagedView());
+    expect(equalsCagedView(resetCaged(), dirty)).toBe(false);
+  });
+
+  it('equalsLayers and equalsCagedView compare layers and labelType', () => {
+    const s = initialCagedView();
+    expect(equalsLayers(s.layers, { ...s.layers })).toBe(true);
+    expect(equalsLayers(s.layers, all)).toBe(false);
+    expect(equalsCagedView(s, setLayers(s, all))).toBe(false);
+    expect(equalsCagedView(s, setLabelType(s, 'name'))).toBe(false);
+    expect(equalsCagedView(s, { ...s, layers: { ...s.layers } })).toBe(true);
   });
 });

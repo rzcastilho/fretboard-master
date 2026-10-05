@@ -3,8 +3,9 @@
  * Turns the view state and instrument into the fretboard `DisplayModel`.
  * Shape letters are literal parameters and never pass through `src/lib/notation`.
  */
+import { getLocale } from '$lib/paraglide/runtime.js';
 import { m } from '$lib/paraglide/messages.js';
-import type { DisplayModel, FretboardTag, Marker } from '../fretboard/types';
+import type { DisplayModel, FretboardTag, Marker, NoteFunction } from '../fretboard/types';
 import type { Instrument } from '../instrument/instrument';
 import { noteLabel, spokenNote } from '../notation/notation';
 import {
@@ -23,6 +24,15 @@ import {
 import { pitchOfSpelling, type Pitch, type Spelling } from '../theory/pitch';
 import { otherRootSpelling, spellTriad, type TriadFunction } from '../theory/triad';
 import { drawnLetters, occurrenceIndex, stepAvailability } from './caged-focus';
+import {
+  isDrawable,
+  layerCounts,
+  resolveCagedPositions,
+  switchStates,
+  type ResolvedPosition,
+  type SwitchState
+} from './caged-layers';
+import { spellScale, type CagedLayer, type ScaleDegree } from '../theory/caged-layers';
 import { cagedRootSpelling, type CagedViewState } from './caged-view';
 import { qualityName } from './triads-model';
 
@@ -36,6 +46,14 @@ export interface CagedContext {
 export interface StepTransition {
   /** "s:f" keys. */
   readonly positions: readonly string[];
+}
+
+/** Transient presentation state owned by the store (data-model §5). */
+export interface CagedExtras {
+  /** Newly drawn keys, low → high, for the staggered intro; null when nothing reveals. */
+  readonly reveal: { readonly ids: readonly string[] } | null;
+  /** The last layer switch (or the automatic Chord restore), announced first. */
+  readonly layerChange: { readonly layer: CagedLayer; readonly on: boolean } | null;
 }
 
 export interface CagedDisplay {
@@ -58,10 +76,39 @@ export interface CagedDisplay {
   readonly drawnLetters: ReadonlySet<CagedShapeId>;
   /** Positions shared by adjacent drawn occurrences; [] for a non-compatible tuning. */
   readonly connections: readonly CagedConnection[];
+  /** Zone-D layer switches; every one is `'no-shapes'` in a non-compatible tuning. */
+  readonly switches: Readonly<Record<CagedLayer, SwitchState>>;
+  /** The second (extra-dot) Scale sample shows only with Pentatonic and Scale both on. */
+  readonly extraSampleShown: boolean;
+  /** Resolved layer positions, low → high; [] when non-compatible. */
+  readonly positions: readonly ResolvedPosition[];
 }
 
 const NO_STEPS = { previous: false, next: false } as const;
 const NO_LETTERS: ReadonlySet<CagedShapeId> = new Set();
+/** Degrees that can carry the extra mark, in scale order. */
+const EXTRA_ORDER: readonly ScaleDegree[] = ['2', '4', 'b6', '7'];
+const LAYER_ORDER: readonly CagedLayer[] = ['chord', 'arpeggio', 'pentatonic', 'scale'];
+const NO_EXTRAS: CagedExtras = { reveal: null, layerChange: null };
+
+function layerName(layer: CagedLayer): string {
+  switch (layer) {
+    case 'chord':
+      return m.caged_layer_chord();
+    case 'arpeggio':
+      return m.caged_layer_arpeggio();
+    case 'pentatonic':
+      return m.caged_layer_pentatonic();
+    default:
+      return m.caged_layer_scale();
+  }
+}
+
+function layerList(layers: readonly CagedLayer[]): string {
+  return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(
+    layers.map(layerName)
+  );
+}
 
 /** The drawn occurrences (sorted by start) for the view and instrument; [] when non-compatible. */
 export function cagedOccurrencesFor(
@@ -113,7 +160,8 @@ export function buildCagedModel(
   view: CagedViewState,
   instrument: Instrument,
   context: CagedContext,
-  transition: StepTransition | null = null
+  transition: StepTransition | null = null,
+  extras: CagedExtras = NO_EXTRAS
 ): CagedDisplay {
   const { tuningName, temporary } = context;
   const temporaryName = temporary ? tuningName : null;
@@ -142,7 +190,10 @@ export function buildCagedModel(
       focused: null,
       steps: NO_STEPS,
       drawnLetters: NO_LETTERS,
-      connections: []
+      connections: [],
+      switches: switchStates(view.layers, false, false),
+      extraSampleShown: view.layers.pentatonic && view.layers.scale,
+      positions: []
     };
   }
 
@@ -150,36 +201,45 @@ export function buildCagedModel(
   const occurrences = cagedOccurrencesFor(view, instrument);
   const focusIndex = occurrenceIndex(view.focus, occurrences);
   const focused = focusIndex === null ? null : occurrences[focusIndex];
-  const inFocus = new Set(focused ? focused.notes.map((n) => `${n.string}:${n.fret}`) : []);
   const stepping = new Set(transition?.positions ?? []);
   const connections = cagedConnections(occurrences);
   const connected = new Set(
     view.connections ? connections.map((c) => `${c.string}:${c.fret}`) : []
   );
 
-  const markers: Marker[] = [];
-  const seen = new Set<string>();
-  for (const occ of occurrences) {
-    for (const n of occ.notes) {
-      const id = `${n.string}:${n.fret}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      const fn = FUNCTION_OF[n.degree];
-      const inStep = stepping.has(id);
-      const ringed = inStep || connected.has(id);
-      markers.push({
-        string: n.string,
-        fret: n.fret,
-        function: fn,
-        emphasis:
-          inStep || inFocus.has(id) ? 'highlighted' : focused === null ? 'normal' : 'dimmed',
-        spelling: triad[fn],
-        interval: n.degree,
-        id,
-        ...(ringed ? { ring: true } : {})
-      });
-    }
-  }
+  const positions = resolveCagedPositions({
+    occurrences,
+    focusIndex,
+    layers: view.layers,
+    rootPc: view.rootPc,
+    quality: view.quality,
+    openPitches: instrument.openStrings.map(pitchOfSpelling),
+    fretCount: instrument.fretCount
+  });
+  const scaleSpelling = spellScale(root, view.quality);
+  const revealIds = extras.reveal?.ids ?? [];
+  const revealIndex = new Map(revealIds.map((id, i) => [id, i / revealIds.length] as const));
+  const markers: Marker[] = positions.map((p) => {
+    const id = `${p.string}:${p.fret}`;
+    const inStep = stepping.has(id);
+    const ringed = inStep || connected.has(id);
+    const chordal = p.layer === 'chord' || p.layer === 'arpeggio';
+    const fn: NoteFunction = chordal ? FUNCTION_OF[p.degree as CagedDegree] : 'degree';
+    const appear = revealIndex.get(id);
+    return {
+      string: p.string,
+      fret: p.fret,
+      function: fn,
+      emphasis: inStep ? 'highlighted' : p.emphasis,
+      spelling: scaleSpelling[p.degree] ?? (chordal ? triad[fn as TriadFunction] : undefined),
+      interval: p.degree,
+      id,
+      ...(p.layer === 'arpeggio' ? { layer: 'arpeggio' as const } : {}),
+      ...(p.extra ? { extra: true } : {}),
+      ...(ringed ? { ring: true } : {}),
+      ...(appear === undefined ? {} : { appear })
+    };
+  });
 
   const tags: FretboardTag[] = occurrences.map((o, i) => {
     const label = cagedTagText(o);
@@ -230,13 +290,47 @@ export function buildCagedModel(
   const focusSentence = focused
     ? m.caged_focus_status({ shape: focused.shape.id, lo: focused.start, hi: focused.end })
     : m.caged_focus_none();
+  const change = extras.layerChange;
+  // Spoken names of the extra-marked degrees, in scale order (F, B or B, F).
+  const extraDegrees = new Set(positions.filter((p) => p.extra).map((p) => p.degree));
+  const extraNotes = EXTRA_ORDER.filter((d) => extraDegrees.has(d)).flatMap((d) => {
+    const spelling = scaleSpelling[d];
+    return spelling ? [spokenNote(spelling)] : [];
+  });
+  const hasFocus = focused !== null;
+  const layersOn = LAYER_ORDER.filter((l) => view.layers[l]);
+  const drawn = layersOn.filter((l) => isDrawable(view.layers, l, hasFocus));
+  const waiting = layersOn.filter((l) => !drawn.includes(l));
+  const counts = layerCounts(positions);
+  const layerSentences = [
+    ...(layersOn.length > 0 ? [m.caged_layers_on({ list: layerList(layersOn) })] : []),
+    ...(drawn.length > 0
+      ? [
+          `${hasFocus ? m.caged_layers_in_region() : m.caged_layers_on_neck()} ${drawn
+            .map((l) =>
+              m.caged_layer_counts({ count: counts[l], layer: layerName(l).toLocaleLowerCase() })
+            )
+            .join(', ')}.`
+        ]
+      : []),
+    ...waiting.map((l) => m.caged_layer_waiting({ layer: layerName(l) }))
+  ];
   const description = [
+    ...(change
+      ? [
+          (change.on ? m.caged_layer_now_on : m.caged_layer_now_off)({
+            layer: layerName(change.layer)
+          })
+        ]
+      : []),
     focusSentence,
     temporary
       ? m.caged_description_temporary({ tuning: tuningName })
       : m.caged_description_tuning({ tuning: tuningName }),
     ...(altered ? [m.caged_description_altered({ string: 6 })] : []),
     m.caged_description_summary({ key: spokenKey, count: occurrences.length }),
+    ...layerSentences,
+    ...(extraNotes.length > 0 ? [m.caged_extra_mark({ notes: extraNotes.join(', ') })] : []),
     ...entries,
     ...connectionSentences
   ].join(' ');
@@ -255,7 +349,7 @@ export function buildCagedModel(
     fitNote,
     model: {
       markers,
-      labelMode: 'interval',
+      labelMode: view.labelType === 'name' ? 'note' : 'interval',
       tags,
       tagsInteractive: true,
       ...(focused
@@ -269,6 +363,9 @@ export function buildCagedModel(
     focused,
     steps: stepAvailability(view.focus, occurrences),
     drawnLetters: drawnLetters(occurrences),
-    connections
+    connections,
+    switches: switchStates(view.layers, focused !== null, occurrences.length > 0),
+    extraSampleShown: view.layers.pentatonic && view.layers.scale,
+    positions
   };
 }

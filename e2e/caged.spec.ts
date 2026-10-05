@@ -65,17 +65,18 @@ test.describe('caged US1: five linked shapes', () => {
     ).toHaveCount(9);
   });
 
-  test('Q4: root markers are squares, no layer/label controls', async ({ page }) => {
+  test('Q4: root markers are squares; radios are Quality, Shape and Labels', async ({ page }) => {
     await page.goto('/caged');
     const roots = board(page).locator('.marker.root');
     await expect(roots.first()).toBeAttached();
     expect(await roots.count()).toBeGreaterThan(0);
     await expect(roots.locator('rect.glyph')).toHaveCount(await roots.count());
-    // Layer/label controls are absent; the radios are the Quality group (US3) and the Shape selector (016).
-    await expect(page.getByRole('radio')).toHaveCount(8);
-    await expect(page.getByRole('radiogroup')).toHaveCount(2);
+    // The radios are the Quality group (US3), the Shape selector (016) and the Labels group (017).
+    await expect(page.getByRole('radio')).toHaveCount(10);
+    await expect(page.getByRole('radiogroup')).toHaveCount(3);
     await expect(page.getByRole('radiogroup', { name: 'Quality' })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'Shape' })).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Labels' })).toBeVisible();
     await expect(page.getByRole('checkbox')).toHaveCount(0);
   });
 
@@ -507,7 +508,10 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
         const el = document.activeElement as HTMLElement | null;
         if (!el) return 'none';
         const group = el.closest('[role="radiogroup"]');
-        if (group) return group.getAttribute('aria-label') === 'Shape' ? 'shape' : 'quality';
+        if (group) {
+          const name = group.getAttribute('aria-label');
+          return name === 'Shape' ? 'shape' : name === 'Labels' ? 'labels' : 'quality';
+        }
         if (el.closest('[role="group"][aria-label="Key"]')) return 'key';
         if (el.getAttribute('role') === 'switch') return 'connections';
         if (el.classList.contains('switch')) return 'switch';
@@ -535,6 +539,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
       'shape',
       'tags',
       'board',
+      'labels',
       'steps',
       'connections',
       'reset'

@@ -32,6 +32,11 @@ export interface ShapeOccurrence {
   readonly start: number;
   readonly end: number;
   readonly notes: readonly OccurrenceNote[];
+  /**
+   * Scale window of the shape (R-01, R-02): `SCALE_REGIONS` + placement. Not clipped, so it may
+   * be < 0 or > `fretCount`; always contains `start…end`.
+   */
+  readonly region: { readonly start: number; readonly end: number };
   /** True when string 6 is altered and shows only chord tones (never for compatible tunings). */
   readonly alteredString: boolean;
 }
@@ -97,6 +102,30 @@ export const CAGED_SHAPES: Readonly<Record<CagedQuality, readonly CagedShape[]>>
     ]),
     shape('D', 'minor', [null, null, [10, 'R'], [12, '5'], [13, 'R'], [11, 'b3']])
   ])
+});
+
+/**
+ * Scale window per shape and quality, in the same C-key, standard-tuning reference frets as
+ * `CAGED_SHAPES` (R-01). Lives here so `cagedOccurrences` can place it; re-exported by
+ * `caged-layers`.
+ */
+export const SCALE_REGIONS: Readonly<
+  Record<CagedQuality, Readonly<Record<CagedShapeId, readonly [lo: number, hi: number]>>>
+> = Object.freeze({
+  major: Object.freeze({
+    C: [0, 3],
+    A: [2, 6],
+    G: [4, 8],
+    E: [7, 10],
+    D: [9, 13]
+  } as const),
+  minor: Object.freeze({
+    C: [0, 4],
+    A: [3, 6],
+    G: [5, 9],
+    E: [7, 11],
+    D: [10, 13]
+  } as const)
 });
 
 /** Standard intervals between strings 6→5, 5→4, 4→3, 3→2, 2→1. */
@@ -198,7 +227,9 @@ export function cagedOccurrences(
       if (altered && (sh.id === 'G' || sh.id === 'E')) {
         notes.unshift(...alteredStringNotes(sixOpen[0], rootPc, quality, start, end));
       }
-      out.push({ shape: sh, start, end, notes, alteredString: altered });
+      const [lo, hi] = SCALE_REGIONS[quality][sh.id];
+      const region = { start: lo + shift + o, end: hi + shift + o };
+      out.push({ shape: sh, start, end, notes, region, alteredString: altered });
     }
   }
   return out.sort((a, b) => a.start - b.start);

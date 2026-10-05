@@ -948,6 +948,45 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
     expect(await readTimer(page)).toBeLessThanOrEqual(300);
   });
 
+  test('7 strings × 24 frets with every layer on: layer toggle ≤ 100 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, strings: 7, tuning: 'AF-21', frets: 24 })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/caged');
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await expect(board.locator('.cell')).toHaveCount(7 * 25);
+    await page
+      .getByRole('radiogroup', { name: 'Shape' })
+      .getByRole('radio', { name: 'E', exact: true })
+      .click();
+    const layers = page.getByRole('group', { name: 'Layers' });
+    const toggle = (name: string) => layers.getByRole('switch', { name, exact: true });
+    await toggle('Arpeggio').click();
+    await toggle('Pentatonic').click();
+    const times: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      await armTimer(page, 'Pentatonic, and Scale.');
+      await toggle('Scale').click();
+      times.push(await readTimer(page));
+      await toggle('Scale').click();
+      await expect(toggle('Scale')).toHaveAttribute('aria-checked', 'false');
+    }
+    expect(median(times)).toBeLessThanOrEqual(100);
+    await toggle('Scale').click();
+    await expect(board.locator('.marker')).not.toHaveCount(0);
+    const keys = await board
+      .locator('.marker')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-key')));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   test('7 strings × 24 frets with nine tags: scrolling stays inside .scroller', async ({
     page
   }) => {
@@ -969,7 +1008,7 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
     await page.getByRole('button', { name: 'Confirm' }).click();
     const board = page.getByRole('region', { name: 'Fretboard' });
     await expect(board.locator('.cell')).toHaveCount(7 * 25);
-    await expect(board.locator('.tag.static:visible')).toHaveCount(9);
+    await expect(board.locator('.tag:visible')).toHaveCount(9);
 
     const scroller = page.locator('.scroller').first();
     const scrolled = await scroller.evaluate(async (el) => {

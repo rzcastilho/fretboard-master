@@ -30,7 +30,7 @@ describe('constants and defaults (FR-018)', () => {
       muted: false,
       volume: 80,
       lastTool: null,
-      labels: { notes: 'name', triads: 'interval' },
+      labels: { notes: 'name', triads: 'interval', caged: 'interval' },
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false
@@ -163,7 +163,7 @@ describe('serializePreferences', () => {
       muted: true,
       volume: 35,
       lastTool: 'triads',
-      labels: { notes: 'octave', triads: 'name' },
+      labels: { notes: 'octave', triads: 'name', caged: 'interval' },
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false
@@ -212,7 +212,7 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       muted: true,
       volume: 35,
       lastTool: 'triads',
-      labels: { notes: 'octave', triads: 'name' },
+      labels: { notes: 'octave', triads: 'name', caged: 'interval' },
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false
@@ -374,6 +374,44 @@ describe('rotate hint (016 US4)', () => {
   });
 });
 
+describe('labels.caged (017)', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+  it('absent → interval', () => expect(p({}).labels.caged).toBe('interval'));
+  it('name and interval parse', () => {
+    expect(p({ labels: { caged: 'name' } }).labels.caged).toBe('name');
+    expect(p({ labels: { caged: 'interval' } }).labels.caged).toBe('interval');
+  });
+  it.each(['octave', 'none', 1, null, {}])('invalid %j → interval, others kept', (bad) => {
+    const r = p({ labels: { notes: 'octave', triads: 'name', caged: bad }, frets: 18 });
+    expect(r.labels).toEqual({ notes: 'octave', triads: 'name', caged: 'interval' });
+    expect(r.fretCount).toBe(18);
+  });
+  it('defaults to interval', () => expect(DEFAULT_PREFERENCES.labels.caged).toBe('interval'));
+  it('serialize writes caged only when name, after triads', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('caged');
+    const raw = serializePreferences({
+      ...DEFAULT_PREFERENCES,
+      labels: { ...DEFAULT_PREFERENCES.labels, caged: 'name' }
+    });
+    expect(raw).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval","caged":"name"}}'
+    );
+    expect(Object.keys(JSON.parse(raw).labels)).toEqual(['notes', 'triads', 'caged']);
+  });
+  it('labels-caged-name fixture round-trips byte-identical', () => {
+    const raw = FIXTURES.find((f) => f.name === 'labels-caged-name')?.raw ?? '';
+    expect(serializePreferences(parsePreferences(raw))).toBe(raw);
+  });
+  it('existing fixtures serialize without caged unless they hold name', () => {
+    for (const f of FIXTURES) {
+      if (f.name === 'labels-caged-name' || f.raw.length > 16_384) continue;
+      expect(
+        JSON.parse(serializePreferences(parsePreferences(f.raw))).labels.caged
+      ).toBeUndefined();
+    }
+  });
+});
+
 const arbOffsetsOf = (n: 6 | 7): fc.Arbitrary<Offsets> =>
   fc
     .tuple(...Array.from({ length: n }, () => fc.integer({ min: OFFSET_MIN, max: OFFSET_MAX })))
@@ -395,7 +433,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   lastTool: fc.constantFrom(...TOOL_IDS, null),
   labels: fc.record({
     notes: fc.constantFrom('name', 'octave', 'none'),
-    triads: fc.constantFrom('interval', 'name')
+    triads: fc.constantFrom('interval', 'name'),
+    caged: fc.constantFrom('interval', 'name')
   }),
   handedness: fc.constantFrom('right', 'left'),
   orientation: fc.constantFrom('highest-top', 'lowest-top'),

@@ -294,6 +294,7 @@ describe('occurrenceRootStrings (T12)', () => {
     shape: shapeOf(id),
     start: 0,
     end: 0,
+    region: { start: 0, end: 0 },
     notes: [],
     alteredString
   });

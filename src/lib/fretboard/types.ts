@@ -1,5 +1,6 @@
 import type { Instrument, Position } from '../instrument/instrument';
 import type { Spelling } from '../theory/pitch';
+import type { ScaleDegree } from '../theory/caged-layers';
 import type { IntervalId } from '../theory/triad';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
@@ -18,8 +19,14 @@ export interface Marker {
   readonly label?: boolean;
   /** Same-octave tone token (Notes). Drawing only. */
   readonly tone?: OctaveTone;
-  /** Interval from the root (Triads). Used only when labelMode is 'interval'. */
-  readonly interval?: IntervalId;
+  /** Interval or scale degree from the root. Used only when labelMode is 'interval'. */
+  readonly interval?: IntervalId | ScaleDegree;
+  /** CAGED Arpeggio layer: smaller, slightly translucent glyph. Drawing only. */
+  readonly layer?: 'arpeggio';
+  /** CAGED: extra dot on a Pentatonic/Scale note outside the pentatonic. Drawing only. */
+  readonly extra?: boolean;
+  /** 0 ≤ appear < 1: fraction of the reveal sequence; delays the intro. Drawing only. */
+  readonly appear?: number;
   /** Draws a connection ring around the glyph (CAGED). Never announced. */
   readonly ring?: boolean;
   /** Draw the small octave number beside a 'note' label. */

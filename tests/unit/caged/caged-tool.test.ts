@@ -31,16 +31,15 @@ describe('CagedTool', () => {
     expect(within(board).getAllByText('D shape · roots on strings 4, 2').length).toBeGreaterThan(0);
   });
 
-  it('has no layer, label, connection, focus, Listen or link controls', () => {
+  it('has the Labels group (017) but no connection, focus, Listen or link buttons', () => {
     render(CagedTool);
-    for (const name of [
-      /layer/i,
-      /label|names|intervals/i,
-      /connect/i,
-      /focus/i,
-      /listen/i,
-      /link/i
-    ]) {
+    const labels = screen.getByRole('radiogroup', { name: 'Labels' });
+    expect(
+      within(labels)
+        .getAllByRole('radio')
+        .map((r) => r.getAttribute('aria-label') ?? r.textContent?.trim())
+    ).toEqual(['Intervals', 'Note names']);
+    for (const name of [/layer/i, /connect/i, /focus/i, /listen/i, /link/i]) {
       expect(screen.queryByRole('button', { name })).toBeNull();
       expect(screen.queryByRole('radio', { name })).toBeNull();
       expect(screen.queryByRole('checkbox', { name })).toBeNull();
@@ -473,5 +472,99 @@ describe('CagedTool: rotate hint (016 US4)', () => {
     await tick();
     expect(screen.queryByText(HINT)).toBeNull();
     expect(preferences.rotateHintShown).toBe(false);
+  });
+});
+
+describe('CagedLayerList (US2)', () => {
+  const layerSwitches = () => {
+    const group = screen.getByRole('group', { name: 'Layers' });
+    return within(group).getAllByRole('switch');
+  };
+
+  it('lists Chord, Arpeggio, Pentatonic, Scale in order as switches', () => {
+    render(CagedTool);
+    const sw = layerSwitches();
+    expect(sw.map((s) => s.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      'Chord On',
+      'Arpeggio Off',
+      'Pentatonic Off',
+      'Scale Off'
+    ]);
+    expect(sw.map((s) => s.getAttribute('aria-checked'))).toEqual([
+      'true',
+      'false',
+      'false',
+      'false'
+    ]);
+    for (const s of sw) expect(s.getAttribute('type')).toBe('button');
+  });
+
+  it('Chord starts disabled with the last-layer reason; the others are enabled', () => {
+    render(CagedTool);
+    const [chord, arpeggio] = layerSwitches();
+    expect(chord.getAttribute('aria-disabled')).toBe('true');
+    const reason = document.getElementById(chord.getAttribute('aria-describedby') as string);
+    expect(reason?.textContent).toBe('At least one layer stays on.');
+    expect(arpeggio.getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('a disabled switch stays focusable and does nothing on activate', async () => {
+    render(CagedTool);
+    const [chord] = layerSwitches();
+    chord.focus();
+    expect(document.activeElement).toBe(chord);
+    await fireEvent.click(chord);
+    expect(caged.state.layers.chord).toBe(true);
+  });
+
+  it('activating a switch toggles the layer and the checked state', async () => {
+    render(CagedTool);
+    const sw = layerSwitches();
+    await fireEvent.click(sw[1]);
+    await tick();
+    expect(caged.state.layers.arpeggio).toBe(true);
+    expect(layerSwitches()[1].getAttribute('aria-checked')).toBe('true');
+    // Chord is no longer the last layer.
+    expect(layerSwitches()[0].getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('every switch is disabled with the no-shapes reason in a non-compatible tuning', async () => {
+    render(CagedTool);
+    caged.applyInstrument(AF_8, 'Open');
+    await tick();
+    for (const s of layerSwitches()) {
+      expect(s.getAttribute('aria-disabled')).toBe('true');
+      const reason = document.getElementById(s.getAttribute('aria-describedby') as string);
+      expect(reason?.textContent).toBe('Layers need a CAGED shape on the fretboard.');
+    }
+  });
+
+  it('shows the second Scale sample only when Pentatonic and Scale are both on', async () => {
+    render(CagedTool);
+    const samples = () => layerSwitches()[3].querySelectorAll('svg.marker-sample').length;
+    expect(samples()).toBe(1);
+    await fireEvent.click(layerSwitches()[2]);
+    await fireEvent.click(layerSwitches()[3]);
+    await tick();
+    expect(samples()).toBe(2);
+  });
+
+  it('sample markers are aria-hidden, 44 by 44, and mirror the board tokens', () => {
+    render(CagedTool);
+    const sw = layerSwitches();
+    for (const s of sw) {
+      const svg = s.querySelector('svg.marker-sample');
+      expect(svg?.getAttribute('aria-hidden')).toBe('true');
+      expect(svg?.getAttribute('width')).toBe('44');
+      expect(svg?.getAttribute('height')).toBe('44');
+    }
+    const shape = (i: number) => sw[i].querySelector('svg.marker-sample .shape') as SVGElement;
+    // Arpeggio sample uses the same token-driven transform and opacity as an arpeggio board marker.
+    expect(sw[1].querySelector('svg.marker-sample')?.classList.contains('layer-arpeggio')).toBe(
+      true
+    );
+    expect(shape(1).style.transform).toBe('scale(var(--marker-layer-scale))');
+    expect(shape(1).style.opacity).toBe('var(--marker-layer-opacity)');
+    expect(shape(0).style.transform).toBe('');
   });
 });

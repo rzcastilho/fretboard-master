@@ -468,7 +468,8 @@ for (const size of sizes) {
         .locator('.marker')
         .first()
         .evaluate((el) => getComputedStyle(el).transitionDuration);
-      expect(duration).toBe('0s');
+      // The marker now transitions several properties (transform, opacity): every one must be 0s.
+      expect(duration.split(',').map((d) => d.trim())).toEqual(duration.split(',').map(() => '0s'));
       await compareToggle(page).click();
       await expect(comparisonMarkers(page)).toHaveCount(1);
     });

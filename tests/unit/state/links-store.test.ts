@@ -271,7 +271,9 @@ describe('caged is outside the links (US6)', () => {
       spellingOverride: 'none',
       quality: 'major',
       focus: null,
-      connections: false
+      connections: false,
+      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false },
+      labelType: 'interval'
     });
     expect(triads.state).toBe(triadsBefore);
   });

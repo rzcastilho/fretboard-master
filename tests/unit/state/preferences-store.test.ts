@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializePreferences, DEFAULT_PREFERENCES } from '../../../src/lib/prefs/schema';
 import { PREFS_KEY } from '../../../src/lib/prefs/storage';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
-import { caged } from '../../../src/lib/state/caged.svelte';
+import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -15,6 +15,7 @@ beforeEach(() => {
   resetPlaybackForTests();
   resetNotesForTests();
   resetTriadsForTests();
+  resetCagedForTests();
   resetInstrumentForTests();
   resetPreferencesForTests();
 });
@@ -330,5 +331,38 @@ describe('rotate hint (016 US4)', () => {
     caged.reset();
     expect(preferences.rotateHintShown).toBe(true);
     expect(JSON.parse(s.data.get(PREFS_KEY) as string).rotateHint).toBe(true);
+  });
+});
+
+describe('CAGED label type (017, US1)', () => {
+  it('restore pushes the stored label through caged.restoreLabelType without writing', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['labels-caged-name'].raw });
+    const before = s.data.get(PREFS_KEY);
+    const cl = vi.spyOn(caged, 'restoreLabelType');
+    preferences.start(s);
+    expect(cl).toHaveBeenCalledWith('name');
+    expect(caged.state.labelType).toBe('name');
+    expect(s.data.get(PREFS_KEY)).toBe(before);
+  });
+
+  it('erase restores the default label', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['labels-caged-name'].raw });
+    preferences.start(s);
+    const cl = vi.spyOn(caged, 'restoreLabelType');
+    preferences.erase();
+    expect(cl).toHaveBeenCalledWith('interval');
+    expect(caged.state.labelType).toBe('interval');
+  });
+
+  it('setLabelType remembers labels.caged; Reset tool keeps the label', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    caged.setLabelType('name');
+    expect(caged.state.labelType).toBe('name');
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).labels.caged).toBe('name');
+    caged.reset();
+    expect(caged.state.labelType).toBe('name');
+    caged.setLabelType('interval');
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).labels.caged).toBeUndefined();
   });
 });
