@@ -43,16 +43,12 @@
 </div>
 
 <style>
+  /* Track floor is rem-based, so it grows with the user's text size: at 100 % six keys fit a
+     320 px row; at 200 % they wrap to more rows instead of overlapping (US4). */
   .selector {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(2.2rem, 1fr));
     gap: var(--space-2);
-  }
-
-  @media (min-width: 600px) {
-    .selector {
-      grid-template-columns: repeat(12, minmax(0, 1fr));
-    }
   }
 
   button {

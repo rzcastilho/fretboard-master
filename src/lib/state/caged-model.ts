@@ -144,6 +144,22 @@ function layerName(layer: CagedLayer): string {
   }
 }
 
+/** One message per layer: the layer word agrees with the noun in es/pt-BR (FR-016). */
+function layerCount(layer: CagedLayer, count: number): string {
+  switch (layer) {
+    case 'triad':
+      return m.caged_layer_counts_triad({ count });
+    case 'chord':
+      return m.caged_layer_counts_chord({ count });
+    case 'arpeggio':
+      return m.caged_layer_counts_arpeggio({ count });
+    case 'pentatonic':
+      return m.caged_layer_counts_pentatonic({ count });
+    case 'scale':
+      return m.caged_layer_counts_scale({ count });
+  }
+}
+
 function layerList(layers: readonly CagedLayer[]): string {
   return new Intl.ListFormat(getLocale(), { style: 'long', type: 'conjunction' }).format(
     layers.map(layerName)
@@ -396,9 +412,7 @@ export function buildCagedModel(
     ...(drawn.length > 0
       ? [
           `${hasFocus ? m.caged_layers_in_region() : m.caged_layers_on_neck()} ${drawn
-            .map((l) =>
-              m.caged_layer_counts({ count: counts[l], layer: layerName(l).toLocaleLowerCase() })
-            )
+            .map((l) => layerCount(l, counts[l]))
             .join(', ')}.`
         ]
       : []),

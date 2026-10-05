@@ -440,16 +440,14 @@ function fullNeck(
 
   const tags: FretboardTag[] = shapes.map((x) => {
     const label = TAG_LABEL[x.inversion]();
-    const name = m.triads_tag_name({
-      inversion: inversionName(x.inversion),
-      frets: x.frets.join('-')
-    });
+    const tagParams = { inversion: inversionName(x.inversion), frets: x.frets.join('-') };
+    const name = x.wideStretch ? m.triads_tag_name_wide(tagParams) : m.triads_tag_name(tagParams);
     return {
       id: x.id,
       start: Math.min(...x.frets),
       end: Math.max(...x.frets),
       label,
-      name: x.wideStretch ? `${name}${m.triads_desc_chain_wide()}` : name,
+      name,
       pressed: x.selected,
       ...(x.wideStretch ? { detail: m.triads_tag_wide_stretch() } : {})
     };
@@ -459,13 +457,12 @@ function fullNeck(
     name: rootName,
     strings: setStrings(s.stringSet).slice().reverse().join(', '),
     shapes: shapes
-      .map(
-        (x) =>
-          m.triads_desc_chain_entry({
-            inversion: TAG_LABEL[x.inversion](),
-            frets: x.frets.join('-')
-          }) + (x.wideStretch ? m.triads_desc_chain_wide() : '')
-      )
+      .map((x) => {
+        const entry = { inversion: TAG_LABEL[x.inversion](), frets: x.frets.join('-') };
+        return x.wideStretch
+          ? m.triads_desc_chain_entry_wide(entry)
+          : m.triads_desc_chain_entry(entry);
+      })
       .join('; '),
     inversion: inversionName(s.inversion)
   });

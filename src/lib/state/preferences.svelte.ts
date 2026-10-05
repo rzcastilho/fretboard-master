@@ -9,6 +9,7 @@ import type { StorageLike } from '$lib/prefs/storage';
 import type { ToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
 import { instrument } from './instrument.svelte';
+import { language } from './language.svelte';
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
 import { triads } from './triads.svelte';
@@ -49,6 +50,7 @@ export const preferences = {
     triads.restoreLabelType(p.labels.triads);
     caged.restoreLabelType(p.labels.caged);
     caged.restoreTempo(p.tempo);
+    language.start(p.language);
     lastTool = p.lastTool;
     rotateHintShown = p.rotateHintShown;
     if (!session.available && !noticeShown) {
@@ -98,6 +100,7 @@ export const preferences = {
       caged.restoreLabelType(d.labels.caged);
       caged.restoreTempo(d.tempo);
     }
+    language.restore(null);
     lastTool = null;
     rotateHintShown = false;
   },

@@ -100,30 +100,4 @@
     margin: 0;
     color: var(--color-text-muted);
   }
-
-  /* Narrow (design §5.1): each option group is one row; what does not fit scrolls as a strip,
-     so the fretboard stays the largest zone (FR-005 of 001). */
-  @media (max-width: 599px) {
-    .controls :global([role='radiogroup']) {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      white-space: nowrap;
-    }
-
-    .controls :global([role='radiogroup'] > *) {
-      flex: none;
-    }
-
-    /* The group name stays put while its options scroll beneath it. */
-    .controls :global([role='radiogroup'] > .name) {
-      position: sticky;
-      inset-inline-start: 0;
-      z-index: 1;
-      align-self: stretch;
-      display: flex;
-      align-items: center;
-      padding-inline-end: var(--space-2);
-      background: var(--color-surface-raised);
-    }
-  }
 </style>

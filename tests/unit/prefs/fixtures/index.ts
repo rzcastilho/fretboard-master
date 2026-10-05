@@ -6,6 +6,7 @@ import type { TriadsLabelType } from '$lib/state/triads-view';
 import type { CagedLabelType } from '$lib/state/caged-view';
 import type { ToolId } from '$lib/shell/tools';
 import type { Tempo } from '$lib/state/listen';
+import type { LanguageTag } from '$lib/i18n/languages';
 
 /**
  * Seed fixtures from specs/010-remembered-preferences/contracts/storage-format.md.
@@ -37,6 +38,8 @@ export interface ExpectedPreferences {
   readonly rotateHintShown: boolean;
   /** 019: absent or invalid in a record → 'medium'. */
   readonly tempo: Tempo;
+  /** 020: absent or invalid in a record → null (no stored choice). */
+  readonly language: LanguageTag | null;
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -65,7 +68,8 @@ const defaults: ExpectedPreferences = {
   handedness: 'right',
   orientation: 'highest-top',
   rotateHintShown: false,
-  tempo: 'medium'
+  tempo: 'medium',
+  language: null
 };
 
 function load(name: string): string {
@@ -98,7 +102,8 @@ export const FIXTURES: readonly PrefsFixture[] = [
     handedness: 'right',
     orientation: 'highest-top',
     rotateHintShown: false,
-    tempo: 'medium'
+    tempo: 'medium',
+    language: null
   }),
   fixture('bad-volume', { ...defaults, tuningId: 'AF-2' }),
   fixture('garbage', defaults),
@@ -175,7 +180,12 @@ export const FIXTURES: readonly PrefsFixture[] = [
   }),
   // 019 Listen tempo: written only when not 'medium'
   fixture('tempo-fast', { ...defaults, tempo: 'fast' }),
-  fixture('bad-tempo', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true })
+  fixture('bad-tempo', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
+  // 020 language: written only when non-null
+  fixture('language-pt', { ...defaults, language: 'pt-BR' }),
+  fixture('language-es', { ...defaults, language: 'es' }),
+  fixture('bad-language', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
+  fixture('language-number', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

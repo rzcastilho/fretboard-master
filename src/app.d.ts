@@ -1,6 +1,8 @@
 declare global {
   const __APP_VERSION__: string;
   const __FM_FAULT_INJECTION__: boolean;
+  /** Build-time: per-locale message keys whose text is still missing (falls back to English). */
+  const __FM_MISSING_TEXT__: Readonly<Record<'en' | 'pt-BR' | 'es', readonly string[]>>;
 
   var __fmFault: Partial<Record<'notes' | 'triads' | 'caged', number>> | undefined;
 

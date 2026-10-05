@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { overwriteGetLocale } from '../../../src/lib/paraglide/runtime.js';
 import {
   defaultSpelling,
   intervalLabel,
@@ -154,5 +155,25 @@ describe('intervalLabel with scale degrees', () => {
     expect(intervalLabel('#5')).toBe('♯5');
     expect(intervalLabel('R')).toBe('R');
     for (const d of ['2', '4', '6', '7'] as const) expect(intervalLabel(d)).toBe(d);
+  });
+});
+
+describe('list joining follows the active language (020)', () => {
+  afterEach(() => overwriteGetLocale(() => 'en'));
+  const three: Spelling[] = [
+    { letter: 'C', accidental: 0 },
+    { letter: 'E', accidental: 0 },
+    { letter: 'G', accidental: 0 }
+  ];
+
+  it('joins with "y" in Spanish and "e" in Brazilian Portuguese', () => {
+    overwriteGetLocale(() => 'es');
+    expect(spokenNoteList(three.slice(0, 2))).toMatch(/ y /);
+    expect(spokenNoteList(three)).toMatch(/, .* y /);
+    overwriteGetLocale(() => 'pt-BR');
+    expect(spokenNoteList(three.slice(0, 2))).toMatch(/ e /);
+    expect(noteList(three.slice(0, 2))).toMatch(/ ou /);
+    overwriteGetLocale(() => 'es');
+    expect(noteList(three.slice(0, 2))).toMatch(/ o /);
   });
 });

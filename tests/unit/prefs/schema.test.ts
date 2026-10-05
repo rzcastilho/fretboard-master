@@ -14,7 +14,7 @@ import { OFFSET_MAX, OFFSET_MIN, type Offsets } from '../../../src/lib/instrumen
 import { TOOLS } from '../../../src/lib/shell/tools';
 import { TUNING_PRESETS, tuningFromOffsets } from '../../../src/lib/instrument/tunings';
 import { DEFAULT_TEMPO, TEMPOS } from '../../../src/lib/state/listen';
-import { FIXTURES } from './fixtures';
+import { FIXTURES, FIXTURE_BY_NAME } from './fixtures';
 
 const rec = (o: unknown): string => JSON.stringify(o);
 
@@ -35,7 +35,8 @@ describe('constants and defaults (FR-018)', () => {
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false,
-      tempo: 'medium'
+      tempo: 'medium',
+      language: null
     });
   });
 
@@ -142,6 +143,42 @@ describe('raw handling', () => {
   });
 });
 
+describe('language (020)', () => {
+  it('parses valid tags from fixtures', () => {
+    expect(parsePreferences(FIXTURE_BY_NAME['language-pt'].raw).language).toBe('pt-BR');
+    expect(parsePreferences(FIXTURE_BY_NAME['language-es'].raw).language).toBe('es');
+  });
+
+  it('invalid language falls back to null and keeps other fields', () => {
+    for (const name of ['bad-language', 'language-number']) {
+      const p = parsePreferences(FIXTURE_BY_NAME[name].raw);
+      expect(p.language).toBeNull();
+      expect(p.tuningId).toBe('AF-3');
+      expect(p.fretCount).toBe(20);
+      expect(p.muted).toBe(true);
+    }
+  });
+
+  it('record without language serializes byte-identically to slice 019', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, tempo: 'fast' })).not.toContain(
+      'language'
+    );
+  });
+
+  it('serializes language after tempo only when non-null', () => {
+    const raw = serializePreferences({ ...DEFAULT_PREFERENCES, tempo: 'fast', language: 'es' });
+    expect(raw).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"tempo":"fast","language":"es"}'
+    );
+    expect(serializePreferences(parsePreferences(FIXTURE_BY_NAME['language-pt'].raw))).toBe(
+      FIXTURE_BY_NAME['language-pt'].raw
+    );
+  });
+});
+
 describe('serializePreferences', () => {
   it('writes customTuning after tuning when present, in contract order', () => {
     const p: Preferences = {
@@ -169,7 +206,8 @@ describe('serializePreferences', () => {
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false,
-      tempo: 'medium'
+      tempo: 'medium',
+      language: null
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -219,7 +257,8 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false,
-      tempo: 'medium'
+      tempo: 'medium',
+      language: null
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -492,7 +531,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   handedness: fc.constantFrom('right', 'left'),
   orientation: fc.constantFrom('highest-top', 'lowest-top'),
   rotateHintShown: fc.boolean(),
-  tempo: fc.constantFrom('slow', 'medium', 'fast')
+  tempo: fc.constantFrom('slow', 'medium', 'fast'),
+  language: fc.constantFrom(null, 'en', 'pt-BR', 'es')
 });
 
 function isValid(p: Preferences): boolean {
