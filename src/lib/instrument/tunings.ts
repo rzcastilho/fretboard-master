@@ -9,7 +9,7 @@ import {
   type Letter,
   type SpelledPitch
 } from '../theory/pitch';
-import { STANDARD_GUITAR, type Instrument } from './instrument';
+import { STANDARD_GUITAR, withPresentation, type Instrument } from './instrument';
 import { matchPreset, offsetPitches, presetOffsets, type Offsets } from './custom-tuning';
 
 export type TuningId =
@@ -172,6 +172,19 @@ export function presetInstrument(id: TuningId, count: StringCount, fretCount: nu
       : build(count, frets, presetStrings(id, count));
   cache.set(key, made);
   return made;
+}
+
+/**
+ * The standard tuning for `inst`'s string count, keeping its frets, handedness and orientation.
+ * Memoized through `presetInstrument` and `withPresentation`. Used for CAGED's temporary view.
+ */
+export function standardCounterpart(inst: Instrument): Instrument {
+  const count: StringCount = inst.stringCount === 7 ? 7 : 6;
+  return withPresentation(
+    presetInstrument(standardTuningId(count), count, inst.fretCount),
+    inst.handedness,
+    inst.orientation
+  );
 }
 
 /** A preset, or per-string offsets (one per string) that match no preset (canonical form, 011 R-01). */

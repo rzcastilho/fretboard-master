@@ -1,11 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { AF_1_12, AF_1_24, AF_2, AF_21, AF_4, AF_8 } from '../../../src/lib/instrument/fixtures';
-import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
+import {
+  STANDARD_GUITAR,
+  positionPitch,
+  withPresentation
+} from '../../../src/lib/instrument/instrument';
 import type { DisplayModel } from '../../../src/lib/fretboard/types';
-import { buildCagedModel } from '../../../src/lib/state/caged-model';
-import { initialCagedView } from '../../../src/lib/state/caged-view';
+import {
+  buildCagedModel as build,
+  cagedTagText,
+  type CagedContext
+} from '../../../src/lib/state/caged-model';
+import { cagedOccurrences } from '../../../src/lib/theory/caged';
+import { pitchOfSpelling } from '../../../src/lib/theory/pitch';
+import { initialCagedView, selectRoot } from '../../../src/lib/state/caged-view';
 
 const view = initialCagedView();
+const CTX: CagedContext = { tuningName: 'Standard', temporary: false };
+const buildCagedModel = (
+  v: Parameters<typeof build>[0],
+  inst: Parameters<typeof build>[1],
+  ctx: CagedContext = CTX
+) => build(v, inst, ctx);
 
 function shown(d: ReturnType<typeof buildCagedModel>): DisplayModel & {
   tags: NonNullable<DisplayModel['tags']>;
@@ -277,15 +293,193 @@ describe('other tunings (US5)', () => {
     expect(shown(d).tags[0].label).toBe('C shape · roots on strings 5, 2');
   });
 
-  it.each([
-    ['Drop D', AF_4],
-    ['Open G', AF_8]
-  ])('%s: not compatible, nothing drawn, no fit note', (_n, inst) => {
+  it.each([['Open G', AF_8]])('%s: not compatible, nothing drawn, no fit note', (_n, inst) => {
     const d = buildCagedModel(view, inst);
     expect(d.tuningClass).not.toBe('compatible');
     expect(d.model).toBeNull();
     expect(d.fitNote).toBeNull();
     expect(d.occurrences).toEqual([]);
     expect(d.fitCount).toBe(0);
+  });
+});
+
+describe('buildCagedModel: tuning context (slice 015, M7, M8)', () => {
+  it('M8: description starts with the tuning sentence; no altered sentence for Standard', () => {
+    const d = shown(buildCagedModel(view, STANDARD_GUITAR));
+    expect(d.description.startsWith('Tuning: Standard. ')).toBe(true);
+    expect(d.description).not.toContain('is altered');
+  });
+
+  it('exposes tuningName, temporaryName null and unsupportedNotice null', () => {
+    const d = buildCagedModel(view, STANDARD_GUITAR);
+    expect(d.tuningName).toBe('Standard');
+    expect(d.temporaryName).toBeNull();
+    expect(d.unsupportedNotice).toBeNull();
+  });
+
+  it('M7: temporary uses the temporary sentence and names the tuning', () => {
+    const d = buildCagedModel(view, AF_21, { tuningName: '7-string standard', temporary: true });
+    expect(d.temporaryName).toBe('7-string standard');
+    expect(shown(d).description.startsWith('Temporary tuning: 7-string standard. ')).toBe(true);
+  });
+});
+
+describe('buildCagedModel: altered lowest string (slice 015 US3)', () => {
+  const DROP_D: CagedContext = { tuningName: 'Drop D', temporary: false };
+  const dMajor = { ...selectRoot(view, 2), spellingOverride: 'none' as const };
+  const d = buildCagedModel(dMajor, AF_4, DROP_D);
+  const model = shown(d);
+
+  it('M3: altered mark, string-6 markers only at frets 7 and 12, tags omit string 6', () => {
+    expect(d.tuningClass).toBe('altered-string');
+    expect(model.stringMarks).toEqual([{ string: 6, label: 'altered' }]);
+    const six = model.markers.filter((mk) => mk.string === 6);
+    const byFret = new Map(six.map((mk) => [mk.fret, mk]));
+    expect([...byFret.keys()].sort((a, b) => a - b).slice(0, 2)).toEqual([7, 12]);
+    expect(byFret.get(7)).toMatchObject({ spelling: { letter: 'A' }, interval: '5', id: '6:7' });
+    expect(byFret.get(12)).toMatchObject({ spelling: { letter: 'D' }, interval: 'R', id: '6:12' });
+    const labels = model.tags.map((t) => t.label);
+    expect(labels).toContain('E shape · roots on strings 4, 1');
+    expect(labels).toContain('G shape · roots on strings 3, 1');
+    for (const l of labels) expect(l).not.toMatch(/strings 6|, 6/);
+  });
+
+  it('M3: string-6 marker ids are unique', () => {
+    const ids = model.markers.map((mk) => mk.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('M4: stringMarks present for every key, even with no string-6 marker', () => {
+    for (let pc = 0; pc < 12; pc++)
+      for (const quality of ['major', 'minor'] as const) {
+        const x = buildCagedModel({ ...selectRoot(view, pc), quality }, AF_4, DROP_D);
+        expect(shown(x).stringMarks).toEqual([{ string: 6, label: 'altered' }]);
+      }
+  });
+
+  it('M9: string 6 fret 12 spells D and sounds D3', () => {
+    const mk = model.markers.find((x) => x.string === 6 && x.fret === 12);
+    expect(mk?.spelling).toMatchObject({ letter: 'D' });
+    expect(positionPitch(AF_4, { string: 6, fret: 12 })).toBe(
+      pitchOfSpelling({ letter: 'D', accidental: 0, octave: 3 })
+    );
+  });
+
+  it('M8: the altered sentence follows the tuning sentence, only when altered', () => {
+    expect(model.description.startsWith('Tuning: Drop D. String 6 is altered')).toBe(true);
+    expect(shown(buildCagedModel(view, STANDARD_GUITAR)).description).not.toContain('is altered');
+  });
+
+  it('never emits stringMarks for compatible or temporary views', () => {
+    expect(shown(buildCagedModel(view, STANDARD_GUITAR)).stringMarks).toBeUndefined();
+    expect(shown(buildCagedModel(view, AF_2)).stringMarks).toBeUndefined();
+    const t = buildCagedModel(view, STANDARD_GUITAR, { tuningName: 'Standard', temporary: true });
+    expect(shown(t).stringMarks).toBeUndefined();
+    expect(buildCagedModel(view, AF_8).model).toBeNull();
+  });
+});
+
+describe('cagedTagText takes the occurrence', () => {
+  const sixOpen = STANDARD_GUITAR.openStrings.slice(0, 6).map(pitchOfSpelling).reverse();
+  const occ = cagedOccurrences(sixOpen, 0, 'major', 22);
+
+  it('builds roots on strings from occurrenceRootStrings', () => {
+    expect(cagedTagText(occ[0])).toBe('C shape · roots on strings 5, 2');
+    expect(cagedTagText(occ[3])).toBe('E shape · roots on strings 6, 4, 1');
+  });
+
+  it('altered occurrence omits string 6', () => {
+    const altered = { ...occ[3], alteredString: true };
+    expect(cagedTagText(altered)).toBe('E shape · roots on strings 4, 1');
+  });
+});
+
+describe('buildCagedModel: non-compatible tunings (slice 015 US1)', () => {
+  it('M1: Open G shows the notice and no shapes', () => {
+    const d = buildCagedModel(view, AF_8, { tuningName: 'Open G', temporary: false });
+    expect(d.tuningClass).toBe('non-compatible');
+    expect(d.model).toBeNull();
+    expect(d.occurrences).toEqual([]);
+    expect(d.fitCount).toBe(0);
+    expect(d.fitNote).toBeNull();
+    expect(d.temporaryName).toBeNull();
+    expect(d.unsupportedNotice).toBe(
+      "CAGED depends on the standard relationship between the strings, so its shapes don't exist in Open G."
+    );
+  });
+
+  it('M2: a custom non-compatible tuning is named "Custom"', () => {
+    const d = buildCagedModel(view, AF_8, { tuningName: 'Custom', temporary: false });
+    expect(d.unsupportedNotice).toContain('Custom');
+    expect(d.model).toBeNull();
+  });
+
+  it('M7: temporary on a 7-string instrument names the standard tuning', () => {
+    const d = buildCagedModel(view, AF_21, { tuningName: '7-string standard', temporary: true });
+    expect(d.temporaryName).toBe('7-string standard');
+    expect(d.unsupportedNotice).toBeNull();
+    expect(d.model?.description?.startsWith('Temporary tuning: 7-string standard.')).toBe(true);
+  });
+});
+
+describe('buildCagedModel: transposed compatible tunings (slice 015 US2)', () => {
+  const flatView = (pc: number) => ({ ...selectRoot(view, pc), spellingOverride: 'flat' as const });
+
+  it('M5: Standard and Half step down have no stringMarks and equal tag texts', () => {
+    const std = shown(buildCagedModel(view, STANDARD_GUITAR));
+    const half = shown(
+      buildCagedModel(view, AF_2, { tuningName: 'Half step down', temporary: false })
+    );
+    expect(std.stringMarks).toBeUndefined();
+    expect(half.stringMarks).toBeUndefined();
+    expect(half.tags.map((t) => t.label)).toEqual(
+      std.tags.slice(0, half.tags.length).map((t) => t.label)
+    );
+  });
+
+  it('M6: Half step down, E♭ major: E shape roots at fret 0 spell E♭ and sound E♭2/E♭3/E♭4', () => {
+    const d = buildCagedModel(flatView(3), AF_2, {
+      tuningName: 'Half step down',
+      temporary: false
+    });
+    expect(d.keyName).toBe('E♭ major');
+    const model = shown(d);
+    const e = d.occurrences.find((o) => o.shape.id === 'E' && o.start === 0);
+    expect(e).toBeDefined();
+    expect(model.tags.find((t) => t.id === 'E@0')?.label).toBe(
+      'E shape · roots on strings 6, 4, 1'
+    );
+    const roots = [
+      [6, 0, 39],
+      [4, 2, 51],
+      [1, 0, 63]
+    ] as const;
+    for (const [string, fret, pitch] of roots) {
+      const mk = model.markers.find((k) => k.string === string && k.fret === fret);
+      expect(mk?.function).toBe('root');
+      expect(mk?.spelling).toMatchObject({ letter: 'E', accidental: -1 });
+      expect(positionPitch(AF_2, { string, fret })).toBe(pitch);
+    }
+  });
+
+  it('G♭ major: E shape starts at fret 3 and spells G♭–B♭–D♭', () => {
+    const d = buildCagedModel(flatView(6), AF_2, {
+      tuningName: 'Half step down',
+      temporary: false
+    });
+    expect(d.occurrences.find((o) => o.shape.id === 'E')?.start).toBe(3);
+    const names = new Set(
+      d.occurrences
+        .filter((o) => o.shape.id === 'E' && o.start === 3)
+        .flatMap((o) => o.notes)
+        .map((n) => {
+          const sp = shown(d).markers.find(
+            (k) => k.string === n.string && k.fret === n.fret
+          )?.spelling;
+          return `${sp?.letter}${sp?.accidental}`;
+        })
+    );
+    expect([...names].sort()).toEqual(['B-1', 'D-1', 'G-1']);
+    expect(d.model?.stringMarks).toBeUndefined();
   });
 });

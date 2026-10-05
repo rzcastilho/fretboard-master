@@ -304,8 +304,9 @@ const browserSeven = async (page: Page) => {
   ).sort();
 };
 
-const UNAVAILABLE =
-  "CAGED depends on the standard relationship between the strings. It isn't available in this tuning yet.";
+// Slice 014 interim text: still used by the Drop D cases until US3 (T041/T046) replaces them.
+const unsupported = (tuning: string) =>
+  `CAGED depends on the standard relationship between the strings, so its shapes don't exist in ${tuning}.`;
 
 test.describe('caged US5: other tunings', () => {
   test('Q17: Half step down draws C1 A4 G6 E9 D11', async ({ page }) => {
@@ -321,22 +322,37 @@ test.describe('caged US5: other tunings', () => {
     await expect(board(page).locator('.marker').first()).toBeVisible();
   });
 
-  for (const [q, id] of [
-    ['Q18', 'AF-4'],
-    ['Q19', 'AF-8']
-  ]) {
-    test(`${q}: ${id} shows the message and nothing else`, async ({ page }) => {
-      await withFixture(page, id);
-      await page.goto('/caged');
-      await expect(page.getByRole('status').filter({ hasText: UNAVAILABLE })).toBeVisible();
-      await expect(board(page).locator('.marker')).toHaveCount(0);
-      await expect(board(page).locator('.tag')).toHaveCount(0);
-      await expect(page.getByText(/shapes fit on the fretboard/)).toHaveCount(0);
-      await expect(board(page).getByRole('button')).toHaveCount(0);
-      await expect(page.getByRole('group', { name: 'Key' })).toBeVisible();
-      await expect(qualityRadio(page, 'Major')).toBeVisible();
+  // Drop D (AF-4): shapes on strings 5→1 plus the "altered" mark (slice 015 US3).
+  test('Q18: AF-4 draws shapes with the altered mark', async ({ page }) => {
+    await withFixture(page, 'AF-4');
+    await page.goto('/caged');
+    await expect(board(page).locator('.marker').first()).toBeVisible();
+    await expect(tags(page).first()).toBeVisible();
+    await expect(board(page).locator('text.string-mark')).toHaveText('altered');
+    await expect(page.getByRole('status').filter({ hasText: /relationship/ })).toHaveCount(0);
+    await expect(page.getByRole('group', { name: 'Key' })).toBeVisible();
+    await expect(qualityRadio(page, 'Major')).toBeVisible();
+  });
+
+  test('Q19: AF-8 shows the notice and nothing else', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-8' })
+      );
     });
-  }
+    await page.goto('/caged');
+    await expect(page.getByRole('status').filter({ hasText: unsupported('Open G') })).toBeVisible();
+    await expect(board(page).locator('.marker')).toHaveCount(0);
+    await expect(board(page).locator('.tag')).toHaveCount(0);
+    await expect(page.getByText(/shapes fit on the fretboard/)).toHaveCount(0);
+    await expect(board(page).getByRole('button')).toHaveText([
+      'View in standard tuning',
+      'Go to Triads'
+    ]);
+    await expect(page.getByRole('group', { name: 'Key' })).toBeVisible();
+    await expect(qualityRadio(page, 'Major')).toBeVisible();
+  });
 
   test('switching back to Standard redraws shapes for the kept key and quality', async ({
     page
@@ -347,14 +363,14 @@ test.describe('caged US5: other tunings', () => {
     let dialog = await openPanel(page);
     await dialog.getByRole('radio', { name: /^Open G/ }).check();
     await confirmPanel(page);
-    await expect(page.getByRole('status').filter({ hasText: UNAVAILABLE })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: unsupported('Open G') })).toBeVisible();
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
     dialog = await openPanel(page);
     await dialog.getByRole('radio', { name: /^Standard/ }).check();
     await confirmPanel(page);
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
     await expect(tags(page).first()).toContainText('Gm shape');
-    await expect(page.getByText(UNAVAILABLE)).toHaveCount(0);
+    await expect(page.getByText(/shapes don't exist in/)).toHaveCount(0);
   });
 });
 
@@ -435,10 +451,10 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
     await settle(page);
   });
 
-  test('axe: Drop D shows the message', async ({ page }) => {
+  test('axe: Drop D draws shapes with the altered mark', async ({ page }) => {
     await withFixture(page, 'AF-4');
     await page.goto('/caged');
-    await expect(page.getByRole('status').filter({ hasText: UNAVAILABLE })).toBeVisible();
+    await expect(board(page).locator('text.string-mark')).toHaveText('altered');
     await runAxe(page);
   });
 

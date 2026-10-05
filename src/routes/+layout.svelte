@@ -5,6 +5,7 @@
   import { SCREENS } from '$lib/shell/screens';
   import PlaybackHost from '$lib/shell/PlaybackHost.svelte';
   import PrefsNotice from '$lib/shell/PrefsNotice.svelte';
+  import { caged } from '$lib/state/caged.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { preferences } from '$lib/state/preferences.svelte';
@@ -24,6 +25,7 @@
     if (from && to && from.url.pathname === to.url.pathname) return;
     playback.stop('navigate');
     instrument.screenChanged();
+    caged.screenChanged();
     preferences.screenChanged();
   });
 

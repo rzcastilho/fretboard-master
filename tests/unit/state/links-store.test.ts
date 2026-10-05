@@ -7,6 +7,7 @@ vi.mock('$app/paths', () => ({ resolve: (p: string) => p }));
 import { AF_7 } from '../../../src/lib/instrument/fixtures';
 import {
   linkTools,
+  openTriadsFromCaged,
   openTriadsFromNote,
   resetTool,
   viewAsTriad
@@ -267,5 +268,15 @@ describe('caged is outside the links (US6)', () => {
     resetTool('caged');
     expect(caged.state).toEqual({ rootPc: 0, spellingOverride: 'none', quality: 'major' });
     expect(triads.state).toBe(triadsBefore);
+  });
+});
+
+describe('openTriadsFromCaged (slice 015 US1)', () => {
+  it('goes to /triads once and leaves the triads state unchanged', async () => {
+    const before = triads.state;
+    await openTriadsFromCaged();
+    expect(goto).toHaveBeenCalledTimes(1);
+    expect(goto).toHaveBeenCalledWith('/triads');
+    expect(triads.state).toBe(before);
   });
 });

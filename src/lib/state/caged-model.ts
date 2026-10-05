@@ -11,7 +11,7 @@ import {
   cagedOccurrences,
   cagedTuningClass,
   fitCount,
-  rootStrings,
+  occurrenceRootStrings,
   type CagedDegree,
   type CagedShape,
   type CagedTuningClass,
@@ -22,8 +22,19 @@ import { otherRootSpelling, spellTriad, type TriadFunction } from '../theory/tri
 import { cagedRootSpelling, type CagedViewState } from './caged-view';
 import { qualityName } from './triads-model';
 
+/** Tuning context for the display (slice 015). */
+export interface CagedContext {
+  readonly tuningName: string;
+  readonly temporary: boolean;
+}
+
 export interface CagedDisplay {
   readonly keyName: string;
+  readonly tuningName: string;
+  /** Name of the temporary tuning being shown, else null. */
+  readonly temporaryName: string | null;
+  /** Explanation for tunings CAGED cannot draw, else null. */
+  readonly unsupportedNotice: string | null;
   readonly tuningClass: CagedTuningClass;
   readonly occurrences: readonly ShapeOccurrence[];
   readonly fitCount: number;
@@ -57,15 +68,22 @@ export function sixHighestOpen(instrument: Instrument): readonly Pitch[] {
   return instrument.openStrings.slice(0, 6).map(pitchOfSpelling).reverse();
 }
 
-const strings = (s: CagedShape): string => rootStrings(s).join(', ');
+const strings = (o: ShapeOccurrence): string => occurrenceRootStrings(o).join(', ');
 
 /** Visible tag text, e.g. "C shape · roots on strings 5, 2" (minor: "Cm shape · …"). */
-export function cagedTagText(shape: CagedShape): string {
-  const params = { shape: shape.id, strings: strings(shape) };
+export function cagedTagText(occ: ShapeOccurrence): string {
+  const shape: CagedShape = occ.shape;
+  const params = { shape: shape.id, strings: strings(occ) };
   return shape.quality === 'major' ? m.caged_tag_major(params) : m.caged_tag_minor(params);
 }
 
-export function buildCagedModel(view: CagedViewState, instrument: Instrument): CagedDisplay {
+export function buildCagedModel(
+  view: CagedViewState,
+  instrument: Instrument,
+  context: CagedContext
+): CagedDisplay {
+  const { tuningName, temporary } = context;
+  const temporaryName = temporary ? tuningName : null;
   const root = cagedRootSpelling(view);
   const triad = spellTriad(root, view.quality);
   const keyName = m.caged_key_name({ root: noteLabel(root), quality: qualityName(view.quality) });
@@ -75,9 +93,12 @@ export function buildCagedModel(view: CagedViewState, instrument: Instrument): C
   });
 
   const tuningClass = cagedTuningClass(sixHighestOpen(instrument));
-  if (tuningClass !== 'compatible') {
+  if (tuningClass === 'non-compatible') {
     return {
       keyName,
+      tuningName,
+      temporaryName,
+      unsupportedNotice: m.caged_tuning_unsupported({ tuning: tuningName }),
       tuningClass,
       occurrences: [],
       fitCount: 0,
@@ -87,6 +108,7 @@ export function buildCagedModel(view: CagedViewState, instrument: Instrument): C
     };
   }
 
+  const altered = tuningClass === 'altered-string';
   const occurrences = cagedOccurrences(
     sixHighestOpen(instrument),
     view.rootPc,
@@ -115,7 +137,7 @@ export function buildCagedModel(view: CagedViewState, instrument: Instrument): C
   }
 
   const tags: FretboardTag[] = occurrences.map((o) => {
-    const label = cagedTagText(o.shape);
+    const label = cagedTagText(o);
     return {
       id: `${o.shape.id}@${o.start}`,
       start: o.start,
@@ -131,7 +153,7 @@ export function buildCagedModel(view: CagedViewState, instrument: Instrument): C
       shape: o.shape.id,
       lo: o.start,
       hi: o.end,
-      strings: strings(o.shape),
+      strings: strings(o),
       notes: o.notes
         .map((n) =>
           n.fret === 0
@@ -149,6 +171,10 @@ export function buildCagedModel(view: CagedViewState, instrument: Instrument): C
     })
   );
   const description = [
+    temporary
+      ? m.caged_description_temporary({ tuning: tuningName })
+      : m.caged_description_tuning({ tuning: tuningName }),
+    ...(altered ? [m.caged_description_altered({ string: 6 })] : []),
     m.caged_description_summary({ key: spokenKey, count: occurrences.length }),
     ...entries
   ].join(' ');
@@ -158,11 +184,21 @@ export function buildCagedModel(view: CagedViewState, instrument: Instrument): C
 
   return {
     keyName,
+    tuningName,
+    temporaryName,
+    unsupportedNotice: null,
     tuningClass,
     occurrences,
     fitCount: fit,
     fitNote,
-    model: { markers, labelMode: 'interval', tags, tagsInteractive: false, description },
+    model: {
+      markers,
+      labelMode: 'interval',
+      tags,
+      tagsInteractive: false,
+      description,
+      ...(altered ? { stringMarks: [{ string: 6, label: m.caged_altered_mark() }] } : {})
+    },
     switchTo: otherRootSpelling(view.rootPc, root)
   };
 }

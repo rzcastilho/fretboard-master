@@ -64,6 +64,8 @@ export interface DisplayModel {
   readonly tagsInteractive?: boolean;
   /** Drawn above markers, mirrored with the layout; never announced (the description covers them). */
   readonly arrows?: readonly FretboardArrow[];
+  /** Visible text marks beside a string's label (CAGED "altered"). Aria-hidden; the description carries the meaning. */
+  readonly stringMarks?: readonly { readonly string: number; readonly label: string }[];
   /** Keyed auto-scroll: re-runs only when `key` changes (replaces the highlighted-set trigger). */
   readonly autoScroll?: {
     readonly key: string;

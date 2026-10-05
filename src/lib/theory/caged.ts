@@ -32,6 +32,8 @@ export interface ShapeOccurrence {
   readonly start: number;
   readonly end: number;
   readonly notes: readonly OccurrenceNote[];
+  /** True when string 6 is altered and shows only chord tones (never for compatible tunings). */
+  readonly alteredString: boolean;
 }
 
 export type CagedTuningClass = 'compatible' | 'altered-string' | 'non-compatible';
@@ -112,6 +114,12 @@ export function rootStrings(s: CagedShape): readonly number[] {
   return out.sort((a, b) => b - a);
 }
 
+/** `rootStrings` minus string 6 when the occurrence has an altered string; descending. */
+export function occurrenceRootStrings(occ: ShapeOccurrence): readonly number[] {
+  const all = rootStrings(occ.shape);
+  return occ.alteredString ? all.filter((s) => s !== 6) : all;
+}
+
 function wellFormed(sixOpen: readonly Pitch[]): boolean {
   return Array.isArray(sixOpen) && sixOpen.length === 6 && sixOpen.every((p) => Number.isFinite(p));
 }
@@ -126,8 +134,41 @@ export function cagedTuningClass(sixOpen: readonly Pitch[]): CagedTuningClass {
 }
 
 /**
- * Every complete copy of the five shapes for the key, lowest first. `[]` unless the tuning is
- * `'compatible'`, the input is well formed and at least one copy fits in `0…fretCount`.
+ * Chord tones of the key on the altered string 6 for frets `lo…hi` (inclusive), ascending.
+ * `open6` is the open pitch of string 6. Total: a bad input or `lo > hi` gives `[]`.
+ */
+export function alteredStringNotes(
+  open6: Pitch,
+  rootPc: PitchClass,
+  quality: CagedQuality,
+  lo: number,
+  hi: number
+): readonly OccurrenceNote[] {
+  if (![open6, rootPc, lo, hi].every((v) => Number.isFinite(v)) || lo > hi) return [];
+  const third = quality === 'minor' ? 3 : 4;
+  const degreeAt = (offset: number): CagedDegree | null =>
+    offset === 0
+      ? 'R'
+      : offset === third
+        ? quality === 'minor'
+          ? 'b3'
+          : '3'
+        : offset === 7
+          ? '5'
+          : null;
+  const out: OccurrenceNote[] = [];
+  for (let fret = Math.ceil(lo); fret <= hi; fret++) {
+    const offset = (((pitchClass(open6 + fret) - rootPc) % 12) + 12) % 12;
+    const degree = degreeAt(offset);
+    if (degree !== null) out.push({ string: 6, fret, degree });
+  }
+  return out;
+}
+
+/**
+ * Every complete copy of the five shapes for the key, lowest first. `[]` when the tuning is
+ * `'non-compatible'`, the input is malformed or no copy fits in `0…fretCount`. When string 6 is
+ * altered, position and fit come from strings 5→1 only and string 6 shows chord tones (G, E).
  */
 export function cagedOccurrences(
   sixOpen: readonly Pitch[],
@@ -137,19 +178,27 @@ export function cagedOccurrences(
 ): readonly ShapeOccurrence[] {
   const shapes = CAGED_SHAPES[quality];
   if (!shapes || !Number.isFinite(rootPc) || !Number.isFinite(fretCount)) return [];
-  if (cagedTuningClass(sixOpen) !== 'compatible') return [];
-  const shift = (((rootPc - (pitchClass(sixOpen[0]) - 4)) % 12) + 12) % 12;
+  const tuningClass = cagedTuningClass(sixOpen);
+  if (tuningClass === 'non-compatible') return [];
+  const altered = tuningClass === 'altered-string';
+  // Placement from string 5 (R-02): its open A = pitch class 9 in the table's reference tuning.
+  const shift = (((rootPc - (pitchClass(sixOpen[1]) - 9)) % 12) + 12) % 12;
   const out: ShapeOccurrence[] = [];
   for (const sh of shapes) {
     for (const o of OCTAVES) {
       const notes: OccurrenceNote[] = [];
       sh.strings.forEach((n, i) => {
-        if (n !== null) notes.push({ string: 6 - i, fret: n.fret + shift + o, degree: n.degree });
+        if (n === null || (altered && i === 0)) return;
+        notes.push({ string: 6 - i, fret: n.fret + shift + o, degree: n.degree });
       });
       const frets = notes.map((n) => n.fret);
       const start = Math.min(...frets);
       const end = Math.max(...frets);
-      if (start >= 0 && end <= fretCount) out.push({ shape: sh, start, end, notes });
+      if (start < 0 || end > fretCount) continue;
+      if (altered && (sh.id === 'G' || sh.id === 'E')) {
+        notes.unshift(...alteredStringNotes(sixOpen[0], rootPc, quality, start, end));
+      }
+      out.push({ shape: sh, start, end, notes, alteredString: altered });
     }
   }
   return out.sort((a, b) => a.start - b.start);

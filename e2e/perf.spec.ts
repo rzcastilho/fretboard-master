@@ -927,6 +927,27 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
     expect(median(times)).toBeLessThanOrEqual(100);
   });
 
+  test('CAGED instrument change to DADGAD ≤ 300 ms (SC-006)', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-8' })
+      );
+    });
+    await page.goto('/caged');
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: /^DADGAD/ }).check();
+    await armTimer(page, "don't exist in DADGAD");
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    expect(await readTimer(page)).toBeLessThanOrEqual(300);
+  });
+
   test('7 strings × 24 frets with nine tags: scrolling stays inside .scroller', async ({
     page
   }) => {

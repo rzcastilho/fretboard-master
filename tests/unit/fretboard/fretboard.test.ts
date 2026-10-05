@@ -1862,3 +1862,53 @@ describe('Fretboard non-interactive tags (tagsInteractive: false)', () => {
     }
   });
 });
+
+describe('Fretboard string marks (slice 015)', () => {
+  const marks = [{ string: 6, label: 'altered' }];
+  const model = (stringMarks: DisplayModel['stringMarks']): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    stringMarks
+  });
+
+  it.each([
+    ['right', 'highest-top'],
+    ['right', 'lowest-top'],
+    ['left', 'highest-top'],
+    ['left', 'lowest-top']
+  ] as const)('draws the mark in the string-6 row (%s, %s)', (hand, orient) => {
+    const instrument = withPresentation(STANDARD_GUITAR, hand, orient);
+    const { container } = render(Fretboard, { instrument, model: model(marks) });
+    const mark = container.querySelector('text.string-mark') as SVGTextElement;
+    expect(mark.textContent).toBe('altered');
+    const label = [...container.querySelectorAll('text.string-label')].find((t) =>
+      t.textContent?.startsWith('6 ')
+    ) as SVGTextElement;
+    expect(Number(mark.getAttribute('y'))).toBeGreaterThan(Number(label.getAttribute('y')));
+    expect(mark.getAttribute('x')).toBe(label.getAttribute('x'));
+    const labelX = Number(mark.getAttribute('x'));
+    const svgWidth = Number(container.querySelector('svg')?.getAttribute('width'));
+    // Label column sits on the nut's opposite side: left edge when right-handed, right when left.
+    expect(labelX < svgWidth / 2).toBe(hand === 'right');
+  });
+
+  it('ignores a mark for a string the instrument lacks', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model([{ string: 7, label: 'altered' }])
+    });
+    expect(container.querySelector('text.string-mark')).toBeNull();
+  });
+
+  it('is aria-hidden and outside the accessibility tree', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model: model(marks) });
+    const mark = container.querySelector('text.string-mark') as SVGTextElement;
+    expect(mark.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(mark.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('draws no mark without stringMarks', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR });
+    expect(container.querySelector('text.string-mark')).toBeNull();
+  });
+});

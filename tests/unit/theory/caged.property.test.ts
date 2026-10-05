@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   CAGED_CYCLE,
+  CAGED_SHAPES,
   cagedOccurrences,
   cagedTuningClass,
   fitCount
@@ -113,6 +114,113 @@ describe('cagedTuningClass properties', () => {
           expect(cagedTuningClass(altered)).toBe('altered-string');
         }
       )
+    );
+  });
+});
+
+describe('P6: placement from string 5 matches slice-014 for compatible tunings', () => {
+  it('start of each shape equals the string-6-based shift expectation', () => {
+    // Slice-014 expected starts come from the table: min table fret + shift, folded by octave.
+    const MIN_FRET = { C: 0, A: 3, G: 5, E: 8, D: 10 } as const;
+    fc.assert(
+      fc.property(arbCase, ({ open, rootPc, quality, frets }) => {
+        const shift = (((rootPc - (pitchClass(open[0]) - 4)) % 12) + 12) % 12;
+        for (const occ of cagedOccurrences(open, rootPc, quality, frets)) {
+          const base = MIN_FRET[occ.shape.id] + shift;
+          expect((((occ.start - base) % 12) + 12) % 12).toBe(0);
+          expect(occ.alteredString).toBe(false);
+        }
+      })
+    );
+  });
+});
+
+describe('altered lowest string (P1–P5)', () => {
+  const arbDelta = fc.integer({ min: -11, max: 11 }).filter((d) => d !== 0);
+  const arbAltered = fc.record({
+    base: arbCompatible,
+    delta: arbDelta,
+    rootPc: fc.integer({ min: 0, max: 11 }),
+    quality: fc.constantFrom<'major' | 'minor'>('major', 'minor'),
+    frets: fc.integer({ min: 12, max: 24 })
+  });
+  const alter = (base: readonly number[], delta: number) => [base[0] + delta, ...base.slice(1)];
+  const upper = <T extends { string: number }>(notes: readonly T[]) =>
+    notes.filter((n) => n.string !== 6);
+
+  it('P1: strings 5→1 equal the compatible base', () => {
+    fc.assert(
+      fc.property(arbAltered, ({ base, delta, rootPc, quality, frets }) => {
+        const alt = cagedOccurrences(alter(base, delta), rootPc, quality, frets);
+        const std = cagedOccurrences(base, rootPc, quality, frets);
+        for (const b of std) {
+          const a = alt.find((o) => o.shape.id === b.shape.id && o.start === b.start);
+          expect(a).toBeDefined();
+          expect(upper(a?.notes ?? [])).toEqual(upper(b.notes));
+        }
+        for (const a of alt)
+          if (!['G', 'E'].includes(a.shape.id)) {
+            const b = std.find((o) => o.shape.id === a.shape.id && o.start === a.start);
+            expect(b).toBeDefined();
+          }
+      })
+    );
+  });
+
+  it('P2: string-6 notes are real chord tones of their degree inside start…end', () => {
+    fc.assert(
+      fc.property(arbAltered, ({ base, delta, rootPc, quality, frets }) => {
+        const open = alter(base, delta);
+        for (const occ of cagedOccurrences(open, rootPc, quality, frets))
+          for (const n of occ.notes.filter((x) => x.string === 6)) {
+            expect(pitchClass(open[0] + n.fret)).toBe((rootPc + OFFSET[n.degree]) % 12);
+            expect(n.degree).not.toBe(quality === 'minor' ? '3' : 'b3');
+            expect(n.fret).toBeGreaterThanOrEqual(occ.start);
+            expect(n.fret).toBeLessThanOrEqual(occ.end);
+          }
+      })
+    );
+  });
+
+  it('P3: string-6 notes appear only in G and E shapes', () => {
+    fc.assert(
+      fc.property(arbAltered, ({ base, delta, rootPc, quality, frets }) => {
+        for (const occ of cagedOccurrences(alter(base, delta), rootPc, quality, frets))
+          if (occ.notes.some((n) => n.string === 6)) expect(['G', 'E']).toContain(occ.shape.id);
+      })
+    );
+  });
+
+  it('P4: no string-6 note has the table degree at the table fret', () => {
+    fc.assert(
+      fc.property(arbAltered, ({ base, delta, rootPc, quality, frets }) => {
+        const shift = (((rootPc - (pitchClass(base[1]) - 9)) % 12) + 12) % 12;
+        for (const occ of cagedOccurrences(alter(base, delta), rootPc, quality, frets)) {
+          const cell = CAGED_SHAPES[quality].find((x) => x.id === occ.shape.id)?.strings[0];
+          if (!cell) continue;
+          for (const n of occ.notes.filter((x) => x.string === 6))
+            expect(
+              n.degree === cell.degree &&
+                [-12, 0, 12, 24].some((o) => n.fret === cell.fret + shift + o)
+            ).toBe(false);
+        }
+      })
+    );
+  });
+
+  it('P5: strings 5→1 stay in 0…fretCount and fit ignores string 6', () => {
+    fc.assert(
+      fc.property(arbAltered, arbDelta, ({ base, delta, rootPc, quality, frets }, other) => {
+        const a = cagedOccurrences(alter(base, delta), rootPc, quality, frets);
+        const b = cagedOccurrences(alter(base, other), rootPc, quality, frets);
+        const key = (o: (typeof a)[number]) => `${o.shape.id}@${o.start}-${o.end}`;
+        expect(a.map(key)).toEqual(b.map(key));
+        for (const occ of a)
+          for (const n of upper(occ.notes)) {
+            expect(n.fret).toBeGreaterThanOrEqual(0);
+            expect(n.fret).toBeLessThanOrEqual(frets);
+          }
+      })
     );
   });
 });

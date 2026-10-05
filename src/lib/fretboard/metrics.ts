@@ -4,6 +4,7 @@ import { DEFAULT_METRICS, type FretboardMetrics } from './geometry';
 const TOKENS: Readonly<Record<keyof FretboardMetrics, string>> = {
   row: '--fb-row',
   labelCol: '--fb-label-col',
+  labelColMarked: '--fb-label-col-marked',
   openCol: '--fb-open-col',
   fretFirst: '--fb-fret-first',
   fretLast: '--fb-fret-last',

@@ -1,5 +1,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { tick } from 'svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const openTriadsFromCaged = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('../../../src/lib/state/links.svelte', async (orig) => ({
+  ...(await orig<object>()),
+  openTriadsFromCaged
+}));
+
 import { AF_1_12, AF_8 } from '../../../src/lib/instrument/fixtures';
 import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import CagedTool from '../../../src/lib/tools/caged/CagedTool.svelte';
@@ -110,19 +118,25 @@ describe('CagedTool', () => {
     });
   });
 
-  describe('other tunings (US5)', () => {
-    it('shows only the unavailable message in zone C, keeping the controls', () => {
-      caged.useInstrument(AF_8);
+  describe('non-compatible tunings (slice 015 US1)', () => {
+    const NOTICE =
+      "CAGED depends on the standard relationship between the strings, so its shapes don't exist in Open G.";
+
+    it('shows the notice and two buttons in zone C, keeping the controls', () => {
+      resetCagedForTests(AF_8, 'Open G');
       render(CagedTool);
       const zone = screen.getByRole('region', { name: 'Fretboard' });
       const note = within(zone).getByRole('status');
       expect(note.tagName).toBe('P');
-      expect(note.textContent).toBe(
-        "CAGED depends on the standard relationship between the strings. It isn't available in this tuning yet."
-      );
+      expect(note.textContent).toBe(NOTICE);
       expect(within(zone).queryByRole('grid')).toBeNull();
-      expect(within(zone).queryAllByRole('button')).toEqual([]);
-      expect(screen.getAllByRole('status')).toHaveLength(1);
+      expect(within(zone).queryByText(/shape ·/)).toBeNull();
+      expect(within(zone).queryByText(/shapes fit/)).toBeNull();
+      expect(
+        within(zone)
+          .getAllByRole('button')
+          .map((b) => b.textContent?.trim())
+      ).toEqual(['View in standard tuning', 'Go to Triads']);
       expect(screen.getByText('C major')).toBeTruthy();
       const keys = within(screen.getByRole('group', { name: 'Key' })).getAllByRole('button');
       expect(keys[0].getAttribute('aria-pressed')).toBe('true');
@@ -131,6 +145,24 @@ describe('CagedTool', () => {
           .getByRole('radio', { name: 'Major' })
           .getAttribute('aria-checked')
       ).toBe('true');
+    });
+
+    it('View in standard tuning calls viewInStandard and focuses zone C', async () => {
+      resetCagedForTests(AF_8, 'Open G');
+      const spy = vi.spyOn(caged, 'viewInStandard');
+      render(CagedTool);
+      await fireEvent.click(screen.getByRole('button', { name: 'View in standard tuning' }));
+      expect(spy).toHaveBeenCalledTimes(1);
+      await tick();
+      expect(document.activeElement?.id).toBe('caged-zone-c');
+      spy.mockRestore();
+    });
+
+    it('Go to Triads calls openTriadsFromCaged', async () => {
+      resetCagedForTests(AF_8, 'Open G');
+      render(CagedTool);
+      await fireEvent.click(screen.getByRole('button', { name: 'Go to Triads' }));
+      expect(openTriadsFromCaged).toHaveBeenCalledTimes(1);
     });
   });
 

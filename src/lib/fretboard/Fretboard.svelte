@@ -44,6 +44,8 @@
     GestureState
   } from './types';
 
+  /** Vertical gap (px) between a marked string's label and its text mark. */
+  const STRING_MARK_OFFSET = 9;
   const NO_MARKERS = { markers: [], labelMode: 'none' } as const;
 
   let {
@@ -113,7 +115,18 @@
     return fade(node, { duration: d, delay: direction.in ? d : 0 });
   }
 
-  const layout = $derived(layoutFretboard(instrument, metrics, containerWidth, variant));
+  /** Marks for strings the instrument has; the interactive variant only. */
+  const stringMarks = $derived(
+    compact
+      ? []
+      : (model.stringMarks ?? []).filter(
+          (mk) => instrument.openStrings.length >= mk.string && mk.string >= 1
+        )
+  );
+  const markByString = $derived(new Map(stringMarks.map((mk) => [mk.string, mk.label])));
+  const layout = $derived(
+    layoutFretboard(instrument, metrics, containerWidth, variant, stringMarks.length > 0)
+  );
   const lastFret = $derived(layout.columns.length - 1);
 
   const singleInlays = $derived(
@@ -767,9 +780,21 @@
         <g aria-hidden="true" class="drawing">
           {@render drawing()}
           {#each layout.rows as row (row.string)}
-            <text class="string-label" x={layout.labelCenter} y={row.center}
+            {@const mark = markByString.get(row.string)}
+            <text
+              class="string-label"
+              x={layout.labelCenter}
+              y={mark === undefined ? row.center : row.center - STRING_MARK_OFFSET}
               >{row.string} {openLabel(row.string)}</text
             >
+            {#if mark !== undefined}
+              <text
+                class="string-mark"
+                x={layout.labelCenter}
+                y={row.center + STRING_MARK_OFFSET}
+                aria-hidden="true">{mark}</text
+              >
+            {/if}
           {/each}
           {#each fretNumbers as c (c.fret)}
             <text
@@ -1060,6 +1085,11 @@
 
   .string-label {
     font-size: var(--marker-label-min-size);
+  }
+
+  .string-mark {
+    font-size: var(--marker-label-min-size);
+    font-style: italic;
   }
 
   .fret-number {

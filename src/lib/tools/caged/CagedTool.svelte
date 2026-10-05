@@ -7,7 +7,9 @@
   import { STANDARD_GUITAR, type Position } from '$lib/instrument/instrument';
   import { maybeFault } from '$lib/shell/fault';
   import { caged } from '$lib/state/caged.svelte';
+  import { openTriadsFromCaged } from '$lib/state/links.svelte';
   import { playback } from '$lib/state/playback.svelte';
+  import { tick } from 'svelte';
   import { onMount } from 'svelte';
   import CagedControls from './CagedControls.svelte';
 
@@ -24,6 +26,12 @@
       fixture = fixtureModel(globalThis.__fmFretboardFixture);
     }
   });
+
+  async function viewInStandard() {
+    caged.viewInStandard();
+    await tick();
+    document.getElementById('caged-zone-c')?.focus();
+  }
 
   // Test-only hook: log activations for e2e assertions (dead code in production).
   function onactivate(p: Position) {
@@ -44,7 +52,7 @@
   <p class="key">{caged.display.keyName}</p>
 </section>
 <section class="c" aria-labelledby="caged-zone-c">
-  <h2 id="caged-zone-c">{m.zone_fretboard()}</h2>
+  <h2 id="caged-zone-c" tabindex="-1">{m.zone_fretboard()}</h2>
   {#if caged.display.model || fixture}
     <Fretboard
       instrument={caged.instrument}
@@ -56,7 +64,14 @@
       <p class="fit" role="status">{caged.display.fitNote}</p>
     {/if}
   {:else}
-    <p class="unavailable" role="status">{m.caged_tuning_unavailable()}</p>
+    <div class="unsupported">
+      <p role="status">{caged.display.unsupportedNotice}</p>
+      <div class="actions">
+        <button type="button" onclick={viewInStandard}>{m.caged_view_in_standard()}</button>
+        <button type="button" onclick={() => openTriadsFromCaged()}>{m.caged_go_to_triads()}</button
+        >
+      </div>
+    </div>
   {/if}
 </section>
 
@@ -89,10 +104,31 @@
     padding-inline: var(--space-4);
   }
 
-  .unavailable {
+  .unsupported {
     margin: var(--space-3) 0 0;
     padding-inline: var(--space-4);
-    color: var(--color-text-muted);
+    color: var(--color-text);
+  }
+
+  .unsupported p {
+    margin: 0 0 var(--space-3);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .actions button {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-inline: var(--space-4);
+    font: inherit;
+  }
+
+  h2:focus {
+    outline: none;
   }
 
   .d {

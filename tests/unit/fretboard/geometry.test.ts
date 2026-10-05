@@ -547,3 +547,22 @@ describe('layout invariants table (US5)', () => {
     }
   }
 });
+
+describe('layoutFretboard label column with string marks (slice 015)', () => {
+  const plain = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 0, 'interactive');
+  const marked = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 0, 'interactive', true);
+
+  it('uses --fb-label-col-marked width only when marks exist', () => {
+    expect(plain.columns[0].start).toBe(DEFAULT_METRICS.labelCol);
+    expect(marked.columns[0].start).toBe(DEFAULT_METRICS.labelColMarked);
+    expect(marked.labelCenter).toBe(DEFAULT_METRICS.labelColMarked / 2);
+    expect(DEFAULT_METRICS.labelColMarked).toBeGreaterThan(DEFAULT_METRICS.labelCol);
+  });
+
+  it('mirrors the wider column for left-handed boards', () => {
+    const left = withPresentation(STANDARD_GUITAR, 'left', 'highest-top');
+    const l = layoutFretboard(left, DEFAULT_METRICS, 0, 'interactive', true);
+    expect(l.labelCenter).toBe(l.width - DEFAULT_METRICS.labelColMarked / 2);
+    expect(l.board).toEqual({ start: 0, end: l.width - DEFAULT_METRICS.labelColMarked });
+  });
+});

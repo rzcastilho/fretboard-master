@@ -43,6 +43,11 @@ export async function openTriadsFromNote(pc: PitchClass): Promise<void> {
   await goto(resolve('/triads'));
 }
 
+/** CAGED non-compatible notice "Go to Triads": no musical context carried, preferred tuning kept. */
+export async function openTriadsFromCaged(): Promise<void> {
+  await goto(resolve('/triads'));
+}
+
 /** Reset the given tool's store (failure-view Reset tool, EC-1.3). */
 export function resetTool(tool: LinkedTool): void {
   if (tool === 'notes') notes.reset();

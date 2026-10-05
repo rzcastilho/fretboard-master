@@ -1,11 +1,13 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
+  import { caged } from '$lib/state/caged.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { rememberOpener } from './instrument-opener';
   import { isStandard } from '$lib/instrument/tunings';
   import { tuningLabel } from './tuning-names';
 
   const name = $derived(tuningLabel(instrument.active.tuning));
+  const temporaryName = $derived(caged.temporaryName);
 
   function open(event: MouseEvent): void {
     rememberOpener(event.currentTarget as HTMLElement);
@@ -13,7 +15,14 @@
   }
 </script>
 
-{#if !isStandard(instrument.active.tuning)}
+{#if temporaryName !== null}
+  <button
+    type="button"
+    class="tuning-badge"
+    aria-label={m.caged_temporary_badge_label({ name: temporaryName })}
+    onclick={open}>{m.caged_temporary_badge({ name: temporaryName })}</button
+  >
+{:else if !isStandard(instrument.active.tuning)}
   <button
     type="button"
     class="tuning-badge"

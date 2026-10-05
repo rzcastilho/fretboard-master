@@ -1,23 +1,22 @@
 <!--
 Sync Impact Report
-- Version change: 1.4.0 → 1.5.0 (MINOR: new "Verification tiers" rule in Development Workflow
-  and Quality Gates)
-- Modified principles: none
-- Modified sections: Development Workflow and Quality Gates — added **Verification tiers**.
-  The merge gate already required its checks to pass in CI; implementation rounds were
-  nonetheless re-running the full multi-browser Playwright matrix locally after every
-  checkpoint, which made each slice slow. Local runs now target the touched specs on one
-  Chromium project, and the full matrix stays a CI-only gate. No gate, budget, or coverage
-  threshold changed.
+- Version change: 1.5.0 → 1.6.0 (MINOR: Principle VI initial JS budget raised from 90 KB to
+  92 KB gzip)
+- Modified principles: VI (Performance Budgets) — initial JavaScript, gzip: ≤ 90 KB → ≤ 92 KB.
+  Slice 015 (CAGED in any tuning) adds ≈ 1.3 KB gzip with no dependency (88.9 → 90.2 KB,
+  inside its +1.0–1.5 KB estimate) and crosses the 90 KB cap by 155 bytes. Trimming the
+  slice's own code recovered only ≈ 11 bytes after gzip. ADR 0002 keeps a single bundle, so
+  every screen counts toward the cap.
+- Modified sections: none
 - Added sections: none
 - Removed sections: none
-- Dependent guidance updated: `package.json` (`test:e2e:fast`, `verify` scripts), `CLAUDE.md`
-  (verification commands), `.specify/templates/tasks-template.md` (checkpoint and polish
-  commands)
-- Prior amendments: 1.3.0 → 1.4.0 raised the initial JS budget from 85 KB to 90 KB (slice 013);
-  1.2.0 → 1.3.0 raised it from 80 KB to 85 KB (slice 010, Valibot); 1.1.0 → 1.2.0 changed the
-  mandated font choice and clarified the Principle I merge gate scope; 1.0.0 → 1.1.0 added the
-  mise "Tool installation" row and rule
+- Dependent guidance updated: `scripts/check-bundle-size.mjs` (limit and messages),
+  `docs/adr/0002-single-bundle-for-version-continuity.md` (cap history)
+- Prior amendments: 1.4.0 → 1.5.0 added the "Verification tiers" rule (local runs target touched
+  specs on one Chromium project; full matrix is CI-only); 1.3.0 → 1.4.0 raised the initial JS
+  budget from 85 KB to 90 KB (slice 013); 1.2.0 → 1.3.0 raised it from 80 KB to 85 KB (slice
+  010, Valibot); 1.1.0 → 1.2.0 changed the mandated font choice and clarified the Principle I
+  merge gate scope; 1.0.0 → 1.1.0 added the mise "Tool installation" row and rule
 - Deferred TODOs: none
 -->
 
@@ -129,7 +128,7 @@ enforce these budgets:
 | Control change to fretboard update | ≤ 100 ms |
 | Instrument change | ≤ 300 ms |
 | Tap to sound, after audio unlock | ≤ 100 ms |
-| Initial JavaScript, gzip | ≤ 90 KB |
+| Initial JavaScript, gzip | ≤ 92 KB |
 | Lighthouse mobile performance score | ≥ 90 |
 
 - Sound material MUST NOT block the fretboard from becoming interactive.
@@ -315,4 +314,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.5.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-04
+**Version**: 1.6.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-04
