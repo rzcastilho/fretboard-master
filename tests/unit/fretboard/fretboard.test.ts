@@ -8,6 +8,7 @@ import {
   rowOf,
   screenOrder
 } from '../../../src/lib/fretboard/geometry';
+import { centerScrollTarget } from '../../../src/lib/fretboard/interaction';
 import Fretboard from '../../../src/lib/fretboard/Fretboard.svelte';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
 import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
@@ -843,6 +844,114 @@ describe('Fretboard region band (US3)', () => {
       else delete (proto as unknown as Record<string, unknown>).clientWidth;
       delete (proto as unknown as Record<string, unknown>).scrollLeft;
     }
+  });
+});
+
+describe('Fretboard centred region (016 US1)', () => {
+  const model = (region?: { start: number; end: number; align?: 'center' }): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    ...(region ? { region } : {})
+  });
+
+  async function lastWrite(first: DisplayModel | undefined, next: DisplayModel) {
+    const writes: number[] = [];
+    const proto = HTMLElement.prototype;
+    const widthDesc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => 286 });
+    Object.defineProperty(proto, 'scrollLeft', {
+      configurable: true,
+      get(this: HTMLElement & { __sl?: number }) {
+        return this.__sl ?? 0;
+      },
+      set(this: HTMLElement & { __sl?: number }, v: number) {
+        this.__sl = v;
+        writes.push(v);
+      }
+    });
+    try {
+      const view = render(Fretboard, { instrument: STANDARD_GUITAR, model: first ?? model() });
+      await tick();
+      await view.rerender({ instrument: STANDARD_GUITAR, model: next });
+      await tick();
+      return { writes, bands: view.container.querySelectorAll('.region-band').length };
+    } finally {
+      if (widthDesc) Object.defineProperty(proto, 'clientWidth', widthDesc);
+      else delete (proto as unknown as Record<string, unknown>).clientWidth;
+      delete (proto as unknown as Record<string, unknown>).scrollLeft;
+    }
+  }
+
+  it("align 'center' renders the band and scrolls to the centring target (instant here: no token)", async () => {
+    const { writes, bands } = await lastWrite(
+      model(),
+      model({ start: 8, end: 10, align: 'center' })
+    );
+    expect(bands).toBe(1);
+    const layout = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 286, 'interactive');
+    const expected = centerScrollTarget(layout, 8, 10, { scrollLeft: 0, width: 286 });
+    expect(expected).not.toBeNull();
+    expect(writes.at(-1)).toBeCloseTo(expected as number, 0);
+  });
+
+  it('a region without align keeps the minimal-move scroll', async () => {
+    const centred = await lastWrite(model(), model({ start: 8, end: 10, align: 'center' }));
+    const plain = await lastWrite(model(), model({ start: 8, end: 10 }));
+    expect(plain.writes.at(-1)).not.toBe(centred.writes.at(-1));
+  });
+
+  it('leaving focus (no region) draws no band and does not scroll', async () => {
+    const { writes, bands } = await lastWrite(
+      model({ start: 8, end: 10, align: 'center' }),
+      model()
+    );
+    expect(bands).toBe(0);
+    expect(writes).toHaveLength(0);
+  });
+
+  it('reads --duration-medium for the centred scroll', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(src).toMatch(/tokenDuration\(root, '--duration-medium'\)/);
+  });
+});
+
+describe('Fretboard connection ring (016 US2)', () => {
+  it('Marker.ring draws an aria-hidden circle.connection-ring inside the marker group', () => {
+    const { container } = show([
+      mk({ string: 4, fret: 10, function: 'root', emphasis: 'highlighted', ring: true })
+    ]);
+    const group = container.querySelector('.marker[data-key="4:10"]');
+    const ring = group?.querySelector('circle.connection-ring');
+    expect(ring).toBeTruthy();
+    expect(ring?.closest('.marker')).toBe(group);
+    expect(ring?.closest('[aria-hidden="true"]')).toBeTruthy();
+  });
+
+  it('draws the ring for every marker function', () => {
+    const { container } = show(
+      (['root', 'third', 'fifth', 'degree', 'neutral'] as const).map((fn, i) =>
+        mk({ string: i + 1, fret: 3, function: fn, ring: true })
+      )
+    );
+    expect(container.querySelectorAll('.marker circle.connection-ring')).toHaveLength(5);
+  });
+
+  it('markers without ring render exactly as before', () => {
+    const { container } = show([
+      mk({ string: 2, fret: 1 }),
+      mk({ string: 3, fret: 1, ring: false })
+    ]);
+    expect(container.querySelectorAll('.connection-ring')).toHaveLength(0);
+  });
+
+  it('is styled from the ring tokens and never animates', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    const rule = /\.connection-ring\s*\{([^}]*)\}/.exec(src)?.[1] ?? '';
+    expect(rule).toMatch(/var\(--connection-ring\)/);
+    expect(rule).toMatch(/var\(--connection-ring-width\)/);
+    expect(src).toMatch(/var\(--connection-ring-gap\)/);
+    expect(rule).not.toMatch(/animation|transition/);
+    expect(rule).toMatch(/fill:\s*none/);
   });
 });
 

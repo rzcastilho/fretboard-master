@@ -8,11 +8,18 @@ vi.mock('../../../src/lib/state/links.svelte', async (orig) => ({
   openTriadsFromCaged
 }));
 
-import { AF_1_12, AF_8 } from '../../../src/lib/instrument/fixtures';
+import { AF_1_12, AF_1_24, AF_8 } from '../../../src/lib/instrument/fixtures';
+import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
 import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
+import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
+import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import CagedTool from '../../../src/lib/tools/caged/CagedTool.svelte';
 
-beforeEach(() => resetCagedForTests());
+beforeEach(() => {
+  resetPreferencesForTests();
+  resetCagedForTests();
+  resetInstrumentForTests();
+});
 
 describe('CagedTool', () => {
   it('shows the key heading and the fretboard with the CAGED model', () => {
@@ -38,11 +45,12 @@ describe('CagedTool', () => {
       expect(screen.queryByRole('radio', { name })).toBeNull();
       expect(screen.queryByRole('checkbox', { name })).toBeNull();
     }
-    // The only button on the board is the description toggle; tags are not buttons.
+    // Board buttons: the nine toggle tags, then the description toggle.
     const buttons = within(screen.getByRole('region', { name: 'Fretboard' })).queryAllByRole(
       'button'
     );
-    expect(buttons.map((b) => b.textContent?.trim())).toEqual(['Show text description']);
+    expect(buttons.filter((b) => b.hasAttribute('aria-pressed'))).toHaveLength(9);
+    expect(buttons.map((b) => b.textContent?.trim()).at(-1)).toBe('Show text description');
   });
 
   describe('key selection (US2)', () => {
@@ -175,5 +183,295 @@ describe('CagedTool', () => {
       expect(caged.state.rootPc).toBe(0);
       expect(screen.getByText('C major')).toBeTruthy();
     });
+  });
+
+  describe('shape focus (016 US1)', () => {
+    const board = () => screen.getByRole('region', { name: 'Fretboard' });
+    const tagButtons = () =>
+      within(board())
+        .getAllByRole('button')
+        .filter((b) => b.hasAttribute('aria-pressed'));
+    const shapeGroup = () => screen.getByRole('radiogroup', { name: 'Shape' });
+
+    it('tags are toggle buttons named by their text, in neck order', () => {
+      render(CagedTool);
+      const tags = tagButtons();
+      expect(tags).toHaveLength(9);
+      expect(tags[0].getAttribute('aria-label')).toBe('C shape · roots on strings 5, 2');
+      expect(tags[3].getAttribute('aria-label')).toBe('E shape · roots on strings 6, 4, 1');
+      expect(tags.every((t) => t.getAttribute('aria-pressed') === 'false')).toBe(true);
+    });
+
+    it('offers C A G E D then See all; See all is checked with no focus', () => {
+      render(CagedTool);
+      const radios = within(shapeGroup()).getAllByRole('radio');
+      expect(radios.map((r) => r.textContent?.trim())).toEqual([
+        'C',
+        'A',
+        'G',
+        'E',
+        'D',
+        'See all'
+      ]);
+      expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual([
+        'false',
+        'false',
+        'false',
+        'false',
+        'false',
+        'true'
+      ]);
+    });
+
+    it('tag activation and selector choice show the same state', async () => {
+      render(CagedTool);
+      await fireEvent.click(tagButtons()[3]);
+      await tick();
+      expect(tagButtons()[3].getAttribute('aria-pressed')).toBe('true');
+      expect(
+        within(shapeGroup()).getByRole('radio', { name: 'E' }).getAttribute('aria-checked')
+      ).toBe('true');
+      // Second press leaves focus.
+      await fireEvent.click(tagButtons()[3]);
+      await tick();
+      expect(
+        within(shapeGroup()).getByRole('radio', { name: 'See all' }).getAttribute('aria-checked')
+      ).toBe('true');
+
+      await fireEvent.click(within(shapeGroup()).getByRole('radio', { name: 'G' }));
+      await tick();
+      expect(tagButtons()[2].getAttribute('aria-pressed')).toBe('true');
+      expect(tagButtons().filter((t) => t.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
+      await fireEvent.click(within(shapeGroup()).getByRole('radio', { name: 'See all' }));
+      await tick();
+      expect(tagButtons().every((t) => t.getAttribute('aria-pressed') === 'false')).toBe(true);
+    });
+
+    it('undrawn letters are aria-disabled (12 frets omits D)', () => {
+      caged.useInstrument(AF_1_12);
+      render(CagedTool);
+      const d = within(shapeGroup()).getByRole('radio', { name: 'D' });
+      expect(d.getAttribute('aria-disabled')).toBe('true');
+      expect(
+        within(shapeGroup()).getByRole('radio', { name: 'E' }).getAttribute('aria-disabled')
+      ).toBeNull();
+    });
+
+    it('the whole group is aria-disabled for a non-compatible tuning', () => {
+      caged.useInstrument(AF_8, 'Open G');
+      render(CagedTool);
+      expect(shapeGroup().getAttribute('aria-disabled')).toBe('true');
+    });
+
+    it('shows the adjusted notice when adjustedIn is caged', async () => {
+      caged.chooseShape('A');
+      caged.toggleTag('A@15');
+      render(CagedTool);
+      expect(screen.queryByText('We adjusted the view to the new instrument')).toBeNull();
+      instrument.open();
+      instrument.setFrets(12);
+      instrument.confirm('caged');
+      await tick();
+      expect(instrument.adjustedIn).toBe('caged');
+      expect(screen.getByText('We adjusted the view to the new instrument')).toBeTruthy();
+    });
+  });
+  describe('step buttons (016 US2)', () => {
+    const prev = () => screen.getByRole('button', { name: 'Previous shape' });
+    const next = () => screen.getByRole('button', { name: 'Next shape' });
+    const disabled = (b: HTMLElement) => b.getAttribute('aria-disabled') === 'true';
+
+    it('are always rendered, Previous first, and in the tab order', () => {
+      render(CagedTool);
+      const all = screen.getAllByRole('button');
+      expect(all.indexOf(prev())).toBeGreaterThanOrEqual(0);
+      expect(all.indexOf(next())).toBe(all.indexOf(prev()) + 1);
+      expect(prev().getAttribute('tabindex')).not.toBe('-1');
+      expect(next().getAttribute('tabindex')).not.toBe('-1');
+      expect(prev().hasAttribute('disabled')).toBe(false);
+    });
+
+    it('both aria-disabled with no focus', () => {
+      render(CagedTool);
+      expect(disabled(prev())).toBe(true);
+      expect(disabled(next())).toBe(true);
+    });
+
+    it('both aria-disabled for a non-compatible tuning', () => {
+      caged.useInstrument(AF_8, 'Open G');
+      render(CagedTool);
+      expect(disabled(prev())).toBe(true);
+      expect(disabled(next())).toBe(true);
+    });
+
+    it.each([
+      ['12 frets', AF_1_12],
+      ['22 frets', undefined],
+      ['24 frets', AF_1_24]
+    ])('Previous is disabled at index 0 and Next at the last index (%s)', async (_n, inst) => {
+      if (inst) caged.useInstrument(inst);
+      render(CagedTool);
+      const occs = caged.display.occurrences;
+      const id = (i: number) => `${occs[i].shape.id}@${occs[i].start}`;
+      caged.toggleTag(id(0));
+      await tick();
+      expect(disabled(prev())).toBe(true);
+      expect(disabled(next())).toBe(false);
+      caged.toggleTag(id(occs.length - 1));
+      await tick();
+      expect(disabled(prev())).toBe(false);
+      expect(disabled(next())).toBe(true);
+    });
+
+    it('labels never flip for left-handed or orientation', async () => {
+      caged.applyInstrument(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'), 'Standard');
+      render(CagedTool);
+      const all = screen.getAllByRole('button');
+      expect(all.indexOf(next())).toBe(all.indexOf(prev()) + 1);
+    });
+
+    it('activating a disabled button does nothing', async () => {
+      render(CagedTool);
+      await fireEvent.click(next());
+      expect(caged.state.focus).toBeNull();
+    });
+
+    it('pressing Next moves the focus and shows the ring for the window', async () => {
+      vi.useFakeTimers();
+      try {
+        caged.chooseShape('E');
+        const { container } = render(CagedTool);
+        await fireEvent.click(next());
+        await tick();
+        expect(caged.display.focused?.shape.id).toBe('D');
+        expect(container.querySelector('.marker[data-key="4:10"] .connection-ring')).toBeTruthy();
+        vi.advanceTimersByTime(500);
+        await tick();
+        expect(container.querySelector('.connection-ring')).toBeNull();
+        await fireEvent.click(prev());
+        await tick();
+        expect(caged.display.focused?.shape.id).toBe('E');
+        expect(container.querySelector('.connection-ring')).toBeTruthy();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
+describe('CagedTool: Show connections (016 US3)', () => {
+  const sw = () => screen.getByRole('switch', { name: 'Show connections' });
+
+  it('renders an off-by-default switch before Reset tool', () => {
+    render(CagedTool);
+    expect(sw().getAttribute('aria-checked')).toBe('false');
+    const reset = screen.getByRole('button', { name: 'Reset tool' });
+    expect(sw().compareDocumentPosition(reset) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sw().nextElementSibling).toBe(reset);
+  });
+
+  it('toggles on click, rings markers, and shows a visible position', async () => {
+    const { container } = render(CagedTool);
+    expect(container.querySelector('.connection-ring')).toBeNull();
+    await fireEvent.click(sw());
+    await tick();
+    expect(sw().getAttribute('aria-checked')).toBe('true');
+    expect(container.querySelectorAll('.connection-ring').length).toBe(
+      caged.display.connections.length
+    );
+    // Position shown by text, not color alone.
+    expect(sw().querySelector('.track')).toBeTruthy();
+    expect(sw().textContent).toMatch(/On/i);
+    await fireEvent.click(sw());
+    await tick();
+    expect(sw().textContent).toMatch(/Off/i);
+  });
+
+  it('is aria-disabled with its value kept for a non-compatible tuning', async () => {
+    caged.setConnections(true);
+    caged.applyInstrument(AF_8, 'Open');
+    render(CagedTool);
+    expect(sw().getAttribute('aria-disabled')).toBe('true');
+    expect(sw().getAttribute('aria-checked')).toBe('true');
+    await fireEvent.click(sw());
+    expect(caged.state.connections).toBe(true);
+  });
+
+  it('Reset tool turns it off', async () => {
+    render(CagedTool);
+    await fireEvent.click(sw());
+    await fireEvent.click(screen.getByRole('button', { name: 'Reset tool' }));
+    await tick();
+    expect(sw().getAttribute('aria-checked')).toBe('false');
+  });
+});
+
+describe('CagedTool: rotate hint (016 US4)', () => {
+  const HINT = 'Turn your phone sideways to see more of the neck.';
+  const viewport = (w: number, h: number) => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: h });
+  };
+  const resize = async (w: number, h: number) => {
+    viewport(w, h);
+    await fireEvent(window, new Event('resize'));
+    await tick();
+  };
+
+  it('shows on a portrait phone with nothing recorded, and records it', async () => {
+    viewport(390, 844);
+    render(CagedTool);
+    await tick();
+    expect(screen.getByText(HINT)).toBeTruthy();
+    expect(preferences.rotateHintShown).toBe(true);
+  });
+
+  it('is non-modal and dismissible', async () => {
+    viewport(390, 844);
+    render(CagedTool);
+    await tick();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const notice = screen.getByText(HINT).closest('.notice') as HTMLElement;
+    await fireEvent.click(within(notice).getByRole('button', { name: 'Dismiss' }));
+    await tick();
+    expect(screen.queryByText(HINT)).toBeNull();
+  });
+
+  it('hides on rotation to landscape and does not return', async () => {
+    viewport(390, 844);
+    render(CagedTool);
+    await tick();
+    await resize(844, 390);
+    expect(screen.queryByText(HINT)).toBeNull();
+    await resize(390, 844);
+    expect(screen.queryByText(HINT)).toBeNull();
+  });
+
+  it('hides on unmount', async () => {
+    viewport(390, 844);
+    const { unmount } = render(CagedTool);
+    await tick();
+    unmount();
+    expect(screen.queryByText(HINT)).toBeNull();
+  });
+
+  it('does not show once recorded', async () => {
+    viewport(390, 844);
+    preferences.markRotateHintShown();
+    render(CagedTool);
+    await tick();
+    expect(screen.queryByText(HINT)).toBeNull();
+  });
+
+  it.each([
+    ['tablet', 768, 1024],
+    ['desktop', 1280, 800],
+    ['landscape phone', 844, 390]
+  ])('never shows or records on %s', async (_n, w, h) => {
+    viewport(w, h);
+    render(CagedTool);
+    await tick();
+    expect(screen.queryByText(HINT)).toBeNull();
+    expect(preferences.rotateHintShown).toBe(false);
   });
 });

@@ -208,3 +208,47 @@ export function cagedOccurrences(
 export function fitCount(occ: readonly ShapeOccurrence[]): number {
   return new Set(occ.map((o) => o.shape.id)).size;
 }
+
+export interface CagedConnection {
+  /** 1…6 (never 7; never an altered string 6). */
+  readonly string: number;
+  readonly fret: number;
+  readonly degree: CagedDegree;
+  /** Occurrence indices (into the sorted list) of each adjacent pair sharing this position. */
+  readonly pairs: readonly (readonly [lower: number, upper: number])[];
+}
+
+/** Notes an occurrence really draws: a synthesized altered string-6 note is not one. */
+function realNotes(o: ShapeOccurrence): readonly OccurrenceNote[] {
+  return o.alteredString ? o.notes.filter((n) => n.string !== 6) : o.notes;
+}
+
+/** Positions (string, fret) drawn by both occurrences, in `a`'s note order. */
+export function sharedPositions(a: ShapeOccurrence, b: ShapeOccurrence): readonly OccurrenceNote[] {
+  const inB = new Set(realNotes(b).map((n) => `${n.string}:${n.fret}`));
+  return realNotes(a).filter((n) => inB.has(`${n.string}:${n.fret}`));
+}
+
+/**
+ * Positions shared by each adjacent pair of occurrences (FR-009), sorted by fret then string
+ * descending. `[]` for fewer than two occurrences.
+ */
+export function cagedConnections(occs: readonly ShapeOccurrence[]): readonly CagedConnection[] {
+  const byKey = new Map<string, { note: OccurrenceNote; pairs: [number, number][] }>();
+  for (let i = 0; i < occs.length - 1; i++) {
+    for (const note of sharedPositions(occs[i], occs[i + 1])) {
+      const key = `${note.string}:${note.fret}`;
+      const hit = byKey.get(key);
+      if (hit) hit.pairs.push([i, i + 1]);
+      else byKey.set(key, { note, pairs: [[i, i + 1]] });
+    }
+  }
+  return [...byKey.values()]
+    .sort((x, y) => x.note.fret - y.note.fret || y.note.string - x.note.string)
+    .map(({ note, pairs }) => ({
+      string: note.string,
+      fret: note.fret,
+      degree: note.degree,
+      pairs
+    }));
+}

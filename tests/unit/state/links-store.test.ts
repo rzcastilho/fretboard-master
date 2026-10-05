@@ -266,7 +266,13 @@ describe('caged is outside the links (US6)', () => {
     triads.setQuality('minor');
     const triadsBefore = triads.state;
     resetTool('caged');
-    expect(caged.state).toEqual({ rootPc: 0, spellingOverride: 'none', quality: 'major' });
+    expect(caged.state).toEqual({
+      rootPc: 0,
+      spellingOverride: 'none',
+      quality: 'major',
+      focus: null,
+      connections: false
+    });
     expect(triads.state).toBe(triadsBefore);
   });
 });

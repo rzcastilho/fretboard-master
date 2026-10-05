@@ -8,12 +8,13 @@ import {
 import type { DisplayModel } from '../../../src/lib/fretboard/types';
 import {
   buildCagedModel as build,
+  cagedOccurrencesFor,
   cagedTagText,
   type CagedContext
 } from '../../../src/lib/state/caged-model';
 import { cagedOccurrences } from '../../../src/lib/theory/caged';
 import { pitchOfSpelling } from '../../../src/lib/theory/pitch';
-import { initialCagedView, selectRoot } from '../../../src/lib/state/caged-view';
+import { initialCagedView, selectRoot, setFocus } from '../../../src/lib/state/caged-view';
 
 const view = initialCagedView();
 const CTX: CagedContext = { tuningName: 'Standard', temporary: false };
@@ -58,9 +59,9 @@ describe('buildCagedModel: C major, standard, 22 frets', () => {
     expect(model.tags.slice(5).map((t) => t.start)).toEqual([12, 15, 17, 20]);
   });
 
-  it('is interval-labelled with non-interactive tags', () => {
+  it('is interval-labelled with interactive tags', () => {
     expect(model.labelMode).toBe('interval');
-    expect(model.tagsInteractive).toBe(false);
+    expect(model.tagsInteractive).toBe(true);
   });
 
   it('has one marker per string:fret, normal emphasis', () => {
@@ -135,13 +136,14 @@ describe('buildCagedModel variants', () => {
   });
 
   it('uses sharp or flat spelling of the root', () => {
-    const d = buildCagedModel({ rootPc: 1, spellingOverride: 'none', quality: 'major' }, AF_4);
+    const d = buildCagedModel({ ...initialCagedView(), rootPc: 1 }, AF_4);
     expect(d.keyName).toBe('D♭ major');
   });
 });
 
 describe('buildCagedModel: key choice (US2)', () => {
   const at = (rootPc: number, spellingOverride: 'none' | 'sharp' | 'flat' = 'none') => ({
+    ...initialCagedView(),
     rootPc,
     spellingOverride,
     quality: 'major' as const
@@ -197,6 +199,7 @@ describe('buildCagedModel: key choice (US2)', () => {
 
 describe('buildCagedModel: minor quality (US3)', () => {
   const minor = (rootPc: number) => ({
+    ...initialCagedView(),
     rootPc,
     spellingOverride: 'none' as const,
     quality: 'minor' as const
@@ -306,7 +309,7 @@ describe('other tunings (US5)', () => {
 describe('buildCagedModel: tuning context (slice 015, M7, M8)', () => {
   it('M8: description starts with the tuning sentence; no altered sentence for Standard', () => {
     const d = shown(buildCagedModel(view, STANDARD_GUITAR));
-    expect(d.description.startsWith('Tuning: Standard. ')).toBe(true);
+    expect(d.description.startsWith('All shapes. Tuning: Standard. ')).toBe(true);
     expect(d.description).not.toContain('is altered');
   });
 
@@ -320,7 +323,9 @@ describe('buildCagedModel: tuning context (slice 015, M7, M8)', () => {
   it('M7: temporary uses the temporary sentence and names the tuning', () => {
     const d = buildCagedModel(view, AF_21, { tuningName: '7-string standard', temporary: true });
     expect(d.temporaryName).toBe('7-string standard');
-    expect(shown(d).description.startsWith('Temporary tuning: 7-string standard. ')).toBe(true);
+    expect(
+      shown(d).description.startsWith('All shapes. Temporary tuning: 7-string standard. ')
+    ).toBe(true);
   });
 });
 
@@ -366,7 +371,9 @@ describe('buildCagedModel: altered lowest string (slice 015 US3)', () => {
   });
 
   it('M8: the altered sentence follows the tuning sentence, only when altered', () => {
-    expect(model.description.startsWith('Tuning: Drop D. String 6 is altered')).toBe(true);
+    expect(model.description.startsWith('All shapes. Tuning: Drop D. String 6 is altered')).toBe(
+      true
+    );
     expect(shown(buildCagedModel(view, STANDARD_GUITAR)).description).not.toContain('is altered');
   });
 
@@ -418,7 +425,9 @@ describe('buildCagedModel: non-compatible tunings (slice 015 US1)', () => {
     const d = buildCagedModel(view, AF_21, { tuningName: '7-string standard', temporary: true });
     expect(d.temporaryName).toBe('7-string standard');
     expect(d.unsupportedNotice).toBeNull();
-    expect(d.model?.description?.startsWith('Temporary tuning: 7-string standard.')).toBe(true);
+    expect(
+      d.model?.description?.startsWith('All shapes. Temporary tuning: 7-string standard.')
+    ).toBe(true);
   });
 });
 
@@ -481,5 +490,219 @@ describe('buildCagedModel: transposed compatible tunings (slice 015 US2)', () =>
     );
     expect([...names].sort()).toEqual(['B-1', 'D-1', 'G-1']);
     expect(d.model?.stringMarks).toBeUndefined();
+  });
+});
+
+describe('buildCagedModel: shape focus (US1)', () => {
+  const focusE = setFocus(view, { letter: 'E', ordinal: 0 });
+
+  it('cagedOccurrencesFor is sorted by start', () => {
+    const occs = cagedOccurrencesFor(view, STANDARD_GUITAR);
+    expect(occs.map((o) => o.start)).toEqual([...occs.map((o) => o.start)].sort((a, b) => a - b));
+    expect(cagedOccurrencesFor(view, STANDARD_GUITAR)).toHaveLength(9);
+  });
+
+  it('no focus: every marker normal, no region, nothing pressed, steps off', () => {
+    const d = buildCagedModel(view, STANDARD_GUITAR);
+    const model = shown(d);
+    expect(model.markers.every((mk) => mk.emphasis === 'normal')).toBe(true);
+    expect(model.region).toBeUndefined();
+    expect(model.tags.every((t) => !t.pressed)).toBe(true);
+    expect(model.tagsInteractive).toBe(true);
+    expect(d.focusIndex).toBeNull();
+    expect(d.focused).toBeNull();
+    expect(d.steps).toEqual({ previous: false, next: false });
+    expect(model.description.startsWith('All shapes.')).toBe(true);
+  });
+
+  it('focus: focused notes highlighted (shared too), others dimmed, band centred, tag pressed', () => {
+    const d = buildCagedModel(focusE, STANDARD_GUITAR);
+    const model = shown(d);
+    const focused = d.focused;
+    if (!focused || d.focusIndex === null) throw new Error('expected focus');
+    expect(focused.shape.id).toBe('E');
+    const ids = new Set(focused.notes.map((n) => `${n.string}:${n.fret}`));
+    for (const mk of model.markers) {
+      expect(mk.emphasis).toBe(ids.has(`${mk.string}:${mk.fret}`) ? 'highlighted' : 'dimmed');
+    }
+    expect(model.markers.filter((mk) => mk.emphasis === 'highlighted')).toHaveLength(ids.size);
+    expect(model.region).toEqual({ start: 8, end: 10, align: 'center' });
+    expect(model.tags.map((t) => t.pressed)).toEqual(model.tags.map((_, i) => i === d.focusIndex));
+    expect(model.tags[d.focusIndex].id).toBe('E@8');
+    expect(d.steps).toEqual({ previous: true, next: true });
+    expect(model.description.startsWith('E shape in focus, frets 8 to 10. ')).toBe(true);
+  });
+
+  it('first and last occurrence disable one step', () => {
+    const first = buildCagedModel(setFocus(view, { letter: 'C', ordinal: 0 }), STANDARD_GUITAR);
+    expect(first.steps).toEqual({ previous: false, next: true });
+    const last = buildCagedModel(setFocus(view, { letter: 'E', ordinal: 1 }), STANDARD_GUITAR);
+    expect(last.steps).toEqual({ previous: true, next: false });
+  });
+
+  it('drawnLetters on 12 frets omits D', () => {
+    const d = buildCagedModel(view, AF_1_12);
+    expect([...d.drawnLetters].sort()).toEqual(['A', 'C', 'E', 'G']);
+  });
+
+  it('non-compatible tuning: no focus fields', () => {
+    const d = buildCagedModel(focusE, AF_8);
+    expect(d.model).toBeNull();
+    expect(d.focusIndex).toBeNull();
+    expect(d.steps).toEqual({ previous: false, next: false });
+    expect(d.drawnLetters.size).toBe(0);
+    expect(d.connections).toEqual([]);
+  });
+});
+
+describe('buildCagedModel: step transition (016 US2)', () => {
+  const eFocus = setFocus(view, { letter: 'E', ordinal: 0 });
+  const find = (d: ReturnType<typeof buildCagedModel>, key: string) =>
+    d.model?.markers.find((mk) => mk.id === key);
+
+  it('rings and highlights transition positions even with connections off', () => {
+    const d = build(eFocus, STANDARD_GUITAR, CTX, { positions: ['4:10'] });
+    expect(view.connections).toBe(false);
+    const ringed = find(d, '4:10');
+    expect(ringed?.ring).toBe(true);
+    expect(ringed?.emphasis).toBe('highlighted');
+  });
+
+  it('keeps focus-driven emphasis for every other position and rings only the transition', () => {
+    const d = build(eFocus, STANDARD_GUITAR, CTX, { positions: ['4:10'] });
+    const others = (d.model?.markers ?? []).filter((mk) => mk.id !== '4:10');
+    expect(others.length).toBeGreaterThan(0);
+    expect(others.every((mk) => mk.ring !== true)).toBe(true);
+    const plain = build(eFocus, STANDARD_GUITAR, CTX);
+    for (const mk of others) expect(mk.emphasis).toBe(find(plain, mk.id as string)?.emphasis);
+  });
+
+  it('a null or absent transition changes nothing', () => {
+    const plain = build(eFocus, STANDARD_GUITAR, CTX);
+    expect(build(eFocus, STANDARD_GUITAR, CTX, null).model).toEqual(plain.model);
+    expect(plain.model?.markers.some((mk) => mk.ring === true)).toBe(false);
+  });
+
+  it('a transition position outside the drawn markers is ignored', () => {
+    const plain = build(eFocus, STANDARD_GUITAR, CTX);
+    const d = build(eFocus, STANDARD_GUITAR, CTX, { positions: ['1:21'] });
+    expect(d.model?.markers).toEqual(plain.model?.markers);
+  });
+});
+
+describe('buildCagedModel: connections (016 US3)', () => {
+  const on = (v: typeof view) => ({ ...v, connections: true });
+  const ringed = (d: ReturnType<typeof buildCagedModel>) =>
+    new Set((d.model?.markers ?? []).filter((mk) => mk.ring === true).map((mk) => mk.id as string));
+  const keys = (list: readonly string[]) => new Set(list);
+
+  const C_MAJOR = keys([
+    '5:3',
+    '4:5',
+    '3:5',
+    '2:5',
+    '6:8',
+    '1:8',
+    '4:10',
+    '3:12',
+    '2:13',
+    '1:12',
+    // 22 frets: the same pairs again +12 for C@12→A@15→G@17→E@20 (contract §1)
+    '5:15',
+    '4:17',
+    '3:17',
+    '2:17',
+    '6:20',
+    '1:20'
+  ]);
+  const C_MINOR = keys([
+    '5:3',
+    '4:5',
+    '3:5',
+    '6:8',
+    '2:8',
+    '1:8',
+    '4:10',
+    '3:12',
+    '2:13',
+    '5:15',
+    '4:17',
+    '3:17',
+    '6:20',
+    '2:20',
+    '1:20'
+  ]);
+  const minor = { ...view, quality: 'minor' as const };
+
+  it('connections equal cagedConnections of the occurrences', () => {
+    const d = buildCagedModel(view, STANDARD_GUITAR);
+    expect(d.connections.length).toBeGreaterThan(0);
+    expect(new Set(d.connections.map((c) => `${c.string}:${c.fret}`))).toEqual(C_MAJOR);
+  });
+
+  it('TM-6.3: C major rings exactly the anchor table, with or without focus', () => {
+    expect(ringed(buildCagedModel(on(view), STANDARD_GUITAR))).toEqual(C_MAJOR);
+    const focused = setFocus(on(view), { letter: 'E', ordinal: 0 });
+    expect(ringed(buildCagedModel(focused, STANDARD_GUITAR))).toEqual(C_MAJOR);
+  });
+
+  it('TM-7.2: C minor rings exactly the anchor table', () => {
+    expect(ringed(buildCagedModel(on(minor), STANDARD_GUITAR))).toEqual(C_MINOR);
+  });
+
+  it('F# minor rings the C-minor pattern shifted by 6 frets modulo 12', () => {
+    const fsm = on(selectRoot(minor, 6));
+    const d = buildCagedModel(fsm, STANDARD_GUITAR);
+    expect(d.occurrences.length).toBeGreaterThanOrEqual(5);
+    const norm = (ids: Iterable<string>) =>
+      new Set([...ids].map((id) => `${id.split(':')[0]}:${Number(id.split(':')[1]) % 12}`));
+    const expected = norm(
+      [...C_MINOR].map((id) => {
+        const [s, f] = id.split(':').map(Number);
+        return `${s}:${(f + 6) % 12}`;
+      })
+    );
+    expect(norm(ringed(d))).toEqual(expected);
+  });
+
+  it('off: no ring outside a transition', () => {
+    expect(ringed(buildCagedModel(view, STANDARD_GUITAR)).size).toBe(0);
+  });
+
+  it('rings follow focus emphasis: highlighted inside the focus, dimmed elsewhere', () => {
+    const focused = setFocus(on(view), { letter: 'E', ordinal: 0 });
+    const d = buildCagedModel(focused, STANDARD_GUITAR);
+    const inFocus = new Set(d.focused?.notes.map((n) => `${n.string}:${n.fret}`));
+    const rings = (d.model?.markers ?? []).filter((mk) => mk.ring === true);
+    expect(rings.some((mk) => inFocus.has(mk.id as string))).toBe(true);
+    expect(rings.some((mk) => !inFocus.has(mk.id as string))).toBe(true);
+    for (const mk of rings) {
+      expect(mk.emphasis).toBe(inFocus.has(mk.id as string) ? 'highlighted' : 'dimmed');
+    }
+  });
+
+  it('partial fits ring only between adjacent drawn occurrences', () => {
+    const d = buildCagedModel(on(view), AF_1_12);
+    expect(d.occurrences.length).toBeLessThan(5);
+    const expected = new Set(d.connections.map((c) => `${c.string}:${c.fret}`));
+    expect(ringed(d)).toEqual(expected);
+    expect(ringed(d).size).toBeLessThan(C_MAJOR.size);
+  });
+
+  it('describes each ringed connection with both shape letters, after the existing sentences', () => {
+    const d = buildCagedModel(on(view), STANDARD_GUITAR);
+    const text = shown(d).description;
+    expect(text).toContain('String 4, fret 5, fifth, shared by A and G shapes.');
+    expect(text).toContain('String 4, fret 10, root, shared by E and D shapes.');
+    const sentences = text.match(/shared by/g) ?? [];
+    expect(sentences).toHaveLength(d.connections.length);
+    expect(text.indexOf('shared by')).toBeGreaterThan(text.indexOf('shape, frets'));
+    expect(shown(buildCagedModel(view, STANDARD_GUITAR)).description).not.toContain('shared by');
+  });
+
+  it('non-compatible tuning has no connections', () => {
+    const d = buildCagedModel(on(view), AF_8);
+    expect(d.connections).toEqual([]);
+    expect(d.model).toBeNull();
   });
 });

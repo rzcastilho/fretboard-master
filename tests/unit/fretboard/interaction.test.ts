@@ -7,6 +7,7 @@ import {
 import {
   DRAG_THRESHOLD_PX,
   autoScrollTarget,
+  centerScrollTarget,
   groupScrollTarget,
   moveFocus,
   nutOffset,
@@ -417,6 +418,50 @@ describe('fret-count change when mirrored (US5)', () => {
     expect(after.width).toBeGreaterThan(before.width);
     expect(after.width - after.columns[0].center).toBeCloseTo(
       before.width - before.columns[0].center
+    );
+  });
+});
+
+describe('centerScrollTarget', () => {
+  const width = 286;
+  const build = (inst = STANDARD_GUITAR) =>
+    layoutFretboard(inst, DEFAULT_METRICS, width, 'interactive');
+  const layout = build();
+  const maxScroll = layout.width - width;
+  const mid = (a: number, b: number) =>
+    (Math.min(layout.columns[a].start, layout.columns[b].start) +
+      Math.max(layout.columns[a].end, layout.columns[b].end)) /
+    2;
+
+  it('centres the band, clamped to the board', () => {
+    const target = centerScrollTarget(layout, 8, 10, { scrollLeft: 0, width });
+    expect(target).toBeCloseTo(Math.min(Math.max(mid(8, 10) - width / 2, 0), maxScroll));
+  });
+
+  it('clamps near the nut and the last fret', () => {
+    expect(centerScrollTarget(layout, 0, 3, { scrollLeft: 50, width })).toBe(0);
+    expect(centerScrollTarget(layout, 20, 22, { scrollLeft: 0, width })).toBeCloseTo(maxScroll);
+  });
+
+  it('is null when the board fits', () => {
+    const wide = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 5000, 'interactive');
+    expect(centerScrollTarget(wide, 8, 10, { scrollLeft: 0, width: 5000 })).toBeNull();
+  });
+
+  it('is null when already within 0.5 px of the target', () => {
+    const target = centerScrollTarget(layout, 8, 10, { scrollLeft: 0, width }) as number;
+    expect(centerScrollTarget(layout, 8, 10, { scrollLeft: target + 0.3, width })).toBeNull();
+  });
+
+  it('centres mirrored layouts through layout.columns', () => {
+    const left = build(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'));
+    const m = (a: number, b: number) =>
+      (Math.min(left.columns[a].start, left.columns[b].start) +
+        Math.max(left.columns[a].end, left.columns[b].end)) /
+      2;
+    const target = centerScrollTarget(left, 8, 10, { scrollLeft: 0, width });
+    expect(target).toBeCloseTo(
+      Math.min(Math.max(m(8, 10) - width / 2, 0), Math.max(0, left.width - width))
     );
   });
 });

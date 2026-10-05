@@ -201,9 +201,15 @@ export const instrument = {
     playback.stop('instrument');
     const adjNotes = notes.applyInstrument(inst);
     const adjTriads = triads.applyInstrument(inst);
-    caged.applyInstrument(inst, tuningLabel(tuning));
+    const adjCaged = caged.applyInstrument(inst, tuningLabel(tuning));
     adjustedIn =
-      screen === 'notes' && adjNotes ? 'notes' : screen === 'triads' && adjTriads ? 'triads' : null;
+      screen === 'notes' && adjNotes
+        ? 'notes'
+        : screen === 'triads' && adjTriads
+          ? 'triads'
+          : screen === 'caged' && adjCaged
+            ? 'caged'
+            : null;
   },
   /**
    * Apply a remembered config at startup (010): same path as Confirm, but no notice, no

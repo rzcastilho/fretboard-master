@@ -6,7 +6,7 @@ import { runAxe } from './support/helpers';
 
 const PREFS_KEY = 'fretboard-master:prefs';
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
-const tags = (page: Page) => board(page).locator('.tag.static:visible');
+const tags = (page: Page) => board(page).locator('.tag:visible');
 const unsupported = (tuning: string) =>
   `CAGED depends on the standard relationship between the strings, so its shapes don't exist in ${tuning}.`;
 const notice = (page: Page, tuning: string) =>

@@ -32,7 +32,8 @@ describe('constants and defaults (FR-018)', () => {
       lastTool: null,
       labels: { notes: 'name', triads: 'interval' },
       handedness: 'right',
-      orientation: 'highest-top'
+      orientation: 'highest-top',
+      rotateHintShown: false
     });
   });
 
@@ -164,7 +165,8 @@ describe('serializePreferences', () => {
       lastTool: 'triads',
       labels: { notes: 'octave', triads: 'name' },
       handedness: 'right',
-      orientation: 'highest-top'
+      orientation: 'highest-top',
+      rotateHintShown: false
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -212,7 +214,8 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       lastTool: 'triads',
       labels: { notes: 'octave', triads: 'name' },
       handedness: 'right',
-      orientation: 'highest-top'
+      orientation: 'highest-top',
+      rotateHintShown: false
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -340,6 +343,37 @@ describe('left-handed and orientation (013): reader rules 19–22, writer rules 
   });
 });
 
+describe('rotate hint (016 US4)', () => {
+  const p = (extra: Record<string, unknown>) =>
+    parsePreferences(JSON.stringify({ version: 1, ...extra }));
+
+  it('a record without rotateHint parses to false', () => {
+    expect(p({}).rotateHintShown).toBe(false);
+  });
+  it('parses a stored true', () => {
+    expect(p({ rotateHint: true }).rotateHintShown).toBe(true);
+  });
+  it.each(['yes', 1, null, {}, []])('invalid rotateHint %j → false, other fields kept', (bad) => {
+    const r = p({ rotateHint: bad, frets: 18, muted: true });
+    expect(r.rotateHintShown).toBe(false);
+    expect([r.fretCount, r.muted]).toEqual([18, true]);
+  });
+  it('writes rotateHint only when true; version stays 1', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('rotateHint');
+    const raw = serializePreferences({ ...DEFAULT_PREFERENCES, rotateHintShown: true });
+    expect(raw).toContain('"rotateHint":true');
+    expect(JSON.parse(raw).version).toBe(1);
+  });
+  it('existing fixtures serialize byte-identical', () => {
+    for (const f of FIXTURES) {
+      if (f.raw === null || f.raw.length > 16_384) continue;
+      const parsed = parsePreferences(f.raw);
+      expect(parsed.rotateHintShown).toBe(false);
+      expect(serializePreferences(parsed)).not.toContain('rotateHint');
+    }
+  });
+});
+
 const arbOffsetsOf = (n: 6 | 7): fc.Arbitrary<Offsets> =>
   fc
     .tuple(...Array.from({ length: n }, () => fc.integer({ min: OFFSET_MIN, max: OFFSET_MAX })))
@@ -364,7 +398,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
     triads: fc.constantFrom('interval', 'name')
   }),
   handedness: fc.constantFrom('right', 'left'),
-  orientation: fc.constantFrom('highest-top', 'lowest-top')
+  orientation: fc.constantFrom('highest-top', 'lowest-top'),
+  rotateHintShown: fc.boolean()
 });
 
 function isValid(p: Preferences): boolean {

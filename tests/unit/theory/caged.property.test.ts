@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CAGED_CYCLE,
   CAGED_SHAPES,
+  cagedConnections,
   cagedOccurrences,
   cagedTuningClass,
   fitCount
@@ -221,6 +222,54 @@ describe('altered lowest string (P1–P5)', () => {
             expect(n.fret).toBeLessThanOrEqual(frets);
           }
       })
+    );
+  });
+});
+
+describe('cagedConnections invariants (slice 016)', () => {
+  it('C1: positions in both occurrences of each pair, degree agrees, string 1…6, deterministic, equals brute force', () => {
+    fc.assert(
+      fc.property(arbCase, ({ open, rootPc, quality, frets }) => {
+        const occs = cagedOccurrences(open, rootPc, quality, frets);
+        const conns = cagedConnections(occs);
+        expect(cagedConnections(occs)).toEqual(conns);
+        const has = (i: number, s: number, f: number, d: string) =>
+          occs[i].notes.some((n) => n.string === s && n.fret === f && n.degree === d);
+        for (const c of conns) {
+          expect(c.string).toBeGreaterThanOrEqual(1);
+          expect(c.string).toBeLessThanOrEqual(6);
+          for (const [lo, up] of c.pairs) {
+            expect(up).toBe(lo + 1);
+            expect(has(lo, c.string, c.fret, c.degree)).toBe(true);
+            expect(has(up, c.string, c.fret, c.degree)).toBe(true);
+          }
+        }
+        const brute = new Set<string>();
+        for (let i = 0; i < occs.length - 1; i++)
+          for (const n of occs[i].notes)
+            if (occs[i + 1].notes.some((m) => m.string === n.string && m.fret === n.fret))
+              brute.add(`${n.string},${n.fret},${n.degree}`);
+        expect(new Set(conns.map((c) => `${c.string},${c.fret},${c.degree}`))).toEqual(brute);
+      })
+    );
+  });
+
+  it('C2: never an altered string 6', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 28, max: 52 }),
+        fc.integer({ min: 0, max: 11 }),
+        fc.constantFrom<'major' | 'minor'>('major', 'minor'),
+        fc.integer({ min: 12, max: 24 }),
+        fc.integer({ min: -4, max: 4 }).filter((d) => d !== 0),
+        (low, rootPc, quality, frets, delta) => {
+          const open = tuning(low);
+          open[0] += delta;
+          if (cagedTuningClass(open) !== 'altered-string') return;
+          const conns = cagedConnections(cagedOccurrences(open, rootPc, quality, frets));
+          expect(conns.some((c) => c.string === 6)).toBe(false);
+        }
+      )
     );
   });
 });

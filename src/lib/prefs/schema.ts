@@ -40,6 +40,8 @@ export interface Preferences {
   readonly handedness: Handedness;
   /** 013; absent or invalid in a stored record → 'highest-top'. */
   readonly orientation: Orientation;
+  /** 016; absent or invalid in a stored record → false. Stored as `rotateHint`, only when true. */
+  readonly rotateHintShown: boolean;
 }
 
 export const PREFS_VERSION = 1 as const;
@@ -58,7 +60,8 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   lastTool: null,
   labels: Object.freeze({ notes: 'name', triads: 'interval' }),
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  rotateHintShown: false
 });
 
 const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
@@ -98,7 +101,8 @@ const recordSchema = v.object({
     d.labels
   ),
   handedness: v.fallback(v.picklist(['right', 'left']), d.handedness),
-  orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation)
+  orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation),
+  rotateHint: v.fallback(v.boolean(), d.rotateHintShown)
 });
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -124,7 +128,8 @@ export function parsePreferences(raw: string | null): Preferences {
       lastTool: r.lastTool,
       labels: { notes: r.labels.notes, triads: r.labels.triads },
       handedness: r.handedness,
-      orientation: r.orientation
+      orientation: r.orientation,
+      rotateHintShown: r.rotateHint
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -143,7 +148,8 @@ export function tuningOfPreferences(p: Preferences): Tuning {
 
 /**
  * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
- * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013).
+ * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013),
+ * `rotateHint` only when true (016).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -157,6 +163,7 @@ export function serializePreferences(p: Preferences): string {
     ...(p.lastTool === null ? {} : { lastTool: p.lastTool }),
     labels: { notes: p.labels.notes, triads: p.labels.triads },
     ...(p.handedness === 'left' ? { handedness: 'left' } : {}),
-    ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {})
+    ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {}),
+    ...(p.rotateHintShown ? { rotateHint: true } : {})
   });
 }

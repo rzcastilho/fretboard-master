@@ -3,8 +3,8 @@ import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 
 const dir = process.argv[2] ?? 'build';
-// Constitution Principle VI (1.6.0).
-const LIMIT = 92 * 1024;
+// Constitution Principle VI (1.7.0).
+const LIMIT = 94 * 1024;
 const html = readFileSync(join(dir, 'index.html'), 'utf8');
 
 const refs = new Set();
@@ -29,7 +29,7 @@ for (const [, code] of inline) total += gzipSync(Buffer.from(code), { level: 9 }
 
 const kb = (total / 1024).toFixed(1);
 if (total > LIMIT) {
-  console.error(`FAIL: initial JS gzip: ${kb} KB > 92 KB`);
+  console.error(`FAIL: initial JS gzip: ${kb} KB > 94 KB`);
   process.exit(1);
 }
-console.log(`initial JS gzip: ${kb} KB ≤ 92 KB`);
+console.log(`initial JS gzip: ${kb} KB ≤ 94 KB`);

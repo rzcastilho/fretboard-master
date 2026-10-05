@@ -77,4 +77,29 @@ describe('ChoiceGroup', () => {
     setup();
     expect(screen.getByRole('radiogroup').hasAttribute('aria-disabled')).toBe(false);
   });
+
+  it('per-option disabled: aria-disabled, focusable, skipped by arrows, activation ignored', async () => {
+    const onchoose = vi.fn();
+    const opts = [
+      { value: 'a', label: 'Alpha' },
+      { value: 'b', label: 'Beta', disabled: true },
+      { value: 'c', label: 'Gamma' }
+    ] as const;
+    render(ChoiceGroup, { name: 'Letters', options: opts, current: 'a', onchoose });
+    const beta = screen.getByRole('radio', { name: 'Beta' });
+    expect(beta.getAttribute('aria-disabled')).toBe('true');
+    expect(beta.hasAttribute('disabled')).toBe(false);
+    beta.focus();
+    expect(document.activeElement).toBe(beta);
+    await fireEvent.click(beta);
+    expect(onchoose).not.toHaveBeenCalled();
+    await fireEvent.keyDown(screen.getByRole('radio', { name: 'Alpha' }), { key: 'ArrowRight' });
+    expect(onchoose).toHaveBeenLastCalledWith('c');
+  });
+
+  it('choosing the already-checked option does nothing', async () => {
+    const onchoose = setup('b');
+    await fireEvent.click(screen.getByRole('radio', { name: 'Beta' }));
+    expect(onchoose).not.toHaveBeenCalled();
+  });
 });

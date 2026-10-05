@@ -20,6 +20,8 @@ export interface Marker {
   readonly tone?: OctaveTone;
   /** Interval from the root (Triads). Used only when labelMode is 'interval'. */
   readonly interval?: IntervalId;
+  /** Draws a connection ring around the glyph (CAGED). Never announced. */
+  readonly ring?: boolean;
   /** Draw the small octave number beside a 'note' label. */
   readonly octaveBadge?: boolean;
   /** Stable identity across model updates; a changed fret with the same id slides (R-07). */
@@ -53,7 +55,12 @@ export interface DisplayModel {
   /** Optional localized leading sentence of the text description. */
   readonly summary?: string;
   /** Lit band over frets start..end; a change scrolls it into view. */
-  readonly region?: { readonly start: number; readonly end: number };
+  readonly region?: {
+    readonly start: number;
+    readonly end: number;
+    /** 'center' → scroll the band to the viewport centre (CAGED focus). */
+    readonly align?: 'center';
+  };
   /** false → no hover hint (Hide names). Default true. */
   readonly hoverHint?: boolean;
   /** Replaces the computed text description verbatim. */

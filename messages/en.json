@@ -296,10 +296,21 @@
   "caged_description_summary": "{key}: {count} shapes along the neck.",
   "caged_description_entry": "{shape} shape, frets {lo} to {hi}, roots on strings {strings}: {notes}",
   "caged_description_note": "string {string} fret {fret} {interval}",
+  "caged_description_connection": "String {string}, fret {fret}, {interval}, shared by {a} and {b} shapes.",
   "caged_description_note_open": "string {string} open {interval}",
   "caged_interval_root": "root",
   "caged_interval_third": "major third",
   "caged_interval_flat_third": "minor third",
   "caged_interval_fifth": "fifth",
-  "caged_reset": "Reset tool"
+  "caged_group_shape": "Shape",
+  "caged_shape_all": "See all",
+  "caged_focus_status": "{shape} shape in focus, frets {lo} to {hi}.",
+  "caged_focus_none": "All shapes.",
+  "caged_previous_shape": "Previous shape",
+  "caged_next_shape": "Next shape",
+  "caged_show_connections": "Show connections",
+  "caged_switch_on": "On",
+  "caged_switch_off": "Off",
+  "caged_reset": "Reset tool",
+  "caged_rotate_hint": "Turn your phone sideways to see more of the neck."
 }

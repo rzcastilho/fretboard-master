@@ -6,6 +6,8 @@ import {
   initialCagedView,
   resetCaged,
   selectRoot,
+  setConnections,
+  setFocus,
   setQuality,
   switchSpelling,
   type CagedViewState
@@ -18,7 +20,13 @@ const name = (s: CagedViewState): string => {
 
 describe('caged view state', () => {
   it('starts on C major with no override (FR-002)', () => {
-    expect(initialCagedView()).toEqual({ rootPc: 0, spellingOverride: 'none', quality: 'major' });
+    expect(initialCagedView()).toEqual({
+      rootPc: 0,
+      spellingOverride: 'none',
+      quality: 'major',
+      focus: null,
+      connections: false
+    });
     expect(CAGED_QUALITIES).toEqual(['major', 'minor']);
   });
 
@@ -29,7 +37,11 @@ describe('caged view state', () => {
   describe('selectRoot', () => {
     it('sets the root and clears the override', () => {
       const s = { ...initialCagedView(), rootPc: 1, spellingOverride: 'sharp' as const };
-      expect(selectRoot(s, 7)).toEqual({ rootPc: 7, spellingOverride: 'none', quality: 'major' });
+      expect(selectRoot(s, 7)).toEqual({
+        ...s,
+        rootPc: 7,
+        spellingOverride: 'none'
+      });
     });
     it('same root is a no-op (keeps the override)', () => {
       const s = { ...initialCagedView(), rootPc: 1, spellingOverride: 'sharp' as const };
@@ -43,7 +55,7 @@ describe('caged view state', () => {
 
   describe('setQuality', () => {
     it('changes quality and keeps the override (FR-003)', () => {
-      const s = { rootPc: 1, spellingOverride: 'flat' as const, quality: 'major' as const };
+      const s = { ...initialCagedView(), rootPc: 1, spellingOverride: 'flat' as const };
       expect(setQuality(s, 'minor')).toEqual({ ...s, quality: 'minor' });
     });
     it('same quality is a no-op', () => {
@@ -105,5 +117,52 @@ describe('caged view state', () => {
     expect(equalsCagedView(a, { ...a, rootPc: 2 })).toBe(false);
     expect(equalsCagedView(a, { ...a, quality: 'minor' })).toBe(false);
     expect(equalsCagedView(a, { ...a, spellingOverride: 'sharp' })).toBe(false);
+  });
+
+  it('equalsCagedView compares focus and connections (slice 016)', () => {
+    const a = initialCagedView();
+    expect(equalsCagedView(a, setFocus(a, { letter: 'E', ordinal: 0 }))).toBe(false);
+    expect(
+      equalsCagedView(
+        setFocus(a, { letter: 'E', ordinal: 0 }),
+        setFocus(a, { letter: 'E', ordinal: 0 })
+      )
+    ).toBe(true);
+    expect(
+      equalsCagedView(
+        setFocus(a, { letter: 'A', ordinal: 0 }),
+        setFocus(a, { letter: 'A', ordinal: 1 })
+      )
+    ).toBe(false);
+    expect(equalsCagedView(a, setConnections(a, true))).toBe(false);
+  });
+
+  describe('focus and connections (slice 016)', () => {
+    it('resetCaged clears both', () => {
+      expect(resetCaged()).toEqual(initialCagedView());
+      expect(resetCaged().focus).toBeNull();
+      expect(resetCaged().connections).toBe(false);
+    });
+    it('setFocus sets, equal value is the same object', () => {
+      const a = initialCagedView();
+      const b = setFocus(a, { letter: 'E', ordinal: 0 });
+      expect(b.focus).toEqual({ letter: 'E', ordinal: 0 });
+      expect(setFocus(b, { letter: 'E', ordinal: 0 })).toBe(b);
+      expect(setFocus(a, null)).toBe(a);
+      expect(setFocus(b, null).focus).toBeNull();
+    });
+    it('setConnections sets, equal value is the same object', () => {
+      const a = initialCagedView();
+      const b = setConnections(a, true);
+      expect(b.connections).toBe(true);
+      expect(setConnections(b, true)).toBe(b);
+      expect(setConnections(a, false)).toBe(a);
+    });
+    it('switchSpelling leaves focus untouched; selectRoot/setQuality keep prior behavior', () => {
+      const f = setFocus(selectRoot(initialCagedView(), 1), { letter: 'A', ordinal: 0 });
+      expect(switchSpelling(f).focus).toBe(f.focus);
+      expect(selectRoot(f, 3).spellingOverride).toBe('none');
+      expect(setQuality(f, 'minor').quality).toBe('minor');
+    });
   });
 });

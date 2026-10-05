@@ -8,10 +8,15 @@
   import { maybeFault } from '$lib/shell/fault';
   import { caged } from '$lib/state/caged.svelte';
   import { openTriadsFromCaged } from '$lib/state/links.svelte';
+  import { instrument } from '$lib/state/instrument.svelte';
   import { playback } from '$lib/state/playback.svelte';
+  import { preferences } from '$lib/state/preferences.svelte';
+  import { isPhonePortrait } from '$lib/state/rotate-hint';
+  import Notice from '$lib/shell/Notice.svelte';
   import { tick } from 'svelte';
   import { onMount } from 'svelte';
   import CagedControls from './CagedControls.svelte';
+  import CagedFocusControls from './CagedFocusControls.svelte';
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
   const guard = () => maybeFault('caged');
@@ -24,6 +29,18 @@
       const inst = fixtureInstrument(globalThis.__fmInstrument);
       if (inst !== STANDARD_GUITAR) caged.useInstrument(inst);
       fixture = fixtureModel(globalThis.__fmFretboardFixture);
+    }
+  });
+
+  // Rotate hint (016 US4): shown once on a portrait phone, recorded the moment it appears.
+  let vw = $state(0);
+  let vh = $state(0);
+  let hintOpen = $state(false);
+  $effect(() => {
+    if (!isPhonePortrait(vw, vh)) hintOpen = false;
+    else if (!hintOpen && !preferences.rotateHintShown) {
+      hintOpen = true;
+      preferences.markRotateHintShown();
     }
   });
 
@@ -40,6 +57,8 @@
   }
 </script>
 
+<svelte:window bind:innerWidth={vw} bind:innerHeight={vh} />
+
 <section class="b" aria-labelledby="caged-zone-b">
   <h2 id="caged-zone-b">{m.zone_main_controls()}</h2>
   <CagedControls
@@ -48,6 +67,12 @@
     onroot={(pc) => caged.selectRoot(pc)}
     onquality={(q) => caged.setQuality(q)}
     onswitch={() => caged.switchSpelling()}
+  />
+  <CagedFocusControls
+    letter={caged.state.focus?.letter ?? null}
+    drawn={caged.display.drawnLetters}
+    disabled={caged.display.tuningClass === 'non-compatible'}
+    onchoose={(c) => caged.chooseShape(c)}
   />
   <p class="key">{caged.display.keyName}</p>
 </section>
@@ -58,6 +83,7 @@
       instrument={caged.instrument}
       model={fixture ?? caged.display.model ?? undefined}
       {onactivate}
+      ontag={(id) => caged.toggleTag(id)}
       pulses={playback.pulses}
     />
     {#if caged.display.fitNote}
@@ -75,7 +101,48 @@
   {/if}
 </section>
 
+<section class="e" aria-labelledby="caged-zone-e">
+  <h2 id="caged-zone-e">{m.zone_actions()}</h2>
+  <div class="steps">
+    <button
+      type="button"
+      class="step"
+      aria-disabled={caged.display.steps.previous ? undefined : 'true'}
+      onclick={() => caged.step(-1)}>{m.caged_previous_shape()}</button
+    >
+    <button
+      type="button"
+      class="step"
+      aria-disabled={caged.display.steps.next ? undefined : 'true'}
+      onclick={() => caged.step(1)}>{m.caged_next_shape()}</button
+    >
+  </div>
+  {#if instrument.adjustedIn === 'caged'}
+    <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
+  {/if}
+  {#if hintOpen}
+    <Notice message={m.caged_rotate_hint()} ondismiss={() => (hintOpen = false)} />
+  {/if}
+</section>
+
 <div class="d">
+  <button
+    type="button"
+    class="conn-switch"
+    role="switch"
+    aria-checked={caged.state.connections}
+    aria-disabled={caged.display.tuningClass === 'non-compatible' ? 'true' : undefined}
+    onclick={() => {
+      if (caged.display.tuningClass !== 'non-compatible')
+        caged.setConnections(!caged.state.connections);
+    }}
+  >
+    <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+    {m.caged_show_connections()}
+    <span class="state" aria-hidden="true"
+      >{caged.state.connections ? m.caged_switch_on() : m.caged_switch_off()}</span
+    >
+  </button>
   <button type="button" onclick={() => caged.reset()}>{m.caged_reset()}</button>
 </div>
 
@@ -127,6 +194,73 @@
     font: inherit;
   }
 
+  .steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .step {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-inline: var(--space-4);
+    font: inherit;
+  }
+
+  .step[aria-disabled='true'] {
+    color: var(--color-disabled-text);
+    border-color: var(--color-disabled-border);
+    cursor: not-allowed;
+  }
+
+  .conn-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    margin-inline-end: var(--space-3);
+    padding-inline: var(--space-4);
+    font: inherit;
+  }
+
+  .track {
+    position: relative;
+    inline-size: 2.25rem;
+    block-size: 1.25rem;
+    border: var(--border-width) solid currentColor;
+    border-radius: 999px;
+    flex: none;
+  }
+
+  .thumb {
+    position: absolute;
+    inset-block: 2px;
+    inset-inline-start: 2px;
+    inline-size: calc(1.25rem - 4px - 2 * var(--border-width));
+    background: currentColor;
+    border-radius: 50%;
+  }
+
+  .conn-switch[aria-checked='true'] .thumb {
+    inset-inline-start: auto;
+    inset-inline-end: 2px;
+  }
+
+  .conn-switch[aria-checked='true'] .track {
+    background: var(--color-surface);
+  }
+
+  .state {
+    font-weight: 600;
+  }
+
+  .conn-switch[aria-disabled='true'] {
+    color: var(--color-disabled-text);
+    border-color: var(--color-disabled-border);
+    cursor: not-allowed;
+  }
+
   h2:focus {
     outline: none;
   }
@@ -138,6 +272,12 @@
     border: var(--border-width) solid var(--color-border);
     border-radius: var(--radius-md);
     min-inline-size: 0;
+  }
+  .e {
+    grid-area: e;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
   }
   .b {
     grid-area: b;

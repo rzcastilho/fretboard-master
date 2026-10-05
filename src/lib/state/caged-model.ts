@@ -8,17 +8,21 @@ import type { DisplayModel, FretboardTag, Marker } from '../fretboard/types';
 import type { Instrument } from '../instrument/instrument';
 import { noteLabel, spokenNote } from '../notation/notation';
 import {
+  cagedConnections,
   cagedOccurrences,
   cagedTuningClass,
   fitCount,
   occurrenceRootStrings,
+  type CagedConnection,
   type CagedDegree,
+  type CagedShapeId,
   type CagedShape,
   type CagedTuningClass,
   type ShapeOccurrence
 } from '../theory/caged';
 import { pitchOfSpelling, type Pitch, type Spelling } from '../theory/pitch';
 import { otherRootSpelling, spellTriad, type TriadFunction } from '../theory/triad';
+import { drawnLetters, occurrenceIndex, stepAvailability } from './caged-focus';
 import { cagedRootSpelling, type CagedViewState } from './caged-view';
 import { qualityName } from './triads-model';
 
@@ -26,6 +30,12 @@ import { qualityName } from './triads-model';
 export interface CagedContext {
   readonly tuningName: string;
   readonly temporary: boolean;
+}
+
+/** Shared positions of the departing and arriving shapes after a step (data-model §3). */
+export interface StepTransition {
+  /** "s:f" keys. */
+  readonly positions: readonly string[];
 }
 
 export interface CagedDisplay {
@@ -41,6 +51,28 @@ export interface CagedDisplay {
   readonly fitNote: string | null;
   readonly model: DisplayModel | null;
   readonly switchTo: Spelling | null;
+  /** Index into `occurrences` of the focused shape, else null. */
+  readonly focusIndex: number | null;
+  readonly focused: ShapeOccurrence | null;
+  readonly steps: { readonly previous: boolean; readonly next: boolean };
+  readonly drawnLetters: ReadonlySet<CagedShapeId>;
+  /** Positions shared by adjacent drawn occurrences; [] for a non-compatible tuning. */
+  readonly connections: readonly CagedConnection[];
+}
+
+const NO_STEPS = { previous: false, next: false } as const;
+const NO_LETTERS: ReadonlySet<CagedShapeId> = new Set();
+
+/** The drawn occurrences (sorted by start) for the view and instrument; [] when non-compatible. */
+export function cagedOccurrencesFor(
+  view: CagedViewState,
+  instrument: Instrument
+): readonly ShapeOccurrence[] {
+  const open = sixHighestOpen(instrument);
+  if (cagedTuningClass(open) === 'non-compatible') return [];
+  return [...cagedOccurrences(open, view.rootPc, view.quality, instrument.fretCount)].sort(
+    (a, b) => a.start - b.start
+  );
 }
 
 const FUNCTION_OF: Readonly<Record<CagedDegree, TriadFunction>> = {
@@ -80,7 +112,8 @@ export function cagedTagText(occ: ShapeOccurrence): string {
 export function buildCagedModel(
   view: CagedViewState,
   instrument: Instrument,
-  context: CagedContext
+  context: CagedContext,
+  transition: StepTransition | null = null
 ): CagedDisplay {
   const { tuningName, temporary } = context;
   const temporaryName = temporary ? tuningName : null;
@@ -104,16 +137,24 @@ export function buildCagedModel(
       fitCount: 0,
       fitNote: null,
       model: null,
-      switchTo: otherRootSpelling(view.rootPc, root)
+      switchTo: otherRootSpelling(view.rootPc, root),
+      focusIndex: null,
+      focused: null,
+      steps: NO_STEPS,
+      drawnLetters: NO_LETTERS,
+      connections: []
     };
   }
 
   const altered = tuningClass === 'altered-string';
-  const occurrences = cagedOccurrences(
-    sixHighestOpen(instrument),
-    view.rootPc,
-    view.quality,
-    instrument.fretCount
+  const occurrences = cagedOccurrencesFor(view, instrument);
+  const focusIndex = occurrenceIndex(view.focus, occurrences);
+  const focused = focusIndex === null ? null : occurrences[focusIndex];
+  const inFocus = new Set(focused ? focused.notes.map((n) => `${n.string}:${n.fret}`) : []);
+  const stepping = new Set(transition?.positions ?? []);
+  const connections = cagedConnections(occurrences);
+  const connected = new Set(
+    view.connections ? connections.map((c) => `${c.string}:${c.fret}`) : []
   );
 
   const markers: Marker[] = [];
@@ -124,19 +165,23 @@ export function buildCagedModel(
       if (seen.has(id)) continue;
       seen.add(id);
       const fn = FUNCTION_OF[n.degree];
+      const inStep = stepping.has(id);
+      const ringed = inStep || connected.has(id);
       markers.push({
         string: n.string,
         fret: n.fret,
         function: fn,
-        emphasis: 'normal',
+        emphasis:
+          inStep || inFocus.has(id) ? 'highlighted' : focused === null ? 'normal' : 'dimmed',
         spelling: triad[fn],
         interval: n.degree,
-        id
+        id,
+        ...(ringed ? { ring: true } : {})
       });
     }
   }
 
-  const tags: FretboardTag[] = occurrences.map((o) => {
+  const tags: FretboardTag[] = occurrences.map((o, i) => {
     const label = cagedTagText(o);
     return {
       id: `${o.shape.id}@${o.start}`,
@@ -144,7 +189,7 @@ export function buildCagedModel(
       end: o.end,
       label,
       name: label,
-      pressed: false
+      pressed: i === focusIndex
     };
   });
 
@@ -170,13 +215,30 @@ export function buildCagedModel(
         .join(', ')
     })
   );
+  const connectionSentences = view.connections
+    ? connections.map((c) => {
+        const [lower, upper] = c.pairs[0];
+        return m.caged_description_connection({
+          string: c.string,
+          fret: c.fret,
+          interval: intervalName(c.degree),
+          a: occurrences[lower].shape.id,
+          b: occurrences[upper].shape.id
+        });
+      })
+    : [];
+  const focusSentence = focused
+    ? m.caged_focus_status({ shape: focused.shape.id, lo: focused.start, hi: focused.end })
+    : m.caged_focus_none();
   const description = [
+    focusSentence,
     temporary
       ? m.caged_description_temporary({ tuning: tuningName })
       : m.caged_description_tuning({ tuning: tuningName }),
     ...(altered ? [m.caged_description_altered({ string: 6 })] : []),
     m.caged_description_summary({ key: spokenKey, count: occurrences.length }),
-    ...entries
+    ...entries,
+    ...connectionSentences
   ].join(' ');
 
   const fit = fitCount(occurrences);
@@ -195,10 +257,18 @@ export function buildCagedModel(
       markers,
       labelMode: 'interval',
       tags,
-      tagsInteractive: false,
+      tagsInteractive: true,
+      ...(focused
+        ? { region: { start: focused.start, end: focused.end, align: 'center' as const } }
+        : {}),
       description,
       ...(altered ? { stringMarks: [{ string: 6, label: m.caged_altered_mark() }] } : {})
     },
-    switchTo: otherRootSpelling(view.rootPc, root)
+    switchTo: otherRootSpelling(view.rootPc, root),
+    focusIndex,
+    focused,
+    steps: stepAvailability(view.focus, occurrences),
+    drawnLetters: drawnLetters(occurrences),
+    connections
   };
 }

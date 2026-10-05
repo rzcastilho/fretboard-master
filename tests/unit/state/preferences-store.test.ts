@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializePreferences, DEFAULT_PREFERENCES } from '../../../src/lib/prefs/schema';
 import { PREFS_KEY } from '../../../src/lib/prefs/storage';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
+import { caged } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -282,5 +283,52 @@ describe('left-handed and orientation (013, US4)', () => {
     expect(instrument.active.orientation).toBe('lowest-top');
     expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-2' });
     expect(preferences.noticeVisible).toBe(false);
+  });
+});
+
+describe('rotate hint (016 US4)', () => {
+  it('is false by default and true when the record has rotateHint', () => {
+    preferences.start(fakeStorage());
+    expect(preferences.rotateHintShown).toBe(false);
+    resetPreferencesForTests();
+    preferences.start(fakeStorage({ [PREFS_KEY]: '{"version":1,"rotateHint":true}' }));
+    expect(preferences.rotateHintShown).toBe(true);
+  });
+
+  it('markRotateHintShown is idempotent and persists rotateHint', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markRotateHintShown();
+    const writes = s.calls.set;
+    preferences.markRotateHintShown();
+    expect(s.calls.set).toBe(writes);
+    expect(preferences.rotateHintShown).toBe(true);
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).rotateHint).toBe(true);
+  });
+
+  it('with storage unavailable it does not throw and the in-load flag holds', () => {
+    const s = fakeStorage();
+    s.fail.get = s.fail.set = s.fail.remove = true;
+    preferences.start(s);
+    expect(() => preferences.markRotateHintShown()).not.toThrow();
+    expect(preferences.rotateHintShown).toBe(true);
+  });
+
+  it('erase clears it', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markRotateHintShown();
+    preferences.erase();
+    expect(preferences.rotateHintShown).toBe(false);
+    expect(s.data.has(PREFS_KEY)).toBe(false);
+  });
+
+  it('Reset tool does not clear it', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markRotateHintShown();
+    caged.reset();
+    expect(preferences.rotateHintShown).toBe(true);
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).rotateHint).toBe(true);
   });
 });

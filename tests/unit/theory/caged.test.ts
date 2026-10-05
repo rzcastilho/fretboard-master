@@ -4,11 +4,13 @@ import {
   CAGED_CYCLE,
   CAGED_SHAPES,
   alteredStringNotes,
+  cagedConnections,
   cagedOccurrences,
   cagedTuningClass,
   fitCount,
   occurrenceRootStrings,
   rootStrings,
+  sharedPositions,
   type CagedQuality,
   type ShapeOccurrence
 } from '../../../src/lib/theory/caged';
@@ -433,5 +435,106 @@ describe('altered lowest string (slice 015, US3)', () => {
       expect(alteredStringNotes(D2, 0, 'major', 5, 4)).toEqual([]);
       expect(alteredStringNotes(NaN, 0, 'major', 0, 4)).toEqual([]);
     });
+  });
+});
+
+describe('connections (slice 016, FR-009, SC-002)', () => {
+  const keyOf = (c: { string: number; fret: number; degree: string }) =>
+    `${c.string},${c.fret},${c.degree}`;
+  const set = (rows: readonly (readonly [number, number, string])[]) =>
+    rows.map(([s, f, d]) => `${s},${f},${d}`).sort();
+  const got = (open: readonly Pitch[], q: CagedQuality, frets: number) =>
+    cagedConnections(cagedOccurrences(open, 0, q, frets))
+      .map(keyOf)
+      .sort();
+
+  it('C major, standard, 22 frets: exact set incl. +12 repeats', () => {
+    expect(got(STD, 'major', 22)).toEqual(
+      set([
+        [5, 3, 'R'],
+        [4, 5, '5'],
+        [3, 5, 'R'],
+        [2, 5, '3'],
+        [6, 8, 'R'],
+        [1, 8, 'R'],
+        [4, 10, 'R'],
+        [3, 12, '5'],
+        [2, 13, 'R'],
+        [1, 12, '3'],
+        [5, 15, 'R'],
+        [4, 17, '5'],
+        [3, 17, 'R'],
+        [2, 17, '3'],
+        [6, 20, 'R'],
+        [1, 20, 'R']
+      ])
+    );
+  });
+
+  it('C minor, standard, 22 frets: exact set incl. +12 repeats', () => {
+    expect(got(STD, 'minor', 22)).toEqual(
+      set([
+        [5, 3, 'R'],
+        [4, 5, '5'],
+        [3, 5, 'R'],
+        [6, 8, 'R'],
+        [2, 8, '5'],
+        [1, 8, 'R'],
+        [4, 10, 'R'],
+        [3, 12, '5'],
+        [2, 13, 'R'],
+        [5, 15, 'R'],
+        [4, 17, '5'],
+        [3, 17, 'R'],
+        [6, 20, 'R'],
+        [2, 20, '5'],
+        [1, 20, 'R']
+      ])
+    );
+  });
+
+  it('12 frets: pairs C→A, A→G, G→E only; (4,10,R) is not a connection', () => {
+    const occ = cagedOccurrences(STD, 0, 'major', 12);
+    expect(label(occ)).toEqual(['C0', 'A3', 'G5', 'E8']);
+    const conns = cagedConnections(occ);
+    expect(conns.flatMap((c) => c.pairs.map((p) => p.join('-')))).toSatisfy(
+      (x: string[]) => new Set(x).size === 3 && ['0-1', '1-2', '2-3'].every((p) => x.includes(p))
+    );
+    expect(conns.map(keyOf)).not.toContain('4,10,R');
+  });
+
+  it('Drop D has no string-6 connection; no string 7 ever', () => {
+    const drop = cagedConnections(cagedOccurrences(sixOpen('AF-4'), 0, 'major', 22));
+    expect(drop.length).toBeGreaterThan(0);
+    expect(drop.some((c) => c.string === 6)).toBe(false);
+    const seven = cagedConnections(cagedOccurrences(sixOpen('AF-1', 7), 0, 'major', 22));
+    expect(seven.some((c) => c.string === 7)).toBe(false);
+  });
+
+  it('fewer than 2 occurrences gives []', () => {
+    expect(cagedConnections([])).toEqual([]);
+    expect(cagedConnections(cagedOccurrences(STD, 0, 'major', 22).slice(0, 1))).toEqual([]);
+  });
+
+  it('sorted by fret then string descending; pairs length 1 or 2', () => {
+    const conns = cagedConnections(cagedOccurrences(STD, 0, 'major', 22));
+    for (let i = 1; i < conns.length; i++) {
+      const a = conns[i - 1];
+      const b = conns[i];
+      expect(a.fret < b.fret || (a.fret === b.fret && a.string > b.string)).toBe(true);
+    }
+    for (const c of conns) expect([1, 2]).toContain(c.pairs.length);
+  });
+
+  it('sharedPositions returns the pair intersection', () => {
+    const occ = cagedOccurrences(STD, 0, 'major', 22);
+    const shared = sharedPositions(occ[3], occ[4]); // E8 ∩ D10
+    expect(shared.map(keyOf)).toEqual(['4,10,R']);
+  });
+
+  it('sharedPositions ignores synthesized altered string-6 notes', () => {
+    const occ = cagedOccurrences(sixOpen('AF-4'), 0, 'major', 22);
+    for (let i = 0; i < occ.length - 1; i++)
+      expect(sharedPositions(occ[i], occ[i + 1]).some((n) => n.string === 6)).toBe(false);
   });
 });

@@ -26,6 +26,8 @@ export interface ExpectedPreferences {
   /** 013: absent or invalid in a record → right / highest-top. */
   readonly handedness: 'right' | 'left';
   readonly orientation: 'highest-top' | 'lowest-top';
+  /** 016: absent or invalid in a record → false. */
+  readonly rotateHintShown: boolean;
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -52,7 +54,8 @@ const defaults: ExpectedPreferences = {
   lastTool: null,
   labels: { notes: 'name', triads: 'interval' },
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  rotateHintShown: false
 };
 
 function load(name: string): string {
@@ -83,7 +86,8 @@ export const FIXTURES: readonly PrefsFixture[] = [
     lastTool: 'triads',
     labels: { notes: 'octave', triads: 'name' },
     handedness: 'right',
-    orientation: 'highest-top'
+    orientation: 'highest-top',
+    rotateHintShown: false
   }),
   fixture('bad-volume', { ...defaults, tuningId: 'AF-2' }),
   fixture('garbage', defaults),

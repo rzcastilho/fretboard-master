@@ -17,7 +17,7 @@ async function open(page: Page) {
 test.describe('TM-9 CAGED views', () => {
   test('tm9 view 15: C major, standard tuning → five linked shapes', async ({ page }) => {
     await open(page);
-    await expect(board(page).locator('.tag.static:visible')).toHaveCount(9);
+    await expect(board(page).locator('.tag:visible')).toHaveCount(9);
     await expect(page).toHaveScreenshot('tm9-view-15.png');
   });
 
@@ -32,7 +32,7 @@ test.describe('TM-9 CAGED views', () => {
     await page.getByRole('button', { name: 'Confirm' }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByText('C major', { exact: true })).toBeVisible();
-    await expect(board(page).locator('.tag.static:visible')).toHaveCount(9);
+    await expect(board(page).locator('.tag:visible')).toHaveCount(9);
     await expect(page).toHaveScreenshot('tm9-view-15-left-handed.png');
   });
 
@@ -65,5 +65,16 @@ test.describe('TM-9 CAGED views', () => {
     await expect(board(page).locator('text.string-mark')).toHaveText('altered');
     await expect(board(page).locator('.marker').first()).toBeVisible();
     await expect(board(page)).toHaveScreenshot('tm9-caged-drop-d-d-major.png');
+  });
+});
+
+test.describe('TM-9 CAGED view 18 (connections)', () => {
+  test('tm9 view 18: F♯ minor, five shapes, connections on', async ({ page }) => {
+    await open(page);
+    await page.getByRole('radio', { name: 'Minor', exact: true }).click();
+    await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(6).click();
+    await page.getByRole('switch', { name: 'Show connections' }).click();
+    await expect(board(page).locator('.markers .connection-ring').first()).toBeAttached();
+    await expect(page).toHaveScreenshot('tm9-view-18.png');
   });
 });

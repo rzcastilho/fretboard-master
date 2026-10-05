@@ -15,6 +15,8 @@ import { triads } from './triads.svelte';
 let session: PrefsSession | null = null;
 let lastTool = $state<ToolId | null>(null);
 let noticeVisible = $state(false);
+/** Rotate hint (016): recorded value, or set for this load when storage is unavailable. */
+let rotateHintShown = $state(false);
 /** Set once, on the first unavailable start; never reset during the session (FR-012). */
 let noticeShown = false;
 
@@ -24,6 +26,9 @@ export const preferences = {
   },
   get noticeVisible(): boolean {
     return noticeVisible;
+  },
+  get rotateHintShown(): boolean {
+    return rotateHintShown;
   },
 
   /** Read once, apply, never write. Idempotent. */
@@ -42,6 +47,7 @@ export const preferences = {
     notes.restoreLabelType(p.labels.notes);
     triads.restoreLabelType(p.labels.triads);
     lastTool = p.lastTool;
+    rotateHintShown = p.rotateHintShown;
     if (!session.available && !noticeShown) {
       noticeShown = true;
       noticeVisible = true;
@@ -52,6 +58,13 @@ export const preferences = {
     if (!(TOOL_IDS as readonly string[]).includes(id)) return;
     lastTool = id;
     session?.remember({ lastTool: id });
+  },
+
+  /** Idempotent, fire-and-forget; the in-load flag holds even when storage is unavailable. */
+  markRotateHintShown(): void {
+    if (rotateHintShown) return;
+    rotateHintShown = true;
+    session?.remember({ rotateHintShown: true });
   },
 
   dismissNotice(): void {
@@ -81,6 +94,7 @@ export const preferences = {
       triads.restoreLabelType(d.labels.triads);
     }
     lastTool = null;
+    rotateHintShown = false;
   },
 
   remember(patch: PreferencesPatch): void {
@@ -92,6 +106,7 @@ export const preferences = {
 export function resetPreferencesForTests(): void {
   session = null;
   lastTool = null;
+  rotateHintShown = false;
   noticeVisible = false;
   noticeShown = false;
 }

@@ -124,10 +124,16 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-short: 300ms;
+  --duration-medium: 500ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
   /* Sizing */
   --target-min: 44px;
+
+  /* CAGED shape connections (feature 016): ring follows text color in every theme */
+  --connection-ring: var(--color-text);
+  --connection-ring-width: 2px;
+  --connection-ring-gap: 2px;
 
   /* Playback / sound control */
   --pulse-scale: 1.25;
@@ -198,6 +204,7 @@
     --color-disabled-border: GrayText;
     --color-notice-border: var(--color-text);
     --color-sound-panel-border: var(--color-text);
+    --connection-ring: CanvasText;
     --border-width: 2px;
     --focus-ring-width: 4px;
     --color-fretboard-wood: Canvas;
@@ -222,11 +229,18 @@
   }
 }
 
+@media (forced-colors: active) {
+  :root {
+    --connection-ring: CanvasText;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-fast: 0s;
     --duration-base: 0s;
     --duration-short: 0s;
+    --duration-medium: 0s;
   }
 }
 

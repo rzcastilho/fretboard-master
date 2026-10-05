@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { runAxe } from './support/helpers';
 
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
-const tags = (page: Page) => board(page).locator('.tag.static:visible');
+const tags = (page: Page) => board(page).locator('.tag:visible');
 
 test.describe('caged US1: five linked shapes', () => {
   test('Q1: home card and nav order', async ({ page }) => {
@@ -59,10 +59,10 @@ test.describe('caged US1: five linked shapes', () => {
           b.y < a.y + a.height;
         expect(overlap, `tags ${i} and ${j} overlap`).toBe(false);
       }
-    // Tags are text, not controls.
+    // Tags are toggle buttons (016): one per occurrence, none pressed at first.
     await expect(
-      board(page).getByRole('group', { name: 'Shapes' }).getByRole('button')
-    ).toHaveCount(0);
+      board(page).getByRole('group', { name: 'Shapes' }).getByRole('button', { pressed: false })
+    ).toHaveCount(9);
   });
 
   test('Q4: root markers are squares, no layer/label controls', async ({ page }) => {
@@ -71,9 +71,11 @@ test.describe('caged US1: five linked shapes', () => {
     await expect(roots.first()).toBeAttached();
     expect(await roots.count()).toBeGreaterThan(0);
     await expect(roots.locator('rect.glyph')).toHaveCount(await roots.count());
-    // Layer/label controls are absent; the only radios are the Quality group (US3).
-    await expect(page.getByRole('radio')).toHaveCount(2);
-    await expect(page.getByRole('radiogroup')).toHaveAccessibleName('Quality');
+    // Layer/label controls are absent; the radios are the Quality group (US3) and the Shape selector (016).
+    await expect(page.getByRole('radio')).toHaveCount(8);
+    await expect(page.getByRole('radiogroup')).toHaveCount(2);
+    await expect(page.getByRole('radiogroup', { name: 'Quality' })).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Shape' })).toBeVisible();
     await expect(page.getByRole('checkbox')).toHaveCount(0);
   });
 
@@ -491,7 +493,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
     });
   }
 
-  test('Q25: Tab order, tags not focusable, description lists the five occurrences', async ({
+  test('Q25: Tab order, tags are buttons, description lists the five occurrences', async ({
     page
   }) => {
     await page.goto('/caged');
@@ -504,14 +506,18 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
       page.evaluate(() => {
         const el = document.activeElement as HTMLElement | null;
         if (!el) return 'none';
-        if (el.closest('[role="radiogroup"]')) return 'quality';
+        const group = el.closest('[role="radiogroup"]');
+        if (group) return group.getAttribute('aria-label') === 'Shape' ? 'shape' : 'quality';
         if (el.closest('[role="group"][aria-label="Key"]')) return 'key';
+        if (el.getAttribute('role') === 'switch') return 'connections';
         if (el.classList.contains('switch')) return 'switch';
         if (
           el.closest('[role="region"][aria-label="Fretboard"], svg') ||
           el.classList.contains('description-toggle')
         )
           return 'board';
+        if (el.classList.contains('tag')) return 'tags';
+        if (/^(Previous|Next) shape$/.test((el.textContent ?? '').trim())) return 'steps';
         if ((el.textContent ?? '').trim() === 'Reset tool') return 'reset';
         return `other:${el.tagName}:${(el.textContent ?? '').trim().slice(0, 20)}`;
       });
@@ -522,9 +528,19 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
       if (k === 'reset') break;
       await page.keyboard.press('Tab');
     }
-    expect(seen).toEqual(['key', 'quality', 'switch', 'board', 'reset']);
+    expect(seen).toEqual([
+      'key',
+      'quality',
+      'switch',
+      'shape',
+      'tags',
+      'board',
+      'steps',
+      'connections',
+      'reset'
+    ]);
 
-    await expect(board(page).locator('.tag button, .tag[tabindex], .tag a')).toHaveCount(0);
+    expect(await board(page).locator('button.tag').count()).toBeGreaterThanOrEqual(5);
     const description = (await board(page).locator('.description').textContent()) ?? '';
     // Occurrences are listed in order (D♭ major: C A G E D).
     const at = ['C', 'A', 'G', 'E', 'D'].map((s) => description.indexOf(`${s} shape, frets`));

@@ -24,6 +24,7 @@
   } from './geometry';
   import {
     autoScrollTarget,
+    centerScrollTarget,
     groupScrollTarget,
     moveFocus,
     nutOffset,
@@ -64,6 +65,8 @@
   const compact = $derived(thumb || preview);
 
   let metrics: FretboardMetrics = $state(DEFAULT_METRICS);
+  /** Inner radius of the connection ring: clears the largest glyph. */
+  const ringBase = $derived(Math.max(metrics.markerRoot, metrics.markerMedium + 4) / 2);
   let containerWidth = $state(0);
   let root: HTMLElement | undefined = $state();
   let scroller: HTMLElement | undefined = $state();
@@ -328,17 +331,22 @@
     if (previous === undefined || previous === key || band === null) return;
     untrack(() => {
       if (!scroller || band === null) return;
-      const target = autoScrollTarget(
-        layout,
-        [
-          { string: 1, fret: band.start },
-          { string: 1, fret: band.end }
-        ],
-        { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth }
-      );
+      const viewport = { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth };
+      const centered = model.region?.align === 'center';
+      const target = centered
+        ? centerScrollTarget(layout, band.start, band.end, viewport)
+        : autoScrollTarget(
+            layout,
+            [
+              { string: 1, fret: band.start },
+              { string: 1, fret: band.end }
+            ],
+            viewport
+          );
       if (target === null) return;
       stopAutoScroll();
-      cancelScroll = animateScroll(scroller, target, scrollDuration(), browserClock);
+      const duration = centered ? tokenDuration(root, '--duration-medium') : scrollDuration();
+      cancelScroll = animateScroll(scroller, target, duration, browserClock);
     });
   });
 
@@ -837,6 +845,9 @@
                 {:else}
                   <circle class="glyph" r={metrics.markerMedium / 2} />
                 {/if}
+                {#if d.mk.ring}
+                  <circle class="connection-ring" aria-hidden="true" style:--ring-base={ringBase} />
+                {/if}
                 {#if d.label}
                   <text class="marker-label" class:long={d.label.length > 1}>{d.label}</text>
                 {/if}
@@ -1148,16 +1159,25 @@
 
   .marker {
     pointer-events: none;
-    transition: transform var(--duration-short) var(--ease-standard);
+    transition:
+      transform var(--duration-short) var(--ease-standard),
+      opacity var(--duration-medium) var(--ease-standard);
   }
 
   .shape {
-    transition: transform var(--duration-short);
+    transition: transform var(--duration-medium);
   }
 
   .marker.highlighted .shape {
     transform: scale(var(--emph-highlight-scale));
     filter: drop-shadow(0 0 var(--marker-elevation-stroke) var(--color-text));
+  }
+
+  .marker .connection-ring {
+    fill: none;
+    stroke: var(--connection-ring);
+    stroke-width: var(--connection-ring-width);
+    r: calc(var(--ring-base) * 1px + var(--connection-ring-gap));
   }
 
   .marker.pulse .shape {

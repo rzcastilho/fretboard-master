@@ -108,6 +108,41 @@ describe('instrument store (contracts §3)', () => {
     expect(instrument.adjustedIn).toBe('triads');
   });
 
+  it("confirm on the caged screen: adjustedIn is 'caged' iff applyInstrument returns true", () => {
+    spies();
+    const adj = vi.spyOn(caged, 'applyInstrument').mockReturnValue(true);
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('caged');
+    expect(adj).toHaveBeenCalled();
+    expect(instrument.adjustedIn).toBe('caged');
+
+    resetInstrumentForTests();
+    adj.mockReturnValue(false);
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('caged');
+    expect(instrument.adjustedIn).toBeNull();
+
+    resetInstrumentForTests();
+    adj.mockReturnValue(true);
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('notes');
+    expect(instrument.adjustedIn).toBeNull();
+  });
+
+  it('presentation-only changes and restore never set caged', () => {
+    spies();
+    vi.spyOn(caged, 'applyInstrument').mockReturnValue(true);
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.confirm('caged');
+    expect(instrument.adjustedIn).toBeNull();
+    instrument.restore({ ...DEFAULT_CONFIG, fretCount: 12 });
+    expect(instrument.adjustedIn).toBeNull();
+  });
+
   it('confirm: only the other tool adjusted → adjustedIn null', () => {
     spies(false, true);
     instrument.open();
