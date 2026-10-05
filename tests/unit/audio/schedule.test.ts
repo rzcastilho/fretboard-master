@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampBpm, planRequest } from '../../../src/lib/audio/schedule';
+import { clampBpm, MAX_TIMELINE_MS, planRequest } from '../../../src/lib/audio/schedule';
 import { STANDARD_GUITAR, type Instrument } from '../../../src/lib/instrument/instrument';
 
 const p = (string: number, fret: number) => ({ string, fret });
@@ -122,6 +122,111 @@ describe('planRequest rest step (007 US6, R-10)', () => {
       [1000, 1500],
       [1000, 1500],
       [1000, 1500]
+    ]);
+  });
+});
+
+describe('planRequest timeline (019, R-01)', () => {
+  it('one step per surviving event, each with its own onset and duration', () => {
+    const plan = planRequest(
+      {
+        kind: 'timeline',
+        events: [
+          { positions: [p(6, 0)], onsetMs: 0, durationMs: 1500 },
+          { positions: [p(5, 0)], onsetMs: 250, durationMs: 1500 },
+          { positions: [p(6, 0), p(5, 0), p(4, 0)], onsetMs: 1000, durationMs: 800 }
+        ]
+      },
+      STANDARD_GUITAR
+    );
+    expect(plan.kind).toBe('timeline');
+    expect(plan.steps.map((s) => [s.onsetMs, s.durationMs])).toEqual([
+      [0, 1500],
+      [250, 1500],
+      [1000, 800]
+    ]);
+    expect(plan.steps[2].pitches).toEqual([40, 45, 50]);
+    expect(plan.marks.map((m) => [m.onsetMs, m.endMs])).toEqual([
+      [0, 1500],
+      [250, 1750],
+      [1000, 1800],
+      [1000, 1800],
+      [1000, 1800]
+    ]);
+  });
+
+  it('clamps onset to 0..MAX_TIMELINE_MS and duration to 1..MAX_TIMELINE_MS', () => {
+    expect(MAX_TIMELINE_MS).toBe(60_000);
+    const plan = planRequest(
+      {
+        kind: 'timeline',
+        events: [
+          { positions: [p(6, 0)], onsetMs: -50, durationMs: 0 },
+          { positions: [p(5, 0)], onsetMs: 999_999, durationMs: 999_999 },
+          { positions: [p(4, 0)], onsetMs: Infinity, durationMs: 100 }
+        ]
+      },
+      STANDARD_GUITAR
+    );
+    expect(plan.steps.map((s) => [s.onsetMs, s.durationMs])).toEqual([
+      [0, 1],
+      [60_000, 60_000]
+    ]);
+  });
+
+  it('drops events with a non-finite onset or duration', () => {
+    const plan = planRequest(
+      {
+        kind: 'timeline',
+        events: [
+          { positions: [p(6, 0)], onsetMs: NaN, durationMs: 100 },
+          { positions: [p(5, 0)], onsetMs: 0, durationMs: NaN },
+          { positions: [p(4, 0)], onsetMs: 0, durationMs: -Infinity },
+          { positions: [p(3, 0)], onsetMs: 10, durationMs: 100 }
+        ]
+      },
+      STANDARD_GUITAR
+    );
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0].positions).toEqual([p(3, 0)]);
+  });
+
+  it('drops invalid and duplicate positions, and events left empty', () => {
+    const plan = planRequest(
+      {
+        kind: 'timeline',
+        events: [
+          { positions: [p(6, 0), p(6, 0), p(9, 0), p(5, 99)], onsetMs: 0, durationMs: 100 },
+          { positions: [p(9, 0)], onsetMs: 100, durationMs: 100 },
+          { positions: [], onsetMs: 200, durationMs: 100 }
+        ]
+      },
+      STANDARD_GUITAR
+    );
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0].positions).toEqual([p(6, 0)]);
+    expect(plan.marks).toHaveLength(1);
+  });
+
+  it('never throws on an empty timeline', () => {
+    const plan = planRequest({ kind: 'timeline', events: [] }, STANDARD_GUITAR);
+    expect(plan.steps).toEqual([]);
+    expect(plan.marks).toEqual([]);
+  });
+
+  it('note, chord and sequence plans are unchanged', () => {
+    expect(planRequest({ kind: 'note', position: p(6, 0) }, STANDARD_GUITAR).kind).toBe('note');
+    expect(planRequest({ kind: 'chord', positions: [p(6, 0)] }, STANDARD_GUITAR).kind).toBe(
+      'chord'
+    );
+    const seq = planRequest(
+      { kind: 'sequence', steps: [p(6, 0), p(5, 0)], bpm: 120 },
+      STANDARD_GUITAR
+    );
+    expect(seq.kind).toBe('sequence');
+    expect(seq.steps.map((s) => [s.onsetMs, s.durationMs])).toEqual([
+      [0, 500],
+      [500, 500]
     ]);
   });
 });

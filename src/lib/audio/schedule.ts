@@ -11,6 +11,8 @@ import type { PlannedStep, PlaybackRequest, Plan, TimeMark } from './types';
 export const NOTE_MS = 1500;
 export const MIN_BPM = 30;
 export const MAX_BPM = 300;
+/** Upper bound for a `timeline` event's onset and duration. */
+export const MAX_TIMELINE_MS = 60_000;
 
 /** NaN → 30, +∞ → 300, −∞ → 30. */
 export function clampBpm(bpm: number): number {
@@ -63,6 +65,13 @@ export function planRequest(request: PlaybackRequest, instrument: Instrument): P
     add(buildStep(instrument, [request.position], 0, NOTE_MS));
   } else if (request.kind === 'chord') {
     add(buildStep(instrument, request.positions, 0, NOTE_MS));
+  } else if (request.kind === 'timeline') {
+    for (const e of request.events) {
+      if (!Number.isFinite(e.onsetMs) || !Number.isFinite(e.durationMs)) continue;
+      const onset = Math.min(MAX_TIMELINE_MS, Math.max(0, e.onsetMs));
+      const duration = Math.min(MAX_TIMELINE_MS, Math.max(1, e.durationMs));
+      add(buildStep(instrument, e.positions, onset, duration));
+    }
   } else {
     const beat = 60000 / clampBpm(request.bpm);
     request.steps.forEach((s, i) => {

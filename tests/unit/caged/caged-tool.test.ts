@@ -13,6 +13,7 @@ vi.mock('../../../src/lib/state/links.svelte', async (orig) => ({
 
 import { AF_1_12, AF_1_24, AF_8 } from '../../../src/lib/instrument/fixtures';
 import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
+import { playback } from '../../../src/lib/state/playback.svelte';
 import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -35,7 +36,7 @@ describe('CagedTool', () => {
     expect(within(board).getAllByText('D shape · roots on strings 4, 2').length).toBeGreaterThan(0);
   });
 
-  it('has the Labels group (017) but no connection, focus, Listen or link buttons', () => {
+  it('has the Labels group (017) but no connection, focus or link buttons', () => {
     render(CagedTool);
     const labels = screen.getByRole('radiogroup', { name: 'Labels' });
     expect(
@@ -43,7 +44,7 @@ describe('CagedTool', () => {
         .getAllByRole('radio')
         .map((r) => r.getAttribute('aria-label') ?? r.textContent?.trim())
     ).toEqual(['Intervals', 'Note names']);
-    for (const name of [/layer/i, /connect/i, /focus/i, /listen/i, /link/i]) {
+    for (const name of [/layer/i, /connect/i, /focus/i, /link/i]) {
       expect(screen.queryByRole('button', { name })).toBeNull();
       expect(screen.queryByRole('radio', { name })).toBeNull();
       expect(screen.queryByRole('checkbox', { name })).toBeNull();
@@ -118,7 +119,7 @@ describe('CagedTool', () => {
     it('renders a status paragraph only when fewer than five shapes fit', () => {
       caged.useInstrument(AF_1_12);
       render(CagedTool);
-      const note = screen.getByRole('status');
+      const note = within(screen.getByRole('region', { name: 'Fretboard' })).getByRole('status');
       expect(note.tagName).toBe('P');
       expect(note.textContent).toBe('With 12 frets, 4 shapes fit on the fretboard');
     });
@@ -686,5 +687,82 @@ describe('Open in Triads (018 US3)', () => {
     await tick();
     expect(caged.display.triad?.handoff ?? null).toBeNull();
     expect(openButton()).toBeNull();
+  });
+});
+
+describe('CagedTool: Listen button (019 US1)', () => {
+  it('renders caged_listen and is enabled when a shape is drawn', () => {
+    render(CagedTool);
+    const b = screen.getByRole('button', { name: 'Listen' });
+    expect(b.getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('is aria-disabled, focusable and described by the visible reason when no shape fits', async () => {
+    caged.applyInstrument(AF_8, 'AF-8');
+    render(CagedTool);
+    const b = screen.getByRole('button', { name: 'Listen' });
+    expect(b.getAttribute('aria-disabled')).toBe('true');
+    expect(b.hasAttribute('disabled')).toBe(false);
+    b.focus();
+    expect(document.activeElement).toBe(b);
+    const reason = document.getElementById(must(b.getAttribute('aria-describedby')));
+    expect(reason?.textContent?.trim()).toBeTruthy();
+    expect(reason?.textContent).toBe(caged.display.listen.reason);
+  });
+
+  it('announces the playing layer and shape (empty while idle)', async () => {
+    const playing = vi.spyOn(playback, 'sequencePlaying', 'get').mockReturnValue(true);
+    vi.spyOn(playback, 'timeline').mockImplementation(() => []);
+    caged.chooseShape('E');
+    render(CagedTool);
+    const status = () => document.querySelector('[data-listen-status]');
+    expect(status()?.getAttribute('role')).toBe('status');
+    expect(status()?.textContent?.trim()).toBe('');
+    await fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
+    await tick();
+    expect(status()?.textContent?.trim()).toBe('Playing: Chord, E shape');
+    caged.chooseShape('all');
+    await fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
+    await tick();
+    expect(status()?.textContent?.trim()).toBe('Playing every shape');
+    playing.mockRestore();
+    vi.restoreAllMocks();
+  });
+});
+
+describe('CagedTool: Tempo radiogroup (019 US2)', () => {
+  const radios = () =>
+    within(screen.getByRole('radiogroup', { name: 'Tempo' })).getAllByRole('radio');
+
+  it('is labelled Tempo and offers Slow, Medium and Fast', () => {
+    render(CagedTool);
+    expect(radios().map((r) => r.textContent?.trim())).toEqual(['Slow', 'Medium', 'Fast']);
+  });
+
+  it('has Medium selected by default', () => {
+    render(CagedTool);
+    expect(radios().map((r) => r.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
+  });
+
+  it('arrow keys move the selection and the store', async () => {
+    render(CagedTool);
+    const medium = must(radios()[1]);
+    medium.focus();
+    await fireEvent.keyDown(medium, { key: 'ArrowRight' });
+    await tick();
+    expect(caged.tempo).toBe('fast');
+    expect(radios()[2].getAttribute('aria-checked')).toBe('true');
+    await fireEvent.keyDown(radios()[2], { key: 'ArrowLeft' });
+    await fireEvent.keyDown(radios()[1], { key: 'ArrowLeft' });
+    await tick();
+    expect(caged.tempo).toBe('slow');
+  });
+
+  it('clicking an option selects it', async () => {
+    render(CagedTool);
+    await fireEvent.click(must(radios()[0]));
+    await tick();
+    expect(caged.tempo).toBe('slow');
+    expect(radios()[0].getAttribute('aria-checked')).toBe('true');
   });
 });

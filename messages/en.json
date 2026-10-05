@@ -341,5 +341,17 @@
   "caged_group_labels": "Labels",
   "caged_label_intervals": "Intervals",
   "caged_label_note_names": "Note names",
-  "caged_rotate_hint": "Turn your phone sideways to see more of the neck."
+  "caged_rotate_hint": "Turn your phone sideways to see more of the neck.",
+  "caged_listen": "Listen",
+  "caged_listen_reason_no_shapes": "No shapes to play",
+  "caged_listen_reason_no_fit": "No shape fits on the fretboard",
+  "caged_listen_playing_layer": "Playing: {layer}, {shape} shape",
+  "caged_listen_playing_all": "Playing every shape",
+  "caged_tempo_label": "Tempo",
+  "caged_tempo_slow": "Slow",
+  "caged_tempo_medium": "Medium",
+  "caged_tempo_fast": "Fast",
+  "notes_card_caged": "CAGED in this key",
+  "triads_view_in_caged": "View in CAGED",
+  "triads_view_in_caged_unavailable": "CAGED covers major and minor chords"
 }

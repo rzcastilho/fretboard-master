@@ -399,3 +399,170 @@ test.describe('linked tools: CAGED triad round trip (018 US3)', () => {
     ).toBeChecked();
   });
 });
+
+const cagedKey = (page: Page, name: string) =>
+  page.getByRole('group', { name: 'Key' }).getByRole('button', { name, exact: true });
+const cagedQuality = (page: Page, name: 'Major' | 'Minor') =>
+  page.getByRole('radiogroup', { name: 'Quality' }).getByRole('radio', { name, exact: true });
+const tool = (page: Page, name: string) => nav(page).getByRole('link', { name, exact: true });
+
+test.describe('linked tools: CAGED carry (019 US3)', () => {
+  test('Notes (B♭ only) → CAGED B♭ with the previous quality', async ({ page }) => {
+    await page.goto('/caged');
+    await cagedQuality(page, 'Minor').click();
+    await tool(page, 'Fretboard Notes').click();
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await note(page, 'A sharp or B flat').click();
+    await tool(page, 'CAGED').click();
+    await expect(cagedKey(page, 'A sharp or B flat')).toHaveAttribute('aria-pressed', 'true');
+    await expect(cagedQuality(page, 'Minor')).toBeChecked();
+  });
+
+  test('CAGED A minor → Notes with A, C and E selected', async ({ page }) => {
+    await page.goto('/caged');
+    await cagedKey(page, 'A').click();
+    await cagedQuality(page, 'Minor').click();
+    await tool(page, 'Fretboard Notes').click();
+    for (const n of ['A', 'C', 'E']) {
+      await expect(note(page, n)).toHaveAttribute('aria-pressed', 'true');
+    }
+    await expect(detected(page)).toContainText('A minor');
+  });
+
+  test('Triads B diminished → CAGED B major', async ({ page }) => {
+    await page.goto('/triads');
+    await rootButton(page, 'B').click();
+    await radio(page, 'diminished').click();
+    await tool(page, 'CAGED').click();
+    await expect(cagedKey(page, 'B')).toHaveAttribute('aria-pressed', 'true');
+    await expect(cagedQuality(page, 'Major')).toBeChecked();
+  });
+
+  test('CAGED D major → Triads D major with inversion and set unchanged', async ({ page }) => {
+    await page.goto('/triads');
+    await radio(page, '1st inversion').click();
+    await tool(page, 'CAGED').click();
+    await cagedKey(page, 'D').click();
+    await tool(page, 'Triads').click();
+    await expect(page.getByText('D major — 1st inversion', { exact: true })).toBeVisible();
+  });
+
+  test('Notes with two notes → CAGED as left', async ({ page }) => {
+    await page.goto('/caged');
+    await cagedKey(page, 'G').click();
+    await tool(page, 'Fretboard Notes').click();
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await pick(page, 'A', 'D');
+    await tool(page, 'CAGED').click();
+    await expect(cagedKey(page, 'G')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('reload, Back/Forward and deep links never carry', async ({ page }) => {
+    await page.goto('/notes');
+    await note(page, 'F').click();
+    await tool(page, 'CAGED').click();
+    await expect(cagedKey(page, 'F')).toHaveAttribute('aria-pressed', 'true');
+    await cagedKey(page, 'E').click();
+    await page.goBack();
+    await page.goForward();
+    await expect(cagedKey(page, 'E')).toHaveAttribute('aria-pressed', 'true');
+    await page.reload();
+    await expect(cagedKey(page, 'C')).toHaveAttribute('aria-pressed', 'true');
+    await page.goto('/notes');
+    await expect(note(page, 'F')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('A♯ major shows the Switch to B♭ guidance and 𝄪 where needed', async ({ page }) => {
+    await page.goto('/triads');
+    await rootButton(page, 'A sharp or B flat').click();
+    const sw = page.getByRole('button', { name: /switch to/i });
+    if (!/B♭/.test((await sw.textContent()) ?? '')) await sw.click();
+    await tool(page, 'CAGED').click();
+    await expect(cagedKey(page, 'A sharp or B flat')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Switch to B♭', exact: true })).toBeVisible();
+    await page.getByRole('radio', { name: 'Note names', exact: true }).click();
+    await expect(page.getByText(/C𝄪/).first()).toBeVisible();
+  });
+});
+
+const cagedLayerSwitch = (page: Page, name: string) =>
+  page.getByRole('switch', { name, exact: true });
+const viewInCaged = (page: Page) =>
+  page.getByRole('button', { name: 'View in CAGED', exact: true });
+const cagedInThisKey = (page: Page) =>
+  card(page).getByRole('button', { name: 'CAGED in this key', exact: true });
+const unavailableNote = (page: Page) =>
+  page.getByText('CAGED covers major and minor chords', { exact: true });
+
+test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
+  test('Notes position card on a G → CAGED in this key → CAGED in G; Back returns in one step', async ({
+    page
+  }) => {
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    await cell(page, 1, 3).click(); // string 1, fret 3 = G
+    await expect(card(page)).toBeVisible();
+    await cagedInThisKey(page).click();
+    await expect(page).toHaveURL(/\/caged$/);
+    await expect(cagedKey(page, 'G')).toHaveAttribute('aria-pressed', 'true');
+    await page.goBack();
+    await expect(page).toHaveURL(/\/notes$/);
+  });
+
+  test('Triads B♭ minor → View in CAGED → CAGED B♭ minor, Triad on, a shape focused', async ({
+    page
+  }) => {
+    await page.goto('/triads');
+    await rootButton(page, 'A sharp or B flat').click();
+    await radio(page, 'minor').click();
+    await viewInCaged(page).click();
+    await expect(page).toHaveURL(/\/caged$/);
+    await expect(cagedKey(page, 'A sharp or B flat')).toHaveAttribute('aria-pressed', 'true');
+    await expect(cagedQuality(page, 'Minor')).toBeChecked();
+    await expect(cagedLayerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'true');
+    await expect(
+      page
+        .getByRole('radiogroup', { name: 'Shape' })
+        .getByRole('radio', { name: 'See all', exact: true })
+    ).not.toBeChecked();
+  });
+
+  for (const [quality, root] of [
+    ['augmented', 'C'],
+    ['diminished', 'B']
+  ] as const) {
+    test(`Triads ${root} ${quality}: View in CAGED is focusable, does nothing, note visible`, async ({
+      page
+    }) => {
+      await page.goto('/triads');
+      await rootButton(page, root).click();
+      await radio(page, quality).click();
+      const btn = viewInCaged(page);
+      await expect(btn).toHaveAttribute('aria-disabled', 'true');
+      await expect(unavailableNote(page)).toBeVisible();
+      await btn.focus();
+      await expect(btn).toBeFocused();
+      await btn.click({ force: true }); // aria-disabled: Playwright treats as not enabled
+      await expect(page).toHaveURL(/\/triads$/);
+    });
+  }
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`axe clean: Notes card and Triads View in CAGED enabled and disabled (${colorScheme})`, async ({
+      page
+    }) => {
+      await page.emulateMedia({ colorScheme });
+      await page.goto('/notes');
+      await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+      await cell(page, 1, 3).click();
+      await expect(cagedInThisKey(page)).toBeVisible();
+      await runAxe(page);
+      await page.goto('/triads');
+      await expect(viewInCaged(page)).toHaveAttribute('aria-disabled', 'false');
+      await runAxe(page);
+      await radio(page, 'augmented').click();
+      await expect(unavailableNote(page)).toBeVisible();
+      await runAxe(page);
+    });
+  }
+});

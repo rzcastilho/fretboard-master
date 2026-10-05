@@ -9,7 +9,15 @@ import type { PitchClass } from '$lib/theory/pitch';
 import type { ScreenId } from '$lib/shell/screens';
 import type { ToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
-import { carryFromDetected, carryFromNotes, carryFromTriads } from './links';
+import {
+  cagedTriadCarry,
+  carryFromCaged,
+  carryFromDetected,
+  carryFromNotes,
+  carryFromTriads,
+  cagedCanShow,
+  carryTriadsToCaged
+} from './links';
 import { notes } from './notes.svelte';
 import { triads } from './triads.svelte';
 
@@ -17,8 +25,22 @@ export type LinkedTool = ToolId;
 
 /** Apply the carry for a user switch `from → to` (nav link). No-op if `from === to`. */
 export function linkTools(from: ScreenId, to: LinkedTool): void {
-  if (from === to || from === 'caged' || to === 'caged') return;
-  if (from === 'notes' && to === 'triads') {
+  if (from === to) return;
+  if (from === 'notes' && to === 'caged') {
+    const ctx = carryFromNotes(notes.state);
+    // Same key: keep the spelling and focus the user already has.
+    if (ctx?.kind === 'root' && ctx.rootPc !== caged.state.rootPc) {
+      caged.carry({ rootPc: ctx.rootPc, quality: caged.state.quality, spelling: 'none' });
+    }
+  } else if (from === 'caged' && to === 'notes') {
+    const ctx = carryFromCaged(caged.state);
+    if (ctx.kind === 'notes') notes.carrySelection(ctx.selection);
+  } else if (from === 'triads' && to === 'caged') {
+    caged.carry(carryTriadsToCaged(triads.state));
+  } else if (from === 'caged' && to === 'triads') {
+    const c = cagedTriadCarry(caged.state);
+    triads.carryTriad(c.rootPc, c.quality, c.spelling);
+  } else if (from === 'notes' && to === 'triads') {
     const ctx = carryFromNotes(notes.state);
     if (ctx?.kind === 'root') triads.carryRoot(ctx.rootPc);
   } else if (from === 'triads' && to === 'notes') {
@@ -41,6 +63,22 @@ export async function viewAsTriad(): Promise<void> {
 export async function openTriadsFromNote(pc: PitchClass): Promise<void> {
   triads.carryRoot(pc);
   await goto(resolve('/triads'));
+}
+
+/** Position card "CAGED in this key": the pitch class becomes the key, quality kept, Notes untouched. */
+export async function openCagedFromNote(pc: PitchClass): Promise<void> {
+  if (pc !== caged.state.rootPc) {
+    caged.carry({ rootPc: pc, quality: caged.state.quality, spelling: 'none' });
+  }
+  await goto(resolve('/caged'));
+}
+
+/** Triads "View in CAGED": carry the chord, show its triad, open CAGED. No-op for dim/aug. */
+export async function openCagedFromTriads(): Promise<void> {
+  if (!cagedCanShow(triads.state.quality)) return;
+  caged.carry(carryTriadsToCaged(triads.state));
+  caged.showTriadLayer();
+  await goto(resolve('/caged'));
 }
 
 /** CAGED non-compatible notice "Go to Triads": no musical context carried, preferred tuning kept. */

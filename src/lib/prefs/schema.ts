@@ -23,6 +23,7 @@ import type { LabelType } from '$lib/state/notes-view';
 import type { CagedLabelType } from '$lib/state/caged-view';
 import type { TriadsLabelType } from '$lib/state/triads-view';
 import type { ToolId } from '$lib/shell/tools';
+import type { Tempo } from '$lib/state/listen';
 
 export interface Preferences {
   /** 6 or 7 (012); absent or invalid in a stored record → 6. */
@@ -48,6 +49,8 @@ export interface Preferences {
   readonly orientation: Orientation;
   /** 016; absent or invalid in a stored record → false. Stored as `rotateHint`, only when true. */
   readonly rotateHintShown: boolean;
+  /** 019; absent or invalid in a stored record → 'medium'. Stored only when not 'medium'. */
+  readonly tempo: Tempo;
 }
 
 export const PREFS_VERSION = 1 as const;
@@ -67,11 +70,13 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   labels: Object.freeze({ notes: 'name', triads: 'interval', caged: 'interval' }),
   handedness: 'right',
   orientation: 'highest-top',
-  rotateHintShown: false
+  rotateHintShown: false,
+  tempo: 'medium'
 });
 
 const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
 const TRIADS_LABELS = ['interval', 'name'] as const satisfies readonly TriadsLabelType[];
+const TEMPO_VALUES = ['slow', 'medium', 'fast'] as const satisfies readonly Tempo[];
 const CAGED_LABELS = ['interval', 'name'] as const satisfies readonly CagedLabelType[];
 
 const d = DEFAULT_PREFERENCES;
@@ -110,7 +115,8 @@ const recordSchema = v.object({
   ),
   handedness: v.fallback(v.picklist(['right', 'left']), d.handedness),
   orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation),
-  rotateHint: v.fallback(v.boolean(), d.rotateHintShown)
+  rotateHint: v.fallback(v.boolean(), d.rotateHintShown),
+  tempo: v.fallback(v.picklist(TEMPO_VALUES), d.tempo)
 });
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -137,7 +143,8 @@ export function parsePreferences(raw: string | null): Preferences {
       labels: { notes: r.labels.notes, triads: r.labels.triads, caged: r.labels.caged },
       handedness: r.handedness,
       orientation: r.orientation,
-      rotateHintShown: r.rotateHint
+      rotateHintShown: r.rotateHint,
+      tempo: r.tempo
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -157,7 +164,8 @@ export function tuningOfPreferences(p: Preferences): Tuning {
 /**
  * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
  * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013),
- * `rotateHint` only when true (016), `labels.caged` only when `'name'` (017).
+ * `rotateHint` only when true (016), `labels.caged` only when `'name'` (017),
+ * `tempo` (after `rotateHint`) only when not `'medium'` (019).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -176,6 +184,7 @@ export function serializePreferences(p: Preferences): string {
     },
     ...(p.handedness === 'left' ? { handedness: 'left' } : {}),
     ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {}),
-    ...(p.rotateHintShown ? { rotateHint: true } : {})
+    ...(p.rotateHintShown ? { rotateHint: true } : {}),
+    ...(p.tempo === 'medium' ? {} : { tempo: p.tempo })
   });
 }

@@ -42,6 +42,12 @@ requests after load, safe across version skew). The constitution allows Karplus-
 - Long sustains cost main-thread time at request time instead of real-time CPU in a worklet. This
   is acceptable at the 1.5 s note length. Revisit if notes become much longer.
 - DSP, mixing and limiting are covered by plain unit tests.
+- **Addendum (feature 019): `timeline` request kind.** CAGED Listen adds a `timeline` playback
+  request next to `note`, `chord` and `sequence`. It is a planned list of timed onsets (with
+  durations, pulses and clamps) that the same main-thread engine schedules and mixes through the
+  existing voice, limiter and mute graph. The architecture is unchanged: no worklet, no new
+  request or chunk. Like `sequence`, a `timeline` counts as sequence playback, so focus and layer
+  changes stop it, while a single tapped note keeps playing.
 
 ## Alternatives considered
 

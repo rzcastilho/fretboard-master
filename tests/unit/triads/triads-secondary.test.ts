@@ -107,7 +107,8 @@ describe('TriadsSecondary Listen to comparison (007 US6)', () => {
     const fn = vi.fn();
     render(TriadsSecondary, props(true, false, fn));
     const names = screen.getAllByRole('button').map((b) => b.textContent?.trim());
-    expect(names.indexOf('Listen to comparison')).toBe(names.indexOf('Listen') + 1);
+    // View in CAGED (019) sits directly after Listen, so the comparison command follows it.
+    expect(names.indexOf('Listen to comparison')).toBe(names.indexOf('Listen') + 2);
     const b = screen.getByRole('button', { name: 'Listen to comparison' });
     expect(b.getAttribute('aria-disabled')).toBe('true');
     await fireEvent.click(b);
@@ -119,5 +120,48 @@ describe('TriadsSecondary Listen to comparison (007 US6)', () => {
     render(TriadsSecondary, props(true, true, fn));
     await fireEvent.click(screen.getByRole('button', { name: 'Listen to comparison' }));
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('TriadsSecondary View in CAGED (019 US4)', () => {
+  function mountCaged(enabled: boolean) {
+    const onviewincaged = vi.fn();
+    render(TriadsSecondary, {
+      labelType: 'interval',
+      onlabeltype: vi.fn(),
+      octave: { applies: true, up: true, down: true },
+      onoctaveup: vi.fn(),
+      onoctavedown: vi.fn(),
+      listen: { enabled: true },
+      onlisten: vi.fn(),
+      viewInCaged: { enabled },
+      onviewincaged,
+      onreset: vi.fn()
+    });
+    return onviewincaged;
+  }
+
+  it('is enabled for major and minor, with no note, after Listen', async () => {
+    const onviewincaged = mountCaged(true);
+    const names = screen.getAllByRole('button').map((b) => b.textContent?.trim());
+    expect(names.indexOf('View in CAGED')).toBe(names.indexOf('Listen') + 1);
+    const btn = screen.getByRole('button', { name: 'View in CAGED' });
+    expect(btn.getAttribute('aria-disabled')).toBe('false');
+    expect(screen.queryByText('CAGED covers major and minor chords')).toBeNull();
+    await fireEvent.click(btn);
+    expect(onviewincaged).toHaveBeenCalledTimes(1);
+  });
+
+  it('disabled: aria-disabled, focusable, ignores activation, described by the visible note', async () => {
+    const onviewincaged = mountCaged(false);
+    const btn = screen.getByRole('button', { name: 'View in CAGED' });
+    expect(btn.getAttribute('aria-disabled')).toBe('true');
+    expect(btn.hasAttribute('disabled')).toBe(false);
+    btn.focus();
+    expect(document.activeElement).toBe(btn);
+    const note = screen.getByText('CAGED covers major and minor chords');
+    expect(btn.getAttribute('aria-describedby')).toBe(note.id);
+    await fireEvent.click(btn);
+    expect(onviewincaged).not.toHaveBeenCalled();
   });
 });

@@ -360,7 +360,7 @@ export function createPlaybackEngine(
       halt('interrupt');
       const current: ActiveRequest = {
         id: nextRequestId++,
-        sequence: plan.kind === 'sequence',
+        sequence: plan.kind === 'sequence' || plan.kind === 'timeline',
         voices: [],
         livePulses: new Set()
       };

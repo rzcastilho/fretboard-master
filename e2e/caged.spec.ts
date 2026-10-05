@@ -71,9 +71,11 @@ test.describe('caged US1: five linked shapes', () => {
     await expect(roots.first()).toBeAttached();
     expect(await roots.count()).toBeGreaterThan(0);
     await expect(roots.locator('rect.glyph')).toHaveCount(await roots.count());
-    // The radios are the Quality group (US3), the Shape selector (016) and the Labels group (017).
-    await expect(page.getByRole('radio')).toHaveCount(10);
-    await expect(page.getByRole('radiogroup')).toHaveCount(3);
+    // The radios are the Quality group (US3), the Shape selector (016), the Labels group (017)
+    // and the Listen Tempo group (019).
+    await expect(page.getByRole('radio')).toHaveCount(13);
+    await expect(page.getByRole('radiogroup')).toHaveCount(4);
+    await expect(page.getByRole('radiogroup', { name: 'Tempo' })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'Quality' })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'Shape' })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'Labels' })).toBeVisible();
@@ -380,14 +382,17 @@ test.describe('caged US5: other tunings', () => {
 test.describe('caged US6: behaves like the other tools', () => {
   const nav = (page: Page) => page.getByRole('navigation', { name: 'Tools' });
 
-  test('Q20: G minor survives a visit to Triads; Triads is untouched', async ({ page }) => {
+  // 019 FR-1.6 supersedes 014 Q20's "Triads is untouched": a nav switch now carries the chord
+  test('Q20: G minor survives a visit to Triads, which receives the carried chord', async ({
+    page
+  }) => {
     await page.goto('/caged');
     await key(page, 7).click();
     await qualityRadio(page, 'Minor').click();
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
     await nav(page).getByRole('link', { name: 'Triads' }).click();
     await expect(page).toHaveURL(/\/triads$/);
-    await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
+    await expect(page.getByText('G minor — Root position', { exact: true })).toBeVisible();
     await nav(page).getByRole('link', { name: 'CAGED' }).click();
     await expect(page).toHaveURL(/\/caged$/);
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
@@ -510,7 +515,13 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
         const group = el.closest('[role="radiogroup"]');
         if (group) {
           const name = group.getAttribute('aria-label');
-          return name === 'Shape' ? 'shape' : name === 'Labels' ? 'labels' : 'quality';
+          return name === 'Shape'
+            ? 'shape'
+            : name === 'Labels'
+              ? 'labels'
+              : name === 'Tempo'
+                ? 'tempo'
+                : 'quality';
         }
         if (el.closest('[role="group"][aria-label="Key"]')) return 'key';
         if (el.getAttribute('role') === 'switch') return 'connections';
@@ -523,6 +534,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
         if (el.classList.contains('tag')) return 'tags';
         if (/^(Previous|Next) shape$/.test((el.textContent ?? '').trim())) return 'steps';
         if ((el.textContent ?? '').trim() === 'Reset tool') return 'reset';
+        if ((el.textContent ?? '').trim() === 'Listen') return 'listen';
         return `other:${el.tagName}:${(el.textContent ?? '').trim().slice(0, 20)}`;
       });
     const seen: string[] = [];
@@ -537,6 +549,8 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
       'quality',
       'switch',
       'shape',
+      'listen',
+      'tempo',
       'tags',
       'board',
       'labels',

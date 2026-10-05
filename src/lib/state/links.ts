@@ -7,9 +7,11 @@ import type { PitchClass } from '../theory/pitch';
 import { QUALITY_INTERVALS, isAlteredRoot, type Quality } from '../theory/triad';
 import type { TriadMatch } from '../theory/triad-detect';
 import type { NotesViewState } from './notes-view';
+import type { CagedQuality } from '../theory/caged';
+import { cagedRootSpelling, type CagedViewState } from './caged-view';
 import type { TriadsHandoff } from './caged-triad';
 import { setOpenPitches } from '../instrument/string-sets';
-import { defaultRootSpelling, spellTriad } from '../theory/triad';
+import { choiceOf, defaultRootSpelling, spellTriad } from '../theory/triad';
 import { occurrences, pairOccurrences, triadShape } from '../theory/triad-shape';
 import {
   equalsTriadsView,
@@ -58,6 +60,53 @@ export function carryFromTriads(t: TriadsViewState): CarryContext {
     kind: 'notes',
     selection: [t.rootPc, (t.rootPc + third) % 12, (t.rootPc + fifth) % 12]
   };
+}
+
+/** What a carry sets in CAGED (data-model §7). */
+export interface CagedCarry {
+  readonly rootPc: PitchClass;
+  readonly quality: CagedQuality;
+  readonly spelling: SpellingOverride;
+}
+
+/** CAGED can draw only major and minor. */
+export function cagedCanShow(q: Quality): q is CagedQuality {
+  return q === 'major' || q === 'minor';
+}
+
+/** CAGED → Notes: the chord's three notes (R-11). */
+export function carryFromCaged(c: CagedViewState): CarryContext {
+  const { third, fifth } = QUALITY_INTERVALS[c.quality];
+  return {
+    kind: 'notes',
+    selection: [c.rootPc, (c.rootPc + third) % 12, (c.rootPc + fifth) % 12]
+  };
+}
+
+/** Triads → CAGED: major and minor carry whole; diminished and augmented become the root's major. */
+export function carryTriadsToCaged(t: TriadsViewState): CagedCarry {
+  return cagedCanShow(t.quality)
+    ? { rootPc: t.rootPc, quality: t.quality, spelling: t.spellingOverride }
+    : { rootPc: t.rootPc, quality: 'major', spelling: 'none' };
+}
+
+/** CAGED → Triads: the spelling shown is kept so the same letters appear. */
+export function cagedTriadCarry(c: CagedViewState): {
+  readonly rootPc: PitchClass;
+  readonly quality: Quality;
+  readonly spelling: SpellingOverride;
+} {
+  const spelling: SpellingOverride = choiceOf(c.rootPc, cagedRootSpelling(c)) ?? 'none';
+  return { rootPc: c.rootPc, quality: c.quality, spelling };
+}
+
+/** Set root, spelling and quality as if the user picked them; same object when nothing changes. */
+export function carryIntoCaged(c: CagedViewState, k: CagedCarry): CagedViewState {
+  if (!validPc(k.rootPc)) return c;
+  if (k.rootPc === c.rootPc && k.spelling === c.spellingOverride && k.quality === c.quality) {
+    return c;
+  }
+  return { ...c, rootPc: k.rootPc, spellingOverride: k.spelling, quality: k.quality };
 }
 
 export function carryRoot(t: TriadsViewState, pc: PitchClass): TriadsViewState {

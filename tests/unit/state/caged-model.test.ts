@@ -1303,3 +1303,78 @@ describe('Triad layer model: tunings (018 US5)', () => {
     expect(v.triadSet).toBe(3);
   });
 });
+
+describe('display.listen (019)', () => {
+  const layersOn = (
+    l: Partial<Record<'chord' | 'arpeggio' | 'pentatonic' | 'scale' | 'triad', boolean>>
+  ) => ({
+    chord: false,
+    arpeggio: false,
+    pentatonic: false,
+    scale: false,
+    triad: false,
+    ...l
+  });
+
+  it('enabled iff there is an occurrence; no reason; all-chords source with no focus', () => {
+    const d = buildCagedModel(view, STANDARD_GUITAR);
+    expect(d.occurrences.length).toBeGreaterThan(0);
+    expect(d.listen).toEqual({ enabled: true, reason: null, source: { kind: 'all-chords' } });
+  });
+
+  it('source follows the widest layer on for the focused shape', () => {
+    const focused = setFocus(view, { letter: 'A', ordinal: 0 });
+    const d = buildCagedModel(
+      { ...focused, layers: layersOn({ chord: true, arpeggio: true }) },
+      STANDARD_GUITAR
+    );
+    expect(d.listen.source).toEqual({ kind: 'shape', layer: 'arpeggio', letter: 'A' });
+    const s = buildCagedModel(
+      { ...focused, layers: layersOn({ chord: true, scale: true }) },
+      STANDARD_GUITAR
+    );
+    expect(s.listen.source).toEqual({ kind: 'shape', layer: 'scale', letter: 'A' });
+  });
+
+  it('Triad on with a triad available makes triad the source', () => {
+    const focused = setFocus(view, { letter: 'E', ordinal: 0 });
+    const d = buildCagedModel(
+      { ...focused, layers: layersOn({ chord: true, triad: true }), triadSet: 3 },
+      STANDARD_GUITAR
+    );
+    expect(d.listen.source).toEqual({ kind: 'shape', layer: 'triad', letter: 'E' });
+  });
+
+  it('non-compatible tuning without the temporary view: disabled, no shapes reason', () => {
+    const d = buildCagedModel(view, AF_8, { tuningName: 'Open G', temporary: false });
+    expect(d.listen).toEqual({
+      enabled: false,
+      reason: 'No shapes to play',
+      source: null
+    });
+  });
+
+  it('no shape fits the fret count: disabled, no fit reason', () => {
+    const d = buildCagedModel(view, { ...STANDARD_GUITAR, fretCount: 2 });
+    expect(d.occurrences).toEqual([]);
+    expect(d.tuningClass).toBe('compatible');
+    expect(d.listen).toEqual({
+      enabled: false,
+      reason: 'No shape fits on the fretboard',
+      source: null
+    });
+  });
+
+  it('pitches come from the effective instrument: the temporary standard view plays standard', () => {
+    const d = buildCagedModel(view, STANDARD_GUITAR, { tuningName: 'Standard', temporary: true });
+    expect(d.listen.enabled).toBe(true);
+    for (const p of d.positions) {
+      expect(p.pitch).toBe(positionPitch(STANDARD_GUITAR, { string: p.string, fret: p.fret }));
+    }
+  });
+
+  it('Half step down: listen is enabled', () => {
+    const half = buildCagedModel(view, AF_2);
+    expect(half.listen.enabled).toBe(true);
+  });
+});

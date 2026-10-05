@@ -393,3 +393,38 @@ describe('playback.restore (010)', () => {
     expect(t.createContext).not.toHaveBeenCalled();
   });
 });
+
+describe('playback.timeline (019)', () => {
+  const events = [
+    { positions: [{ string: 6, fret: 0 }], onsetMs: 0, durationMs: 1500 },
+    { positions: [{ string: 5, fret: 0 }], onsetMs: 250, durationMs: 1500 }
+  ];
+
+  it('is gesture-only like sequence: marks unlocked, returns marks, sets sequencePlaying', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    expect(playback.availability).toBe('idle');
+    const marks = playback.timeline(events, STANDARD_GUITAR);
+    expect(playback.availability).toBe('on');
+    expect(marks.map((m) => [m.onsetMs, m.endMs])).toEqual([
+      [0, 1500],
+      [250, 1750]
+    ]);
+    expect(playback.sequencePlaying).toBe(true);
+    await flush();
+    expect(d.rendered).toEqual([40, 45]);
+    d.deps.clock.advance(1750);
+    expect(playback.sequencePlaying).toBe(false);
+  });
+
+  it('stop() ends it', async () => {
+    const d = deps();
+    resetPlaybackForTests(d.deps);
+    playback.preload();
+    await flush();
+    playback.timeline(events, STANDARD_GUITAR);
+    playback.stop('view');
+    expect(playback.sequencePlaying).toBe(false);
+    expect(playback.pulses).toEqual([]);
+  });
+});

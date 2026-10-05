@@ -48,6 +48,7 @@ export const preferences = {
     notes.restoreLabelType(p.labels.notes);
     triads.restoreLabelType(p.labels.triads);
     caged.restoreLabelType(p.labels.caged);
+    caged.restoreTempo(p.tempo);
     lastTool = p.lastTool;
     rotateHintShown = p.rotateHintShown;
     if (!session.available && !noticeShown) {
@@ -95,6 +96,7 @@ export const preferences = {
       notes.restoreLabelType(d.labels.notes);
       triads.restoreLabelType(d.labels.triads);
       caged.restoreLabelType(d.labels.caged);
+      caged.restoreTempo(d.tempo);
     }
     lastTool = null;
     rotateHintShown = false;

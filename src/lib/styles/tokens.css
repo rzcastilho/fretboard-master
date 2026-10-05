@@ -16,6 +16,7 @@
   /* Disabled controls: greyed, never error red (feature 006) */
   --color-disabled-text: #6b7280;
   --color-disabled-border: #d1d5db;
+  --disabled-opacity: 0.6;
   --color-focus-ring: #0b5cad;
   --color-notice-surface: #e8eef6;
   --color-notice-text: #1a1d21;

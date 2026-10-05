@@ -18,6 +18,7 @@
   import { onMount } from 'svelte';
   import CagedControls from './CagedControls.svelte';
   import CagedFocusControls from './CagedFocusControls.svelte';
+  import CagedListen from './CagedListen.svelte';
   import CagedLayerList from './CagedLayerList.svelte';
   import CagedTriadSets from './CagedTriadSets.svelte';
   import ChoiceGroup from '../ChoiceGroup.svelte';
@@ -82,6 +83,14 @@
     drawn={caged.display.drawnLetters}
     disabled={caged.display.tuningClass === 'non-compatible'}
     onchoose={(c) => caged.chooseShape(c)}
+  />
+  <CagedListen
+    enabled={caged.display.listen.enabled}
+    reason={caged.display.listen.reason}
+    listening={caged.listening}
+    onlisten={() => caged.listen()}
+    tempo={caged.tempo}
+    ontempo={(t) => caged.setTempo(t)}
   />
   <p class="key">{caged.display.keyName}</p>
 </section>

@@ -22,6 +22,7 @@ const props = (info: CardInfo, over: Record<string, unknown> = {}) => ({
   onaddnote: () => {},
   onclose: () => {},
   ontriads: () => {},
+  oncaged: () => {},
   ...over
 });
 
@@ -94,7 +95,7 @@ describe('PositionCard', () => {
     expect(onclose).toHaveBeenCalledTimes(1);
   });
 
-  it('has a Triads from this note button before Close, and no CAGED button', () => {
+  it('has a Triads from this note button before Close', () => {
     const { container } = render(PositionCard, props(A3));
     const labels = [...container.querySelectorAll('.actions button')].map((b) =>
       b.textContent?.trim()
@@ -103,7 +104,6 @@ describe('PositionCard', () => {
     expect(labels.indexOf('Triads from this note')).toBeLessThan(
       labels.indexOf('Close position card')
     );
-    expect(screen.queryByRole('button', { name: /CAGED/i })).toBeNull();
   });
 
   it('Triads from this note calls ontriads with the pitch class and is keyboard focusable', async () => {
@@ -115,5 +115,20 @@ describe('PositionCard', () => {
     await fireEvent.click(button);
     expect(ontriads).toHaveBeenCalledWith(9);
     expect(ontriads).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('PositionCard CAGED in this key (019 US4)', () => {
+  it('renders after "Triads from this note" and calls oncaged with the pitch class', async () => {
+    const oncaged = vi.fn();
+    render(PositionCard, props(A3, { oncaged }));
+    const names = screen.getAllByRole('button').map((b) => b.textContent?.trim());
+    expect(names.indexOf('CAGED in this key')).toBe(names.indexOf('Triads from this note') + 1);
+    const btn = screen.getByRole('button', { name: 'CAGED in this key' });
+    btn.focus();
+    expect(document.activeElement).toBe(btn);
+    await fireEvent.click(btn);
+    expect(oncaged).toHaveBeenCalledTimes(1);
+    expect(oncaged).toHaveBeenCalledWith(9);
   });
 });

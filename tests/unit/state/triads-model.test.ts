@@ -1285,3 +1285,11 @@ describe('triads model Listen to comparison (007 US6, M9)', () => {
     expect(build(g(), NC_UNISON).listenComparison.enabled).toBe(false);
   });
 });
+
+describe('triads model View in CAGED (019 US4)', () => {
+  const qualities: readonly Quality[] = ['major', 'minor', 'diminished', 'augmented'];
+  it.each(qualities)('viewInCaged.enabled for %s', (quality) => {
+    const d = buildTriadsModel(setQuality(initial, quality), STANDARD_GUITAR);
+    expect(d.viewInCaged.enabled).toBe(quality === 'major' || quality === 'minor');
+  });
+});

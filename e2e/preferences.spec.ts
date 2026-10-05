@@ -571,3 +571,43 @@ test.describe('remembered preferences: left-handed and orientation (013 US4)', (
     expect(s).not.toHaveProperty('orientation');
   });
 });
+
+test.describe('remembered preferences: Listen tempo (019 US2)', () => {
+  const tempo = (page: Page, name: 'Slow' | 'Medium' | 'Fast') =>
+    page.getByRole('radiogroup', { name: 'Tempo' }).getByRole('radio', { name, exact: true });
+  const stored = (page: Page) =>
+    page.evaluate(() => localStorage.getItem('fretboard-master:prefs'));
+  const storedTempo = async (page: Page) => {
+    const raw = await stored(page);
+    return raw === null ? undefined : (JSON.parse(raw) as { tempo?: string }).tempo;
+  };
+
+  test('reload restores Fast; the record has a tempo key only for slow or fast', async ({
+    page
+  }) => {
+    await page.goto('/caged');
+    await expect(tempo(page, 'Medium')).toBeChecked();
+    await tempo(page, 'Fast').click();
+    expect(await storedTempo(page)).toBe('fast');
+    await page.reload();
+    await expect(tempo(page, 'Fast')).toBeChecked();
+    await tempo(page, 'Slow').click();
+    expect(await storedTempo(page)).toBe('slow');
+    await tempo(page, 'Medium').click();
+    expect(await storedTempo(page)).toBeUndefined();
+    await page.reload();
+    await expect(tempo(page, 'Medium')).toBeChecked();
+  });
+
+  test('Erase preferences returns Tempo to Medium', async ({ page }) => {
+    await page.goto('/caged');
+    await tempo(page, 'Fast').click();
+    await page.goto('/about');
+    await page.getByRole('button', { name: 'Erase my preferences' }).click();
+    await page.getByRole('button', { name: 'Erase', exact: true }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/caged');
+    await expect(tempo(page, 'Medium')).toBeChecked();
+    expect(await storedTempo(page)).toBeUndefined();
+  });
+});

@@ -6,7 +6,7 @@
 import { STANDARD_GUITAR, type Instrument, type Position } from '$lib/instrument/instrument';
 import { standardCounterpart, standardTuningId } from '$lib/instrument/tunings';
 import { tuningName as presetName } from '$lib/shell/tuning-names';
-import type { PitchClass } from '$lib/theory/pitch';
+import { pitchOfSpelling, type PitchClass } from '$lib/theory/pitch';
 import { sharedPositions, type CagedQuality } from '$lib/theory/caged';
 import {
   buildCagedModel,
@@ -58,6 +58,9 @@ import {
   type CagedLabelType,
   type CagedViewState
 } from './caged-view';
+import { carryIntoCaged, type CagedCarry } from './links';
+import { buildCagedListen, type ListenSource } from './caged-listen';
+import { DEFAULT_TEMPO, isTempo, type Tempo } from './listen';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
 
@@ -102,6 +105,10 @@ let tuningName = $state<string>('Standard');
 let temporary = $state<boolean>(false);
 /** Shared positions of the last step, shown for `STEP_WINDOW_MS`; never part of the view state. */
 let transition = $state.raw<StepTransition | null>(null);
+/** Source of the Listen playback started by `listen()`; read through `listening`. */
+let listenSource = $state.raw<ListenSource | null>(null);
+/** Listen tempo; remembered (`tempo`), restored by `preferences.start()` and `erase()`. */
+let tempo = $state<Tempo>(DEFAULT_TEMPO);
 let transitionTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Drop the transition and its pending timer. */
@@ -169,12 +176,20 @@ function currentTriad(): ReturnType<typeof selectedTriad> {
   return selectedTriad(view.triadSet, currentAvailability());
 }
 
+/**
+ * Stop a playing Listen sequence or timeline (R-09). A tapped single note is not a sequence and
+ * keeps sounding through focus and layer changes.
+ */
+function stopListen(): void {
+  if (playback.sequencePlaying) playback.stop('view');
+}
+
 /** Apply a transition; a changed view stops playback, a no-op does nothing. */
-function apply(next: CagedViewState): void {
+function apply(next: CagedViewState, stops: boolean = true): void {
   if (equalsCagedView(next, view)) return;
   clearTransition();
   clearLayerTransients();
-  playback.stop('view');
+  if (stops) playback.stop('view');
   view = next;
   settleLayers();
 }
@@ -183,6 +198,7 @@ function apply(next: CagedViewState): void {
 function commitFocus(f: CagedViewState['focus']): void {
   const next = setFocus(view, f);
   if (next === view) return;
+  stopListen();
   clearLayerTransients();
   view = next;
   settleLayers();
@@ -220,6 +236,49 @@ export const caged = {
   get temporaryName(): string | null {
     return display.temporaryName;
   },
+  /** What Listen is playing right now, else null (only while a sequence plays). */
+  get listening(): ListenSource | null {
+    return playback.sequencePlaying ? listenSource : null;
+  },
+  /** The Listen tempo. */
+  get tempo(): Tempo {
+    return tempo;
+  },
+  /**
+   * Pick the Listen tempo. Invalid and equal values are ignored. Stops a playing sequence (the
+   * pace is part of what is playing) and is remembered.
+   */
+  setTempo(t: Tempo): void {
+    if (!isTempo(t) || t === tempo) return;
+    stopListen();
+    tempo = t;
+    preferences.remember({ tempo: t });
+  },
+  /** Apply a remembered tempo: no playback stop, no write (010). */
+  restoreTempo(t: Tempo): void {
+    if (!isTempo(t)) return;
+    tempo = t;
+  },
+  /** Play the widest layer on for the focused shape, or every shape. Gesture handler. */
+  listen(): void {
+    const plan = buildCagedListen({
+      view,
+      occurrences: display.occurrences,
+      focusIndex: display.focusIndex,
+      positions: display.positions,
+      triad: currentTriad(),
+      openPitches: instrument.openStrings.map(pitchOfSpelling),
+      tempo
+    });
+    if (plan.kind === 'none') return;
+    listenSource = plan.source;
+    if (plan.kind === 'sequence') playback.sequence(plan.steps, plan.bpm, instrument);
+    else playback.timeline(plan.events, instrument);
+  },
+  /** Tool-link carry: as if the user picked this key and quality; focus re-resolves (R-11). */
+  carry(k: CagedCarry): void {
+    apply(withResolvedFocus(carryIntoCaged(view, k)));
+  },
   selectRoot(pc: PitchClass): void {
     apply(withResolvedFocus(selectRoot(view, pc)));
   },
@@ -254,6 +313,7 @@ export const caged = {
     }
     const next = flipLayer(view.layers, layer, view.focus !== null, display.occurrences.length > 0);
     if (next === view.layers) return;
+    stopListen();
     const before = display.positions;
     clearTransition();
     clearLayerTransients();
@@ -266,6 +326,26 @@ export const caged = {
     }
     if (next[layer]) startReveal(revealOrder(before, display.positions));
   },
+  /**
+   * Shortcut entry (R-12): leave the Triad layer on with the default string set and a shape in
+   * focus. Off → the ordinary toggle (auto-focus nearest the nut). Already on → reset the set and
+   * focus the first occurrence if none. A no-op in a non-compatible tuning.
+   */
+  showTriadLayer(): void {
+    if (display.tuningClass === 'non-compatible') return;
+    if (!view.layers.triad) {
+      this.toggleLayer('triad');
+      return;
+    }
+    if (view.focus === null) commitFocus(focusOfIndex(0, display.occurrences));
+    if (view.focus === null) return;
+    const set = defaultTriadSet(currentAvailability());
+    if (set === null || set === view.triadSet) return;
+    stopListen();
+    view = setTriadSet(view, set);
+    triadChange = { kind: 'selected', set };
+    startReveal(triadRevealIds(currentTriad()));
+  },
   /** The last Triad set change to announce, else null. */
   get triadChange(): CagedExtras['triadChange'] {
     return triadChange;
@@ -277,6 +357,7 @@ export const caged = {
   selectTriadSet(id: StringSetId): void {
     if (!view.layers.triad || view.focus === null || view.triadSet === id) return;
     if (!currentAvailability().some((a) => a.set === id && a.triad !== null)) return;
+    stopListen();
     clearTransition();
     clearLayerTransients();
     view = setTriadSet(view, id);
@@ -292,7 +373,7 @@ export const caged = {
   },
   /** Zone-E label control; remembered across reloads (`labels.caged`). */
   setLabelType(t: CagedLabelType): void {
-    apply(setLabelType(view, t));
+    apply(setLabelType(view, t), false);
     if (view.labelType === t) preferredLabel = t;
     preferences.remember({ labels: { caged: t } });
   },
@@ -361,20 +442,20 @@ export const caged = {
   /** Show the same key in the standard tuning; only from the non-compatible notice. */
   viewInStandard(): void {
     if (temporary || display.tuningClass !== 'non-compatible') return;
+    playback.stop('instrument');
     temporary = true;
     clearTransition();
     clearFocusIfUnsupported();
     settleLayers();
-    playback.stop('instrument');
   },
   /** Leave the temporary view (confirm, screen change). No-op when not temporary. */
   endTemporary(): void {
     if (!temporary) return;
+    playback.stop('instrument');
     temporary = false;
     clearTransition();
     clearFocusIfUnsupported();
     settleTriad();
-    playback.stop('instrument');
   },
   /** A real screen change ends the temporary view. */
   screenChanged(): void {
@@ -397,5 +478,7 @@ export function resetCagedForTests(
   clearTransition();
   clearLayerTransients();
   preferredLabel = 'interval';
+  tempo = DEFAULT_TEMPO;
+  listenSource = null;
   view = initialCagedView(preferredLabel);
 }

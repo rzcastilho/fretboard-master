@@ -4,10 +4,13 @@ import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/i
 import { readFileSync } from 'node:fs';
 import { REVEAL_WINDOW_MS, caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
+import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
+import type { StorageLike } from '../../../src/lib/prefs/storage';
 import { sharedPositions } from '../../../src/lib/theory/caged';
 
 beforeEach(() => {
   resetPlaybackForTests();
+  resetPreferencesForTests();
   resetCagedForTests();
 });
 
@@ -927,5 +930,305 @@ describe('caged store: triad without a shape in focus (018 US4)', () => {
     caged.chooseShape('all');
     expect(caged.layerChange).toEqual({ layer: 'chord', on: true });
     expect(caged.display.model?.description).toMatch(/chord/i);
+  });
+});
+
+describe('caged store: Listen (019 US1)', () => {
+  const stubs = () => ({
+    seq: vi.spyOn(playback, 'sequence').mockImplementation(() => []),
+    tl: vi.spyOn(playback, 'timeline').mockImplementation(() => [])
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('is a no-op when no shape is drawn', () => {
+    const { seq, tl } = stubs();
+    caged.applyInstrument(AF_8, 'AF-8');
+    expect(caged.display.listen.source).toBeNull();
+    caged.listen();
+    expect(seq).not.toHaveBeenCalled();
+    expect(tl).not.toHaveBeenCalled();
+  });
+
+  it('sends a sequence plan to playback.sequence', () => {
+    const { seq, tl } = stubs();
+    caged.chooseShape('E');
+    caged.toggleLayer('scale');
+    caged.toggleLayer('chord');
+    caged.listen();
+    expect(seq).toHaveBeenCalledTimes(1);
+    expect(tl).not.toHaveBeenCalled();
+    expect(seq.mock.calls[0][1]).toBe(120);
+    expect(seq.mock.calls[0][2]).toBe(caged.instrument);
+  });
+
+  it('sends a timeline plan to playback.timeline (chord only, and no focus)', () => {
+    const { seq, tl } = stubs();
+    caged.chooseShape('E');
+    caged.listen();
+    caged.chooseShape('all');
+    caged.listen();
+    expect(tl).toHaveBeenCalledTimes(2);
+    expect(seq).not.toHaveBeenCalled();
+  });
+
+  it('listening holds the source only while a sequence plays', () => {
+    stubs();
+    const playing = vi.spyOn(playback, 'sequencePlaying', 'get');
+    caged.chooseShape('E');
+    playing.mockReturnValue(false);
+    expect(caged.listening).toBeNull();
+    caged.listen();
+    playing.mockReturnValue(true);
+    expect(caged.listening).toEqual({ kind: 'shape', layer: 'chord', letter: 'E' });
+    playing.mockReturnValue(false);
+    expect(caged.listening).toBeNull();
+  });
+
+  it('pressed again restarts from the beginning', () => {
+    const { tl } = stubs();
+    caged.chooseShape('E');
+    caged.listen();
+    caged.listen();
+    expect(tl).toHaveBeenCalledTimes(2);
+    expect(tl.mock.calls[1][0]).toEqual(tl.mock.calls[0][0]);
+  });
+});
+
+describe('caged store: stop matrix and tempo (019 US2, R-09)', () => {
+  /** `playing` stands in for a running Listen sequence or timeline. */
+  const setup = (playing: boolean) => {
+    vi.spyOn(playback, 'sequencePlaying', 'get').mockReturnValue(playing);
+    return vi.spyOn(playback, 'stop').mockImplementation(() => {});
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  describe('stops a playing sequence only', () => {
+    // Each action starts from shape A focused, so every one changes the focus or layers.
+    const actions: readonly (readonly [string, () => void])[] = [
+      ['shape selector', () => caged.chooseShape('E')],
+      ['tag', () => caged.toggleTag('G@5')],
+      ['See all', () => caged.chooseShape('all')],
+      ['Next', () => caged.step(1)],
+      ['layer switch', () => caged.toggleLayer('scale')],
+      ['tempo', () => caged.setTempo('fast')]
+    ];
+
+    it.each(actions)('%s stops a sequence with reason view', (_name, act) => {
+      caged.chooseShape('A');
+      const stop = setup(true);
+      act();
+      expect(stop).toHaveBeenCalledWith('view');
+    });
+
+    it.each(actions)('%s leaves a tapped single note alone', (_name, act) => {
+      caged.chooseShape('A');
+      const stop = setup(false);
+      act();
+      expect(stop).not.toHaveBeenCalled();
+    });
+
+    it('Previous stops a sequence', () => {
+      caged.chooseShape('E');
+      caged.step(1);
+      const stop = setup(true);
+      caged.step(-1);
+      expect(stop).toHaveBeenCalledWith('view');
+    });
+
+    it('auto-focus (Scale with no focus) stops a sequence', () => {
+      const stop = setup(true);
+      caged.toggleLayer('scale');
+      expect(caged.state.focus).not.toBeNull();
+      expect(stop).toHaveBeenCalledWith('view');
+    });
+
+    it('Triad string set stops a sequence', () => {
+      caged.chooseShape('A');
+      caged.toggleLayer('triad');
+      const stop = setup(true);
+      caged.selectTriadSet(4);
+      expect(caged.state.triadSet).toBe(4);
+      expect(stop).toHaveBeenCalledWith('view');
+    });
+
+    it('a no-op focus change does not stop', () => {
+      const stop = setup(true);
+      caged.chooseShape('all'); // already no focus
+      expect(stop).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stops any playback', () => {
+    it.each([
+      ['key', () => caged.selectRoot(7)],
+      ['quality', () => caged.setQuality('minor')],
+      ['spelling', () => caged.switchSpelling()],
+      ['reset', () => caged.reset()]
+    ] as const)('%s', (name, act) => {
+      if (name === 'spelling') caged.selectRoot(1);
+      if (name === 'reset') caged.selectRoot(7);
+      const stop = setup(false);
+      act();
+      expect(stop).toHaveBeenCalledWith('view');
+    });
+  });
+
+  describe('never stops', () => {
+    it('label type and Show connections', () => {
+      const stop = setup(true);
+      caged.setLabelType('name');
+      caged.setConnections(true);
+      caged.setConnections(false);
+      caged.setLabelType('interval');
+      expect(stop).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('instrument and temporary view stop with reason instrument', () => {
+    it('useInstrument', () => {
+      caged.chooseShape('E');
+      const stop = setup(true);
+      caged.useInstrument(AF_1_24, 'AF-1');
+      expect(stop).toHaveBeenCalledWith('instrument');
+      expect(stop).not.toHaveBeenCalledWith('view');
+    });
+
+    it('viewInStandard and endTemporary', () => {
+      caged.chooseShape('E');
+      caged.applyInstrument(AF_8, 'AF-8');
+      const stop = setup(true);
+      caged.viewInStandard();
+      expect(stop).toHaveBeenCalledWith('instrument');
+      expect(stop).not.toHaveBeenCalledWith('view');
+      stop.mockClear();
+      caged.endTemporary();
+      expect(stop).toHaveBeenCalledWith('instrument');
+      expect(stop).not.toHaveBeenCalledWith('view');
+    });
+  });
+
+  describe('tempo', () => {
+    it('defaults to medium', () => expect(caged.tempo).toBe('medium'));
+
+    it('setTempo remembers the change', () => {
+      setup(false);
+      const remember = vi.spyOn(preferences, 'remember').mockImplementation(() => {});
+      caged.setTempo('fast');
+      expect(caged.tempo).toBe('fast');
+      expect(remember).toHaveBeenCalledWith({ tempo: 'fast' });
+    });
+
+    it('setTempo ignores invalid and equal values', () => {
+      const stop = setup(true);
+      const remember = vi.spyOn(preferences, 'remember').mockImplementation(() => {});
+      // @ts-expect-error not a tempo
+      caged.setTempo('allegro');
+      caged.setTempo('medium');
+      expect(caged.tempo).toBe('medium');
+      expect(stop).not.toHaveBeenCalled();
+      expect(remember).not.toHaveBeenCalled();
+    });
+
+    it('restoreTempo validates, neither stops nor writes', () => {
+      const stop = setup(true);
+      const remember = vi.spyOn(preferences, 'remember').mockImplementation(() => {});
+      caged.restoreTempo('slow');
+      expect(caged.tempo).toBe('slow');
+      // @ts-expect-error not a tempo
+      caged.restoreTempo('allegro');
+      expect(caged.tempo).toBe('slow');
+      expect(stop).not.toHaveBeenCalled();
+      expect(remember).not.toHaveBeenCalled();
+    });
+
+    it('Listen uses the chosen tempo', () => {
+      const seq = vi.spyOn(playback, 'sequence').mockImplementation(() => []);
+      caged.chooseShape('E');
+      caged.toggleLayer('scale');
+      caged.setTempo('slow');
+      caged.listen();
+      expect(seq.mock.calls[0][1]).toBe(80);
+      caged.setTempo('fast');
+      caged.listen();
+      expect(seq.mock.calls[1][1]).toBe(180);
+    });
+
+    it('erase restores medium; start restores a stored tempo without writing', () => {
+      const data = new Map<string, string>([
+        [
+          'fretboard-master:prefs',
+          '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"tempo":"fast"}'
+        ]
+      ]);
+      const storage: StorageLike = {
+        getItem: (k) => data.get(k) ?? null,
+        setItem: (k, v) => void data.set(k, v),
+        removeItem: (k) => void data.delete(k),
+        key: (i) => [...data.keys()][i] ?? null,
+        get length() {
+          return data.size;
+        }
+      };
+      preferences.start(storage);
+      expect(caged.tempo).toBe('fast');
+      preferences.erase();
+      expect(caged.tempo).toBe('medium');
+    });
+  });
+});
+
+describe('caged store: showTriadLayer (019 US4, R-12)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('Triad off, no focus: turns it on, focuses the occurrence nearest the nut, sets the default set', () => {
+    expect(caged.state.focus).toBeNull();
+    caged.showTriadLayer();
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.state.focus).not.toBeNull();
+    expect(caged.state.focus).toEqual({
+      letter: caged.display.occurrences[0].shape.id,
+      ordinal: 0
+    });
+    expect(caged.state.triadSet).toBe(3);
+  });
+
+  it('Triad already on: sets the default set and focuses index 0 when there is no focus', () => {
+    caged.toggleLayer('triad');
+    caged.selectTriadSet(4);
+    caged.chooseShape('all');
+    expect(caged.state.focus).toBeNull();
+    expect(caged.state.layers.triad).toBe(true);
+    caged.showTriadLayer();
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.state.triadSet).toBe(3);
+    expect(caged.state.focus).toEqual({
+      letter: caged.display.occurrences[0].shape.id,
+      ordinal: 0
+    });
+  });
+
+  it('keeps an existing focus', () => {
+    caged.chooseShape('A');
+    const focus = caged.state.focus;
+    caged.showTriadLayer();
+    expect(caged.state.focus).toEqual(focus);
+    expect(caged.state.layers.triad).toBe(true);
+  });
+
+  it('is a no-op in a non-compatible tuning', () => {
+    resetCagedForTests(AF_8, 'Open G');
+    expect(caged.display.tuningClass).toBe('non-compatible');
+    const before = caged.state;
+    caged.showTriadLayer();
+    expect(caged.state).toBe(before);
+  });
+
+  it('leaves the other layers as they were', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('arpeggio');
+    const { chord, arpeggio, pentatonic, scale } = caged.state.layers;
+    caged.showTriadLayer();
+    expect(caged.state.layers).toEqual({ chord, arpeggio, pentatonic, scale, triad: true });
   });
 });

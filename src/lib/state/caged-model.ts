@@ -35,6 +35,7 @@ import {
   type SwitchState
 } from './caged-layers';
 import { spellScale, type CagedLayer, type ScaleDegree } from '../theory/caged-layers';
+import { listenSource, type ListenSource } from './caged-listen';
 import { cagedRootSpelling, type CagedViewState } from './caged-view';
 import { inversionName, qualityName } from './triads-model';
 
@@ -80,6 +81,16 @@ export interface CagedTriadDisplay {
   readonly handoff: TriadsHandoff | null;
 }
 
+/** The Listen button's state (019). */
+export interface CagedListenDisplay {
+  /** True exactly when at least one shape is drawn. */
+  readonly enabled: boolean;
+  /** Visible reason while disabled, else null. */
+  readonly reason: string | null;
+  /** What Listen would play; null while disabled. */
+  readonly source: ListenSource | null;
+}
+
 export interface CagedDisplay {
   readonly keyName: string;
   readonly tuningName: string;
@@ -108,6 +119,7 @@ export interface CagedDisplay {
   readonly positions: readonly ResolvedPosition[];
   /** Triad selector state; null while the layer is off or nothing is in focus. */
   readonly triad: CagedTriadDisplay | null;
+  readonly listen: CagedListenDisplay;
 }
 
 const NO_STEPS = { previous: false, next: false } as const;
@@ -222,7 +234,8 @@ export function buildCagedModel(
       switches: switchStates(view.layers, false, false),
       extraSampleShown: view.layers.pentatonic && view.layers.scale,
       positions: [],
-      triad: null
+      triad: null,
+      listen: { enabled: false, reason: m.caged_listen_reason_no_shapes(), source: null }
     };
   }
 
@@ -456,6 +469,14 @@ export function buildCagedModel(
     switches: switchStates(view.layers, focused !== null, occurrences.length > 0),
     extraSampleShown: view.layers.pentatonic && view.layers.scale,
     positions,
-    triad: triadDisplay
+    triad: triadDisplay,
+    listen:
+      occurrences.length === 0
+        ? { enabled: false, reason: m.caged_listen_reason_no_fit(), source: null }
+        : {
+            enabled: true,
+            reason: null,
+            source: listenSource({ view, occurrences, focusIndex, triad: drawnTriad })
+          }
   };
 }

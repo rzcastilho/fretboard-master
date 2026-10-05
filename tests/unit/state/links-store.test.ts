@@ -7,6 +7,8 @@ vi.mock('$app/paths', () => ({ resolve: (p: string) => p }));
 import { AF_7 } from '../../../src/lib/instrument/fixtures';
 import {
   linkTools,
+  openCagedFromNote,
+  openCagedFromTriads,
   openTriadsFromCaged,
   openTriadsFromNote,
   resetTool,
@@ -14,7 +16,7 @@ import {
 } from '../../../src/lib/state/links.svelte';
 import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
-import { resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
+import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
 
 beforeEach(() => {
@@ -245,21 +247,108 @@ describe('session memory and Reset tool (US4)', () => {
   });
 });
 
-describe('caged is outside the links (US6)', () => {
-  it('linkTools is a no-op when either side is caged', () => {
-    notes.toggleNote(7);
-    triads.setQuality('minor');
-    caged.selectRoot(7);
-    const before = { n: notes.state, t: triads.state, c: caged.state };
+describe('CAGED links (US3)', () => {
+  it('Notes with one note carries the root into CAGED and keeps the quality', () => {
+    caged.setQuality('minor');
+    select(10);
     linkTools('notes', 'caged');
-    linkTools('triads', 'caged');
-    linkTools('caged', 'notes');
-    linkTools('caged', 'triads');
-    expect(notes.state).toBe(before.n);
-    expect(triads.state).toBe(before.t);
-    expect(caged.state).toBe(before.c);
+    expect(caged.state.rootPc).toBe(10);
+    expect(caged.state.quality).toBe('minor');
+    expect(caged.state.spellingOverride).toBe('none');
   });
 
+  it('Notes with zero or two or more notes does not carry', () => {
+    caged.selectRoot(7);
+    const before = caged.state;
+    linkTools('notes', 'caged');
+    expect(caged.state).toBe(before);
+    select(2, 4);
+    linkTools('notes', 'caged');
+    expect(caged.state).toBe(before);
+  });
+
+  it('a carry equal to the current key is a no-op that keeps spelling and focus', () => {
+    caged.selectRoot(1);
+    caged.switchSpelling();
+    caged.chooseShape('A');
+    const before = caged.state;
+    select(1);
+    linkTools('notes', 'caged');
+    expect(caged.state).toBe(before);
+  });
+
+  it('CAGED → Notes selects root, third and fifth', () => {
+    caged.selectRoot(9);
+    caged.setQuality('minor');
+    linkTools('caged', 'notes');
+    expect([...notes.state.selection]).toEqual([9, 0, 4]);
+  });
+
+  it('Triads → CAGED carries major and minor; diminished becomes major', () => {
+    triads.carryTriad(2, 'minor', 'none');
+    linkTools('triads', 'caged');
+    expect(caged.state.rootPc).toBe(2);
+    expect(caged.state.quality).toBe('minor');
+    triads.carryTriad(11, 'diminished', 'none');
+    linkTools('triads', 'caged');
+    expect(caged.state.rootPc).toBe(11);
+    expect(caged.state.quality).toBe('major');
+  });
+
+  it('CAGED → Triads keeps inversion, string set, view and Compare', () => {
+    triads.setInversion('first');
+    triads.setStringSet(4);
+    triads.setCompare(true);
+    const { inversion, stringSet, view, compare } = triads.state;
+    caged.selectRoot(2);
+    linkTools('caged', 'triads');
+    expect(triads.state.rootPc).toBe(2);
+    expect(triads.state.quality).toBe('major');
+    expect(triads.state.inversion).toBe(inversion);
+    expect(triads.state.stringSet).toBe(stringSet);
+    expect(triads.state.view).toBe(view);
+    expect(triads.state.compare.on).toBe(compare.on);
+  });
+
+  it('Notes ↔ Triads is unchanged', () => {
+    select(9);
+    linkTools('notes', 'triads');
+    expect(triads.state.rootPc).toBe(9);
+  });
+
+  it('focus is re-resolved after the carry, keeping the same letter', () => {
+    caged.chooseShape('A');
+    select(7);
+    linkTools('notes', 'caged');
+    expect(caged.state.rootPc).toBe(7);
+    expect(caged.state.focus?.letter).toBe('A');
+  });
+
+  it('a carry stops playback', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    select(5);
+    linkTools('notes', 'caged');
+    expect(stop).toHaveBeenCalledWith('view');
+    stop.mockRestore();
+  });
+
+  it('a carried A♯ major is accepted and offers the Switch to B♭ guidance', () => {
+    triads.carryTriad(10, 'major', 'sharp');
+    linkTools('triads', 'caged');
+    expect(caged.state.rootPc).toBe(10);
+    expect(caged.state.spellingOverride).toBe('sharp');
+    expect(caged.display.switchTo).not.toBeNull();
+  });
+
+  it('carry never happens from state alone (no handler call, no change)', () => {
+    const before = caged.state;
+    select(3);
+    triads.carryTriad(6, 'minor', 'none');
+    expect(caged.state).toBe(before);
+  });
+});
+
+describe('caged reset (US6)', () => {
   it("resetTool('caged') restores CAGED and leaves Notes and Triads untouched", () => {
     caged.selectRoot(7);
     caged.setQuality('minor');
@@ -287,5 +376,49 @@ describe('openTriadsFromCaged (slice 015 US1)', () => {
     expect(goto).toHaveBeenCalledTimes(1);
     expect(goto).toHaveBeenCalledWith('/triads');
     expect(triads.state).toBe(before);
+  });
+});
+
+describe('openCagedFromNote (019 US4)', () => {
+  it('carries the pitch class as the key, keeps quality, leaves Notes alone, one goto', async () => {
+    caged.setQuality('minor');
+    select(0, 4);
+    const notesBefore = notes.state;
+    await openCagedFromNote(7);
+    expect(caged.state.rootPc).toBe(7);
+    expect(caged.state.quality).toBe('minor');
+    expect(notes.state).toBe(notesBefore);
+    expect(goto).toHaveBeenCalledTimes(1);
+    expect(goto).toHaveBeenCalledWith('/caged');
+  });
+
+  it('same pitch class as the current key: no key change, still one goto', async () => {
+    caged.selectRoot(7);
+    const before = caged.state;
+    await openCagedFromNote(7);
+    expect(caged.state).toBe(before);
+    expect(goto).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('openCagedFromTriads (019 US4)', () => {
+  it('carries B♭ minor, shows the Triad layer, one goto', async () => {
+    triads.selectRoot(10);
+    triads.setQuality('minor');
+    await openCagedFromTriads();
+    expect(caged.state.rootPc).toBe(10);
+    expect(caged.state.quality).toBe('minor');
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.state.focus).not.toBeNull();
+    expect(goto).toHaveBeenCalledTimes(1);
+    expect(goto).toHaveBeenCalledWith('/caged');
+  });
+
+  it.each(['diminished', 'augmented'] as const)('is a no-op for %s', async (q) => {
+    triads.setQuality(q);
+    const before = caged.state;
+    await openCagedFromTriads();
+    expect(caged.state).toBe(before);
+    expect(goto).not.toHaveBeenCalled();
   });
 });
