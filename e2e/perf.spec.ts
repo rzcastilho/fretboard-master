@@ -862,3 +862,169 @@ test.describe('handedness and orientation (013 SC-006)', () => {
     expect(scrolled.worst).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('CAGED latency (014 Q27, SC-004)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  /** Pointerdown → `text` present in the page body, measured in the page. */
+  const armTimer = (page: Page, text: string) =>
+    page.evaluate((t) => {
+      const w = globalThis as unknown as { __cagedMs: number | null };
+      w.__cagedMs = null;
+      let downAt = 0;
+      document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+        capture: true,
+        once: true
+      });
+      new MutationObserver((_, obs) => {
+        if (!document.body.textContent?.includes(t)) return;
+        w.__cagedMs = performance.now() - downAt;
+        obs.disconnect();
+      }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    }, text);
+  const readTimer = async (page: Page) => {
+    await page.waitForFunction(
+      () => (globalThis as unknown as { __cagedMs: number | null }).__cagedMs !== null
+    );
+    return page.evaluate(() => (globalThis as unknown as { __cagedMs: number }).__cagedMs);
+  };
+
+  test('median open CAGED ≤ 300 ms at 4× CPU throttle', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const times: number[] = [];
+    // Like FR-023, a median of five: the first open also fetches the tool's chunk.
+    for (let i = 0; i < 5; i++) {
+      await page.goto('/');
+      const card = page.getByRole('list').getByRole('link', { name: /CAGED/ });
+      await card.waitFor();
+      await armTimer(page, 'C major');
+      await card.click();
+      times.push(await readTimer(page));
+      await expect(page.getByRole('region', { name: 'Fretboard' })).toBeVisible();
+    }
+    expect(median(times)).toBeLessThanOrEqual(300);
+  });
+
+  test('median CAGED key change ≤ 100 ms at 4× CPU throttle', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/caged');
+    await expect(page.getByText('C major', { exact: true })).toBeVisible();
+    const keys = page.getByRole('group', { name: 'Key' }).getByRole('button');
+    const times: number[] = [];
+    for (const [pc, heading] of [
+      [7, 'G major'],
+      [2, 'D major'],
+      [9, 'A major'],
+      [4, 'E major'],
+      [5, 'F major']
+    ] as const) {
+      await armTimer(page, heading);
+      await keys.nth(pc).click();
+      times.push(await readTimer(page));
+    }
+    expect(median(times)).toBeLessThanOrEqual(100);
+  });
+
+  test('CAGED instrument change to DADGAD ≤ 300 ms (SC-006)', async ({ page }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-8' })
+      );
+    });
+    await page.goto('/caged');
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: /^DADGAD/ }).check();
+    await armTimer(page, "don't exist in DADGAD");
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    expect(await readTimer(page)).toBeLessThanOrEqual(300);
+  });
+
+  test('7 strings × 24 frets with every layer on: layer toggle ≤ 100 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, strings: 7, tuning: 'AF-21', frets: 24 })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/caged');
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await expect(board.locator('.cell')).toHaveCount(7 * 25);
+    await page
+      .getByRole('radiogroup', { name: 'Shape' })
+      .getByRole('radio', { name: 'E', exact: true })
+      .click();
+    const layers = page.getByRole('group', { name: 'Layers' });
+    const toggle = (name: string) => layers.getByRole('switch', { name, exact: true });
+    await toggle('Arpeggio').click();
+    await toggle('Pentatonic').click();
+    const times: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      await armTimer(page, 'Pentatonic, and Scale.');
+      await toggle('Scale').click();
+      times.push(await readTimer(page));
+      await toggle('Scale').click();
+      await expect(toggle('Scale')).toHaveAttribute('aria-checked', 'false');
+    }
+    expect(median(times)).toBeLessThanOrEqual(100);
+    await toggle('Scale').click();
+    await expect(board.locator('.marker')).not.toHaveCount(0);
+    const keys = await board
+      .locator('.marker')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-key')));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  test('7 strings × 24 frets with nine tags: scrolling stays inside .scroller', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-1', frets: 24 })
+      );
+    });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/caged');
+    await page
+      .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Instrument' });
+    await dialog.getByRole('radio', { name: '7 strings' }).check();
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    const board = page.getByRole('region', { name: 'Fretboard' });
+    await expect(board.locator('.cell')).toHaveCount(7 * 25);
+    await expect(board.locator('.tag:visible')).toHaveCount(9);
+
+    const scroller = page.locator('.scroller').first();
+    const scrolled = await scroller.evaluate(async (el) => {
+      const frames: number[] = [];
+      let last = performance.now();
+      el.scrollLeft = 0;
+      for (let i = 1; i <= 20; i++) {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) * (i / 20);
+        await new Promise((r) => requestAnimationFrame(r));
+        const now = performance.now();
+        frames.push(now - last);
+        last = now;
+      }
+      return { worst: Math.max(...frames), moved: el.scrollLeft };
+    });
+    expect(scrolled.moved).toBeGreaterThan(0);
+    expect(scrolled.worst).toBeLessThanOrEqual(100);
+  });
+});

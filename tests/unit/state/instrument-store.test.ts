@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AF_8 } from '../../../src/lib/instrument/fixtures';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
 import { presetInstrument } from '../../../src/lib/instrument/tunings';
 import { DEFAULT_CONFIG } from '../../../src/lib/state/instrument-config';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
+import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -104,6 +106,41 @@ describe('instrument store (contracts §3)', () => {
     instrument.setFrets(12);
     instrument.confirm('triads');
     expect(instrument.adjustedIn).toBe('triads');
+  });
+
+  it("confirm on the caged screen: adjustedIn is 'caged' iff applyInstrument returns true", () => {
+    spies();
+    const adj = vi.spyOn(caged, 'applyInstrument').mockReturnValue(true);
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('caged');
+    expect(adj).toHaveBeenCalled();
+    expect(instrument.adjustedIn).toBe('caged');
+
+    resetInstrumentForTests();
+    adj.mockReturnValue(false);
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('caged');
+    expect(instrument.adjustedIn).toBeNull();
+
+    resetInstrumentForTests();
+    adj.mockReturnValue(true);
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('notes');
+    expect(instrument.adjustedIn).toBeNull();
+  });
+
+  it('presentation-only changes and restore never set caged', () => {
+    spies();
+    vi.spyOn(caged, 'applyInstrument').mockReturnValue(true);
+    instrument.open();
+    instrument.setHandedness('left');
+    instrument.confirm('caged');
+    expect(instrument.adjustedIn).toBeNull();
+    instrument.restore({ ...DEFAULT_CONFIG, fretCount: 12 });
+    expect(instrument.adjustedIn).toBeNull();
   });
 
   it('confirm: only the other tool adjusted → adjustedIn null', () => {
@@ -663,5 +700,85 @@ describe('presentation settings (contracts/orientation-api §5)', () => {
     expect(instrument.current.orientation).toBe('lowest-top');
     expect(s.notes).toHaveBeenCalledTimes(1);
     expect(instrument.adjustedIn).toBeNull();
+  });
+});
+
+describe('instrument store: caged (US4)', () => {
+  it('confirm and restore call caged.applyInstrument', () => {
+    const spy = vi.spyOn(caged, 'applyInstrument');
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('caged');
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0].fretCount).toBe(12);
+    instrument.restore({ ...DEFAULT_CONFIG, fretCount: 15 });
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy.mock.calls[1][0].fretCount).toBe(15);
+    expect(instrument.adjustedIn).toBeNull();
+  });
+});
+
+describe('instrument store: CAGED tuning name (slice 015)', () => {
+  it('confirm passes the tuning label to caged.applyInstrument', () => {
+    const apply = vi.spyOn(caged, 'applyInstrument');
+    instrument.open();
+    instrument.selectTuning('AF-4');
+    instrument.confirm('caged');
+    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-4', 6, 22), 'Drop D');
+  });
+
+  it('confirm of a presentation-only change also passes the label', () => {
+    const apply = vi.spyOn(caged, 'applyInstrument');
+    instrument.open();
+    instrument.setFrets(12);
+    instrument.confirm('caged');
+    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-1', 6, 12), 'Standard');
+  });
+
+  it('restore passes the label', () => {
+    const apply = vi.spyOn(caged, 'applyInstrument');
+    instrument.restore({
+      ...DEFAULT_CONFIG,
+      tuning: { kind: 'preset', id: 'AF-4' }
+    });
+    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-4', 6, 22), 'Drop D');
+  });
+});
+
+describe('instrument store: CAGED temporary tuning (slice 015 US1)', () => {
+  const temporaryOpenG = () => {
+    resetCagedForTests(AF_8, 'Open G');
+    caged.viewInStandard();
+    expect(caged.temporary).toBe(true);
+  };
+
+  it('an unchanged confirm ends the temporary tuning', () => {
+    temporaryOpenG();
+    instrument.open();
+    instrument.confirm('caged');
+    expect(caged.temporary).toBe(false);
+  });
+
+  it('a changed confirm ends the temporary tuning', () => {
+    temporaryOpenG();
+    instrument.open();
+    instrument.selectTuning('AF-4');
+    instrument.confirm('caged');
+    expect(caged.temporary).toBe(false);
+  });
+
+  it('cancel keeps the temporary tuning', () => {
+    temporaryOpenG();
+    instrument.open();
+    instrument.cancel();
+    expect(caged.temporary).toBe(true);
+  });
+
+  it('viewInStandard and endTemporary never write preferences (SC-005)', () => {
+    const remember = vi.spyOn(preferences, 'remember');
+    resetCagedForTests(AF_8, 'Open G');
+    caged.viewInStandard();
+    caged.endTemporary();
+    expect(remember).not.toHaveBeenCalled();
   });
 });

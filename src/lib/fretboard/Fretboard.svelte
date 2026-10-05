@@ -24,6 +24,7 @@
   } from './geometry';
   import {
     autoScrollTarget,
+    centerScrollTarget,
     groupScrollTarget,
     moveFocus,
     nutOffset,
@@ -44,6 +45,8 @@
     GestureState
   } from './types';
 
+  /** Vertical gap (px) between a marked string's label and its text mark. */
+  const STRING_MARK_OFFSET = 9;
   const NO_MARKERS = { markers: [], labelMode: 'none' } as const;
 
   let {
@@ -62,6 +65,8 @@
   const compact = $derived(thumb || preview);
 
   let metrics: FretboardMetrics = $state(DEFAULT_METRICS);
+  /** Inner radius of the connection ring: clears the largest glyph. */
+  const ringBase = $derived(Math.max(metrics.markerRoot, metrics.markerMedium + 4) / 2);
   let containerWidth = $state(0);
   let root: HTMLElement | undefined = $state();
   let scroller: HTMLElement | undefined = $state();
@@ -99,13 +104,32 @@
   const scrollDuration = () => tokenDuration(root);
 
   /**
-   * Fade (F5): only comparison markers and arrows fade; other markers appear instantly.
-   * Arrows fade in after the slide has finished (delay = one token duration).
+   * Intro (F5, 017): comparison markers fade over `--duration-short`. A marker with `appear`
+   * (a layer reveal) starts after `appear × (short − fast)` and fades and scales in over
+   * `--duration-fast`, so the whole sequence fits in `--duration-short`; reduced motion zeroes
+   * both. Every other marker appears at once. Never 0 ms: see `markerOut`.
    */
-  function markerFade(node: Element, comparison: boolean) {
-    // Never 0: Svelte 5 keyed-each outro groups never finish when some items' outros complete
-    // synchronously (duration 0) and others asynchronously, leaving faded-out markers in the DOM.
-    // 1 ms keeps every marker outro asynchronous, which is visually instant.
+  function markerIn(node: Element, mk: { comparison: boolean; appear?: number }) {
+    if (mk.appear !== undefined) {
+      const short = tokenDuration(root);
+      const fast = tokenDuration(root, '--duration-fast');
+      const shape = node.querySelector<SVGGElement>('.shape');
+      return {
+        ...fade(node, {
+          duration: Math.max(1, fast),
+          delay: Math.max(0, mk.appear * (short - fast))
+        }),
+        tick: (t: number) => {
+          if (shape) shape.style.transform = t < 1 ? `scale(${0.6 + 0.4 * t})` : '';
+        }
+      };
+    }
+    // Never 0: Svelte 5 keyed-each groups never finish when some items' transitions complete
+    // synchronously (duration 0) and others asynchronously. 1 ms is visually instant.
+    return fade(node, { duration: Math.max(1, mk.comparison ? tokenDuration(root) : 0) });
+  }
+  /** Outro: comparison markers fade; every other removal is immediate and never staggered. */
+  function markerOut(node: Element, comparison: boolean) {
     return fade(node, { duration: Math.max(1, comparison ? tokenDuration(root) : 0) });
   }
   function arrowFade(node: Element, direction: { in: boolean }) {
@@ -113,7 +137,18 @@
     return fade(node, { duration: d, delay: direction.in ? d : 0 });
   }
 
-  const layout = $derived(layoutFretboard(instrument, metrics, containerWidth, variant));
+  /** Marks for strings the instrument has; the interactive variant only. */
+  const stringMarks = $derived(
+    compact
+      ? []
+      : (model.stringMarks ?? []).filter(
+          (mk) => instrument.openStrings.length >= mk.string && mk.string >= 1
+        )
+  );
+  const markByString = $derived(new Map(stringMarks.map((mk) => [mk.string, mk.label])));
+  const layout = $derived(
+    layoutFretboard(instrument, metrics, containerWidth, variant, stringMarks.length > 0)
+  );
   const lastFret = $derived(layout.columns.length - 1);
 
   const singleInlays = $derived(
@@ -315,17 +350,22 @@
     if (previous === undefined || previous === key || band === null) return;
     untrack(() => {
       if (!scroller || band === null) return;
-      const target = autoScrollTarget(
-        layout,
-        [
-          { string: 1, fret: band.start },
-          { string: 1, fret: band.end }
-        ],
-        { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth }
-      );
+      const viewport = { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth };
+      const centered = model.region?.align === 'center';
+      const target = centered
+        ? centerScrollTarget(layout, band.start, band.end, viewport)
+        : autoScrollTarget(
+            layout,
+            [
+              { string: 1, fret: band.start },
+              { string: 1, fret: band.end }
+            ],
+            viewport
+          );
       if (target === null) return;
       stopAutoScroll();
-      cancelScroll = animateScroll(scroller, target, scrollDuration(), browserClock);
+      const duration = centered ? tokenDuration(root, '--duration-medium') : scrollDuration();
+      cancelScroll = animateScroll(scroller, target, duration, browserClock);
     });
   });
 
@@ -676,20 +716,32 @@
       style:block-size={`${tagsHeight}px`}
     >
       {#each tags as t, i (t.id)}
-        <button
-          type="button"
-          class="tag"
-          class:pressed={t.pressed}
-          aria-pressed={t.pressed}
-          aria-label={t.name}
-          bind:this={tagEls[i]}
-          style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
-          style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
-          onclick={() => ontag?.(t.id)}
-        >
-          <span>{t.label}</span>
-          {#if t.detail}<span class="detail">{t.detail}</span>{/if}
-        </button>
+        {#if model.tagsInteractive === false}
+          <span
+            class="tag static"
+            bind:this={tagEls[i]}
+            style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
+            style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
+          >
+            <span>{t.label}</span>
+            {#if t.detail}<span class="detail">{t.detail}</span>{/if}
+          </span>
+        {:else}
+          <button
+            type="button"
+            class="tag"
+            class:pressed={t.pressed}
+            aria-pressed={t.pressed}
+            aria-label={t.name}
+            bind:this={tagEls[i]}
+            style:inset-inline-start={`${placedTags[i]?.x ?? 0}px`}
+            style:inset-block-start={`${(placedTags[i]?.row ?? 0) * (tagMin + TAG_GAP)}px`}
+            onclick={() => ontag?.(t.id)}
+          >
+            <span>{t.label}</span>
+            {#if t.detail}<span class="detail">{t.detail}</span>{/if}
+          </button>
+        {/if}
       {/each}
     </div>
   {/if}
@@ -755,9 +807,21 @@
         <g aria-hidden="true" class="drawing">
           {@render drawing()}
           {#each layout.rows as row (row.string)}
-            <text class="string-label" x={layout.labelCenter} y={row.center}
+            {@const mark = markByString.get(row.string)}
+            <text
+              class="string-label"
+              x={layout.labelCenter}
+              y={mark === undefined ? row.center : row.center - STRING_MARK_OFFSET}
               >{row.string} {openLabel(row.string)}</text
             >
+            {#if mark !== undefined}
+              <text
+                class="string-mark"
+                x={layout.labelCenter}
+                y={row.center + STRING_MARK_OFFSET}
+                aria-hidden="true">{mark}</text
+              >
+            {/if}
           {/each}
           {#each fretNumbers as c (c.fret)}
             <text
@@ -773,13 +837,16 @@
             <g
               class="marker {d.mk.function} {d.mk.emphasis}{d.tone ? ` tone-${d.tone}` : ''}"
               class:comparison={d.mk.variant === 'comparison'}
+              class:layer-arpeggio={d.mk.layer === 'arpeggio'}
+              class:layer-triad={d.mk.layer === 'triad'}
               class:pulse={d.mk.pulse !== undefined}
               data-variant={d.mk.variant}
               style:--pulse-duration={d.mk.pulse ? `${d.mk.pulse.durationMs}ms` : undefined}
               data-key={d.key}
               transform="translate({d.x} {d.y})"
               style:transform={mounted ? `translate(${d.x}px, ${d.y}px)` : undefined}
-              transition:markerFade={d.mk.variant === 'comparison'}
+              in:markerIn={{ comparison: d.mk.variant === 'comparison', appear: d.mk.appear }}
+              out:markerOut={d.mk.variant === 'comparison'}
             >
               <g class="shape">
                 {#if d.mk.function === 'root'}
@@ -799,6 +866,12 @@
                   <circle class="glyph ring" r={metrics.markerMedium / 2} />
                 {:else}
                   <circle class="glyph" r={metrics.markerMedium / 2} />
+                {/if}
+                {#if d.mk.extra && d.mk.function === 'degree'}
+                  <circle class="extra-dot" aria-hidden="true" cy={metrics.markerSmall / 2 + 3} />
+                {/if}
+                {#if d.mk.ring}
+                  <circle class="connection-ring" aria-hidden="true" style:--ring-base={ringBase} />
                 {/if}
                 {#if d.label}
                   <text class="marker-label" class:long={d.label.length > 1}>{d.label}</text>
@@ -940,6 +1013,11 @@
     cursor: pointer;
   }
 
+  .tag.static {
+    cursor: default;
+    user-select: none;
+  }
+
   .tag.pressed {
     font-weight: 700;
     background: var(--color-surface);
@@ -1045,6 +1123,11 @@
     font-size: var(--marker-label-min-size);
   }
 
+  .string-mark {
+    font-size: var(--marker-label-min-size);
+    font-style: italic;
+  }
+
   .fret-number {
     font-weight: 400;
   }
@@ -1101,16 +1184,53 @@
 
   .marker {
     pointer-events: none;
-    transition: transform var(--duration-short) var(--ease-standard);
+    transition:
+      transform var(--duration-short) var(--ease-standard),
+      opacity var(--duration-medium) var(--ease-standard);
   }
 
   .shape {
-    transition: transform var(--duration-short);
+    transition: transform var(--duration-medium);
   }
 
   .marker.highlighted .shape {
     transform: scale(var(--emph-highlight-scale));
     filter: drop-shadow(0 0 var(--marker-elevation-stroke) var(--color-text));
+  }
+
+  /* Arpeggio layer: smaller and slightly translucent; shape still carries the function. */
+  .marker.layer-arpeggio .shape {
+    transform: scale(var(--marker-layer-scale));
+    opacity: var(--marker-layer-opacity);
+  }
+
+  .marker.layer-arpeggio.highlighted .shape {
+    transform: scale(calc(var(--marker-layer-scale) * var(--emph-highlight-scale)));
+  }
+
+  /* Triad layer: larger with a heavier outline so it reads over every other layer. */
+  .marker.layer-triad .shape {
+    transform: scale(var(--marker-triad-scale));
+  }
+
+  .marker.layer-triad .glyph {
+    stroke: var(--color-text);
+    stroke-width: var(--marker-triad-stroke);
+  }
+
+  .marker.layer-triad.highlighted .shape {
+    transform: scale(calc(var(--marker-triad-scale) * var(--emph-highlight-scale)));
+  }
+
+  .marker .extra-dot {
+    fill: var(--color-text);
+    r: var(--marker-extra-dot);
+  }
+  .marker .connection-ring {
+    fill: none;
+    stroke: var(--connection-ring);
+    stroke-width: var(--connection-ring-width);
+    r: calc(var(--ring-base) * 1px + var(--connection-ring-gap));
   }
 
   .marker.pulse .shape {

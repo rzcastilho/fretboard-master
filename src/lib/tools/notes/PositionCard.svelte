@@ -9,10 +9,12 @@
     onaddnote: (pc: number) => void;
     /** "Triads from this note": open Triads rooted on the card's pitch class. */
     ontriads: (pc: CardInfo['pitchClass']) => void;
+    /** "CAGED in this key": open CAGED in the card's pitch class. */
+    oncaged: (pc: CardInfo['pitchClass']) => void;
     onclose: () => void;
   }
 
-  let { info, onaddnote, ontriads, onclose }: Props = $props();
+  let { info, onaddnote, ontriads, oncaged, onclose }: Props = $props();
 
   const heading = $derived(
     info.altSpelling
@@ -60,6 +62,9 @@
     </button>
     <button type="button" onclick={() => ontriads(info.pitchClass)}>
       {m.notes_card_triads_from_note()}
+    </button>
+    <button type="button" onclick={() => oncaged(info.pitchClass)}>
+      {m.notes_card_caged()}
     </button>
     <button type="button" onclick={onclose}>{m.notes_card_close()}</button>
   </div>

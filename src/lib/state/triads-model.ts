@@ -55,6 +55,7 @@ import {
   type NoteMove
 } from '../theory/triad-shape';
 import type { ListenStep } from './listen';
+import { cagedCanShow } from './links';
 import type { TriadsView, TriadsViewState } from './triads-view';
 
 export interface NoteEntry {
@@ -159,6 +160,8 @@ export interface TriadsDisplay extends DisplayBody {
   readonly seeAllNotes: boolean;
   /** Listen to comparison: first triad, a rest, then the comparison triad (R-10, M9). */
   readonly listenComparison: ListenComparison;
+  /** "View in CAGED" is available only for major and minor (CAGED draws no others). */
+  readonly viewInCaged: { readonly enabled: boolean };
 }
 
 export interface ListenComparison {
@@ -622,7 +625,8 @@ export function buildTriadsModel(s: TriadsViewState, instrument: Instrument): Tr
     ...d,
     compare,
     seeAllNotes: guidance && s.view !== 'all-notes',
-    listenComparison: buildListenComparison(s, d, instrument)
+    listenComparison: buildListenComparison(s, d, instrument),
+    viewInCaged: { enabled: cagedCanShow(s.quality) }
   };
 }
 

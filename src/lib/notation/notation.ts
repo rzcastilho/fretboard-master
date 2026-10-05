@@ -2,6 +2,7 @@
 import { m } from '$lib/paraglide/messages.js';
 import { getLocale } from '$lib/paraglide/runtime.js';
 import type { IntervalId } from '../theory/triad';
+import type { ScaleDegree } from '../theory/caged-layers';
 import { sharpSpelling } from '../theory/pitch';
 import type { Accidental, Letter, PitchClass, Spelling } from '../theory/pitch';
 
@@ -64,13 +65,17 @@ export function noteList(spellings: readonly Spelling[]): string {
   );
 }
 
-/** Interval label for a triad member: R from the catalog, other ids as glyph strings. */
-export function intervalLabel(id: IntervalId): string {
+/** Interval label for a triad member or scale degree: R from the catalog, others as glyphs. */
+export function intervalLabel(id: IntervalId | ScaleDegree): string {
   switch (id) {
     case 'R':
       return m.interval_root();
     case 'b3':
       return '♭3';
+    case 'b6':
+      return '♭6';
+    case 'b7':
+      return '♭7';
     case 'b5':
       return '♭5';
     case '#5':

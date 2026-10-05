@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 import type { TuningId } from '$lib/instrument/tunings';
 import type { LabelType } from '$lib/state/notes-view';
 import type { TriadsLabelType } from '$lib/state/triads-view';
+import type { CagedLabelType } from '$lib/state/caged-view';
 import type { ToolId } from '$lib/shell/tools';
+import type { Tempo } from '$lib/state/listen';
 
 /**
  * Seed fixtures from specs/010-remembered-preferences/contracts/storage-format.md.
@@ -22,10 +24,19 @@ export interface ExpectedPreferences {
   readonly muted: boolean;
   readonly volume: number;
   readonly lastTool: ToolId | null;
-  readonly labels: { readonly notes: LabelType; readonly triads: TriadsLabelType };
+  readonly labels: {
+    readonly notes: LabelType;
+    readonly triads: TriadsLabelType;
+    /** 017: absent or invalid in a record → 'interval'. */
+    readonly caged: CagedLabelType;
+  };
   /** 013: absent or invalid in a record → right / highest-top. */
   readonly handedness: 'right' | 'left';
   readonly orientation: 'highest-top' | 'lowest-top';
+  /** 016: absent or invalid in a record → false. */
+  readonly rotateHintShown: boolean;
+  /** 019: absent or invalid in a record → 'medium'. */
+  readonly tempo: Tempo;
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -50,9 +61,11 @@ const defaults: ExpectedPreferences = {
   muted: false,
   volume: 80,
   lastTool: null,
-  labels: { notes: 'name', triads: 'interval' },
+  labels: { notes: 'name', triads: 'interval', caged: 'interval' },
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  rotateHintShown: false,
+  tempo: 'medium'
 };
 
 function load(name: string): string {
@@ -81,16 +94,20 @@ export const FIXTURES: readonly PrefsFixture[] = [
     muted: true,
     volume: 35,
     lastTool: 'triads',
-    labels: { notes: 'octave', triads: 'name' },
+    labels: { notes: 'octave', triads: 'name', caged: 'interval' },
     handedness: 'right',
-    orientation: 'highest-top'
+    orientation: 'highest-top',
+    rotateHintShown: false,
+    tempo: 'medium'
   }),
   fixture('bad-volume', { ...defaults, tuningId: 'AF-2' }),
   fixture('garbage', defaults),
   fixture('array', defaults),
   // The reader ignores `version`; the record's fields are read as for v1 (handedness included).
-  fixture('future', { ...defaults, tuningId: 'AF-5', handedness: 'left' }),
-  fixture('wrong-types', defaults),
+  // (the record also carries `"tempo":"slow"`, read as for v1)
+  fixture('future', { ...defaults, tuningId: 'AF-5', handedness: 'left', tempo: 'slow' }),
+  fixture('wrong-types', { ...defaults, lastTool: 'caged' }),
+  fixture('last-tool-caged', { ...defaults, lastTool: 'caged' }),
   fixture('markup', defaults),
   // 16 385 × 'a': one over MAX_RAW_LENGTH, so it is never parsed.
   fixture('oversize', defaults),
@@ -150,7 +167,15 @@ export const FIXTURES: readonly PrefsFixture[] = [
     handedness: 'left',
     orientation: 'lowest-top'
   }),
-  fixture('bad-orientation', { ...defaults, handedness: 'left', fretCount: 18 })
+  fixture('bad-orientation', { ...defaults, handedness: 'left', fretCount: 18 }),
+  // 017 CAGED label type: written only when 'name'
+  fixture('labels-caged-name', {
+    ...defaults,
+    labels: { notes: 'name', triads: 'interval', caged: 'name' }
+  }),
+  // 019 Listen tempo: written only when not 'medium'
+  fixture('tempo-fast', { ...defaults, tempo: 'fast' }),
+  fixture('bad-tempo', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

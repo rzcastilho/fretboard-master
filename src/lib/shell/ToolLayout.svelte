@@ -7,6 +7,7 @@
   import { recordFailure } from './failure';
   import NotesTool from '$lib/tools/notes/NotesTool.svelte';
   import TriadsTool from '$lib/tools/triads/TriadsTool.svelte';
+  import CagedTool from '$lib/tools/caged/CagedTool.svelte';
   import { resetTool } from '$lib/state/links.svelte';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
@@ -39,13 +40,15 @@
         <NotesTool />
       {:else if tool === 'triads'}
         <TriadsTool />
+      {:else if tool === 'caged'}
+        <CagedTool />
       {:else}
         <ToolPlaceholder {tool} />
       {/if}
       {#snippet failed(_error, boundaryReset)}
         <FailureView
           reset={() => {
-            if (tool === 'notes' || tool === 'triads') resetTool(tool);
+            resetTool(tool);
             boundaryReset();
           }}
         />

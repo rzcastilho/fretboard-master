@@ -1,5 +1,6 @@
 import type { Instrument, Position } from '../instrument/instrument';
 import type { Spelling } from '../theory/pitch';
+import type { ScaleDegree } from '../theory/caged-layers';
 import type { IntervalId } from '../theory/triad';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
@@ -18,8 +19,16 @@ export interface Marker {
   readonly label?: boolean;
   /** Same-octave tone token (Notes). Drawing only. */
   readonly tone?: OctaveTone;
-  /** Interval from the root (Triads). Used only when labelMode is 'interval'. */
-  readonly interval?: IntervalId;
+  /** Interval or scale degree from the root. Used only when labelMode is 'interval'. */
+  readonly interval?: IntervalId | ScaleDegree;
+  /** CAGED Arpeggio layer: smaller, slightly translucent glyph. Drawing only. */
+  readonly layer?: 'arpeggio' | 'triad';
+  /** CAGED: extra dot on a Pentatonic/Scale note outside the pentatonic. Drawing only. */
+  readonly extra?: boolean;
+  /** 0 ≤ appear < 1: fraction of the reveal sequence; delays the intro. Drawing only. */
+  readonly appear?: number;
+  /** Draws a connection ring around the glyph (CAGED). Never announced. */
+  readonly ring?: boolean;
   /** Draw the small octave number beside a 'note' label. */
   readonly octaveBadge?: boolean;
   /** Stable identity across model updates; a changed fret with the same id slides (R-07). */
@@ -53,15 +62,24 @@ export interface DisplayModel {
   /** Optional localized leading sentence of the text description. */
   readonly summary?: string;
   /** Lit band over frets start..end; a change scrolls it into view. */
-  readonly region?: { readonly start: number; readonly end: number };
+  readonly region?: {
+    readonly start: number;
+    readonly end: number;
+    /** 'center' → scroll the band to the viewport centre (CAGED focus). */
+    readonly align?: 'center';
+  };
   /** false → no hover hint (Hide names). Default true. */
   readonly hoverHint?: boolean;
   /** Replaces the computed text description verbatim. */
   readonly description?: string;
   /** Tappable shape tags above the board (Triads Full neck). Interactive variant only. */
   readonly tags?: readonly FretboardTag[];
+  /** false → tags render as non-focusable text (CAGED). Default true (button tags). */
+  readonly tagsInteractive?: boolean;
   /** Drawn above markers, mirrored with the layout; never announced (the description covers them). */
   readonly arrows?: readonly FretboardArrow[];
+  /** Visible text marks beside a string's label (CAGED "altered"). Aria-hidden; the description carries the meaning. */
+  readonly stringMarks?: readonly { readonly string: number; readonly label: string }[];
   /** Keyed auto-scroll: re-runs only when `key` changes (replaces the highlighted-set trigger). */
   readonly autoScroll?: {
     readonly key: string;

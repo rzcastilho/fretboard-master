@@ -28,11 +28,11 @@ describe('HomeScreen', () => {
     expect(within(banner).getByRole('group', { name: 'Sound' })).toBeTruthy();
   });
 
-  it('renders exactly two tool cards in order', () => {
+  it('renders exactly three tool cards in order', () => {
     render(HomeScreen);
     const list = screen.getByRole('list');
     const items = within(list).getAllByRole('listitem');
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(3);
     const first = within(items[0]).getByRole('link', {
       name: 'Fretboard Notes — Where is every note?'
     });
@@ -41,6 +41,10 @@ describe('HomeScreen', () => {
     });
     expect(first.getAttribute('href')).toBe('/notes');
     expect(second.getAttribute('href')).toBe('/triads');
+    const third = within(items[2]).getByRole('link', {
+      name: 'CAGED — How does the whole neck connect?'
+    });
+    expect(third.getAttribute('href')).toBe('/caged');
   });
 
   it('bottom zone holds a single instrument summary button, no spinner or image', () => {

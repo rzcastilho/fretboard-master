@@ -144,3 +144,15 @@ describe('intervalLabel', () => {
     }
   });
 });
+
+describe('intervalLabel with scale degrees', () => {
+  it('maps flats and sharps to real glyphs, R to the catalog string', () => {
+    expect(intervalLabel('b3')).toBe('♭3');
+    expect(intervalLabel('b6')).toBe('♭6');
+    expect(intervalLabel('b7')).toBe('♭7');
+    expect(intervalLabel('b5')).toBe('♭5');
+    expect(intervalLabel('#5')).toBe('♯5');
+    expect(intervalLabel('R')).toBe('R');
+    for (const d of ['2', '4', '6', '7'] as const) expect(intervalLabel(d)).toBe(d);
+  });
+});

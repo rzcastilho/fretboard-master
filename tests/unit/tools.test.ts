@@ -3,9 +3,13 @@ import { KNOWN_PATHS } from '../../src/lib/shell/screens';
 import { TOOLS } from '../../src/lib/shell/tools';
 
 describe('TOOLS', () => {
-  it('has exactly two tools in order notes, triads', () => {
-    expect(TOOLS).toHaveLength(2);
-    expect(TOOLS.map((t) => t.id)).toEqual(['notes', 'triads']);
+  it('has exactly three tools in order notes, triads, caged', () => {
+    expect(TOOLS).toHaveLength(3);
+    expect(TOOLS.map((t) => t.id)).toEqual(['notes', 'triads', 'caged']);
+  });
+
+  it('lists CAGED third with path /caged', () => {
+    expect(TOOLS[2].path).toBe('/caged');
   });
 
   it('has unique ids and paths, all known', () => {

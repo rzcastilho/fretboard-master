@@ -20,8 +20,10 @@ import {
   type TuningId
 } from '$lib/instrument/tunings';
 import type { LabelType } from '$lib/state/notes-view';
+import type { CagedLabelType } from '$lib/state/caged-view';
 import type { TriadsLabelType } from '$lib/state/triads-view';
 import type { ToolId } from '$lib/shell/tools';
+import type { Tempo } from '$lib/state/listen';
 
 export interface Preferences {
   /** 6 or 7 (012); absent or invalid in a stored record → 6. */
@@ -35,18 +37,27 @@ export interface Preferences {
   /** Control scale 0–100, step 5. */
   readonly volume: number;
   readonly lastTool: ToolId | null;
-  readonly labels: { readonly notes: LabelType; readonly triads: TriadsLabelType };
+  readonly labels: {
+    readonly notes: LabelType;
+    readonly triads: TriadsLabelType;
+    /** 017; absent or invalid in a stored record → 'interval'. Stored only when 'name'. */
+    readonly caged: CagedLabelType;
+  };
   /** 013; absent or invalid in a stored record → 'right'. */
   readonly handedness: Handedness;
   /** 013; absent or invalid in a stored record → 'highest-top'. */
   readonly orientation: Orientation;
+  /** 016; absent or invalid in a stored record → false. Stored as `rotateHint`, only when true. */
+  readonly rotateHintShown: boolean;
+  /** 019; absent or invalid in a stored record → 'medium'. Stored only when not 'medium'. */
+  readonly tempo: Tempo;
 }
 
 export const PREFS_VERSION = 1 as const;
 export const MAX_RAW_LENGTH = 16_384 as const;
 
 /** Checked against `TOOLS` by a unit test. */
-export const TOOL_IDS = ['notes', 'triads'] as const satisfies readonly ToolId[];
+export const TOOL_IDS = ['notes', 'triads', 'caged'] as const satisfies readonly ToolId[];
 
 export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   stringCount: DEFAULT_STRING_COUNT,
@@ -56,13 +67,17 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   muted: false,
   volume: 80,
   lastTool: null,
-  labels: Object.freeze({ notes: 'name', triads: 'interval' }),
+  labels: Object.freeze({ notes: 'name', triads: 'interval', caged: 'interval' }),
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  rotateHintShown: false,
+  tempo: 'medium'
 });
 
 const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
 const TRIADS_LABELS = ['interval', 'name'] as const satisfies readonly TriadsLabelType[];
+const TEMPO_VALUES = ['slow', 'medium', 'fast'] as const satisfies readonly Tempo[];
+const CAGED_LABELS = ['interval', 'name'] as const satisfies readonly CagedLabelType[];
 
 const d = DEFAULT_PREFERENCES;
 
@@ -93,12 +108,15 @@ const recordSchema = v.object({
   labels: v.fallback(
     v.object({
       notes: v.fallback(v.picklist(NOTES_LABELS), d.labels.notes),
-      triads: v.fallback(v.picklist(TRIADS_LABELS), d.labels.triads)
+      triads: v.fallback(v.picklist(TRIADS_LABELS), d.labels.triads),
+      caged: v.fallback(v.picklist(CAGED_LABELS), d.labels.caged)
     }),
     d.labels
   ),
   handedness: v.fallback(v.picklist(['right', 'left']), d.handedness),
-  orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation)
+  orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation),
+  rotateHint: v.fallback(v.boolean(), d.rotateHintShown),
+  tempo: v.fallback(v.picklist(TEMPO_VALUES), d.tempo)
 });
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -122,9 +140,11 @@ export function parsePreferences(raw: string | null): Preferences {
       muted: r.muted,
       volume: r.volume,
       lastTool: r.lastTool,
-      labels: { notes: r.labels.notes, triads: r.labels.triads },
+      labels: { notes: r.labels.notes, triads: r.labels.triads, caged: r.labels.caged },
       handedness: r.handedness,
-      orientation: r.orientation
+      orientation: r.orientation,
+      rotateHintShown: r.rotateHint,
+      tempo: r.tempo
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -143,7 +163,9 @@ export function tuningOfPreferences(p: Preferences): Tuning {
 
 /**
  * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
- * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013).
+ * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013),
+ * `rotateHint` only when true (016), `labels.caged` only when `'name'` (017),
+ * `tempo` (after `rotateHint`) only when not `'medium'` (019).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -155,8 +177,14 @@ export function serializePreferences(p: Preferences): string {
     muted: p.muted,
     volume: p.volume / 100,
     ...(p.lastTool === null ? {} : { lastTool: p.lastTool }),
-    labels: { notes: p.labels.notes, triads: p.labels.triads },
+    labels: {
+      notes: p.labels.notes,
+      triads: p.labels.triads,
+      ...(p.labels.caged === 'name' ? { caged: 'name' } : {})
+    },
     ...(p.handedness === 'left' ? { handedness: 'left' } : {}),
-    ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {})
+    ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {}),
+    ...(p.rotateHintShown ? { rotateHint: true } : {}),
+    ...(p.tempo === 'medium' ? {} : { tempo: p.tempo })
   });
 }

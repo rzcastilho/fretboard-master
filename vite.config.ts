@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
       coverage: {
         provider: 'v8',
         include: ['src/**'],
-        exclude: ['src/lib/paraglide/**', 'src/**/*.d.ts', 'src/**/*.css'],
+        exclude: ['src/lib/paraglide/**', 'src/**/*.d.ts', 'src/**/*.css', 'src/**/*.html'],
         thresholds: {
           lines: 80,
           branches: 80,

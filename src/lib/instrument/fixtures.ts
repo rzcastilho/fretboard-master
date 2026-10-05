@@ -14,6 +14,9 @@ const open = (letter: SpelledPitch['letter'], octave: number): SpelledPitch =>
 /** DADGAD, strings 1 → 6, 22 frets (the AF-7 preset). */
 export const AF_7: Instrument = /* @__PURE__ */ presetInstrument('AF-7', 6, 22);
 
+/** Half step down, strings 1 → 6, 22 frets (the AF-2 preset). */
+export const AF_2: Instrument = /* @__PURE__ */ presetInstrument('AF-2', 6, 22);
+
 /** Seven-string standard, strings 1 → 7, 22 frets. */
 export const AF_21: Instrument = /* @__PURE__ */ Object.freeze({
   stringCount: 7,
@@ -38,6 +41,12 @@ export const AF_4: Instrument = /* @__PURE__ */ presetInstrument('AF-4', 6, 22);
 export const AF_1_12: Instrument = /* @__PURE__ */ Object.freeze({
   ...STANDARD_GUITAR,
   fretCount: 12
+});
+
+/** Standard tuning with 24 frets (CAGED second cycle). */
+export const AF_1_24: Instrument = /* @__PURE__ */ Object.freeze({
+  ...STANDARD_GUITAR,
+  fretCount: 24
 });
 
 /** Strings 2 and 3 are both B3: shapes do not close on 4-3-2 and 3-2-1. */
@@ -78,14 +87,17 @@ export const SHORT_7: Instrument = /* @__PURE__ */ Object.freeze({
   fretCount: 7
 });
 
-export type FixtureName = 'AF-7' | 'AF-21' | 'AF-4' | 'AF-1-12' | 'NC-UNISON' | 'AF-8' | 'SHORT-7';
+export type FixtureName =
+  'AF-7' | 'AF-2' | 'AF-21' | 'AF-4' | 'AF-1-12' | 'AF-1-24' | 'NC-UNISON' | 'AF-8' | 'SHORT-7';
 
 export const INSTRUMENT_FIXTURES: Readonly<Record<FixtureName, Instrument>> =
   /* @__PURE__ */ Object.freeze({
     'AF-7': AF_7,
+    'AF-2': AF_2,
     'AF-21': AF_21,
     'AF-4': AF_4,
     'AF-1-12': AF_1_12,
+    'AF-1-24': AF_1_24,
     'NC-UNISON': NC_UNISON,
     'AF-8': AF_8,
     'SHORT-7': SHORT_7

@@ -77,4 +77,97 @@ describe('ChoiceGroup', () => {
     setup();
     expect(screen.getByRole('radiogroup').hasAttribute('aria-disabled')).toBe(false);
   });
+
+  it('per-option disabled: aria-disabled, focusable, skipped by arrows, activation ignored', async () => {
+    const onchoose = vi.fn();
+    const opts = [
+      { value: 'a', label: 'Alpha' },
+      { value: 'b', label: 'Beta', disabled: true },
+      { value: 'c', label: 'Gamma' }
+    ] as const;
+    render(ChoiceGroup, { name: 'Letters', options: opts, current: 'a', onchoose });
+    const beta = screen.getByRole('radio', { name: 'Beta' });
+    expect(beta.getAttribute('aria-disabled')).toBe('true');
+    expect(beta.hasAttribute('disabled')).toBe(false);
+    beta.focus();
+    expect(document.activeElement).toBe(beta);
+    await fireEvent.click(beta);
+    expect(onchoose).not.toHaveBeenCalled();
+    await fireEvent.keyDown(screen.getByRole('radio', { name: 'Alpha' }), { key: 'ArrowRight' });
+    expect(onchoose).toHaveBeenLastCalledWith('c');
+  });
+
+  it('choosing the already-checked option does nothing', async () => {
+    const onchoose = setup('b');
+    await fireEvent.click(screen.getByRole('radio', { name: 'Beta' }));
+    expect(onchoose).not.toHaveBeenCalled();
+  });
+
+  describe('reachDisabled', () => {
+    const opts = [
+      { value: 'a', label: 'Alpha' },
+      { value: 'b', label: 'Beta', disabled: true },
+      { value: 'c', label: 'Gamma', disabled: true }
+    ] as const;
+
+    it('arrows, Home and End focus disabled options without choosing them', async () => {
+      const onchoose = vi.fn();
+      render(ChoiceGroup, {
+        name: 'Letters',
+        options: opts,
+        current: 'a',
+        onchoose,
+        reachDisabled: true
+      });
+      const [alpha, beta, gamma] = screen.getAllByRole('radio');
+      await fireEvent.keyDown(alpha, { key: 'ArrowRight' });
+      expect(document.activeElement).toBe(beta);
+      await fireEvent.keyDown(beta, { key: 'ArrowRight' });
+      expect(document.activeElement).toBe(gamma);
+      await fireEvent.keyDown(gamma, { key: 'ArrowRight' });
+      expect(document.activeElement).toBe(alpha);
+      await fireEvent.keyDown(alpha, { key: 'End' });
+      expect(document.activeElement).toBe(gamma);
+      await fireEvent.keyDown(gamma, { key: 'Home' });
+      expect(document.activeElement).toBe(alpha);
+      // Only the enabled option is ever chosen (landing on Alpha), never a disabled one.
+      expect(onchoose.mock.calls.every(([v]) => v === 'a')).toBe(true);
+      onchoose.mockClear();
+      await fireEvent.click(beta);
+      expect(onchoose).not.toHaveBeenCalled();
+    });
+
+    it('chooses an enabled option it lands on', async () => {
+      const onchoose = vi.fn();
+      const mixed = [
+        { value: 'a', label: 'Alpha' },
+        { value: 'b', label: 'Beta', disabled: true },
+        { value: 'c', label: 'Gamma' }
+      ] as const;
+      render(ChoiceGroup, {
+        name: 'Letters',
+        options: mixed,
+        current: 'a',
+        onchoose,
+        reachDisabled: true
+      });
+      const [alpha, beta, gamma] = screen.getAllByRole('radio');
+      await fireEvent.keyDown(alpha, { key: 'ArrowRight' });
+      expect(document.activeElement).toBe(beta);
+      await fireEvent.keyDown(beta, { key: 'ArrowRight' });
+      expect(onchoose).toHaveBeenCalledWith('c');
+      expect(document.activeElement).toBe(gamma);
+    });
+  });
+
+  it('option describedby renders aria-describedby', () => {
+    const opts = [
+      { value: 'a', label: 'Alpha' },
+      { value: 'b', label: 'Beta', disabled: true, describedby: 'why' }
+    ] as const;
+    render(ChoiceGroup, { name: 'Letters', options: opts, current: 'a', onchoose: vi.fn() });
+    const [alpha, beta] = screen.getAllByRole('radio');
+    expect(beta.getAttribute('aria-describedby')).toBe('why');
+    expect(alpha.hasAttribute('aria-describedby')).toBe(false);
+  });
 });

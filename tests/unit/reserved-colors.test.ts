@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 
 const RESERVED = /var\(\s*--color-(root|third|fifth)\b/;
 const FRETBOARD = 'src/lib/fretboard/Fretboard.svelte';
+/** Legend sample of the same marker glyph (spec 017, R-09): still a fretboard marker, not UI chrome. */
+const MARKER_SAMPLE = 'src/lib/fretboard/MarkerSample.svelte';
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -19,8 +21,10 @@ function files(dir: string): string[] {
 const all = files('src').map((p) => ({ path: relative('.', p), text: readFileSync(p, 'utf8') }));
 
 describe('reserved marker colors', () => {
-  it('are referenced only from Fretboard.svelte', () => {
-    const offenders = all.filter((f) => f.path !== FRETBOARD && RESERVED.test(f.text));
+  it('are referenced only from Fretboard.svelte and its legend sample', () => {
+    const offenders = all.filter(
+      (f) => f.path !== FRETBOARD && f.path !== MARKER_SAMPLE && RESERVED.test(f.text)
+    );
     expect(offenders.map((f) => f.path)).toEqual([]);
   });
 

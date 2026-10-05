@@ -30,6 +30,7 @@ import { playback } from '../../src/lib/state/playback.svelte';
 import HomePage from '../../src/routes/+page.svelte';
 import NotesPage from '../../src/routes/notes/+page.svelte';
 import TriadsPage from '../../src/routes/triads/+page.svelte';
+import * as cagedRoute from '../../src/routes/caged/+page.svelte';
 import UnknownPage from '../../src/routes/[...unknown]/+page.svelte';
 import * as unknownLoad from '../../src/routes/[...unknown]/+page';
 
@@ -59,6 +60,13 @@ describe('route modules', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     handleError({ error: new Error('x') } as Parameters<typeof handleError>[0]);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('caged route', () => {
+  it('exists as a page component and inherits prerender from the root layout', () => {
+    expect(cagedRoute.default).toBeTypeOf('function');
+    expect(prerender).toBe(true);
   });
 });
 

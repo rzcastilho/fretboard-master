@@ -13,6 +13,7 @@ import {
 import { OFFSET_MAX, OFFSET_MIN, type Offsets } from '../../../src/lib/instrument/custom-tuning';
 import { TOOLS } from '../../../src/lib/shell/tools';
 import { TUNING_PRESETS, tuningFromOffsets } from '../../../src/lib/instrument/tunings';
+import { DEFAULT_TEMPO, TEMPOS } from '../../../src/lib/state/listen';
 import { FIXTURES } from './fixtures';
 
 const rec = (o: unknown): string => JSON.stringify(o);
@@ -30,9 +31,11 @@ describe('constants and defaults (FR-018)', () => {
       muted: false,
       volume: 80,
       lastTool: null,
-      labels: { notes: 'name', triads: 'interval' },
+      labels: { notes: 'name', triads: 'interval', caged: 'interval' },
       handedness: 'right',
-      orientation: 'highest-top'
+      orientation: 'highest-top',
+      rotateHintShown: false,
+      tempo: 'medium'
     });
   });
 
@@ -95,9 +98,10 @@ describe('per-field fallback (US2 scenario 6)', () => {
   it('frets non-integer → 22', () => expect(p({ frets: 13.5 }).fretCount).toBe(22));
   it('unknown tuning → AF-1', () => expect(p({ tuning: 'AF-99' }).tuningId).toBe('AF-1'));
   it('muted wrong type → false', () => expect(p({ muted: 'true' }).muted).toBe(false));
-  it.each(['caged', 'home'])('lastTool %s → null', (v) =>
+  it.each(['home', 'scales'])('lastTool %s → null', (v) =>
     expect(p({ lastTool: v }).lastTool).toBeNull()
   );
+  it('lastTool caged → caged', () => expect(p({ lastTool: 'caged' }).lastTool).toBe('caged'));
   it('labels.triads octave → interval', () =>
     expect(p({ labels: { triads: 'octave' } }).labels.triads).toBe('interval'));
   it('custom-tuning object keeps frets', () => {
@@ -161,9 +165,11 @@ describe('serializePreferences', () => {
       muted: true,
       volume: 35,
       lastTool: 'triads',
-      labels: { notes: 'octave', triads: 'name' },
+      labels: { notes: 'octave', triads: 'name', caged: 'interval' },
       handedness: 'right',
-      orientation: 'highest-top'
+      orientation: 'highest-top',
+      rotateHintShown: false,
+      tempo: 'medium'
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -209,9 +215,11 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       muted: true,
       volume: 35,
       lastTool: 'triads',
-      labels: { notes: 'octave', triads: 'name' },
+      labels: { notes: 'octave', triads: 'name', caged: 'interval' },
       handedness: 'right',
-      orientation: 'highest-top'
+      orientation: 'highest-top',
+      rotateHintShown: false,
+      tempo: 'medium'
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -339,6 +347,124 @@ describe('left-handed and orientation (013): reader rules 19–22, writer rules 
   });
 });
 
+describe('rotate hint (016 US4)', () => {
+  const p = (extra: Record<string, unknown>) =>
+    parsePreferences(JSON.stringify({ version: 1, ...extra }));
+
+  it('a record without rotateHint parses to false', () => {
+    expect(p({}).rotateHintShown).toBe(false);
+  });
+  it('parses a stored true', () => {
+    expect(p({ rotateHint: true }).rotateHintShown).toBe(true);
+  });
+  it.each(['yes', 1, null, {}, []])('invalid rotateHint %j → false, other fields kept', (bad) => {
+    const r = p({ rotateHint: bad, frets: 18, muted: true });
+    expect(r.rotateHintShown).toBe(false);
+    expect([r.fretCount, r.muted]).toEqual([18, true]);
+  });
+  it('writes rotateHint only when true; version stays 1', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('rotateHint');
+    const raw = serializePreferences({ ...DEFAULT_PREFERENCES, rotateHintShown: true });
+    expect(raw).toContain('"rotateHint":true');
+    expect(JSON.parse(raw).version).toBe(1);
+  });
+  it('existing fixtures serialize byte-identical', () => {
+    for (const f of FIXTURES) {
+      if (f.raw === null || f.raw.length > 16_384) continue;
+      const parsed = parsePreferences(f.raw);
+      expect(parsed.rotateHintShown).toBe(false);
+      expect(serializePreferences(parsed)).not.toContain('rotateHint');
+    }
+  });
+});
+
+describe('labels.caged (017)', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+  it('absent → interval', () => expect(p({}).labels.caged).toBe('interval'));
+  it('name and interval parse', () => {
+    expect(p({ labels: { caged: 'name' } }).labels.caged).toBe('name');
+    expect(p({ labels: { caged: 'interval' } }).labels.caged).toBe('interval');
+  });
+  it.each(['octave', 'none', 1, null, {}])('invalid %j → interval, others kept', (bad) => {
+    const r = p({ labels: { notes: 'octave', triads: 'name', caged: bad }, frets: 18 });
+    expect(r.labels).toEqual({ notes: 'octave', triads: 'name', caged: 'interval' });
+    expect(r.fretCount).toBe(18);
+  });
+  it('defaults to interval', () => expect(DEFAULT_PREFERENCES.labels.caged).toBe('interval'));
+  it('serialize writes caged only when name, after triads', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('caged');
+    const raw = serializePreferences({
+      ...DEFAULT_PREFERENCES,
+      labels: { ...DEFAULT_PREFERENCES.labels, caged: 'name' }
+    });
+    expect(raw).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval","caged":"name"}}'
+    );
+    expect(Object.keys(JSON.parse(raw).labels)).toEqual(['notes', 'triads', 'caged']);
+  });
+  it('labels-caged-name fixture round-trips byte-identical', () => {
+    const raw = FIXTURES.find((f) => f.name === 'labels-caged-name')?.raw ?? '';
+    expect(serializePreferences(parsePreferences(raw))).toBe(raw);
+  });
+  it('existing fixtures serialize without caged unless they hold name', () => {
+    for (const f of FIXTURES) {
+      if (f.name === 'labels-caged-name' || f.raw.length > 16_384) continue;
+      expect(
+        JSON.parse(serializePreferences(parsePreferences(f.raw))).labels.caged
+      ).toBeUndefined();
+    }
+  });
+});
+
+describe('tempo (019 US2)', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+  const raw = (name: string) => FIXTURES.find((f) => f.name === name)?.raw ?? '';
+
+  it('PREFS_VERSION stays 1', () => expect(PREFS_VERSION).toBe(1));
+  it('defaults to medium', () => expect(DEFAULT_PREFERENCES.tempo).toBe('medium'));
+  it('absent → medium', () => expect(p({}).tempo).toBe('medium'));
+  it.each(['slow', 'medium', 'fast'] as const)('%s parses', (t) =>
+    expect(p({ tempo: t }).tempo).toBe(t)
+  );
+  it.each(['allegro', 'FAST', 1, null, true, {}, []])(
+    'invalid %j → medium, other fields kept',
+    (bad) => {
+      const r = p({ tempo: bad, frets: 18, muted: true, tuning: 'AF-3' });
+      expect(r.tempo).toBe('medium');
+      expect([r.fretCount, r.muted, r.tuningId]).toEqual([18, true, 'AF-3']);
+    }
+  );
+  it('writes tempo only when not medium, after rotateHint', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('tempo');
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, tempo: 'slow' })).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"tempo":"slow"}'
+    );
+    const keys = Object.keys(
+      JSON.parse(
+        serializePreferences({ ...DEFAULT_PREFERENCES, rotateHintShown: true, tempo: 'fast' })
+      )
+    );
+    expect(keys.slice(-2)).toEqual(['rotateHint', 'tempo']);
+  });
+  it('tempo-fast round-trips byte-identical', () => {
+    const r = raw('tempo-fast');
+    expect(parsePreferences(r).tempo).toBe('fast');
+    expect(serializePreferences(parsePreferences(r))).toBe(r);
+  });
+  it('bad-tempo gives medium and re-serializes without tempo', () => {
+    const parsed = parsePreferences(raw('bad-tempo'));
+    expect(parsed.tempo).toBe('medium');
+    expect(serializePreferences(parsed)).not.toContain('tempo');
+  });
+  it('every existing fixture re-serializes without a tempo key', () => {
+    for (const f of FIXTURES) {
+      if (['tempo-fast', 'bad-tempo', 'future'].includes(f.name) || f.raw.length > 16_384) continue;
+      expect(parsePreferences(f.raw).tempo).toBe('medium');
+      expect(serializePreferences(parsePreferences(f.raw))).not.toContain('tempo');
+    }
+  });
+});
+
 const arbOffsetsOf = (n: 6 | 7): fc.Arbitrary<Offsets> =>
   fc
     .tuple(...Array.from({ length: n }, () => fc.integer({ min: OFFSET_MIN, max: OFFSET_MAX })))
@@ -360,10 +486,13 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   lastTool: fc.constantFrom(...TOOL_IDS, null),
   labels: fc.record({
     notes: fc.constantFrom('name', 'octave', 'none'),
-    triads: fc.constantFrom('interval', 'name')
+    triads: fc.constantFrom('interval', 'name'),
+    caged: fc.constantFrom('interval', 'name')
   }),
   handedness: fc.constantFrom('right', 'left'),
-  orientation: fc.constantFrom('highest-top', 'lowest-top')
+  orientation: fc.constantFrom('highest-top', 'lowest-top'),
+  rotateHintShown: fc.boolean(),
+  tempo: fc.constantFrom('slow', 'medium', 'fast')
 });
 
 function isValid(p: Preferences): boolean {
@@ -439,5 +568,12 @@ describe('properties', () => {
         expect(parsePreferences(serializePreferences(p))).toEqual(p);
       })
     );
+  });
+});
+
+describe('tempo picklist parity (019)', () => {
+  it('accepts exactly the TEMPOS of the Listen module', () => {
+    for (const t of TEMPOS) expect(parsePreferences(rec({ tempo: t })).tempo).toBe(t);
+    expect(DEFAULT_PREFERENCES.tempo).toBe(DEFAULT_TEMPO);
   });
 });

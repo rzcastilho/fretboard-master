@@ -8,7 +8,7 @@ import {
   type PlaybackEngine,
   type StopReason
 } from '$lib/audio/engine';
-import type { PulseEvent, TimeMark } from '$lib/audio/types';
+import type { PulseEvent, TimeMark, TimedStep } from '$lib/audio/types';
 import type { Instrument, Position } from '$lib/instrument/instrument';
 import { preferences } from './preferences.svelte';
 
@@ -108,6 +108,13 @@ export const playback = {
     instrument: Instrument
   ): readonly TimeMark[] {
     const marks = engine.play({ kind: 'sequence', steps, bpm }, instrument);
+    markUnlocked();
+    return marks;
+  },
+
+  /** Sound events, each with its own onset and ring length. Call from a user-gesture handler. */
+  timeline(events: readonly TimedStep[], instrument: Instrument): readonly TimeMark[] {
+    const marks = engine.play({ kind: 'timeline', events }, instrument);
     markUnlocked();
     return marks;
   },

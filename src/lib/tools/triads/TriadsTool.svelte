@@ -17,6 +17,7 @@
   import TriadsGuidance from './TriadsGuidance.svelte';
   import TriadsCompare from './TriadsCompare.svelte';
   import TriadsControls from './TriadsControls.svelte';
+  import { openCagedFromTriads } from '$lib/state/links.svelte';
   import TriadsSecondary from './TriadsSecondary.svelte';
   import WideStretchMark from './WideStretchMark.svelte';
 
@@ -103,6 +104,11 @@
       />
     {/key}
   {/if}
+  {#if triads.notice?.kind === 'compare-off-for-shape'}
+    {#key triads.notice}
+      <Notice message={m.triads_notice_compare_off_for_shape()} ondismiss={triads.dismissNotice} />
+    {/key}
+  {/if}
   {#if triads.notice?.kind === 'compare-omitted'}
     {#key triads.notice}
       <Notice message={omittedMessage(triads.notice.notes)} ondismiss={triads.dismissNotice} />
@@ -121,6 +127,8 @@
     onoctavedown={triads.octaveDown}
     listen={triads.display.listen}
     onlisten={triads.listen}
+    viewInCaged={triads.display.viewInCaged}
+    onviewincaged={openCagedFromTriads}
     compareOn={triads.display.compare.on && triads.display.compare.offered}
     listenComparison={triads.display.listenComparison}
     onlistencomparison={triads.listenComparison}

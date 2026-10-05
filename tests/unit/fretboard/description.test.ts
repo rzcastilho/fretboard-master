@@ -139,3 +139,39 @@ describe('seven-string descriptions (FR-018)', () => {
     expect(positionName(seven, { string: 7, fret: 3 })).toBe('D, string 7, fret 3');
   });
 });
+
+describe('CAGED layer change sentence (US2, R-12)', () => {
+  it('leads the description with the layer change, then the focus sentence', async () => {
+    const { buildCagedModel } = await import('../../../src/lib/state/caged-model');
+    const { initialCagedView } = await import('../../../src/lib/state/caged-view');
+    const ctx = { tuningName: 'Standard', temporary: false };
+    const view = initialCagedView();
+    const text = (change: { layer: 'chord' | 'arpeggio'; on: boolean } | null) =>
+      buildCagedModel(view, STANDARD_GUITAR, ctx, null, {
+        reveal: null,
+        layerChange: change,
+        triadChange: null
+      }).model?.description as string;
+    expect(text({ layer: 'arpeggio', on: true }).startsWith('Arpeggio layer on. ')).toBe(true);
+    expect(text({ layer: 'arpeggio', on: false }).startsWith('Arpeggio layer off. ')).toBe(true);
+    expect(text({ layer: 'chord', on: true }).startsWith('Chord layer on. ')).toBe(true);
+    expect(text(null)).not.toMatch(/layer (on|off)\./);
+  });
+});
+
+describe('CAGED layers and counts sentences (US6, R-12)', () => {
+  it('follows the summary with layers and counts, before the shape entries', async () => {
+    const { buildCagedModel } = await import('../../../src/lib/state/caged-model');
+    const { initialCagedView } = await import('../../../src/lib/state/caged-view');
+    const ctx = { tuningName: 'Standard', temporary: false };
+    const view = {
+      ...initialCagedView(),
+      layers: { chord: true, arpeggio: true, pentatonic: false, scale: false, triad: false }
+    };
+    const text = buildCagedModel(view, STANDARD_GUITAR, ctx).model?.description as string;
+    const at = (s: string) => text.indexOf(s);
+    expect(at('Layers on: Chord and Arpeggio.')).toBeGreaterThan(at('shapes along the neck.'));
+    expect(at('Across the neck:')).toBeGreaterThan(at('Layers on:'));
+    expect(at('C shape, frets')).toBeGreaterThan(at('Across the neck:'));
+  });
+});

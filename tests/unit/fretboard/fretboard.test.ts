@@ -8,6 +8,7 @@ import {
   rowOf,
   screenOrder
 } from '../../../src/lib/fretboard/geometry';
+import { centerScrollTarget } from '../../../src/lib/fretboard/interaction';
 import Fretboard from '../../../src/lib/fretboard/Fretboard.svelte';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
 import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
@@ -114,6 +115,19 @@ const show = (markers: Marker[], labelMode: DisplayModel['labelMode'] = 'note') 
   render(Fretboard, { instrument: STANDARD_GUITAR, model: { markers, labelMode } });
 
 describe('Fretboard markers', () => {
+  it('draws circle.extra-dot inside a degree marker only when extra (017 US5)', () => {
+    const { container } = show([
+      mk({ string: 1, fret: 1, function: 'degree', extra: true }),
+      mk({ string: 2, fret: 1, function: 'degree' }),
+      mk({ string: 3, fret: 1, function: 'root', extra: true })
+    ]);
+    const extra = container.querySelector('.marker.degree[data-key="1:1"]');
+    expect(extra?.querySelector('circle.extra-dot')).not.toBeNull();
+    expect(container.querySelector('.marker[data-key="2:1"] circle.extra-dot')).toBeNull();
+    expect(container.querySelector('.marker[data-key="3:1"] circle.extra-dot')).toBeNull();
+    expect(container.querySelectorAll('circle.extra-dot')).toHaveLength(1);
+  });
+
   it('draws one marker per function with function and emphasis classes', () => {
     const { container } = show([
       mk({ string: 1, fret: 1, function: 'root', emphasis: 'highlighted' }),
@@ -846,6 +860,114 @@ describe('Fretboard region band (US3)', () => {
   });
 });
 
+describe('Fretboard centred region (016 US1)', () => {
+  const model = (region?: { start: number; end: number; align?: 'center' }): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    ...(region ? { region } : {})
+  });
+
+  async function lastWrite(first: DisplayModel | undefined, next: DisplayModel) {
+    const writes: number[] = [];
+    const proto = HTMLElement.prototype;
+    const widthDesc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => 286 });
+    Object.defineProperty(proto, 'scrollLeft', {
+      configurable: true,
+      get(this: HTMLElement & { __sl?: number }) {
+        return this.__sl ?? 0;
+      },
+      set(this: HTMLElement & { __sl?: number }, v: number) {
+        this.__sl = v;
+        writes.push(v);
+      }
+    });
+    try {
+      const view = render(Fretboard, { instrument: STANDARD_GUITAR, model: first ?? model() });
+      await tick();
+      await view.rerender({ instrument: STANDARD_GUITAR, model: next });
+      await tick();
+      return { writes, bands: view.container.querySelectorAll('.region-band').length };
+    } finally {
+      if (widthDesc) Object.defineProperty(proto, 'clientWidth', widthDesc);
+      else delete (proto as unknown as Record<string, unknown>).clientWidth;
+      delete (proto as unknown as Record<string, unknown>).scrollLeft;
+    }
+  }
+
+  it("align 'center' renders the band and scrolls to the centring target (instant here: no token)", async () => {
+    const { writes, bands } = await lastWrite(
+      model(),
+      model({ start: 8, end: 10, align: 'center' })
+    );
+    expect(bands).toBe(1);
+    const layout = layoutFretboard(STANDARD_GUITAR, DEFAULT_METRICS, 286, 'interactive');
+    const expected = centerScrollTarget(layout, 8, 10, { scrollLeft: 0, width: 286 });
+    expect(expected).not.toBeNull();
+    expect(writes.at(-1)).toBeCloseTo(expected as number, 0);
+  });
+
+  it('a region without align keeps the minimal-move scroll', async () => {
+    const centred = await lastWrite(model(), model({ start: 8, end: 10, align: 'center' }));
+    const plain = await lastWrite(model(), model({ start: 8, end: 10 }));
+    expect(plain.writes.at(-1)).not.toBe(centred.writes.at(-1));
+  });
+
+  it('leaving focus (no region) draws no band and does not scroll', async () => {
+    const { writes, bands } = await lastWrite(
+      model({ start: 8, end: 10, align: 'center' }),
+      model()
+    );
+    expect(bands).toBe(0);
+    expect(writes).toHaveLength(0);
+  });
+
+  it('reads --duration-medium for the centred scroll', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(src).toMatch(/tokenDuration\(root, '--duration-medium'\)/);
+  });
+});
+
+describe('Fretboard connection ring (016 US2)', () => {
+  it('Marker.ring draws an aria-hidden circle.connection-ring inside the marker group', () => {
+    const { container } = show([
+      mk({ string: 4, fret: 10, function: 'root', emphasis: 'highlighted', ring: true })
+    ]);
+    const group = container.querySelector('.marker[data-key="4:10"]');
+    const ring = group?.querySelector('circle.connection-ring');
+    expect(ring).toBeTruthy();
+    expect(ring?.closest('.marker')).toBe(group);
+    expect(ring?.closest('[aria-hidden="true"]')).toBeTruthy();
+  });
+
+  it('draws the ring for every marker function', () => {
+    const { container } = show(
+      (['root', 'third', 'fifth', 'degree', 'neutral'] as const).map((fn, i) =>
+        mk({ string: i + 1, fret: 3, function: fn, ring: true })
+      )
+    );
+    expect(container.querySelectorAll('.marker circle.connection-ring')).toHaveLength(5);
+  });
+
+  it('markers without ring render exactly as before', () => {
+    const { container } = show([
+      mk({ string: 2, fret: 1 }),
+      mk({ string: 3, fret: 1, ring: false })
+    ]);
+    expect(container.querySelectorAll('.connection-ring')).toHaveLength(0);
+  });
+
+  it('is styled from the ring tokens and never animates', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    const rule = /\.connection-ring\s*\{([^}]*)\}/.exec(src)?.[1] ?? '';
+    expect(rule).toMatch(/var\(--connection-ring\)/);
+    expect(rule).toMatch(/var\(--connection-ring-width\)/);
+    expect(src).toMatch(/var\(--connection-ring-gap\)/);
+    expect(rule).not.toMatch(/animation|transition/);
+    expect(rule).toMatch(/fill:\s*none/);
+  });
+});
+
 describe('Fretboard interval label mode (005)', () => {
   const m = (o: Partial<Marker>): Marker => ({
     string: 1,
@@ -1448,6 +1570,111 @@ describe('Fretboard marker motion (007 US5)', () => {
         cleanup();
       }
     });
+
+    describe('layer reveal intro (017 US1)', () => {
+      const stubTokens = (reduce = false) => {
+        vi.spyOn(globalThis, 'getComputedStyle').mockImplementation(
+          () =>
+            ({
+              getPropertyValue: (t: string) => (t === '--duration-fast' ? '120ms' : '300ms')
+            }) as unknown as CSSStyleDeclaration
+        );
+        vi.stubGlobal('matchMedia', (q: string) => ({
+          matches: reduce && q.includes('reduce'),
+          addEventListener() {}
+        }));
+        proto.animate = (...args: unknown[]) => {
+          animate(...args);
+          return { cancel() {}, finished: Promise.resolve(), onfinish: null, currentTime: 0 };
+        };
+      };
+      const opts = () => animate.mock.calls.map((c) => c[1] as { duration: number; delay: number });
+      const base = () => [id({ string: 3, fret: 0, id: '3:0', function: 'root' })];
+
+      it('holds the intro for appear × (short − fast) before the fast fade', async () => {
+        stubTokens();
+        try {
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model(base())
+          });
+          animate.mockClear();
+          await rerender({
+            instrument: STANDARD_GUITAR,
+            model: model([
+              ...base(),
+              id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.5 })
+            ])
+          });
+          // Svelte holds the node for the delay (one 90 ms animation) before the 120 ms fade.
+          expect(opts().filter((o) => o.duration === 90)).toHaveLength(1);
+        } finally {
+          cleanup();
+        }
+      });
+
+      it('has no delay under reduced motion', async () => {
+        stubTokens(true);
+        try {
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model(base())
+          });
+          animate.mockClear();
+          await rerender({
+            instrument: STANDARD_GUITAR,
+            model: model([
+              ...base(),
+              id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.9 })
+            ])
+          });
+          for (const o of opts()) {
+            expect(o.delay ?? 0).toBe(0);
+            expect(o.duration).toBeLessThanOrEqual(1);
+          }
+        } finally {
+          cleanup();
+        }
+      });
+
+      it('plays only on mount: a marker kept across updates does not animate again', async () => {
+        stubTokens();
+        try {
+          const withAppear = () => [
+            ...base(),
+            id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.5 })
+          ];
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model(base())
+          });
+          await rerender({ instrument: STANDARD_GUITAR, model: model(withAppear()) });
+          animate.mockClear();
+          await rerender({ instrument: STANDARD_GUITAR, model: model(withAppear()) });
+          expect(animate).not.toHaveBeenCalled();
+        } finally {
+          cleanup();
+        }
+      });
+
+      it('removal has no stagger', async () => {
+        stubTokens();
+        try {
+          const { rerender } = render(Fretboard, {
+            instrument: STANDARD_GUITAR,
+            model: model([
+              ...base(),
+              id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.9 })
+            ])
+          });
+          animate.mockClear();
+          await rerender({ instrument: STANDARD_GUITAR, model: model(base()) });
+          for (const o of opts()) expect(o.delay ?? 0).toBe(0);
+        } finally {
+          cleanup();
+        }
+      });
+    });
   });
 
   it('US5-2: a comparison-quality change slides only the changed comparison note', async () => {
@@ -1773,4 +2000,233 @@ describe('Fretboard screen-reader parity (013 US3)', () => {
       expect(await run(withPresentation(STANDARD_GUITAR, h, o))).toBe(expected);
     }
   );
+});
+
+describe('Fretboard non-interactive tags (tagsInteractive: false)', () => {
+  const LEFT = withPresentation(STANDARD_GUITAR, 'left', 'highest-top');
+  const tags = [
+    { id: 'a', start: 0, end: 3, label: 'C shape', name: 'C shape', pressed: false },
+    { id: 'b', start: 3, end: 5, label: 'A shape', name: 'A shape', pressed: false },
+    { id: 'c', start: 5, end: 8, label: 'G shape', name: 'G shape', pressed: false }
+  ];
+  const model = (extra: Partial<DisplayModel> = {}): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    tags,
+    ...extra
+  });
+  const strip = (c: HTMLElement) => c.querySelector('.tags') as HTMLElement;
+  const places = (c: HTMLElement) =>
+    [...c.querySelectorAll<HTMLElement>('.tags .tag')].map((e) => [
+      e.style.insetInlineStart,
+      e.style.insetBlockStart
+    ]);
+
+  it('renders non-button spans with no role, aria-pressed or tab stop', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model({ tagsInteractive: false })
+    });
+    const els = [...container.querySelectorAll<HTMLElement>('.tags .tag')];
+    expect(els).toHaveLength(3);
+    for (const el of els) {
+      expect(el.tagName).toBe('SPAN');
+      expect(el.hasAttribute('aria-pressed')).toBe(false);
+      expect(el.getAttribute('role')).toBeNull();
+      expect(el.hasAttribute('tabindex')).toBe(false);
+    }
+    expect(within(strip(container)).queryAllByRole('button')).toHaveLength(0);
+    expect(els.map((e) => e.textContent?.trim())).toEqual(['C shape', 'A shape', 'G shape']);
+  });
+
+  it('keeps the group role and label', () => {
+    render(Fretboard, { instrument: STANDARD_GUITAR, model: model({ tagsInteractive: false }) });
+    expect(screen.getByRole('group', { name: 'Shapes' })).toBeTruthy();
+  });
+
+  it('places tags exactly like the button variant', () => {
+    const a = render(Fretboard, { instrument: STANDARD_GUITAR, model: model() });
+    const buttons = places(a.container);
+    a.unmount();
+    const b = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model({ tagsInteractive: false })
+    });
+    expect(places(b.container)).toEqual(buttons);
+  });
+
+  it('does not call ontag when a span tag is clicked', async () => {
+    const ontag = vi.fn();
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model({ tagsInteractive: false }),
+      ontag
+    });
+    await fireEvent.click(container.querySelector('.tags .tag') as HTMLElement);
+    expect(ontag).not.toHaveBeenCalled();
+  });
+
+  it('mirrors in left-handed: first tag is rightmost', () => {
+    const { container } = render(Fretboard, {
+      instrument: LEFT,
+      model: model({ tagsInteractive: false })
+    });
+    const lefts = [...container.querySelectorAll<HTMLElement>('.tags .tag')].map((e) =>
+      parseFloat(e.style.insetInlineStart)
+    );
+    expect(lefts[0]).toBeGreaterThan(lefts[1]);
+    expect(lefts[1]).toBeGreaterThan(lefts[2]);
+  });
+
+  it('default (undefined or true) keeps button tags', () => {
+    for (const extra of [{}, { tagsInteractive: true }]) {
+      const { container, unmount } = render(Fretboard, {
+        instrument: STANDARD_GUITAR,
+        model: model(extra)
+      });
+      expect(container.querySelectorAll('.tags button.tag')).toHaveLength(3);
+      unmount();
+    }
+  });
+});
+
+describe('Fretboard string marks (slice 015)', () => {
+  const marks = [{ string: 6, label: 'altered' }];
+  const model = (stringMarks: DisplayModel['stringMarks']): DisplayModel => ({
+    markers: [],
+    labelMode: 'none',
+    stringMarks
+  });
+
+  it.each([
+    ['right', 'highest-top'],
+    ['right', 'lowest-top'],
+    ['left', 'highest-top'],
+    ['left', 'lowest-top']
+  ] as const)('draws the mark in the string-6 row (%s, %s)', (hand, orient) => {
+    const instrument = withPresentation(STANDARD_GUITAR, hand, orient);
+    const { container } = render(Fretboard, { instrument, model: model(marks) });
+    const mark = container.querySelector('text.string-mark') as SVGTextElement;
+    expect(mark.textContent).toBe('altered');
+    const label = [...container.querySelectorAll('text.string-label')].find((t) =>
+      t.textContent?.startsWith('6 ')
+    ) as SVGTextElement;
+    expect(Number(mark.getAttribute('y'))).toBeGreaterThan(Number(label.getAttribute('y')));
+    expect(mark.getAttribute('x')).toBe(label.getAttribute('x'));
+    const labelX = Number(mark.getAttribute('x'));
+    const svgWidth = Number(container.querySelector('svg')?.getAttribute('width'));
+    // Label column sits on the nut's opposite side: left edge when right-handed, right when left.
+    expect(labelX < svgWidth / 2).toBe(hand === 'right');
+  });
+
+  it('ignores a mark for a string the instrument lacks', () => {
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model([{ string: 7, label: 'altered' }])
+    });
+    expect(container.querySelector('text.string-mark')).toBeNull();
+  });
+
+  it('is aria-hidden and outside the accessibility tree', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model: model(marks) });
+    const mark = container.querySelector('text.string-mark') as SVGTextElement;
+    expect(mark.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(mark.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('draws no mark without stringMarks', () => {
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR });
+    expect(container.querySelector('text.string-mark')).toBeNull();
+  });
+});
+
+describe('MarkerSample (US2)', () => {
+  it('draws an aria-hidden 44x44 svg with the function glyph', async () => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const { container } = render(MarkerSample, { fn: 'root' });
+    const svg = container.querySelector('svg.marker-sample') as SVGElement;
+    expect(svg.getAttribute('aria-hidden')).toBe('true');
+    expect(svg.getAttribute('width')).toBe('44');
+    expect(svg.querySelector('rect.glyph')).not.toBeNull();
+  });
+
+  it.each([
+    ['fifth', 'polygon.glyph'],
+    ['degree', 'circle.glyph.outline'],
+    ['third', 'circle.glyph']
+  ] as const)('%s uses %s', async (fn, selector) => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const { container } = render(MarkerSample, { fn });
+    expect(container.querySelector(selector)).not.toBeNull();
+  });
+
+  it('arpeggio layer adds layer-arpeggio and extra adds the extra dot', async () => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const a = render(MarkerSample, { fn: 'root', layer: 'arpeggio' });
+    expect(a.container.querySelector('svg.layer-arpeggio')).not.toBeNull();
+    const e = render(MarkerSample, { fn: 'degree', extra: true });
+    expect(e.container.querySelector('circle.extra-dot')).not.toBeNull();
+  });
+});
+
+describe('Fretboard triad layer (018 US1)', () => {
+  it('a marker with layer triad gets class layer-triad', () => {
+    const { container } = show([
+      mk({ string: 3, fret: 5, function: 'root', layer: 'triad', id: 'triad:3:5' }),
+      mk({ string: 2, fret: 5, function: 'third', id: '2:5' })
+    ]);
+    const triad = container.querySelector('.marker[data-key="3:5"]');
+    expect(triad?.classList.contains('layer-triad')).toBe(true);
+    expect(triad?.classList.contains('layer-arpeggio')).toBe(false);
+    expect(
+      container.querySelector('.marker[data-key="2:5"]')?.classList.contains('layer-triad')
+    ).toBe(false);
+  });
+
+  it('the connection ring still renders when ring is set', () => {
+    const { container } = show([
+      mk({ string: 3, fret: 5, function: 'root', layer: 'triad', ring: true, id: 'triad:3:5' })
+    ]);
+    const group = container.querySelector('.marker.layer-triad[data-key="3:5"]');
+    expect(group?.querySelector('circle.connection-ring')).toBeTruthy();
+  });
+
+  it('is styled from the triad tokens', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    const rule = /\.marker\.layer-triad[^{]*\{([^}]*)\}/.exec(src)?.[1] ?? '';
+    expect(src).toMatch(/var\(--marker-triad-scale\)/);
+    expect(src).toMatch(/var\(--marker-triad-stroke\)/);
+    expect(rule.length).toBeGreaterThan(0);
+  });
+
+  it('remounts with appear when the id changes from s:f to triad:s:f', async () => {
+    const before = [mk({ string: 3, fret: 5, function: 'root', id: '3:5' })];
+    const after = [
+      mk({ string: 3, fret: 5, function: 'root', layer: 'triad', id: 'triad:3:5', appear: 0.5 })
+    ];
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: { markers: before, labelMode: 'note' }
+    });
+    const first = container.querySelector('.marker[data-key="3:5"]');
+    expect(first).toBeTruthy();
+    await rerender({
+      instrument: STANDARD_GUITAR,
+      model: { markers: after, labelMode: 'note' }
+    });
+    const next = container.querySelector('.marker.layer-triad[data-key="3:5"]');
+    expect(next).toBeTruthy();
+    expect(next).not.toBe(first);
+  });
+
+  it('MarkerSample accepts layer triad', async () => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const { container } = render(MarkerSample, { fn: 'root', layer: 'triad' });
+    expect(container.querySelector('svg.layer-triad')).not.toBeNull();
+    expect(container.querySelector('svg.layer-arpeggio')).toBeNull();
+  });
 });

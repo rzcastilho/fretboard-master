@@ -155,6 +155,26 @@ export function autoScrollTarget(
 }
 
 /**
+ * Scroll target that centres the band `start..end` (CAGED focus, data-model §5): null when the
+ * board fits or the target is within 0.5 px of the current scroll. Mirroring comes from the
+ * column geometry.
+ */
+export function centerScrollTarget(
+  layout: FretboardLayout,
+  start: number,
+  end: number,
+  viewport: ScrollViewport
+): number | null {
+  const a = layout.columns[start];
+  const b = layout.columns[end];
+  const maxScroll = Math.max(0, layout.width - viewport.width);
+  if (!a || !b || maxScroll === 0) return null;
+  const mid = (Math.min(a.start, b.start) + Math.max(a.end, b.end)) / 2;
+  const target = Math.min(Math.max(mid - viewport.width / 2, 0), maxScroll);
+  return Math.abs(target - viewport.scrollLeft) < 0.5 ? null : target;
+}
+
+/**
  * Full neck auto-scroll (C15, R-06): null when no group exists or any group is already fully
  * visible; otherwise the `spanTarget` move for the first group.
  */

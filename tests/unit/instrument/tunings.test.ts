@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
+import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';
 import {
   DEFAULT_FRETS,
   DEFAULT_TUNING_ID,
@@ -17,6 +17,7 @@ import {
   normalizePresetId,
   presetStrings,
   presetsFor,
+  standardCounterpart,
   standardTuningId,
   offsetsOfTuning,
   presetInstrument,
@@ -338,5 +339,32 @@ describe('seven-string presets (012)', () => {
     expect([...o]).toEqual([-2, 0, 0, 0, 0, 0, 0]);
     expect(tuningFromOffsets(o)).toEqual({ kind: 'preset', id: 'AF-23' });
     expect(tuningStrings(tuningFromOffsets([-3, 0, 0, 0, 0, 0, 0]), 7).map(fmt)[0]).toBe('G#1');
+  });
+});
+
+describe('standardCounterpart', () => {
+  it('maps AF-8 (24 frets, left-handed, lowest-top) to AF-1 with the same presentation', () => {
+    const base = withPresentation(presetInstrument('AF-8', 6, 24), 'left', 'lowest-top');
+    const std = standardCounterpart(base);
+    const expected = withPresentation(presetInstrument('AF-1', 6, 24), 'left', 'lowest-top');
+    expect(std).toBe(expected);
+    expect(std.fretCount).toBe(24);
+    expect(std.handedness).toBe('left');
+    expect(std.orientation).toBe('lowest-top');
+  });
+
+  it('maps a 7-string AF-10 to AF-21', () => {
+    const std = standardCounterpart(presetInstrument('AF-10', 7, 22));
+    expect(std).toBe(presetInstrument('AF-21', 7, 22));
+  });
+
+  it('maps a custom tuning to the standard for its string count', () => {
+    const custom = tuningInstrument(tuningFromOffsets([0, 0, 0, 0, 0, 3] as never), 6, 22);
+    expect(standardCounterpart(custom)).toBe(presetInstrument('AF-1', 6, 22));
+  });
+
+  it('returns the same reference on repeated calls', () => {
+    const base = withPresentation(presetInstrument('AF-8', 6, 20), 'left', 'highest-top');
+    expect(standardCounterpart(base)).toBe(standardCounterpart(base));
   });
 });

@@ -16,6 +16,7 @@
   /* Disabled controls: greyed, never error red (feature 006) */
   --color-disabled-text: #6b7280;
   --color-disabled-border: #d1d5db;
+  --disabled-opacity: 0.6;
   --color-focus-ring: #0b5cad;
   --color-notice-surface: #e8eef6;
   --color-notice-text: #1a1d21;
@@ -53,6 +54,7 @@
   --fb-fret-first: 3.25rem;
   --fb-fret-last: 2.75rem;
   --fb-label-col: 1.5rem;
+  --fb-label-col-marked: 3.5rem;
   --fb-numbers-row: 1.5rem;
   --fb-nut-width: 0.375rem;
   --fb-string-width-1: 0.0625rem;
@@ -77,6 +79,15 @@
   --marker-elevation-stroke: 1px;
   --marker-label-size: 0.875rem;
   --marker-label-min-size: 0.75rem;
+
+  /* CAGED layers (feature 017) */
+  --marker-layer-scale: 0.8;
+  --marker-layer-opacity: 0.8;
+  --marker-extra-dot: 0.25rem;
+
+  /* CAGED triad layer (feature 018): size and outline only, no new color */
+  --marker-triad-scale: 1.15;
+  --marker-triad-stroke: 3px;
 
   /* Emphasis */
   --emph-highlight-scale: 1.15;
@@ -123,10 +134,16 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-short: 300ms;
+  --duration-medium: 500ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
   /* Sizing */
   --target-min: 44px;
+
+  /* CAGED shape connections (feature 016): ring follows text color in every theme */
+  --connection-ring: var(--color-text);
+  --connection-ring-width: 2px;
+  --connection-ring-gap: 2px;
 
   /* Playback / sound control */
   --pulse-scale: 1.25;
@@ -197,6 +214,7 @@
     --color-disabled-border: GrayText;
     --color-notice-border: var(--color-text);
     --color-sound-panel-border: var(--color-text);
+    --connection-ring: CanvasText;
     --border-width: 2px;
     --focus-ring-width: 4px;
     --color-fretboard-wood: Canvas;
@@ -207,6 +225,8 @@
     --color-degree-stroke: CanvasText;
     --marker-neutral-stroke-width: 3px;
     --marker-stroke: 3px;
+    --marker-layer-opacity: 1;
+    --marker-triad-stroke: 4px;
 
     --color-note-highlight: CanvasText;
     --color-note-highlight-label: Canvas;
@@ -221,11 +241,18 @@
   }
 }
 
+@media (forced-colors: active) {
+  :root {
+    --connection-ring: CanvasText;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-fast: 0s;
     --duration-base: 0s;
     --duration-short: 0s;
+    --duration-medium: 0s;
   }
 }
 

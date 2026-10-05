@@ -40,6 +40,8 @@ import {
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
+import { tuningLabel } from '$lib/shell/tuning-names';
+import { caged } from './caged.svelte';
 import { triads } from './triads.svelte';
 
 let active = $state.raw<InstrumentConfig>(DEFAULT_CONFIG);
@@ -174,6 +176,7 @@ export const instrument = {
   /** Orchestration (data-model §4): apply once, stop playback once, notify the shown tool. */
   confirm(screen: ScreenId): void {
     const result = confirmPanel(panel, active);
+    caged.endTemporary();
     panel = result.panel;
     adjustedIn = null; // R-05: a new confirm replaces any earlier notice
     if (!result.changed) return;
@@ -192,13 +195,21 @@ export const instrument = {
       // Presentation only (FR-017): views and sound untouched, no notice.
       notes.applyInstrument(inst);
       triads.applyInstrument(inst);
+      caged.applyInstrument(inst, tuningLabel(tuning));
       return;
     }
     playback.stop('instrument');
     const adjNotes = notes.applyInstrument(inst);
     const adjTriads = triads.applyInstrument(inst);
+    const adjCaged = caged.applyInstrument(inst, tuningLabel(tuning));
     adjustedIn =
-      screen === 'notes' && adjNotes ? 'notes' : screen === 'triads' && adjTriads ? 'triads' : null;
+      screen === 'notes' && adjNotes
+        ? 'notes'
+        : screen === 'triads' && adjTriads
+          ? 'triads'
+          : screen === 'caged' && adjCaged
+            ? 'caged'
+            : null;
   },
   /**
    * Apply a remembered config at startup (010): same path as Confirm, but no notice, no
@@ -210,6 +221,7 @@ export const instrument = {
     const inst = instrumentOf(config);
     notes.applyInstrument(inst);
     triads.applyInstrument(inst);
+    caged.applyInstrument(inst, tuningLabel(config.tuning));
     adjustedIn = null;
   },
   dismissAdjusted(): void {

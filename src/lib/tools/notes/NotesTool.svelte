@@ -16,7 +16,7 @@
   import StringFilter from '$lib/tools/notes/StringFilter.svelte';
   import PositionCard from '$lib/tools/notes/PositionCard.svelte';
   import { maybeFault } from '$lib/shell/fault';
-  import { openTriadsFromNote, viewAsTriad } from '$lib/state/links.svelte';
+  import { openCagedFromNote, openTriadsFromNote, viewAsTriad } from '$lib/state/links.svelte';
   import { notes } from '$lib/state/notes.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { onMount } from 'svelte';
@@ -118,6 +118,7 @@
       info={notes.display.cardInfo}
       onaddnote={notes.addNote}
       ontriads={openTriadsFromNote}
+      oncaged={openCagedFromNote}
       onclose={closeCard}
     />
   {/if}

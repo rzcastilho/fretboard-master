@@ -5,6 +5,8 @@ import InstrumentButton from '../../src/lib/shell/InstrumentButton.svelte';
 import InstrumentSummary from '../../src/lib/shell/InstrumentSummary.svelte';
 import TuningBadge from '../../src/lib/shell/TuningBadge.svelte';
 import type { TuningId } from '../../src/lib/instrument/tunings';
+import { AF_8 } from '../../src/lib/instrument/fixtures';
+import { caged, resetCagedForTests } from '../../src/lib/state/caged.svelte';
 import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
 
 const applyTuning = (id: 'AF-4' | 'AF-1', frets?: number) => {
@@ -14,7 +16,10 @@ const applyTuning = (id: 'AF-4' | 'AF-1', frets?: number) => {
   instrument.confirm('triads');
 };
 
-beforeEach(() => resetInstrumentForTests());
+beforeEach(() => {
+  resetInstrumentForTests();
+  resetCagedForTests();
+});
 
 describe('TuningBadge', () => {
   it('is absent for Standard', () => {
@@ -173,5 +178,30 @@ describe('InstrumentSummary (handedness)', () => {
     instrument.confirm('triads');
     await tick();
     expect(screen.getByRole('button').textContent?.trim()).toBe('6 strings · Drop D · left-handed');
+  });
+});
+
+describe('TuningBadge: temporary CAGED variant', () => {
+  const temporary = () => {
+    resetCagedForTests(AF_8, 'Open G');
+    caged.viewInStandard();
+  };
+
+  it('shows the temporary text and accessible name in place of the tuning badge', () => {
+    applyTuning('AF-4');
+    temporary();
+    render(TuningBadge);
+    const badge = screen.getByRole('button', {
+      name: 'Temporary tuning: Standard. Open instrument panel'
+    });
+    expect(badge.textContent?.trim()).toBe('Temporary tuning: Standard');
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
+
+  it('shows even when the stored tuning is Standard, and opens the panel', async () => {
+    temporary();
+    render(TuningBadge);
+    await fireEvent.click(screen.getByRole('button', { name: /Temporary tuning/ }));
+    expect(instrument.panel.open).toBe(true);
   });
 });

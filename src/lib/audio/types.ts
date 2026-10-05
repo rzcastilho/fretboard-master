@@ -2,6 +2,16 @@
 import type { Position } from '../instrument/instrument';
 import type { Pitch } from '../theory/pitch';
 
+/** One event of a `timeline` request: a note or block with its own onset and ring length. */
+export interface TimedStep {
+  /** One position = a single note, several = a block. */
+  readonly positions: readonly Position[];
+  /** From request start; clamped 0…MAX_TIMELINE_MS. */
+  readonly onsetMs: number;
+  /** Ring length; clamped 1…MAX_TIMELINE_MS. */
+  readonly durationMs: number;
+}
+
 export type PlaybackRequest =
   | { readonly kind: 'note'; readonly position: Position }
   | { readonly kind: 'chord'; readonly positions: readonly Position[] }
@@ -9,7 +19,8 @@ export type PlaybackRequest =
       readonly kind: 'sequence';
       readonly steps: readonly (Position | readonly Position[])[];
       readonly bpm: number;
-    };
+    }
+  | { readonly kind: 'timeline'; readonly events: readonly TimedStep[] };
 
 export interface TimeMark {
   readonly position: Position;
@@ -51,7 +62,7 @@ export type AudioLogEntry =
   | {
       type: 'step';
       requestId: number;
-      kind: 'note' | 'chord' | 'sequence';
+      kind: 'note' | 'chord' | 'sequence' | 'timeline';
       pitches: number[];
       frequencies: number[];
       when: number;

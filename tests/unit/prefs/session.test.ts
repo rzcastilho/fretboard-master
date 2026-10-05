@@ -46,7 +46,11 @@ describe('remember', () => {
     const session = startSession(s);
     session.remember({ muted: true });
     session.remember({ labels: { notes: 'octave' } });
-    expect(session.current.labels).toEqual({ notes: 'octave', triads: 'interval' });
+    expect(session.current.labels).toEqual({
+      notes: 'octave',
+      triads: 'interval',
+      caged: 'interval'
+    });
     expect(s.data.get(PREFS_KEY)).toBe(serializePreferences(session.current));
   });
   it('writes only when the serialization differs', () => {

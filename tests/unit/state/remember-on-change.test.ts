@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
@@ -12,6 +13,7 @@ beforeEach(() => {
   resetPlaybackForTests();
   resetNotesForTests();
   resetTriadsForTests();
+  resetCagedForTests();
   resetInstrumentForTests();
   remember = vi.spyOn(preferences, 'remember');
 });
@@ -56,6 +58,8 @@ describe('remember on change (FR-019)', () => {
     expect(remember).toHaveBeenLastCalledWith({ labels: { notes: 'octave' } });
     triads.setLabelType('name');
     expect(remember).toHaveBeenLastCalledWith({ labels: { triads: 'name' } });
+    caged.setLabelType('name');
+    expect(remember).toHaveBeenLastCalledWith({ labels: { caged: 'name' } });
   });
 
   it('view actions, carries and restores do not remember', () => {

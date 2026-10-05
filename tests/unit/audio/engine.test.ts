@@ -803,3 +803,107 @@ describe('engine restore with a live context (010)', () => {
     expect(port.resumeCalls).toBeLessThanOrEqual(1);
   });
 });
+
+describe('engine timeline request (019, R-01)', () => {
+  const p = (string: number, fret: number) => ({ string, fret });
+  const timeline = {
+    kind: 'timeline',
+    events: [
+      { positions: [p(6, 0)], onsetMs: 0, durationMs: 1500 },
+      { positions: [p(5, 0)], onsetMs: 250, durationMs: 1500 },
+      { positions: [p(6, 0), p(5, 0)], onsetMs: 750, durationMs: 1500 }
+    ]
+  } as const;
+
+  function build() {
+    const port = new FakeAudioPort();
+    port.currentTime = 1;
+    const clock = new FakeClock();
+    const ev = events();
+    const synth = recordingSynth();
+    const engine = createPlaybackEngine(ev, {
+      createContext: () => port,
+      loadSynth: () => Promise.resolve(synth),
+      clock
+    });
+    return { port, clock, ev, engine };
+  }
+  const log = () => (globalThis.__fmAudioLog ?? []) as { type: string; kind?: string }[];
+
+  beforeEach(() => {
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('sets the sequence flag on start and clears it at the natural end', async () => {
+    const { clock, ev, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(timeline, STANDARD_GUITAR);
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(true);
+    clock.advance(2249);
+    expect(ev.onSequenceChange).toHaveBeenCalledTimes(1);
+    clock.advance(1);
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(false);
+    expect(ev.onSequenceChange).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['stop', 'hidden', 'view'] as const)('stop(%s) interrupts it', async (reason) => {
+    const { clock, ev, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(timeline, STANDARD_GUITAR);
+    clock.advance(0);
+    engine.stop(reason);
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(false);
+    expect(clock.pendingCount).toBe(0);
+    clock.advance(5000);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('a new request interrupts it', async () => {
+    const { ev, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(timeline, STANDARD_GUITAR);
+    engine.play({ kind: 'note', position: p(6, 0) }, STANDARD_GUITAR);
+    expect(ev.onSequenceChange).toHaveBeenLastCalledWith(false);
+    expect(log().filter((e) => e.type === 'stop')).toHaveLength(1);
+  });
+
+  it('fires a pulse per mark', async () => {
+    const { clock, ev, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(timeline, STANDARD_GUITAR);
+    clock.advance(0);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(1);
+    clock.advance(250);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(2);
+    clock.advance(500);
+    expect(ev.onPulseStart).toHaveBeenCalledTimes(4);
+  });
+
+  it('logs kind timeline, with each step at its own onset', async () => {
+    const { port, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(timeline, STANDARD_GUITAR);
+    const steps = log().filter((e) => e.type === 'step');
+    expect(steps.map((e) => e.kind)).toEqual(['timeline', 'timeline', 'timeline']);
+    expect(port.sources.map((s) => (s as unknown as FakeSource).startCalls[0])).toEqual([
+      1, 1.25, 1.75
+    ]);
+  });
+
+  it('notes ring past the next onset: sources are not stopped early', async () => {
+    const { port, clock, engine } = build();
+    engine.preload();
+    await flush();
+    engine.play(timeline, STANDARD_GUITAR);
+    clock.advance(1000);
+    for (const s of port.sources) expect((s as unknown as FakeSource).stopCalls).toEqual([]);
+    expect(port.buffers.map((b) => b.length)).toEqual(
+      port.buffers.map(() => 1.5 * port.sampleRate)
+    );
+  });
+});

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializePreferences, DEFAULT_PREFERENCES } from '../../../src/lib/prefs/schema';
 import { PREFS_KEY } from '../../../src/lib/prefs/storage';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
+import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -14,6 +15,7 @@ beforeEach(() => {
   resetPlaybackForTests();
   resetNotesForTests();
   resetTriadsForTests();
+  resetCagedForTests();
   resetInstrumentForTests();
   resetPreferencesForTests();
 });
@@ -135,8 +137,11 @@ describe('toolOpened / remember', () => {
     expect(preferences.lastTool).toBe('notes');
     expect(JSON.parse(s.data.get(PREFS_KEY) as string).lastTool).toBe('notes');
     // @ts-expect-error unknown id
-    preferences.toolOpened('caged');
+    preferences.toolOpened('scales');
     expect(preferences.lastTool).toBe('notes');
+    preferences.toolOpened('caged');
+    expect(preferences.lastTool).toBe('caged');
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).lastTool).toBe('caged');
   });
 
   it('remember forwards to the session', () => {
@@ -279,5 +284,85 @@ describe('left-handed and orientation (013, US4)', () => {
     expect(instrument.active.orientation).toBe('lowest-top');
     expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-2' });
     expect(preferences.noticeVisible).toBe(false);
+  });
+});
+
+describe('rotate hint (016 US4)', () => {
+  it('is false by default and true when the record has rotateHint', () => {
+    preferences.start(fakeStorage());
+    expect(preferences.rotateHintShown).toBe(false);
+    resetPreferencesForTests();
+    preferences.start(fakeStorage({ [PREFS_KEY]: '{"version":1,"rotateHint":true}' }));
+    expect(preferences.rotateHintShown).toBe(true);
+  });
+
+  it('markRotateHintShown is idempotent and persists rotateHint', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markRotateHintShown();
+    const writes = s.calls.set;
+    preferences.markRotateHintShown();
+    expect(s.calls.set).toBe(writes);
+    expect(preferences.rotateHintShown).toBe(true);
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).rotateHint).toBe(true);
+  });
+
+  it('with storage unavailable it does not throw and the in-load flag holds', () => {
+    const s = fakeStorage();
+    s.fail.get = s.fail.set = s.fail.remove = true;
+    preferences.start(s);
+    expect(() => preferences.markRotateHintShown()).not.toThrow();
+    expect(preferences.rotateHintShown).toBe(true);
+  });
+
+  it('erase clears it', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markRotateHintShown();
+    preferences.erase();
+    expect(preferences.rotateHintShown).toBe(false);
+    expect(s.data.has(PREFS_KEY)).toBe(false);
+  });
+
+  it('Reset tool does not clear it', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markRotateHintShown();
+    caged.reset();
+    expect(preferences.rotateHintShown).toBe(true);
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).rotateHint).toBe(true);
+  });
+});
+
+describe('CAGED label type (017, US1)', () => {
+  it('restore pushes the stored label through caged.restoreLabelType without writing', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['labels-caged-name'].raw });
+    const before = s.data.get(PREFS_KEY);
+    const cl = vi.spyOn(caged, 'restoreLabelType');
+    preferences.start(s);
+    expect(cl).toHaveBeenCalledWith('name');
+    expect(caged.state.labelType).toBe('name');
+    expect(s.data.get(PREFS_KEY)).toBe(before);
+  });
+
+  it('erase restores the default label', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['labels-caged-name'].raw });
+    preferences.start(s);
+    const cl = vi.spyOn(caged, 'restoreLabelType');
+    preferences.erase();
+    expect(cl).toHaveBeenCalledWith('interval');
+    expect(caged.state.labelType).toBe('interval');
+  });
+
+  it('setLabelType remembers labels.caged; Reset tool keeps the label', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    caged.setLabelType('name');
+    expect(caged.state.labelType).toBe('name');
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).labels.caged).toBe('name');
+    caged.reset();
+    expect(caged.state.labelType).toBe('name');
+    caged.setLabelType('interval');
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).labels.caged).toBeUndefined();
   });
 });

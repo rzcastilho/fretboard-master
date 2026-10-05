@@ -4,6 +4,8 @@ import type { Instrument, Position } from '../instrument/instrument';
 export interface FretboardMetrics {
   row: number;
   labelCol: number;
+  /** Label column width when a string carries a text mark. */
+  labelColMarked: number;
   openCol: number;
   fretFirst: number;
   fretLast: number;
@@ -22,6 +24,7 @@ export interface FretboardMetrics {
 export const DEFAULT_METRICS: FretboardMetrics = Object.freeze({
   row: 44,
   labelCol: 24,
+  labelColMarked: 56,
   openCol: 44,
   fretFirst: 52,
   fretLast: 44,
@@ -112,13 +115,14 @@ export function layoutFretboard(
   instrument: Instrument,
   metrics: FretboardMetrics,
   containerWidth: number,
-  variant: FretboardVariant
+  variant: FretboardVariant,
+  marked = false
 ): FretboardLayout {
   const thumb = variant === 'thumbnail';
   // Preview: compact like the thumbnail, but every pending fret and a label column.
   const compact = thumb || variant === 'preview';
   const fretCount = thumb ? Math.min(THUMBNAIL_FRETS, instrument.fretCount) : instrument.fretCount;
-  const labelCol = metrics.labelCol;
+  const labelCol = marked ? metrics.labelColMarked : metrics.labelCol;
   const rowH = variant === 'preview' ? metrics.markerSmall : thumb ? metrics.thumbRow : metrics.row;
   const numbersRow = compact ? 0 : metrics.numbersRow;
 

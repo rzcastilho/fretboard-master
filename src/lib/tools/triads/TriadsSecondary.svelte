@@ -11,6 +11,8 @@
     onoctavedown: () => void;
     listen: { readonly enabled: boolean };
     onlisten: () => void;
+    viewInCaged?: { readonly enabled: boolean };
+    onviewincaged?: () => void;
     compareOn?: boolean;
     listenComparison?: { readonly enabled: boolean };
     onlistencomparison?: () => void;
@@ -25,6 +27,8 @@
     onoctavedown,
     listen,
     onlisten,
+    viewInCaged = { enabled: true },
+    onviewincaged = () => {},
     compareOn = false,
     listenComparison = { enabled: false },
     onlistencomparison = () => {},
@@ -37,6 +41,7 @@
   ]);
 
   const HINT_ID = 'triads-hint-octave';
+  const CAGED_NOTE_ID = 'triads-view-in-caged-unavailable';
   const canDown = $derived(octave.applies && octave.down);
   const canUp = $derived(octave.applies && octave.up);
 </script>
@@ -81,6 +86,19 @@
   >
     {m.triads_listen()}
   </button>
+  <button
+    type="button"
+    aria-disabled={!viewInCaged.enabled}
+    aria-describedby={viewInCaged.enabled ? undefined : CAGED_NOTE_ID}
+    onclick={() => {
+      if (viewInCaged.enabled) onviewincaged();
+    }}
+  >
+    {m.triads_view_in_caged()}
+  </button>
+  {#if !viewInCaged.enabled}
+    <span id={CAGED_NOTE_ID} class="hint">{m.triads_view_in_caged_unavailable()}</span>
+  {/if}
   {#if compareOn}
     <button
       type="button"
@@ -119,7 +137,9 @@
   }
 
   button[aria-disabled='true'] {
-    opacity: 0.6;
+    color: var(--color-disabled-text);
+    border-color: var(--color-disabled-border);
+    opacity: var(--disabled-opacity);
     cursor: not-allowed;
   }
 </style>

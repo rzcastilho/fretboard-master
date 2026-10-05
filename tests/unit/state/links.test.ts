@@ -5,10 +5,19 @@ import {
   carryFromDetected,
   carryFromNotes,
   carryFromTriads,
+  carryCagedTriad,
   carryRoot,
   carrySelection,
-  carryTriad
+  carryTriad,
+  cagedCanShow,
+  cagedTriadCarry,
+  carryFromCaged,
+  carryIntoCaged,
+  carryTriadsToCaged
 } from '../../../src/lib/state/links';
+import { initialCagedView } from '../../../src/lib/state/caged-view';
+import { QUALITY_INTERVALS } from '../../../src/lib/theory/triad';
+import type { TriadsHandoff } from '../../../src/lib/state/caged-triad';
 import { initialNotesView } from '../../../src/lib/state/notes-view';
 import { effectiveRootSpelling } from '../../../src/lib/theory/triad';
 import { initialTriadsView, type TriadsViewState } from '../../../src/lib/state/triads-view';
@@ -132,5 +141,184 @@ describe('links (pure)', () => {
     });
     expect(next.compare.on).toBe(true);
     expect(next.occurrence).toBe(0);
+  });
+});
+
+describe('carryCagedTriad (US3, contract §7)', () => {
+  const h = (p: Partial<TriadsHandoff> = {}): TriadsHandoff => ({
+    rootPc: 0,
+    spelling: 'none',
+    quality: 'major',
+    inversion: 'root',
+    stringSet: 3,
+    occurrence: 0,
+    ...p
+  });
+
+  it('C major A shape set 3', () => {
+    const t = triads({ labelType: 'name', view: 'full-neck', inversion: 'first', stringSet: 5 });
+    const r = carryCagedTriad(t, h(), I);
+    expect(r.compareOff).toBe(false);
+    expect(r.state).toMatchObject({
+      rootPc: 0,
+      quality: 'major',
+      inversion: 'root',
+      stringSet: 3,
+      occurrence: 0,
+      view: 'isolated',
+      labelType: 'name'
+    });
+  });
+
+  it('C minor A shape set 3 from All notes view', () => {
+    const r = carryCagedTriad(triads({ view: 'all-notes' }), h({ quality: 'minor' }), I);
+    expect(r.state).toMatchObject({
+      quality: 'minor',
+      inversion: 'root',
+      stringSet: 3,
+      view: 'isolated'
+    });
+  });
+
+  it('C major D shape set 3: second inversion, occurrence 1', () => {
+    const r = carryCagedTriad(triads(), h({ inversion: 'second', occurrence: 1 }), I);
+    expect(r.state).toMatchObject({ inversion: 'second', stringSet: 3, occurrence: 1 });
+    expect(r.compareOff).toBe(false);
+  });
+
+  it('Compare on with a fitting pair keeps Compare and indexes the pair list', () => {
+    const t = triads({ compare: { on: true, quality: 'minor' } });
+    const r = carryCagedTriad(t, h({ inversion: 'second', occurrence: 1 }), I);
+    expect(r.compareOff).toBe(false);
+    expect(r.state.compare.on).toBe(true);
+    expect(r.state.occurrence).toBeLessThanOrEqual(1);
+  });
+
+  it('Compare on with no fitting pair turns Compare off and keeps the quality', () => {
+    const t = triads({ compare: { on: true, quality: 'minor' } });
+    let found = false;
+    let exact = false;
+    for (const inversion of ['root', 'first', 'second'] as const) {
+      for (let set = 3; set <= 6; set++) {
+        for (let occurrence = 0; occurrence < 3; occurrence++) {
+          const r = carryCagedTriad(t, h({ inversion, stringSet: set, occurrence }), I);
+          if (r.compareOff) {
+            found = true;
+            expect(r.state.compare).toEqual({ on: false, quality: 'minor' });
+            // revalidate clamps indexes that do not exist; real ones are kept as k.
+            expect(r.state.occurrence).toBeLessThanOrEqual(occurrence);
+            if (r.state.occurrence === occurrence) exact = true;
+          }
+        }
+      }
+    }
+    expect(found).toBe(true);
+    expect(exact).toBe(true);
+  });
+
+  it('spelling is carried', () => {
+    const r = carryCagedTriad(triads(), h({ rootPc: 6, spelling: 'flat' }), I);
+    expect(r.state).toMatchObject({ rootPc: 6, spellingOverride: 'flat' });
+  });
+
+  it('equal state returns the same reference', () => {
+    const t = triads();
+    expect(carryCagedTriad(t, h(), I).state).toBe(t);
+  });
+});
+
+describe('CAGED carry (SC-005)', () => {
+  const pcs = Array.from({ length: 12 }, (_, i) => i);
+
+  it('carryFromCaged gives root, third and fifth for 12 roots × 2 qualities', () => {
+    for (const quality of ['major', 'minor'] as const) {
+      for (const rootPc of pcs) {
+        const { third, fifth } = QUALITY_INTERVALS[quality];
+        expect(carryFromCaged({ ...initialCagedView(), rootPc, quality })).toEqual({
+          kind: 'notes',
+          selection: [rootPc, (rootPc + third) % 12, (rootPc + fifth) % 12]
+        });
+      }
+    }
+  });
+
+  it('carryTriadsToCaged keeps root, quality and override for major and minor', () => {
+    for (const quality of ['major', 'minor'] as const) {
+      for (const rootPc of pcs) {
+        for (const spellingOverride of ['none', 'sharp', 'flat'] as const) {
+          expect(carryTriadsToCaged(triads({ rootPc, quality, spellingOverride }))).toEqual({
+            rootPc,
+            quality,
+            spelling: spellingOverride
+          });
+        }
+      }
+    }
+  });
+
+  it('carryTriadsToCaged gives major and no override for diminished and augmented', () => {
+    for (const quality of ['diminished', 'augmented'] as const) {
+      for (const rootPc of pcs) {
+        expect(carryTriadsToCaged(triads({ rootPc, quality, spellingOverride: 'flat' }))).toEqual({
+          rootPc,
+          quality: 'major',
+          spelling: 'none'
+        });
+      }
+    }
+  });
+
+  it('carryIntoCaged sets root, spelling and quality', () => {
+    const c = initialCagedView();
+    expect(carryIntoCaged(c, { rootPc: 10, quality: 'minor', spelling: 'sharp' })).toEqual({
+      ...c,
+      rootPc: 10,
+      quality: 'minor',
+      spellingOverride: 'sharp'
+    });
+  });
+
+  it('carryIntoCaged returns the same object when all are equal', () => {
+    const c = { ...initialCagedView(), rootPc: 9, quality: 'minor' as const };
+    expect(carryIntoCaged(c, { rootPc: 9, quality: 'minor', spelling: 'none' })).toBe(c);
+  });
+
+  it('Notes → CAGED carry keeps quality, resets spelling and is a no-op on the same key', () => {
+    const c = {
+      ...initialCagedView(),
+      rootPc: 10,
+      quality: 'minor' as const,
+      spellingOverride: 'flat' as const
+    };
+    const ctx = carryFromNotes(notes([10]));
+    expect(ctx).toEqual({ kind: 'root', rootPc: 10 });
+    expect(carryIntoCaged(c, { rootPc: 10, quality: c.quality, spelling: 'none' })).toEqual({
+      ...c,
+      spellingOverride: 'none'
+    });
+    const d = { ...c, spellingOverride: 'none' as const };
+    expect(carryIntoCaged(d, { rootPc: 10, quality: d.quality, spelling: 'none' })).toBe(d);
+    expect(carryIntoCaged(c, { rootPc: 3, quality: c.quality, spelling: 'none' })).toEqual({
+      ...c,
+      rootPc: 3,
+      spellingOverride: 'none'
+    });
+  });
+
+  it('cagedTriadCarry gives root, quality and the effective override', () => {
+    const c = {
+      ...initialCagedView(),
+      rootPc: 10,
+      quality: 'minor' as const,
+      spellingOverride: 'flat' as const
+    };
+    expect(cagedTriadCarry(c)).toEqual({ rootPc: 10, quality: 'minor', spelling: 'flat' });
+  });
+
+  it('cagedCanShow is true only for major and minor', () => {
+    expect(cagedCanShow('major')).toBe(true);
+    expect(cagedCanShow('minor')).toBe(true);
+    expect(cagedCanShow('diminished')).toBe(false);
+    expect(cagedCanShow('augmented')).toBe(false);
   });
 });
