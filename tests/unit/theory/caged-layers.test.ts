@@ -13,6 +13,8 @@ import {
   isExtraMarked,
   layerNotes,
   spellScale,
+  type CagedLayer,
+  type MelodicLayer,
   type ScaleDegree
 } from '../../../src/lib/theory/caged-layers';
 import { pitchClassOfSpelling } from '../../../src/lib/theory/pitch';
@@ -304,7 +306,30 @@ describe('degreeOf / inLayer / isExtraMarked', () => {
   });
 
   it('LAYER_PRIORITY order', () => {
-    expect(LAYER_PRIORITY).toEqual(['chord', 'arpeggio', 'pentatonic', 'scale']);
+    expect(LAYER_PRIORITY).toEqual(['triad', 'chord', 'arpeggio', 'pentatonic', 'scale']);
+  });
+});
+
+describe("the 'triad' layer (R-03)", () => {
+  it('is first in LAYER_PRIORITY', () => {
+    expect(LAYER_PRIORITY[0]).toBe('triad');
+    expect(LAYER_PRIORITY).toHaveLength(5);
+  });
+
+  it('is not a MelodicLayer', () => {
+    const melodic: MelodicLayer[] = ['arpeggio', 'pentatonic', 'scale'];
+    // @ts-expect-error 'triad' is not a MelodicLayer
+    const bad: MelodicLayer = 'triad';
+    expect(melodic).not.toContain(bad);
+    const layer: CagedLayer = 'triad';
+    expect(layer).toBe('triad');
+  });
+
+  it('LAYER_DEGREES has no triad entry', () => {
+    for (const q of ['major', 'minor'] as const) {
+      expect(Object.keys(LAYER_DEGREES[q]).sort()).toEqual(['arpeggio', 'pentatonic', 'scale']);
+      expect('triad' in LAYER_DEGREES[q]).toBe(false);
+    }
   });
 });
 
@@ -333,5 +358,40 @@ describe('spellScale', () => {
     const s = spellScale(root, 'major');
     expect(pitchClassOfSpelling(must(s['4']))).toBe((6 + 5) % 12);
     expect(s['4']).toEqual({ letter: 'B', accidental: 0 });
+  });
+});
+
+describe('caged-layers defensive branches', () => {
+  it('degreeOf rejects non-finite pitch classes and unknown qualities', () => {
+    expect(degreeOf(Number.NaN, 0, 'major')).toBeNull();
+    expect(degreeOf(0, Number.POSITIVE_INFINITY, 'major')).toBeNull();
+    expect(degreeOf(0, 0, 'dim' as never)).toBeNull();
+  });
+
+  it('inLayer is false for an unknown quality', () => {
+    expect(inLayer('R', 'scale', 'dim' as never)).toBe(false);
+  });
+
+  it('isExtraMarked covers major, minor and other qualities', () => {
+    expect(isExtraMarked('4', 'major')).toBe(true);
+    expect(isExtraMarked('2', 'major')).toBe(false);
+    expect(isExtraMarked('2', 'minor')).toBe(true);
+    expect(isExtraMarked('b6', 'minor')).toBe(true);
+    expect(isExtraMarked('4', 'minor')).toBe(false);
+    expect(isExtraMarked('4', 'dim' as never)).toBe(false);
+  });
+
+  it('spellScale returns nothing for a bad root letter or quality', () => {
+    expect(spellScale({ letter: 'H', accidental: 0 } as never, 'major')).toEqual({});
+    expect(spellScale({ letter: 'C', accidental: 0 }, 'dim' as never)).toEqual({});
+  });
+
+  it('layerNotes skips a string whose open pitch is not finite', () => {
+    const occ = must(cagedOccurrences(STANDARD, 0, 'major', 24).find((o) => o.shape.id === 'A'));
+    const open = [...OPEN_S1_FIRST];
+    open[1] = Number.NaN;
+    const notes = layerNotes(occ, open, 0, 'major', 24);
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes.every((n) => n.string !== 2)).toBe(true);
   });
 });

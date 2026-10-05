@@ -7,6 +7,7 @@ import type { CagedQuality, CagedShapeId } from '../theory/caged';
 import { CHORD_ONLY } from './caged-layers';
 import { choiceOf, effectiveRootSpelling, isAlteredRoot } from '../theory/triad';
 import type { SpellingOverride } from './triads-view';
+import type { StringSetId } from '../instrument/string-sets';
 
 export type { SpellingOverride } from './triads-view';
 
@@ -22,6 +23,7 @@ export interface LayersOn {
   readonly arpeggio: boolean;
   readonly pentatonic: boolean;
   readonly scale: boolean;
+  readonly triad: boolean;
 }
 
 export type CagedLabelType = 'interval' | 'name';
@@ -37,6 +39,8 @@ export interface CagedViewState {
   readonly connections: boolean;
   /** Layer switches; initial `CHORD_ONLY`. */
   readonly layers: LayersOn;
+  /** Effective Triad string set; null while Triad is off or after reset. Never serialized. */
+  readonly triadSet: StringSetId | null;
   /** Marker label kind; initial = the preferred label. */
   readonly labelType: CagedLabelType;
 }
@@ -52,6 +56,7 @@ export function initialCagedView(label: CagedLabelType = 'interval'): CagedViewS
     focus: null,
     connections: false,
     layers: CHORD_ONLY,
+    triadSet: null,
     labelType: CAGED_LABEL_TYPES.includes(label) ? label : 'interval'
   };
 }
@@ -92,13 +97,19 @@ export function equalsLayers(a: LayersOn, b: LayersOn): boolean {
     (a.chord === b.chord &&
       a.arpeggio === b.arpeggio &&
       a.pentatonic === b.pentatonic &&
-      a.scale === b.scale)
+      a.scale === b.scale &&
+      a.triad === b.triad)
   );
 }
 
 /** Same reference when every flag is equal. */
 export function setLayers(s: CagedViewState, l: LayersOn): CagedViewState {
   return equalsLayers(s.layers, l) ? s : { ...s, layers: l };
+}
+
+/** Same reference when equal. */
+export function setTriadSet(s: CagedViewState, id: StringSetId | null): CagedViewState {
+  return s.triadSet === id ? s : { ...s, triadSet: id };
 }
 
 /** No-op for an unknown or equal value. */
@@ -119,6 +130,7 @@ export function equalsCagedView(a: CagedViewState, b: CagedViewState): boolean {
     equalsFocus(a.focus, b.focus) &&
     a.connections === b.connections &&
     equalsLayers(a.layers, b.layers) &&
+    a.triadSet === b.triadSet &&
     a.labelType === b.labelType
   );
 }

@@ -15,6 +15,7 @@ import {
   type ScaleDegree
 } from '../theory/caged-layers';
 import type { CagedQuality } from '../theory/caged';
+import type { ShapeTriad } from '../theory/caged-triad';
 import type { Pitch, PitchClass } from '../theory/pitch';
 import type { CagedFocus, LayersOn } from './caged-view';
 
@@ -25,7 +26,8 @@ export const CHORD_ONLY: LayersOn = Object.freeze({
   chord: true,
   arpeggio: false,
   pentatonic: false,
-  scale: false
+  scale: false,
+  triad: false
 });
 
 export interface SwitchState {
@@ -33,7 +35,7 @@ export interface SwitchState {
   readonly disabled: null | 'last-layer' | 'no-shapes';
 }
 
-/** On, and (for Pentatonic and Scale) a shape is in focus. */
+/** On, and (for Triad, Pentatonic and Scale) a shape is in focus. */
 export function isDrawable(l: LayersOn, layer: CagedLayer, hasFocus: boolean): boolean {
   if (!l?.[layer]) return false;
   return layer === 'chord' || layer === 'arpeggio' || hasFocus;
@@ -67,7 +69,8 @@ export function switchStates(
     chord: state('chord'),
     arpeggio: state('arpeggio'),
     pentatonic: state('pentatonic'),
-    scale: state('scale')
+    scale: state('scale'),
+    triad: state('triad')
   };
 }
 
@@ -86,9 +89,13 @@ export function toggleLayer(
   return blocked ? l : { ...l, [layer]: !l[layer] };
 }
 
-/** Pentatonic or Scale goes from off to on with nothing in focus (FR-012). */
+/** Triad, Pentatonic or Scale goes from off to on with nothing in focus (FR-012). */
 export function needsAutoFocus(l: LayersOn, layer: CagedLayer, focus: CagedFocus | null): boolean {
-  return (layer === 'pentatonic' || layer === 'scale') && !l?.[layer] && focus === null;
+  return (
+    (layer === 'triad' || layer === 'pentatonic' || layer === 'scale') &&
+    !l?.[layer] &&
+    focus === null
+  );
 }
 
 /** When nothing is drawable, Chord comes back on (FR-002); the other flags are kept. */
@@ -120,6 +127,8 @@ export interface ResolveInput {
   /** String 1 first; length 6 or 7. */
   readonly openPitches: readonly Pitch[];
   readonly fretCount: number;
+  /** The selected set's triad for the focused occurrence, else null. */
+  readonly triad: ShapeTriad | null;
 }
 
 const MELODIC: readonly MelodicLayer[] = ['arpeggio', 'pentatonic', 'scale'];
@@ -133,7 +142,7 @@ const byPitch = (a: { pitch: Pitch; string: number }, b: { pitch: Pitch; string:
  */
 export function resolveCagedPositions(input: ResolveInput): readonly ResolvedPosition[] {
   if (!input) return [];
-  const { occurrences, focusIndex, layers, rootPc, quality, openPitches, fretCount } = input;
+  const { occurrences, focusIndex, layers, rootPc, quality, openPitches, fretCount, triad } = input;
   if (!Array.isArray(occurrences) || !Array.isArray(openPitches) || !layers) return [];
   const focus =
     focusIndex !== null && focusIndex !== undefined && occurrences[focusIndex] ? focusIndex : null;
@@ -174,6 +183,14 @@ export function resolveCagedPositions(input: ResolveInput): readonly ResolvedPos
 
   if (focus !== null) {
     const occ: ShapeOccurrence = occurrences[focus];
+    // The Triad layer claims its three positions first (R-04).
+    if (layers.triad && triad)
+      triad.frets.forEach((fret, i) => {
+        const fn = triad.functions[i];
+        const degree: ScaleDegree =
+          fn === 'root' ? 'R' : fn === 'fifth' ? '5' : quality === 'minor' ? 'b3' : '3';
+        claim(triad.set - i, fret, degree, 'triad', 'highlighted');
+      });
     // Focused occurrence first: its chord notes, then every scale note of its region.
     const chordKeys = new Set(occ.notes.map((n) => keyOf(n.string, n.fret)));
     if (layers.chord) drawChord(occ, 'highlighted');
@@ -207,7 +224,13 @@ export function resolveCagedPositions(input: ResolveInput): readonly ResolvedPos
 }
 
 export function layerCounts(p: readonly ResolvedPosition[]): Readonly<Record<CagedLayer, number>> {
-  const out: Record<CagedLayer, number> = { chord: 0, arpeggio: 0, pentatonic: 0, scale: 0 };
+  const out: Record<CagedLayer, number> = {
+    triad: 0,
+    chord: 0,
+    arpeggio: 0,
+    pentatonic: 0,
+    scale: 0
+  };
   for (const r of p ?? []) out[r.layer] += 1;
   return out;
 }

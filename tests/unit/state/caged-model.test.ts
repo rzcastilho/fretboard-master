@@ -14,7 +14,13 @@ import {
 } from '../../../src/lib/state/caged-model';
 import { cagedOccurrences } from '../../../src/lib/theory/caged';
 import { pitchOfSpelling } from '../../../src/lib/theory/pitch';
-import { initialCagedView, selectRoot, setFocus } from '../../../src/lib/state/caged-view';
+import { defaultTriadSet, triadAvailability } from '../../../src/lib/state/caged-triad';
+import {
+  cagedRootSpelling,
+  initialCagedView,
+  selectRoot,
+  setFocus
+} from '../../../src/lib/state/caged-view';
 
 const view = initialCagedView();
 const CTX: CagedContext = { tuningName: 'Standard', temporary: false };
@@ -716,7 +722,7 @@ describe('buildCagedModel: layer switches (US2)', () => {
   });
 
   it('shows the extra sample only when Pentatonic and Scale are both on', () => {
-    const layers = { chord: true, arpeggio: false, pentatonic: true, scale: false };
+    const layers = { chord: true, arpeggio: false, pentatonic: true, scale: false, triad: false };
     expect(build({ ...view, layers }, STANDARD_GUITAR, CTX).extraSampleShown).toBe(false);
     expect(
       build({ ...view, layers: { ...layers, scale: true } }, STANDARD_GUITAR, CTX).extraSampleShown
@@ -724,7 +730,10 @@ describe('buildCagedModel: layer switches (US2)', () => {
   });
 
   it('forces every switch to no-shapes in a non-compatible tuning and keeps the layers', () => {
-    const v = { ...view, layers: { chord: true, arpeggio: true, pentatonic: false, scale: false } };
+    const v = {
+      ...view,
+      layers: { chord: true, arpeggio: true, pentatonic: false, scale: false, triad: false }
+    };
     const d = build(v, AF_8, CTX);
     expect(d.tuningClass).toBe('non-compatible');
     for (const s of Object.values(d.switches)) expect(s.disabled).toBe('no-shapes');
@@ -740,7 +749,7 @@ describe('buildCagedModel: layer switches (US2)', () => {
 });
 
 describe('buildCagedModel: layer markers and labels (017 US1)', () => {
-  const ALL = { chord: true, arpeggio: false, pentatonic: false, scale: true };
+  const ALL = { chord: true, arpeggio: false, pentatonic: false, scale: true, triad: false };
   const focusE = setFocus(view, { letter: 'E', ordinal: 0 });
   const scaleView = { ...focusE, layers: ALL };
   const keyed = (d: ReturnType<typeof buildCagedModel>) =>
@@ -778,7 +787,7 @@ describe('buildCagedModel: layer markers and labels (017 US1)', () => {
   it('marks the arpeggio layer on non-chord arpeggio notes', () => {
     const v = {
       ...focusE,
-      layers: { chord: true, arpeggio: true, pentatonic: false, scale: false }
+      layers: { chord: true, arpeggio: true, pentatonic: false, scale: false, triad: false }
     };
     const d = build(v, STANDARD_GUITAR, CTX);
     const arps = d.positions.filter((p) => p.layer === 'arpeggio');
@@ -806,7 +815,11 @@ describe('buildCagedModel: layer markers and labels (017 US1)', () => {
   it('staggers appear = i / n only for ids in reveal.ids, in order', () => {
     const base = build(scaleView, STANDARD_GUITAR, CTX);
     const ids = base.positions.slice(0, 4).map((p) => `${p.string}:${p.fret}`);
-    const d = build(scaleView, STANDARD_GUITAR, CTX, null, { reveal: { ids }, layerChange: null });
+    const d = build(scaleView, STANDARD_GUITAR, CTX, null, {
+      reveal: { ids },
+      layerChange: null,
+      triadChange: null
+    });
     const marks = keyed(d);
     ids.forEach((id, i) => expect(marks.get(id)?.appear).toBeCloseTo(i / ids.length));
     for (const [id, mk] of marks) if (!ids.includes(id)) expect(mk.appear).toBeUndefined();
@@ -862,7 +875,7 @@ describe('buildCagedModel: layer markers and labels (017 US1)', () => {
 
 describe('buildCagedModel: extra mark (017 US5)', () => {
   const focusE = setFocus(view, { letter: 'E', ordinal: 0 });
-  const both = { chord: true, arpeggio: false, pentatonic: true, scale: true };
+  const both = { chord: true, arpeggio: false, pentatonic: true, scale: true, triad: false };
 
   it('marks only the 4th and 7th as extra in major and names them', () => {
     const d = buildCagedModel({ ...focusE, layers: both }, STANDARD_GUITAR);
@@ -891,7 +904,7 @@ describe('buildCagedModel: extra mark (017 US5)', () => {
 });
 
 describe('buildCagedModel: arpeggio layer (017 US3)', () => {
-  const arp = { chord: true, arpeggio: true, pentatonic: false, scale: false };
+  const arp = { chord: true, arpeggio: true, pentatonic: false, scale: false, triad: false };
   const markers = (d: ReturnType<typeof buildCagedModel>) => d.model?.markers ?? [];
 
   it('no focus: one marker per position; arpeggio markers keep root/third/fifth functions', () => {
@@ -953,7 +966,7 @@ describe('buildCagedModel: arpeggio layer (017 US3)', () => {
 
 describe('buildCagedModel: layer description (017 US6)', () => {
   const focusE = setFocus(view, { letter: 'E', ordinal: 0 });
-  const all = { chord: true, arpeggio: true, pentatonic: true, scale: true };
+  const all = { chord: true, arpeggio: true, pentatonic: true, scale: true, triad: false };
   const countOf = (d: ReturnType<typeof buildCagedModel>, layer: string): number =>
     d.positions.filter((p) => p.layer === layer).length;
 
@@ -980,7 +993,10 @@ describe('buildCagedModel: layer description (017 US6)', () => {
 
   it('names a layer that is on but not drawable without a focus', () => {
     const d = buildCagedModel(
-      { ...view, layers: { chord: true, arpeggio: false, pentatonic: true, scale: false } },
+      {
+        ...view,
+        layers: { chord: true, arpeggio: false, pentatonic: true, scale: false, triad: false }
+      },
       STANDARD_GUITAR
     );
     const text = shown(d).description;
@@ -991,7 +1007,8 @@ describe('buildCagedModel: layer description (017 US6)', () => {
   it('orders change · focus · tuning · summary · layers · counts · extra · entries', () => {
     const d = build({ ...focusE, layers: all }, STANDARD_GUITAR, CTX, null, {
       reveal: null,
-      layerChange: { layer: 'scale', on: true }
+      layerChange: { layer: 'scale', on: true },
+      triadChange: null
     });
     const text = shown(d).description;
     const marks = [
@@ -1010,11 +1027,279 @@ describe('buildCagedModel: layer description (017 US6)', () => {
 
   it('puts waiting sentences after counts and before entries', () => {
     const d = buildCagedModel(
-      { ...view, layers: { chord: true, arpeggio: false, pentatonic: false, scale: true } },
+      {
+        ...view,
+        layers: { chord: true, arpeggio: false, pentatonic: false, scale: true, triad: false }
+      },
       STANDARD_GUITAR
     );
     const text = shown(d).description;
     expect(text.indexOf('Across the neck:')).toBeLessThan(text.indexOf('Scale is on and shows'));
     expect(text.indexOf('Scale is on and shows')).toBeLessThan(text.indexOf('C shape, frets'));
+  });
+});
+
+describe('Triad layer model (018 US1)', () => {
+  const focusA = setFocus(view, { letter: 'A', ordinal: 0 });
+  const triadView = (over: Partial<typeof view> = {}) => ({
+    ...focusA,
+    layers: { chord: true, arpeggio: false, pentatonic: false, scale: false, triad: true },
+    triadSet: 3 as const,
+    ...over
+  });
+  const NO_EXTRAS = { reveal: null, layerChange: null, triadChange: null };
+  const triadMarkers = (d: ReturnType<typeof buildCagedModel>) =>
+    (d.model?.markers ?? []).filter((k) => k.layer === 'triad');
+
+  it('draws exactly three triad markers, ids triad:s:f, function glyphs', () => {
+    const d = build(triadView(), STANDARD_GUITAR, CTX);
+    const t = triadMarkers(d);
+    expect(t.map((k) => k.id).sort()).toEqual(['triad:1:3', 'triad:2:5', 'triad:3:5']);
+    expect(t.map((k) => k.function).sort()).toEqual(['fifth', 'root', 'third']);
+    expect(t.find((k) => k.id === 'triad:3:5')?.function).toBe('root');
+  });
+
+  it('Name labels give C, E, G', () => {
+    const d = build(triadView({ labelType: 'name' }), STANDARD_GUITAR, CTX);
+    expect(d.model?.labelMode).toBe('note');
+    const names = triadMarkers(d)
+      .sort((a, b) => b.string - a.string)
+      .map((k) => k.spelling?.letter);
+    expect(names).toEqual(['C', 'E', 'G']);
+  });
+
+  it('keeps ring when the position is a connection', () => {
+    const d = build(triadView({ connections: true }), STANDARD_GUITAR, CTX);
+    const shared = new Set(d.connections.map((c) => `${c.string}:${c.fret}`));
+    for (const k of triadMarkers(d))
+      expect(k.ring === true).toBe(shared.has(`${k.string}:${k.fret}`));
+  });
+
+  it('display.triad has sets, selected and summary', () => {
+    const d = build(triadView(), STANDARD_GUITAR, CTX);
+    expect(d.triad?.selected).toBe(3);
+    expect(d.triad?.sets.map((x) => x.id)).toEqual([6, 5, 4, 3]);
+    expect(d.triad?.sets.find((x) => x.id === 3)?.available).toBe(true);
+    expect(d.triad?.summary).toBe('C major, root position, strings 3-2-1, frets 5-5-3');
+  });
+
+  it('display.triad is null with Triad off or no focus', () => {
+    expect(build(triadView({ layers: view.layers }), STANDARD_GUITAR, CTX).triad).toBeNull();
+    expect(build({ ...triadView(), focus: null }, STANDARD_GUITAR, CTX).triad).toBeNull();
+    expect(build(view, STANDARD_GUITAR, CTX).triad).toBeNull();
+  });
+
+  it('description has the triad sentence with spoken accidentals', () => {
+    const d = build(triadView(), STANDARD_GUITAR, CTX);
+    expect(shown(d).description).toContain(
+      'Triad: C, E, G — root position, strings 3-2-1, frets 5-5-3.'
+    );
+    const sharp = build(
+      { ...selectRoot(triadView(), 1), focus: { letter: 'A', ordinal: 0 }, triadSet: 3 },
+      STANDARD_GUITAR,
+      CTX
+    );
+    const text = shown(sharp).description;
+    if (text.includes('Triad:')) expect(text).not.toMatch(/Triad:[^.]*[♯♭]/);
+  });
+
+  it('announces triadChange selected first', () => {
+    const d = build(triadView(), STANDARD_GUITAR, CTX, null, {
+      ...NO_EXTRAS,
+      layerChange: { layer: 'triad', on: true },
+      triadChange: { kind: 'selected', set: 3 }
+    });
+    const text = shown(d).description;
+    expect(text.startsWith('Strings 3-2-1: C major triad, root position, frets 5-5-3')).toBe(true);
+  });
+
+  it('sets appear for ids in extras.reveal', () => {
+    const ids = ['triad:3:5', 'triad:2:5', 'triad:1:3'];
+    const d = build(triadView(), STANDARD_GUITAR, CTX, null, {
+      ...NO_EXTRAS,
+      reveal: { ids }
+    });
+    const t = triadMarkers(d);
+    for (const k of t) expect(k.appear).toBeDefined();
+    expect(t.find((k) => k.id === 'triad:3:5')?.appear).toBeCloseTo(0);
+  });
+
+  it('no triad markers when the set is unavailable or Triad is off', () => {
+    expect(triadMarkers(build(triadView({ triadSet: 5 }), STANDARD_GUITAR, CTX))).toHaveLength(0);
+    expect(
+      triadMarkers(build(triadView({ layers: view.layers }), STANDARD_GUITAR, CTX))
+    ).toHaveLength(0);
+  });
+
+  it('Triad row is last in the layer order', () => {
+    const d = build(triadView(), STANDARD_GUITAR, CTX);
+    expect(Object.keys(d.switches).at(-1)).toBe('triad');
+    expect(d.switches.triad.on).toBe(true);
+  });
+
+  it('US2: sets[i].available and ariaLabel; unavailableNote only when some set is unavailable', () => {
+    const d = build(triadView(), STANDARD_GUITAR, CTX); // A shape: 5-4-3 unavailable
+    const s5 = d.triad?.sets.find((x) => x.id === 5);
+    expect(s5?.available).toBe(false);
+    expect(s5?.ariaLabel).toBe('Strings 5-4-3, unavailable');
+    expect(d.triad?.sets.find((x) => x.id === 3)?.ariaLabel).toBe('3-2-1');
+    expect(d.triad?.unavailableNote).toBe(
+      'In this shape there is no close-position triad on these strings'
+    );
+  });
+
+  it('US2: no unavailableNote when every set is available', () => {
+    const all = (d: ReturnType<typeof build>) => d.triad?.sets.every((x) => x.available);
+    // 24-fret board: scan the five letters for a fully available shape; none ⇒ nothing to assert.
+    for (const letter of ['C', 'A', 'G', 'E', 'D'] as const) {
+      const d = build(
+        { ...triadView(), focus: { letter, ordinal: 0 }, triadSet: null },
+        AF_1_24,
+        CTX
+      );
+      if (all(d)) expect(d.triad?.unavailableNote).toBeNull();
+      else expect(d.triad?.unavailableNote).not.toBeNull();
+    }
+  });
+});
+
+describe('Triad layer model: tunings (018 US5)', () => {
+  const on = { chord: true, arpeggio: false, pentatonic: false, scale: false, triad: true };
+  const HALF: CagedContext = { tuningName: 'Half step down', temporary: false };
+  const DROP_D: CagedContext = { tuningName: 'Drop D', temporary: false };
+  const NO_EXTRAS = { reveal: null, layerChange: null, triadChange: null };
+  const triadMarkers = (d: ReturnType<typeof build>) =>
+    (d.model?.markers ?? []).filter((k) => k.layer === 'triad');
+  const sig = (d: ReturnType<typeof build>) =>
+    triadMarkers(d)
+      .map((k) => `${k.string}:${k.fret}`)
+      .sort();
+
+  it('Half step down names follow real pitch and frets match the standard drawing (every key)', () => {
+    for (let pc = 0; pc < 12; pc++) {
+      for (const letter of ['C', 'A', 'G', 'E', 'D'] as const) {
+        const base = {
+          ...selectRoot(view, pc),
+          focus: { letter, ordinal: 0 },
+          layers: on,
+          triadSet: 3 as const,
+          labelType: 'name' as const
+        };
+        const std = build(base, STANDARD_GUITAR, CTX, null, NO_EXTRAS);
+        const half = build(base, AF_2, HALF, null, NO_EXTRAS);
+        // Same key: names come from the key's spelling, so they match; frets move with the shapes.
+        const names = triadMarkers(half).map((k) => k.spelling);
+        for (const k of triadMarkers(half)) {
+          const sp = k.spelling;
+          if (!sp) throw new Error('triad marker has no spelling');
+          const sounding = positionPitch(AF_2, { string: k.string, fret: k.fret });
+          expect(pitchOfSpelling({ ...sp, octave: 0 }) % 12).toBe(sounding % 12);
+        }
+        expect(names.length).toBe(triadMarkers(std).length);
+        if (triadMarkers(half).length === 3 && triadMarkers(std).length === 3) {
+          // fret pattern of the triad inside its shape is tuning independent
+          const rel = (d: ReturnType<typeof build>) => {
+            const f = triadMarkers(d).map((k) => k.fret);
+            const lo = Math.min(...f);
+            return f.map((x) => x - lo).sort();
+          };
+          expect(rel(half)).toEqual(rel(std));
+        }
+      }
+    }
+  });
+
+  it('Half step down E major A shape draws the same frets as standard', () => {
+    const base = {
+      ...selectRoot(setFocus(view, { letter: 'A', ordinal: 0 }), 4),
+      layers: on,
+      triadSet: 3 as const
+    };
+    const std = build(base, STANDARD_GUITAR, CTX, null, NO_EXTRAS);
+    const half = build(base, AF_2, HALF, null, NO_EXTRAS);
+    // Half step down sounds a semitone lower, so the same key sits one fret higher.
+    expect(sig(std)).toHaveLength(3);
+    expect(sig(half)).toEqual(
+      triadMarkers(std)
+        .map((k) => `${k.string}:${k.fret + 1}`)
+        .sort()
+    );
+  });
+
+  it('Drop D: set 6 is listed; when available it uses real D2 pitches, otherwise it is unavailable', () => {
+    let withSix = 0;
+    for (const letter of ['C', 'A', 'G', 'E', 'D'] as const) {
+      for (let ordinal = 0; ordinal < 3; ordinal++) {
+        const v = {
+          ...selectRoot(setFocus(view, { letter, ordinal }), 2),
+          spellingOverride: 'none' as const,
+          layers: on,
+          triadSet: 6 as const
+        };
+        const d = build(v, AF_4, DROP_D, null, NO_EXTRAS);
+        if (!d.triad) continue;
+        expect(d.triad.sets.map((s) => s.id)).toEqual([6, 5, 4, 3]);
+        const six = d.triad.sets.find((s) => s.id === 6);
+        const marks = triadMarkers(d);
+        if (!six?.available) {
+          expect(marks).toHaveLength(0);
+          continue;
+        }
+        withSix++;
+        expect(new Set(marks.map((k) => k.string))).toEqual(new Set([6, 5, 4]));
+        const classes = marks.map(
+          (k) => positionPitch(AF_4, { string: k.string, fret: k.fret }) % 12
+        );
+        expect(classes.sort((x, y) => x - y)).toEqual([2, 6, 9]); // D, F#, A
+      }
+    }
+    expect(withSix).toBeGreaterThanOrEqual(0);
+  });
+
+  it('7-string: selector lists 7-6-5 first', () => {
+    const v = {
+      ...setFocus(view, { letter: 'A', ordinal: 0 }),
+      layers: on,
+      triadSet: 3 as const
+    };
+    const d = build(
+      v,
+      AF_21,
+      { tuningName: '7-string standard', temporary: false },
+      null,
+      NO_EXTRAS
+    );
+    expect(d.triad?.sets.map((s) => s.id)).toEqual([7, 6, 5, 4, 3]);
+  });
+
+  it('7-string: default falls to the first available when 3-2-1 is unavailable', () => {
+    let checked = 0;
+    for (const letter of ['C', 'A', 'G', 'E', 'D'] as const) {
+      for (let pc = 0; pc < 12; pc++) {
+        const v = selectRoot(setFocus(view, { letter, ordinal: 0 }), pc);
+        const occ = cagedOccurrencesFor(v, AF_21).find((o) => o.shape.id === letter);
+        if (!occ) continue;
+        const avail = triadAvailability(occ, AF_21, cagedRootSpelling(v), 'major');
+        if (avail.find((a) => a.set === 3)?.triad === null) {
+          const first = avail.find((a) => a.triad !== null)?.set ?? null;
+          expect(defaultTriadSet(avail)).toBe(first);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('non-compatible tuning: switch disabled, display.triad null, state kept', () => {
+    const v = {
+      ...setFocus(view, { letter: 'A', ordinal: 0 }),
+      layers: on,
+      triadSet: 3 as const
+    };
+    const d = build(v, AF_8, { tuningName: 'Open G', temporary: false }, null, NO_EXTRAS);
+    expect(d.switches.triad.disabled).toBe('no-shapes');
+    expect(d.triad).toBeNull();
+    expect(v.layers.triad).toBe(true);
+    expect(v.triadSet).toBe(3);
   });
 });

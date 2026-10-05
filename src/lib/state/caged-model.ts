@@ -7,6 +7,7 @@ import { getLocale } from '$lib/paraglide/runtime.js';
 import { m } from '$lib/paraglide/messages.js';
 import type { DisplayModel, FretboardTag, Marker, NoteFunction } from '../fretboard/types';
 import type { Instrument } from '../instrument/instrument';
+import { setLabel } from '../instrument/string-sets';
 import { noteLabel, spokenNote } from '../notation/notation';
 import {
   cagedConnections,
@@ -24,6 +25,7 @@ import {
 import { pitchOfSpelling, type Pitch, type Spelling } from '../theory/pitch';
 import { otherRootSpelling, spellTriad, type TriadFunction } from '../theory/triad';
 import { drawnLetters, occurrenceIndex, stepAvailability } from './caged-focus';
+import { selectedTriad, triadAvailability, triadHandoff, type TriadsHandoff } from './caged-triad';
 import {
   isDrawable,
   layerCounts,
@@ -34,7 +36,7 @@ import {
 } from './caged-layers';
 import { spellScale, type CagedLayer, type ScaleDegree } from '../theory/caged-layers';
 import { cagedRootSpelling, type CagedViewState } from './caged-view';
-import { qualityName } from './triads-model';
+import { inversionName, qualityName } from './triads-model';
 
 /** Tuning context for the display (slice 015). */
 export interface CagedContext {
@@ -54,6 +56,28 @@ export interface CagedExtras {
   readonly reveal: { readonly ids: readonly string[] } | null;
   /** The last layer switch (or the automatic Chord restore), announced first. */
   readonly layerChange: { readonly layer: CagedLayer; readonly on: boolean } | null;
+  /** The last Triad set change, announced first; never part of the view. */
+  readonly triadChange: {
+    readonly kind: 'selected' | 'moved' | 'unavailable';
+    readonly set: number;
+    readonly from?: number;
+  } | null;
+}
+
+/** Triad selector and summary; null while the layer is off or no shape is in focus. */
+export interface CagedTriadDisplay {
+  readonly sets: readonly {
+    readonly id: number;
+    readonly label: string;
+    readonly available: boolean;
+    readonly ariaLabel: string;
+  }[];
+  /** The set drawn; null when none is available. */
+  readonly selected: number | null;
+  readonly summary: string | null;
+  readonly unavailableNote: string | null;
+  /** null ⇒ "Open in Triads" is not offered. */
+  readonly handoff: TriadsHandoff | null;
 }
 
 export interface CagedDisplay {
@@ -82,17 +106,21 @@ export interface CagedDisplay {
   readonly extraSampleShown: boolean;
   /** Resolved layer positions, low → high; [] when non-compatible. */
   readonly positions: readonly ResolvedPosition[];
+  /** Triad selector state; null while the layer is off or nothing is in focus. */
+  readonly triad: CagedTriadDisplay | null;
 }
 
 const NO_STEPS = { previous: false, next: false } as const;
 const NO_LETTERS: ReadonlySet<CagedShapeId> = new Set();
 /** Degrees that can carry the extra mark, in scale order. */
 const EXTRA_ORDER: readonly ScaleDegree[] = ['2', '4', 'b6', '7'];
-const LAYER_ORDER: readonly CagedLayer[] = ['chord', 'arpeggio', 'pentatonic', 'scale'];
-const NO_EXTRAS: CagedExtras = { reveal: null, layerChange: null };
+const LAYER_ORDER: readonly CagedLayer[] = ['chord', 'arpeggio', 'pentatonic', 'scale', 'triad'];
+const NO_EXTRAS: CagedExtras = { reveal: null, layerChange: null, triadChange: null };
 
 function layerName(layer: CagedLayer): string {
   switch (layer) {
+    case 'triad':
+      return m.caged_layer_triad();
     case 'chord':
       return m.caged_layer_chord();
     case 'arpeggio':
@@ -193,7 +221,8 @@ export function buildCagedModel(
       connections: [],
       switches: switchStates(view.layers, false, false),
       extraSampleShown: view.layers.pentatonic && view.layers.scale,
-      positions: []
+      positions: [],
+      triad: null
     };
   }
 
@@ -207,6 +236,41 @@ export function buildCagedModel(
     view.connections ? connections.map((c) => `${c.string}:${c.fret}`) : []
   );
 
+  const hasFocus = focused !== null;
+  const availability = triadAvailability(focused, instrument, root, view.quality);
+  const chosen = selectedTriad(view.triadSet, availability);
+  const drawnTriad = view.layers.triad && hasFocus ? chosen : null;
+  const triadNames = drawnTriad ? drawnTriad.functions.map((f) => triad[f]) : [];
+  const triadFrets = drawnTriad ? drawnTriad.frets.join('-') : '';
+  const triadParams = drawnTriad
+    ? {
+        root: noteLabel(root),
+        quality: qualityName(view.quality),
+        inversion: inversionName(drawnTriad.inversion).toLocaleLowerCase(),
+        set: setLabel(drawnTriad.set),
+        frets: triadFrets
+      }
+    : null;
+  const triadDisplay: CagedTriadDisplay | null =
+    view.layers.triad && hasFocus
+      ? {
+          sets: availability.map((a) => {
+            const label = setLabel(a.set);
+            const available = a.triad !== null;
+            return {
+              id: a.set,
+              label,
+              available,
+              ariaLabel: available ? label : m.caged_triad_set_unavailable({ set: label })
+            };
+          }),
+          selected: drawnTriad ? drawnTriad.set : null,
+          summary: triadParams ? m.caged_triad_summary(triadParams) : null,
+          unavailableNote: availability.some((a) => a.triad === null) ? m.caged_triad_none() : null,
+          handoff: triadHandoff(view, drawnTriad, temporary)
+        }
+      : null;
+
   const positions = resolveCagedPositions({
     occurrences,
     focusIndex,
@@ -214,16 +278,19 @@ export function buildCagedModel(
     rootPc: view.rootPc,
     quality: view.quality,
     openPitches: instrument.openStrings.map(pitchOfSpelling),
-    fretCount: instrument.fretCount
+    fretCount: instrument.fretCount,
+    triad: drawnTriad
   });
   const scaleSpelling = spellScale(root, view.quality);
   const revealIds = extras.reveal?.ids ?? [];
   const revealIndex = new Map(revealIds.map((id, i) => [id, i / revealIds.length] as const));
   const markers: Marker[] = positions.map((p) => {
-    const id = `${p.string}:${p.fret}`;
-    const inStep = stepping.has(id);
-    const ringed = inStep || connected.has(id);
-    const chordal = p.layer === 'chord' || p.layer === 'arpeggio';
+    const key = `${p.string}:${p.fret}`;
+    const isTriad = p.layer === 'triad';
+    const id = isTriad ? `triad:${key}` : key;
+    const inStep = stepping.has(key);
+    const ringed = inStep || connected.has(key);
+    const chordal = isTriad || p.layer === 'chord' || p.layer === 'arpeggio';
     const fn: NoteFunction = chordal ? FUNCTION_OF[p.degree as CagedDegree] : 'degree';
     const appear = revealIndex.get(id);
     return {
@@ -235,6 +302,7 @@ export function buildCagedModel(
       interval: p.degree,
       id,
       ...(p.layer === 'arpeggio' ? { layer: 'arpeggio' as const } : {}),
+      ...(isTriad ? { layer: 'triad' as const } : {}),
       ...(p.extra ? { extra: true } : {}),
       ...(ringed ? { ring: true } : {}),
       ...(appear === undefined ? {} : { appear })
@@ -291,13 +359,21 @@ export function buildCagedModel(
     ? m.caged_focus_status({ shape: focused.shape.id, lo: focused.start, hi: focused.end })
     : m.caged_focus_none();
   const change = extras.layerChange;
+  const tChange = extras.triadChange;
+  const triadChangeSentence = ((): string[] => {
+    if (!tChange) return [];
+    const set = setLabel(tChange.set);
+    if (tChange.kind === 'moved')
+      return [m.caged_triad_moved({ from: setLabel(tChange.from ?? tChange.set), set })];
+    if (tChange.kind === 'unavailable') return [m.caged_triad_unavailable_set({ set })];
+    return triadParams ? [m.caged_triad_selected({ ...triadParams, set })] : [];
+  })();
   // Spoken names of the extra-marked degrees, in scale order (F, B or B, F).
   const extraDegrees = new Set(positions.filter((p) => p.extra).map((p) => p.degree));
   const extraNotes = EXTRA_ORDER.filter((d) => extraDegrees.has(d)).flatMap((d) => {
     const spelling = scaleSpelling[d];
     return spelling ? [spokenNote(spelling)] : [];
   });
-  const hasFocus = focused !== null;
   const layersOn = LAYER_ORDER.filter((l) => view.layers[l]);
   const drawn = layersOn.filter((l) => isDrawable(view.layers, l, hasFocus));
   const waiting = layersOn.filter((l) => !drawn.includes(l));
@@ -315,7 +391,19 @@ export function buildCagedModel(
       : []),
     ...waiting.map((l) => m.caged_layer_waiting({ layer: layerName(l) }))
   ];
+  const triadSentence =
+    drawnTriad && triadParams
+      ? [
+          m.caged_triad_description({
+            notes: triadNames.map(spokenNote).join(', '),
+            inversion: triadParams.inversion,
+            set: triadParams.set,
+            frets: triadParams.frets
+          })
+        ]
+      : [];
   const description = [
+    ...triadChangeSentence,
     ...(change
       ? [
           (change.on ? m.caged_layer_now_on : m.caged_layer_now_off)({
@@ -330,6 +418,7 @@ export function buildCagedModel(
     ...(altered ? [m.caged_description_altered({ string: 6 })] : []),
     m.caged_description_summary({ key: spokenKey, count: occurrences.length }),
     ...layerSentences,
+    ...triadSentence,
     ...(extraNotes.length > 0 ? [m.caged_extra_mark({ notes: extraNotes.join(', ') })] : []),
     ...entries,
     ...connectionSentences
@@ -366,6 +455,7 @@ export function buildCagedModel(
     connections,
     switches: switchStates(view.layers, focused !== null, occurrences.length > 0),
     extraSampleShown: view.layers.pentatonic && view.layers.scale,
-    positions
+    positions,
+    triad: triadDisplay
   };
 }

@@ -31,7 +31,8 @@ import type { PitchClass, Spelling } from '$lib/theory/pitch';
 import type { Quality } from '$lib/theory/triad';
 import type { Inversion } from '$lib/theory/triad-shape';
 import type { StringSetId } from '$lib/instrument/string-sets';
-import { carryRoot, carryTriad } from './links';
+import { carryCagedTriad, carryRoot, carryTriad } from './links';
+import type { TriadsHandoff } from './caged-triad';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
 import type { SpellingOverride } from './triads-view';
@@ -51,6 +52,7 @@ let instrument = $state.raw<Instrument>(STANDARD_GUITAR);
 /** One-line, non-blocking message about the last applied change (A2). */
 export type TriadsNotice =
   | { readonly kind: 'compare-swapped'; readonly quality: Quality }
+  | { readonly kind: 'compare-off-for-shape' }
   | { readonly kind: 'compare-omitted'; readonly notes: readonly Spelling[] }
   | null;
 
@@ -107,6 +109,11 @@ export const triads = {
       next.compare.quality === prev.quality &&
       next.quality === prev.compare.quality;
     apply(next, swapped ? { kind: 'compare-swapped', quality: prev.quality } : null);
+  },
+  /** CAGED "Open in Triads": land on the drawn triad; Compare goes off when its pair does not fit. */
+  carryCagedTriad(h: TriadsHandoff): void {
+    const { state, compareOff } = carryCagedTriad(view, h, instrument);
+    apply(state, compareOff ? { kind: 'compare-off-for-shape' } : null);
   },
   setInversion(inv: Inversion): void {
     apply(setInversion(view, inv));

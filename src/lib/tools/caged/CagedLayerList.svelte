@@ -18,17 +18,20 @@
   interface Row {
     layer: CagedLayer;
     fn: NoteFunction;
-    arpeggio?: boolean;
+    sample?: 'arpeggio' | 'triad';
   }
   const ROWS: readonly Row[] = [
     { layer: 'chord', fn: 'root' },
-    { layer: 'arpeggio', fn: 'root', arpeggio: true },
+    { layer: 'arpeggio', fn: 'root', sample: 'arpeggio' },
     { layer: 'pentatonic', fn: 'degree' },
-    { layer: 'scale', fn: 'degree' }
+    { layer: 'scale', fn: 'degree' },
+    { layer: 'triad', fn: 'root', sample: 'triad' }
   ];
 
   const name = (layer: CagedLayer): string => {
     switch (layer) {
+      case 'triad':
+        return m.caged_layer_triad();
       case 'chord':
         return m.caged_layer_chord();
       case 'arpeggio':
@@ -65,7 +68,7 @@
           if (!s.disabled) ontoggle(row.layer);
         }}
       >
-        <MarkerSample fn={row.fn} layer={row.arpeggio ? 'arpeggio' : undefined} />
+        <MarkerSample fn={row.fn} layer={row.sample} />
         {#if row.layer === 'scale' && extraSampleShown}
           <MarkerSample fn="degree" extra />
         {/if}

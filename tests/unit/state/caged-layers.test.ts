@@ -15,6 +15,8 @@ import {
 } from '../../../src/lib/state/caged-layers';
 import type { LayersOn } from '../../../src/lib/state/caged-view';
 import { cagedOccurrences } from '../../../src/lib/theory/caged';
+import { shapeTriad, type ShapeTriad } from '../../../src/lib/theory/caged-triad';
+import { spellTriad } from '../../../src/lib/theory/triad';
 import type { CagedLayer } from '../../../src/lib/theory/caged-layers';
 
 function must<T>(v: T | undefined | null): T {
@@ -22,12 +24,13 @@ function must<T>(v: T | undefined | null): T {
   return v;
 }
 
-const LAYERS: readonly CagedLayer[] = ['chord', 'arpeggio', 'pentatonic', 'scale'];
+const LAYERS: readonly CagedLayer[] = ['triad', 'chord', 'arpeggio', 'pentatonic', 'scale'];
 const on = (...ls: CagedLayer[]): LayersOn => ({
   chord: ls.includes('chord'),
   arpeggio: ls.includes('arpeggio'),
   pentatonic: ls.includes('pentatonic'),
-  scale: ls.includes('scale')
+  scale: ls.includes('scale'),
+  triad: ls.includes('triad')
 });
 
 const STANDARD = [40, 45, 50, 55, 59, 64];
@@ -37,7 +40,8 @@ function resolve(
   layers: LayersOn,
   focusLetter: string | null,
   rootPc = 0,
-  quality: 'major' | 'minor' = 'major'
+  quality: 'major' | 'minor' = 'major',
+  triad: ShapeTriad | null = null
 ) {
   const occurrences = cagedOccurrences(STANDARD, rootPc, quality, 24);
   const focusIndex =
@@ -49,8 +53,14 @@ function resolve(
     rootPc,
     quality,
     openPitches: OPEN,
-    fretCount: 24
+    fretCount: 24,
+    triad
   });
+}
+/** C major A-shape triad on strings 3-2-1 (frets 5-5-3). */
+function aShapeTriad(set = 3): ShapeTriad {
+  const occ = must(cagedOccurrences(STANDARD, 0, 'major', 24).find((o) => o.shape.id === 'A'));
+  return must(shapeTriad(occ, OPEN, spellTriad({ letter: 'C', accidental: 0 }, 'major'), set, 24));
 }
 const at = (r: readonly ResolvedPosition[], s: number, f: number) =>
   r.filter((p) => p.string === s && p.fret === f);
@@ -246,7 +256,8 @@ describe('resolveCagedPositions', () => {
       rootPc: 2,
       quality: 'major',
       openPitches: [...drop].reverse(),
-      fretCount: 24
+      fretCount: 24,
+      triad: null
     });
     expect(at(r, 6, 12)[0].layer).toBe('chord');
     expect(at(r, 6, 9)[0].layer).toBe('pentatonic');
@@ -259,7 +270,8 @@ describe('invariants I-1 … I-7', () => {
     chord: fc.boolean(),
     arpeggio: fc.boolean(),
     pentatonic: fc.boolean(),
-    scale: fc.boolean()
+    scale: fc.boolean(),
+    triad: fc.constant(false)
   });
 
   it('I-1…I-6 hold for random layers, focus, key, quality', () => {
@@ -279,7 +291,8 @@ describe('invariants I-1 … I-7', () => {
             rootPc,
             quality,
             openPitches: OPEN,
-            fretCount: 24
+            fretCount: 24,
+            triad: null
           });
           // I-1
           expect(new Set(r.map((p) => `${p.string}:${p.fret}`)).size).toBe(r.length);
@@ -395,5 +408,127 @@ describe('arpeggio layer (017 US3)', () => {
       if (focus === null)
         for (const k of chord) expect(r.map((p) => `${p.string}:${p.fret}`)).toContain(k);
     }
+  });
+});
+
+describe('triad layer (018 US1)', () => {
+  const triad = aShapeTriad();
+  const triads = (r: readonly ResolvedPosition[]) => r.filter((p) => p.layer === 'triad');
+
+  it('chord + triad: s3 f5, s2 f5, s1 f3 are triad, each key once', () => {
+    const r = resolve(on('chord', 'triad'), 'A', 0, 'major', triad);
+    expect(
+      triads(r)
+        .map((p) => `${p.string}:${p.fret}`)
+        .sort()
+    ).toEqual(['1:3', '2:5', '3:5']);
+    for (const [s, f] of [
+      [3, 5],
+      [2, 5],
+      [1, 3]
+    ])
+      expect(at(r, s, f)).toHaveLength(1);
+    expect(triads(r).every((p) => p.emphasis === 'highlighted')).toBe(true);
+    expect(
+      triads(r)
+        .map((p) => p.degree)
+        .sort()
+    ).toEqual(['3', '5', 'R']);
+  });
+
+  it('triad only: three triad positions, no chord anywhere', () => {
+    const r = resolve(on('triad'), 'A', 0, 'major', triad);
+    expect(triads(r)).toHaveLength(3);
+    expect(r.some((p) => p.layer === 'chord')).toBe(false);
+  });
+
+  it('I-10: arpeggio on then off gives identical triad positions', () => {
+    const withArp = triads(resolve(on('chord', 'arpeggio', 'triad'), 'A', 0, 'major', triad));
+    const without = triads(resolve(on('chord', 'triad'), 'A', 0, 'major', triad));
+    expect(withArp).toEqual(without);
+  });
+
+  it('focus cleared: zero triad, chord as before', () => {
+    const r = resolve(on('chord', 'triad'), null, 0, 'major', triad);
+    expect(triads(r)).toHaveLength(0);
+    expect(r).toEqual(resolve(on('chord'), null));
+  });
+
+  it('triad null: zero triad, other layers unchanged', () => {
+    const r = resolve(on('chord', 'triad'), 'A', 0, 'major', null);
+    expect(triads(r)).toHaveLength(0);
+    expect(r).toEqual(resolve(on('chord'), 'A'));
+  });
+
+  it('triad off: the triad is not drawn even when supplied', () => {
+    expect(triads(resolve(on('chord'), 'A', 0, 'major', triad))).toHaveLength(0);
+  });
+
+  it('all five layers: one entry per key; triad > chord > arpeggio > pentatonic > scale', () => {
+    const r = resolve(
+      on('triad', 'chord', 'arpeggio', 'pentatonic', 'scale'),
+      'A',
+      0,
+      'major',
+      triad
+    );
+    const keys = r.map((p) => `${p.string}:${p.fret}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(triads(r)).toHaveLength(3);
+    for (const p of triads(r)) expect(at(r, p.string, p.fret)).toHaveLength(1);
+  });
+
+  it('I-8, I-9: exactly three triad positions, never another layer on the same key', () => {
+    const r = resolve(on('triad', 'chord', 'scale'), 'A', 0, 'major', triad);
+    const tk = new Set(triads(r).map((p) => `${p.string}:${p.fret}`));
+    expect(tk.size).toBe(3);
+    expect(r.filter((p) => tk.has(`${p.string}:${p.fret}`))).toHaveLength(3);
+  });
+
+  it('layerCounts has triad', () => {
+    const r = resolve(on('chord', 'triad'), 'A', 0, 'major', triad);
+    expect(layerCounts(r).triad).toBe(3);
+    expect(layerCounts(resolve(on('chord'), null)).triad).toBe(0);
+  });
+
+  it('switches: triad drawable only with focus; auto-focus; last-layer', () => {
+    expect(isDrawable(on('chord', 'triad'), 'triad', false)).toBe(false);
+    expect(isDrawable(on('chord', 'triad'), 'triad', true)).toBe(true);
+    expect(needsAutoFocus(on('chord'), 'triad', null)).toBe(true);
+    expect(needsAutoFocus(on('chord', 'triad'), 'triad', null)).toBe(false);
+    expect(needsAutoFocus(on('chord'), 'triad', { letter: 'A', ordinal: 0 })).toBe(false);
+    expect(switchStates(on('chord'), false, true).triad).toEqual({ on: false, disabled: null });
+    expect(switchStates(on('triad'), true, true).triad.disabled).toBe('last-layer');
+    expect(switchStates(on('chord'), false, false).triad.disabled).toBe('no-shapes');
+  });
+
+  it('clearing focus with only triad on restores chord, triad stays on', () => {
+    const r = ensureDrawable(on('triad'), false);
+    expect(r.restoredChord).toBe(true);
+    expect(r.layers).toEqual(on('chord', 'triad'));
+  });
+});
+
+describe('triad layer without focus (018 US4)', () => {
+  it('toggle sequence: on, focus cleared, refocus keeps the switch on and draws only with focus', () => {
+    const layers = toggleLayer(on('chord'), 'triad', false, true);
+    expect(layers.triad).toBe(true);
+    // Focus cleared with Chord still on: nothing to restore, Triad stays on but undrawn.
+    const cleared = ensureDrawable(layers, false);
+    expect(cleared.restoredChord).toBe(false);
+    expect(cleared.layers.triad).toBe(true);
+    expect(isDrawable(cleared.layers, 'triad', false)).toBe(false);
+    expect(isDrawable(cleared.layers, 'triad', true)).toBe(true);
+    expect(switchStates(cleared.layers, true, true).triad).toEqual({ on: true, disabled: null });
+  });
+
+  it('only Triad on and focus cleared: Chord restored, Triad stays on', () => {
+    const r = ensureDrawable(on('triad'), false);
+    expect(r).toEqual({ layers: on('chord', 'triad'), restoredChord: true });
+  });
+
+  it('Triad is the last drawable layer: switch disabled last-layer; with Chord also on it is not', () => {
+    expect(switchStates(on('triad'), true, true).triad.disabled).toBe('last-layer');
+    expect(switchStates(on('chord', 'triad'), true, true).triad.disabled).toBeNull();
   });
 });

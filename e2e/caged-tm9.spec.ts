@@ -150,3 +150,32 @@ test.describe('TM-9 CAGED layers (017)', () => {
     await expect(board(page)).toHaveScreenshot('tm9-caged-17-g-e-arp-scale.png');
   });
 });
+
+test.describe('TM-9 CAGED triad layer (018)', () => {
+  test('tm9 view 19 layers: E major, A shape in focus, Triad, 6 strings, half step down', async ({
+    page
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, strings: 6, tuning: 'AF-2' })
+      );
+    });
+    await page.goto('/caged');
+    await board(page).waitFor();
+    await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(4).click();
+    await expect(page.getByText('E major', { exact: true })).toBeVisible();
+    await page
+      .getByRole('radiogroup', { name: 'Shape' })
+      .getByRole('radio', { name: 'A', exact: true })
+      .click();
+    await page
+      .getByRole('group', { name: 'Layers' })
+      .getByRole('switch', { name: 'Triad', exact: true })
+      .click();
+    await expect(board(page).locator('g.marker.layer-triad')).toHaveCount(3);
+    // Let the reveal finish before the capture.
+    await expect(board(page).locator('g.marker.layer-triad').first()).toHaveCSS('opacity', '1');
+    await expect(board(page)).toHaveScreenshot('tm9-view-19.png');
+  });
+});

@@ -2171,3 +2171,62 @@ describe('MarkerSample (US2)', () => {
     expect(e.container.querySelector('circle.extra-dot')).not.toBeNull();
   });
 });
+
+describe('Fretboard triad layer (018 US1)', () => {
+  it('a marker with layer triad gets class layer-triad', () => {
+    const { container } = show([
+      mk({ string: 3, fret: 5, function: 'root', layer: 'triad', id: 'triad:3:5' }),
+      mk({ string: 2, fret: 5, function: 'third', id: '2:5' })
+    ]);
+    const triad = container.querySelector('.marker[data-key="3:5"]');
+    expect(triad?.classList.contains('layer-triad')).toBe(true);
+    expect(triad?.classList.contains('layer-arpeggio')).toBe(false);
+    expect(
+      container.querySelector('.marker[data-key="2:5"]')?.classList.contains('layer-triad')
+    ).toBe(false);
+  });
+
+  it('the connection ring still renders when ring is set', () => {
+    const { container } = show([
+      mk({ string: 3, fret: 5, function: 'root', layer: 'triad', ring: true, id: 'triad:3:5' })
+    ]);
+    const group = container.querySelector('.marker.layer-triad[data-key="3:5"]');
+    expect(group?.querySelector('circle.connection-ring')).toBeTruthy();
+  });
+
+  it('is styled from the triad tokens', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    const rule = /\.marker\.layer-triad[^{]*\{([^}]*)\}/.exec(src)?.[1] ?? '';
+    expect(src).toMatch(/var\(--marker-triad-scale\)/);
+    expect(src).toMatch(/var\(--marker-triad-stroke\)/);
+    expect(rule.length).toBeGreaterThan(0);
+  });
+
+  it('remounts with appear when the id changes from s:f to triad:s:f', async () => {
+    const before = [mk({ string: 3, fret: 5, function: 'root', id: '3:5' })];
+    const after = [
+      mk({ string: 3, fret: 5, function: 'root', layer: 'triad', id: 'triad:3:5', appear: 0.5 })
+    ];
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: { markers: before, labelMode: 'note' }
+    });
+    const first = container.querySelector('.marker[data-key="3:5"]');
+    expect(first).toBeTruthy();
+    await rerender({
+      instrument: STANDARD_GUITAR,
+      model: { markers: after, labelMode: 'note' }
+    });
+    const next = container.querySelector('.marker.layer-triad[data-key="3:5"]');
+    expect(next).toBeTruthy();
+    expect(next).not.toBe(first);
+  });
+
+  it('MarkerSample accepts layer triad', async () => {
+    const { default: MarkerSample } =
+      await import('../../../src/lib/fretboard/MarkerSample.svelte');
+    const { container } = render(MarkerSample, { fn: 'root', layer: 'triad' });
+    expect(container.querySelector('svg.layer-triad')).not.toBeNull();
+    expect(container.querySelector('svg.layer-arpeggio')).toBeNull();
+  });
+});

@@ -838,6 +838,7 @@
               class="marker {d.mk.function} {d.mk.emphasis}{d.tone ? ` tone-${d.tone}` : ''}"
               class:comparison={d.mk.variant === 'comparison'}
               class:layer-arpeggio={d.mk.layer === 'arpeggio'}
+              class:layer-triad={d.mk.layer === 'triad'}
               class:pulse={d.mk.pulse !== undefined}
               data-variant={d.mk.variant}
               style:--pulse-duration={d.mk.pulse ? `${d.mk.pulse.durationMs}ms` : undefined}
@@ -1205,6 +1206,20 @@
 
   .marker.layer-arpeggio.highlighted .shape {
     transform: scale(calc(var(--marker-layer-scale) * var(--emph-highlight-scale)));
+  }
+
+  /* Triad layer: larger with a heavier outline so it reads over every other layer. */
+  .marker.layer-triad .shape {
+    transform: scale(var(--marker-triad-scale));
+  }
+
+  .marker.layer-triad .glyph {
+    stroke: var(--color-text);
+    stroke-width: var(--marker-triad-stroke);
+  }
+
+  .marker.layer-triad.highlighted .shape {
+    transform: scale(calc(var(--marker-triad-scale) * var(--emph-highlight-scale)));
   }
 
   .marker .extra-dot {

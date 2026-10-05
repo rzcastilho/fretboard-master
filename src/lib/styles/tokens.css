@@ -84,6 +84,10 @@
   --marker-layer-opacity: 0.8;
   --marker-extra-dot: 0.25rem;
 
+  /* CAGED triad layer (feature 018): size and outline only, no new color */
+  --marker-triad-scale: 1.15;
+  --marker-triad-stroke: 3px;
+
   /* Emphasis */
   --emph-highlight-scale: 1.15;
   --emph-dim-scale: 0.85;
@@ -221,6 +225,7 @@
     --marker-neutral-stroke-width: 3px;
     --marker-stroke: 3px;
     --marker-layer-opacity: 1;
+    --marker-triad-stroke: 4px;
 
     --color-note-highlight: CanvasText;
     --color-note-highlight-label: Canvas;

@@ -362,3 +362,40 @@ test.describe('linked tools: history only follows screens (US5)', () => {
     await expect(page).toHaveURL(/\/notes$/);
   });
 });
+
+test.describe('linked tools: CAGED triad round trip (018 US3)', () => {
+  test('Open in Triads then Back returns to CAGED with Triad on, same set and focus', async ({
+    page
+  }) => {
+    await page.goto('/caged');
+    await page
+      .getByRole('radiogroup', { name: 'Shape' })
+      .getByRole('radio', { name: 'A', exact: true })
+      .click();
+    await page
+      .getByRole('group', { name: 'Layers' })
+      .getByRole('switch', { name: 'Triad', exact: true })
+      .click();
+    await page
+      .getByRole('radiogroup', { name: 'Triad strings' })
+      .getByRole('radio', { name: '4-3-2', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Open in Triads', exact: true }).click();
+    await expect(page).toHaveURL(/\/triads$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/caged$/);
+    await expect(
+      page
+        .getByRole('group', { name: 'Layers' })
+        .getByRole('switch', { name: 'Triad', exact: true })
+    ).toHaveAttribute('aria-checked', 'true');
+    await expect(
+      page
+        .getByRole('radiogroup', { name: 'Triad strings' })
+        .getByRole('radio', { name: '4-3-2', exact: true })
+    ).toBeChecked();
+    await expect(
+      page.getByRole('radiogroup', { name: 'Shape' }).getByRole('radio', { name: 'A', exact: true })
+    ).toBeChecked();
+  });
+});

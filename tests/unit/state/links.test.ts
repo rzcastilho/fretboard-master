@@ -5,10 +5,12 @@ import {
   carryFromDetected,
   carryFromNotes,
   carryFromTriads,
+  carryCagedTriad,
   carryRoot,
   carrySelection,
   carryTriad
 } from '../../../src/lib/state/links';
+import type { TriadsHandoff } from '../../../src/lib/state/caged-triad';
 import { initialNotesView } from '../../../src/lib/state/notes-view';
 import { effectiveRootSpelling } from '../../../src/lib/theory/triad';
 import { initialTriadsView, type TriadsViewState } from '../../../src/lib/state/triads-view';
@@ -132,5 +134,88 @@ describe('links (pure)', () => {
     });
     expect(next.compare.on).toBe(true);
     expect(next.occurrence).toBe(0);
+  });
+});
+
+describe('carryCagedTriad (US3, contract §7)', () => {
+  const h = (p: Partial<TriadsHandoff> = {}): TriadsHandoff => ({
+    rootPc: 0,
+    spelling: 'none',
+    quality: 'major',
+    inversion: 'root',
+    stringSet: 3,
+    occurrence: 0,
+    ...p
+  });
+
+  it('C major A shape set 3', () => {
+    const t = triads({ labelType: 'name', view: 'full-neck', inversion: 'first', stringSet: 5 });
+    const r = carryCagedTriad(t, h(), I);
+    expect(r.compareOff).toBe(false);
+    expect(r.state).toMatchObject({
+      rootPc: 0,
+      quality: 'major',
+      inversion: 'root',
+      stringSet: 3,
+      occurrence: 0,
+      view: 'isolated',
+      labelType: 'name'
+    });
+  });
+
+  it('C minor A shape set 3 from All notes view', () => {
+    const r = carryCagedTriad(triads({ view: 'all-notes' }), h({ quality: 'minor' }), I);
+    expect(r.state).toMatchObject({
+      quality: 'minor',
+      inversion: 'root',
+      stringSet: 3,
+      view: 'isolated'
+    });
+  });
+
+  it('C major D shape set 3: second inversion, occurrence 1', () => {
+    const r = carryCagedTriad(triads(), h({ inversion: 'second', occurrence: 1 }), I);
+    expect(r.state).toMatchObject({ inversion: 'second', stringSet: 3, occurrence: 1 });
+    expect(r.compareOff).toBe(false);
+  });
+
+  it('Compare on with a fitting pair keeps Compare and indexes the pair list', () => {
+    const t = triads({ compare: { on: true, quality: 'minor' } });
+    const r = carryCagedTriad(t, h({ inversion: 'second', occurrence: 1 }), I);
+    expect(r.compareOff).toBe(false);
+    expect(r.state.compare.on).toBe(true);
+    expect(r.state.occurrence).toBeLessThanOrEqual(1);
+  });
+
+  it('Compare on with no fitting pair turns Compare off and keeps the quality', () => {
+    const t = triads({ compare: { on: true, quality: 'minor' } });
+    let found = false;
+    let exact = false;
+    for (const inversion of ['root', 'first', 'second'] as const) {
+      for (let set = 3; set <= 6; set++) {
+        for (let occurrence = 0; occurrence < 3; occurrence++) {
+          const r = carryCagedTriad(t, h({ inversion, stringSet: set, occurrence }), I);
+          if (r.compareOff) {
+            found = true;
+            expect(r.state.compare).toEqual({ on: false, quality: 'minor' });
+            // revalidate clamps indexes that do not exist; real ones are kept as k.
+            expect(r.state.occurrence).toBeLessThanOrEqual(occurrence);
+            if (r.state.occurrence === occurrence) exact = true;
+          }
+        }
+      }
+    }
+    expect(found).toBe(true);
+    expect(exact).toBe(true);
+  });
+
+  it('spelling is carried', () => {
+    const r = carryCagedTriad(triads(), h({ rootPc: 6, spelling: 'flat' }), I);
+    expect(r.state).toMatchObject({ rootPc: 6, spellingOverride: 'flat' });
+  });
+
+  it('equal state returns the same reference', () => {
+    const t = triads();
+    expect(carryCagedTriad(t, h(), I).state).toBe(t);
   });
 });

@@ -19,7 +19,8 @@ describe('caged store (US1)', () => {
       quality: 'major',
       focus: null,
       connections: false,
-      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false },
+      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false, triad: false },
+      triadSet: null,
       labelType: 'interval'
     });
     expect(caged.instrument).toBe(STANDARD_GUITAR);
@@ -70,7 +71,8 @@ describe('caged store: session and reset (US6)', () => {
       quality: 'major',
       focus: null,
       connections: false,
-      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false },
+      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false, triad: false },
+      triadSet: null,
       labelType: 'interval'
     });
     expect(caged.instrument).toBe(AF_1_12);
@@ -434,6 +436,7 @@ describe('caged store: layers (US2)', () => {
     arpeggio: false,
     pentatonic: false,
     scale: false,
+    triad: false,
     ...on
   });
 
@@ -675,5 +678,254 @@ describe('REVEAL_WINDOW_MS', () => {
     const css = readFileSync('src/lib/styles/tokens.css', 'utf8');
     const ms = /--duration-short:\s*(\d+)ms/.exec(css)?.[1];
     expect(REVEAL_WINDOW_MS).toBe(Number(ms));
+  });
+});
+
+describe('caged store: triad layer (018 US1)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const triadKeys = () =>
+    caged.display.positions
+      .filter((p) => p.layer === 'triad')
+      .map((p) => `${p.string}:${p.fret}`)
+      .sort();
+
+  it('toggleLayer("triad") on sets the default set and reveals the three triad ids low to high', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.state.triadSet).toBe(3);
+    expect(triadKeys()).toEqual(['1:3', '2:5', '3:5']);
+    expect(caged.reveal?.ids).toEqual(['triad:3:5', 'triad:2:5', 'triad:1:3']);
+    expect(caged.layerChange).toEqual({ layer: 'triad', on: true });
+  });
+
+  it('with no focus, turning Triad on focuses the first occurrence', () => {
+    caged.toggleLayer('triad');
+    expect(caged.state.focus).not.toBeNull();
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.state.triadSet).not.toBeNull();
+    expect(triadKeys()).toHaveLength(3);
+  });
+
+  it('turning Triad off clears triadSet and the triad markers', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    caged.toggleLayer('triad');
+    expect(caged.state.layers.triad).toBe(false);
+    expect(caged.state.triadSet).toBeNull();
+    expect(triadKeys()).toEqual([]);
+    expect(caged.reveal).toBeNull();
+  });
+
+  it('selectTriadSet reveals and sets triadChange selected', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    vi.advanceTimersByTime(REVEAL_WINDOW_MS);
+    caged.selectTriadSet(4);
+    expect(caged.state.triadSet).toBe(4);
+    expect(caged.triadChange).toEqual({ kind: 'selected', set: 4 });
+    const ids = caged.reveal?.ids ?? [];
+    expect(ids).toHaveLength(3);
+    expect(ids.every((id) => id.startsWith('triad:'))).toBe(true);
+    expect(triadKeys()).toHaveLength(3);
+  });
+
+  it('picking an unavailable or equal set is a no-op', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    vi.advanceTimersByTime(REVEAL_WINDOW_MS);
+    const before = caged.state;
+    caged.selectTriadSet(5); // A shape: no triad on strings 5-4-3
+    expect(caged.state).toBe(before);
+    caged.selectTriadSet(3);
+    expect(caged.state).toBe(before);
+    expect(caged.triadChange).toBeNull();
+    expect(caged.reveal).toBeNull();
+  });
+
+  it('selectTriadSet does nothing while Triad is off', () => {
+    caged.chooseShape('A');
+    const before = caged.state;
+    caged.selectTriadSet(3);
+    expect(caged.state).toBe(before);
+  });
+
+  it('toggling Arpeggio does not change the triad positions (FR-008)', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    const withTriad = triadKeys();
+    caged.toggleLayer('arpeggio');
+    expect(triadKeys()).toEqual(withTriad);
+    caged.toggleLayer('arpeggio');
+    expect(triadKeys()).toEqual(withTriad);
+  });
+
+  it('Triad does not stop playback (R-15)', () => {
+    const stop = vi.spyOn(playback, 'stop');
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    caged.selectTriadSet(4);
+    expect(stop).not.toHaveBeenCalled();
+    stop.mockRestore();
+  });
+
+  it('rapid toggling leaves no stale markers or timers', () => {
+    caged.chooseShape('A');
+    for (let i = 0; i < 5; i++) {
+      caged.toggleLayer('triad');
+      caged.selectTriadSet(4);
+      caged.toggleLayer('triad');
+    }
+    expect(triadKeys()).toEqual([]);
+    expect(caged.display.model?.markers.some((m) => m.layer === 'triad')).toBe(false);
+    vi.advanceTimersByTime(REVEAL_WINDOW_MS * 2);
+    expect(caged.reveal).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('reset turns Triad off and clears triadSet', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    caged.reset();
+    expect(caged.state.layers.triad).toBe(false);
+    expect(caged.state.triadSet).toBeNull();
+    expect(caged.triadChange).toBeNull();
+    expect(caged.reveal).toBeNull();
+  });
+});
+
+describe('caged store: triad settle (018 US2)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('focus change A shape (set 3) → G shape moves to set 6 with a moved change and no reveal', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    vi.advanceTimersByTime(REVEAL_WINDOW_MS);
+    expect(caged.state.triadSet).toBe(3);
+    caged.chooseShape('G');
+    expect(caged.state.triadSet).toBe(6);
+    expect(caged.triadChange).toEqual({ kind: 'moved', set: 6, from: 3 });
+    expect(caged.reveal).toBeNull();
+    expect(caged.display.triad?.selected).toBe(6);
+    expect(caged.display.model?.description).toContain(
+      'Strings 3-2-1 unavailable in this shape; showing strings 6-5-4'
+    );
+  });
+
+  it('keeps the set when the new shape still has it, with no change announced', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    vi.advanceTimersByTime(REVEAL_WINDOW_MS);
+    caged.selectRoot(7); // G major; re-resolved focus
+    const set = caged.state.triadSet;
+    expect(set).not.toBeNull();
+    expect(caged.display.triad?.selected).toBe(set);
+    expect(caged.triadChange === null || caged.triadChange.kind !== 'moved').toBe(true);
+  });
+
+  it('key, quality and spelling changes keep the stored set available or move it per settleTriadSet', () => {
+    caged.chooseShape('G');
+    caged.toggleLayer('triad');
+    expect(caged.state.triadSet).toBe(6);
+    for (const act of [
+      () => caged.setQuality('minor'),
+      () => caged.selectRoot(1),
+      () => caged.switchSpelling()
+    ]) {
+      act();
+      const avail = caged.display.triad?.sets.find((x) => x.id === caged.state.triadSet);
+      expect(avail?.available).toBe(true);
+    }
+  });
+
+  it('instrument change settles the set', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    caged.applyInstrument(AF_1_12, 'Standard');
+    const sel = caged.display.triad?.selected ?? null;
+    const set = caged.state.triadSet;
+    if (sel !== null) expect(sel).toBe(set);
+    expect(caged.display.triad?.sets.find((x) => x.id === set)?.available).toBe(sel !== null);
+  });
+
+  it('the moved announcement is cleared by the next layer transient reset', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    caged.chooseShape('G');
+    expect(caged.triadChange?.kind).toBe('moved');
+    caged.selectTriadSet(5);
+    expect(caged.triadChange).toEqual({ kind: 'selected', set: 5 });
+  });
+});
+
+describe('caged store: triad without a shape in focus (018 US4)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const triadKeys = () =>
+    caged.display.positions.filter((p) => p.layer === 'triad').map((p) => `${p.string}:${p.fret}`);
+
+  it('no focus: on auto-focuses the first drawn occurrence and sets the default set', () => {
+    const first = caged.display.occurrences[0];
+    expect(caged.state.focus).toBeNull();
+    caged.toggleLayer('triad');
+    expect(caged.state.focus).toEqual({ letter: first.shape.id, ordinal: 0 });
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.state.triadSet).not.toBeNull();
+    expect(caged.display.triad?.selected).toBe(caged.state.triadSet);
+    expect(triadKeys()).toHaveLength(3);
+    expect(caged.layerChange).toEqual({ layer: 'triad', on: true });
+    expect(caged.reveal?.ids).toHaveLength(3);
+  });
+
+  it('focus cleared with Chord on keeps the switch on, draws no triad and hides the selector; refocus draws it', () => {
+    caged.toggleLayer('triad');
+    const set = caged.state.triadSet;
+    caged.chooseShape('all');
+    expect(caged.state.focus).toBeNull();
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.switches.triad.on).toBe(true);
+    expect(triadKeys()).toEqual([]);
+    expect(caged.display.triad).toBeNull();
+    caged.chooseShape('A');
+    expect(caged.state.layers.triad).toBe(true);
+    expect(caged.display.triad).not.toBeNull();
+    expect(triadKeys()).toHaveLength(3);
+    expect(caged.state.triadSet).not.toBeNull();
+    expect(set).not.toBeNull();
+  });
+
+  it('only Triad on and focus cleared restores Chord and Triad stays on', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    caged.toggleLayer('chord');
+    expect(caged.state.layers).toMatchObject({ chord: false, triad: true });
+    caged.chooseShape('all');
+    expect(caged.state.layers).toMatchObject({ chord: true, triad: true });
+    expect(caged.layerChange).toEqual({ layer: 'chord', on: true });
+    expect(triadKeys()).toEqual([]);
+    expect(caged.display.triad).toBeNull();
+  });
+
+  it('the only drawable layer is disabled last-layer', () => {
+    caged.chooseShape('A');
+    caged.toggleLayer('triad');
+    caged.toggleLayer('chord');
+    expect(caged.switches.triad).toEqual({ on: true, disabled: 'last-layer' });
+    const before = caged.state;
+    caged.toggleLayer('triad');
+    expect(caged.state).toBe(before);
+  });
+
+  it('auto-focus and restore-Chord are announced in the description', () => {
+    caged.toggleLayer('triad');
+    expect(caged.display.model?.description).toMatch(/triad/i);
+    caged.toggleLayer('chord');
+    caged.chooseShape('all');
+    expect(caged.layerChange).toEqual({ layer: 'chord', on: true });
+    expect(caged.display.model?.description).toMatch(/chord/i);
   });
 });

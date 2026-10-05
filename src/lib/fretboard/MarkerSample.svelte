@@ -7,7 +7,7 @@
    */
   interface Props {
     fn: NoteFunction;
-    layer?: 'arpeggio';
+    layer?: 'arpeggio' | 'triad';
     /** Extra dot on a Pentatonic/Scale note outside the pentatonic. */
     extra?: boolean;
   }
@@ -23,6 +23,7 @@
 <svg
   class="marker-sample marker {fn}"
   class:layer-arpeggio={layer === 'arpeggio'}
+  class:layer-triad={layer === 'triad'}
   aria-hidden="true"
   focusable="false"
   width={SIZE}
@@ -31,7 +32,11 @@
 >
   <g
     class="shape"
-    style:transform={layer === 'arpeggio' ? 'scale(var(--marker-layer-scale))' : undefined}
+    style:transform={layer === 'arpeggio'
+      ? 'scale(var(--marker-layer-scale))'
+      : layer === 'triad'
+        ? 'scale(var(--marker-triad-scale))'
+        : undefined}
     style:opacity={layer === 'arpeggio' ? 'var(--marker-layer-opacity)' : undefined}
   >
     {#if fn === 'root'}
@@ -78,6 +83,10 @@
     fill: none;
     stroke: var(--color-degree-stroke);
     stroke-width: var(--marker-stroke);
+  }
+  .layer-triad .glyph {
+    stroke: var(--color-text);
+    stroke-width: var(--marker-triad-stroke);
   }
   .extra-dot {
     fill: var(--color-text);

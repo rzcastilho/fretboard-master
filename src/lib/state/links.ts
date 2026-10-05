@@ -7,10 +7,15 @@ import type { PitchClass } from '../theory/pitch';
 import { QUALITY_INTERVALS, isAlteredRoot, type Quality } from '../theory/triad';
 import type { TriadMatch } from '../theory/triad-detect';
 import type { NotesViewState } from './notes-view';
+import type { TriadsHandoff } from './caged-triad';
+import { setOpenPitches } from '../instrument/string-sets';
+import { defaultRootSpelling, spellTriad } from '../theory/triad';
+import { occurrences, pairOccurrences, triadShape } from '../theory/triad-shape';
 import {
   equalsTriadsView,
   revalidate,
   setQuality,
+  setView,
   type SpellingOverride,
   type TriadsViewState
 } from './triads-view';
@@ -84,4 +89,47 @@ export function carryTriad(
 export function carrySelection(n: NotesViewState, sel: readonly PitchClass[]): NotesViewState {
   if (n.selection.length === sel.length && n.selection.every((v, k) => v === sel[k])) return n;
   return { ...n, selection: [...sel] };
+}
+
+/**
+ * CAGED "Open in Triads" (R-11): land on the occurrence equal to the drawn triad, Isolated.
+ * `compareOff` is true when Compare had to be turned off so the drawn shape is shown.
+ */
+export function carryCagedTriad(
+  t: TriadsViewState,
+  h: TriadsHandoff,
+  i: Instrument
+): { readonly state: TriadsViewState; readonly compareOff: boolean } {
+  if (!validPc(h.rootPc)) return { state: t, compareOff: false };
+  const base = setQuality(setView(t, 'isolated'), h.quality);
+  let next: TriadsViewState = {
+    ...base,
+    rootPc: h.rootPc,
+    spellingOverride: h.spelling,
+    inversion: h.inversion,
+    stringSet: h.stringSet,
+    occurrence: h.occurrence
+  };
+  let compareOff = false;
+  const cq = next.compare.quality;
+  if (next.compare.on && cq !== null && cq !== next.quality) {
+    const triad = spellTriad(defaultRootSpelling(next.rootPc, next.quality), next.quality);
+    const shape = triadShape(setOpenPitches(i, next.stringSet), triad, next.inversion);
+    if (shape.kind === 'shape') {
+      const occs = occurrences(shape.frets, i.fretCount);
+      const pairs = pairOccurrences(occs, shape.functions, next.quality, cq, i.fretCount);
+      if (pairs.length > 0) {
+        const idx = pairs.indexOf(h.occurrence);
+        if (idx >= 0) next = { ...next, occurrence: idx };
+        else {
+          next = { ...next, compare: { on: false, quality: cq } };
+          compareOff = true;
+        }
+      }
+    }
+  }
+  const clamped = revalidate(next, i);
+  return equalsTriadsView(clamped, t)
+    ? { state: t, compareOff: false }
+    : { state: clamped, compareOff };
 }

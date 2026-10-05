@@ -272,7 +272,8 @@ describe('caged is outside the links (US6)', () => {
       quality: 'major',
       focus: null,
       connections: false,
-      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false },
+      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false, triad: false },
+      triadSet: null,
       labelType: 'interval'
     });
     expect(triads.state).toBe(triadsBefore);

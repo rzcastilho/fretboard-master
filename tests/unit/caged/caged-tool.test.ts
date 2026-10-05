@@ -1,11 +1,14 @@
+import { must } from '../must';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const openTriadsFromCaged = vi.hoisted(() => vi.fn(async () => {}));
+const openTriadsFromCagedTriad = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock('../../../src/lib/state/links.svelte', async (orig) => ({
   ...(await orig<object>()),
-  openTriadsFromCaged
+  openTriadsFromCaged,
+  openTriadsFromCagedTriad
 }));
 
 import { AF_1_12, AF_1_24, AF_8 } from '../../../src/lib/instrument/fixtures';
@@ -16,6 +19,7 @@ import { preferences, resetPreferencesForTests } from '../../../src/lib/state/pr
 import CagedTool from '../../../src/lib/tools/caged/CagedTool.svelte';
 
 beforeEach(() => {
+  openTriadsFromCagedTriad.mockClear();
   resetPreferencesForTests();
   resetCagedForTests();
   resetInstrumentForTests();
@@ -481,17 +485,19 @@ describe('CagedLayerList (US2)', () => {
     return within(group).getAllByRole('switch');
   };
 
-  it('lists Chord, Arpeggio, Pentatonic, Scale in order as switches', () => {
+  it('lists Chord, Arpeggio, Pentatonic, Scale, Triad in order as switches', () => {
     render(CagedTool);
     const sw = layerSwitches();
     expect(sw.map((s) => s.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
       'Chord On',
       'Arpeggio Off',
       'Pentatonic Off',
-      'Scale Off'
+      'Scale Off',
+      'Triad Off'
     ]);
     expect(sw.map((s) => s.getAttribute('aria-checked'))).toEqual([
       'true',
+      'false',
       'false',
       'false',
       'false'
@@ -566,5 +572,119 @@ describe('CagedLayerList (US2)', () => {
     expect(shape(1).style.transform).toBe('scale(var(--marker-layer-scale))');
     expect(shape(1).style.opacity).toBe('var(--marker-layer-opacity)');
     expect(shape(0).style.transform).toBe('');
+  });
+});
+
+describe('Triad layer controls (018 US1)', () => {
+  const triadSwitch = () => screen.getByRole('switch', { name: /^Triad/ });
+
+  it('the Triad switch is the last row, role switch, with a triad sample', () => {
+    render(CagedTool);
+    const group = screen.getByRole('group', { name: 'Layers' });
+    const sw = within(group).getAllByRole('switch');
+    expect(sw.at(-1)).toBe(triadSwitch());
+    expect(triadSwitch().getAttribute('role')).toBe('switch');
+    expect(triadSwitch().querySelector('svg.marker-sample.layer-triad')).not.toBeNull();
+  });
+
+  it('the selector is hidden until Triad is on and a shape is focused', async () => {
+    render(CagedTool);
+    expect(screen.queryByRole('radiogroup', { name: 'Triad strings' })).toBeNull();
+    await fireEvent.click(triadSwitch());
+    await tick();
+    // Turning Triad on focuses a shape.
+    expect(caged.state.focus).not.toBeNull();
+    expect(screen.getByRole('radiogroup', { name: 'Triad strings' })).toBeTruthy();
+    await fireEvent.click(triadSwitch());
+    await tick();
+    expect(screen.queryByRole('radiogroup', { name: 'Triad strings' })).toBeNull();
+  });
+
+  it('lists the string sets bass to treble with the selected one checked, and a summary', async () => {
+    render(CagedTool);
+    caged.chooseShape('A');
+    await fireEvent.click(triadSwitch());
+    await tick();
+    const group = screen.getByRole('radiogroup', { name: 'Triad strings' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map((r) => r.textContent?.trim())).toEqual([
+      '6-5-4',
+      '5-4-3 ✕',
+      '4-3-2',
+      '3-2-1'
+    ]);
+    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'true'
+    ]);
+    expect(screen.getByText('C major, root position, strings 3-2-1, frets 5-5-3')).toBeTruthy();
+  });
+
+  it('choosing another set selects it', async () => {
+    render(CagedTool);
+    caged.chooseShape('A');
+    await fireEvent.click(triadSwitch());
+    await tick();
+    const group = screen.getByRole('radiogroup', { name: 'Triad strings' });
+    await fireEvent.click(within(group).getByRole('radio', { name: '4-3-2' }));
+    await tick();
+    expect(caged.state.triadSet).toBe(4);
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Triad strings' }))
+        .getByRole('radio', { name: '4-3-2' })
+        .getAttribute('aria-checked')
+    ).toBe('true');
+  });
+});
+
+describe('Open in Triads (018 US3)', () => {
+  const triadSwitch = () => screen.getByRole('switch', { name: /^Triad/ });
+  const openButton = () => screen.queryByRole('button', { name: 'Open in Triads' });
+
+  it('is absent until a triad is drawn', async () => {
+    render(CagedTool);
+    expect(openButton()).toBeNull();
+    caged.chooseShape('A');
+    await tick();
+    expect(openButton()).toBeNull();
+  });
+
+  it('is shown while a triad is drawn, with a 44px target, and activates once', async () => {
+    render(CagedTool);
+    caged.chooseShape('A');
+    await fireEvent.click(triadSwitch());
+    await tick();
+    expect(caged.display.triad?.handoff).not.toBeNull();
+    const btn = must(openButton());
+    expect(btn).toBeTruthy();
+    expect(btn.classList.contains('open-triads')).toBe(true);
+    await fireEvent.click(btn);
+    expect(openTriadsFromCagedTriad).toHaveBeenCalledTimes(1);
+  });
+
+  it('is absent again once Triad is turned off', async () => {
+    render(CagedTool);
+    caged.chooseShape('A');
+    await fireEvent.click(triadSwitch());
+    await tick();
+    expect(caged.display.triad?.handoff).not.toBeNull();
+    // Triad off again: selector and shortcut go away.
+    await fireEvent.click(triadSwitch());
+    await tick();
+    expect(openButton()).toBeNull();
+  });
+
+  it('is absent in the temporary standard view', async () => {
+    resetCagedForTests(AF_8, 'Open G');
+    render(CagedTool);
+    await fireEvent.click(screen.getByRole('button', { name: 'View in standard tuning' }));
+    await tick();
+    caged.chooseShape('A');
+    await fireEvent.click(triadSwitch());
+    await tick();
+    expect(caged.display.triad?.handoff ?? null).toBeNull();
+    expect(openButton()).toBeNull();
   });
 });

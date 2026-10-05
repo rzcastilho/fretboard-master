@@ -103,6 +103,11 @@
       />
     {/key}
   {/if}
+  {#if triads.notice?.kind === 'compare-off-for-shape'}
+    {#key triads.notice}
+      <Notice message={m.triads_notice_compare_off_for_shape()} ondismiss={triads.dismissNotice} />
+    {/key}
+  {/if}
   {#if triads.notice?.kind === 'compare-omitted'}
     {#key triads.notice}
       <Notice message={omittedMessage(triads.notice.notes)} ondismiss={triads.dismissNotice} />

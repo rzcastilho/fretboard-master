@@ -2,16 +2,33 @@
   interface Props {
     /** Group name: visible label and accessible name. */
     name: string;
-    options: readonly { value: T; label: string; ariaLabel?: string; disabled?: boolean }[];
+    options: readonly {
+      value: T;
+      label: string;
+      ariaLabel?: string;
+      disabled?: boolean;
+      /** Id of an element explaining this option (e.g. why it is disabled). */
+      describedby?: string;
+    }[];
     current: T;
     onchoose: (value: T) => void;
     /** Greyed and inert but still focusable and announced (aria-disabled, never `disabled`). */
     disabled?: boolean;
     /** Id of a hint element describing why the group is disabled. */
     describedby?: string;
+    /** Arrows, Home and End move focus onto disabled options too; only enabled ones are chosen. */
+    reachDisabled?: boolean;
   }
 
-  let { name, options, current, onchoose, disabled = false, describedby }: Props = $props();
+  let {
+    name,
+    options,
+    current,
+    onchoose,
+    disabled = false,
+    describedby,
+    reachDisabled = false
+  }: Props = $props();
 
   const NEXT: Readonly<Record<string, number>> = {
     ArrowRight: 1,
@@ -24,9 +41,14 @@
   function onkey(e: KeyboardEvent) {
     if (disabled) return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    const index = options.findIndex((o) => o.value === current);
+    const radios = (e.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>(
+      '[role="radio"]'
+    );
+    const focused = radios ? Array.from(radios).indexOf(e.currentTarget as HTMLElement) : -1;
+    const index =
+      reachDisabled && focused >= 0 ? focused : options.findIndex((o) => o.value === current);
     const n = options.length;
-    const enabled = (i: number) => !options[i].disabled;
+    const enabled = (i: number) => reachDisabled || !options[i].disabled;
     let next = -1;
     if (e.key in NEXT) {
       // Arrows skip disabled options (wrapping); none enabled → stay put.
@@ -42,10 +64,7 @@
     else return;
     e.preventDefault();
     if (next < 0) return;
-    onchoose(options[next].value);
-    const radios = (e.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>(
-      '[role="radio"]'
-    );
+    if (!options[next].disabled) onchoose(options[next].value);
     radios?.[next]?.focus();
   }
 </script>
@@ -64,6 +83,7 @@
       role="radio"
       aria-checked={current === o.value}
       aria-label={o.ariaLabel}
+      aria-describedby={o.describedby}
       aria-disabled={disabled || o.disabled ? 'true' : undefined}
       tabindex={current === o.value ? 0 : -1}
       onclick={() => {

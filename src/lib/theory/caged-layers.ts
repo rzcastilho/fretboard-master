@@ -19,12 +19,13 @@ import { SCALE_REGIONS, type CagedQuality, type ShapeOccurrence } from './caged'
 
 export { SCALE_REGIONS };
 
-export type CagedLayer = 'chord' | 'arpeggio' | 'pentatonic' | 'scale';
-export type MelodicLayer = Exclude<CagedLayer, 'chord'>;
+export type CagedLayer = 'triad' | 'chord' | 'arpeggio' | 'pentatonic' | 'scale';
+export type MelodicLayer = 'arpeggio' | 'pentatonic' | 'scale';
 export type ScaleDegree = 'R' | '2' | '3' | 'b3' | '4' | '5' | '6' | 'b6' | '7' | 'b7';
 
 /** Higher priority wins a shared position (FR-009). */
 export const LAYER_PRIORITY: readonly CagedLayer[] = Object.freeze([
+  'triad',
   'chord',
   'arpeggio',
   'pentatonic',

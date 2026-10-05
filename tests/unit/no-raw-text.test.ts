@@ -98,3 +98,35 @@ describe('no raw user-facing text in Svelte components', () => {
     });
   }
 });
+
+describe('triad layer strings (018)', () => {
+  const triadComponent = 'src/lib/tools/caged/CagedTriadSets.svelte';
+  const catalog = JSON.parse(readFileSync('messages/en.json', 'utf8')) as Record<string, string>;
+  const triadKeys = Object.keys(catalog).filter((key) => key.startsWith('caged_triad_'));
+
+  it('scans the triad selector component', () => {
+    expect(svelteFiles('src')).toContain(triadComponent);
+    expect(findRawText(readFileSync(triadComponent, 'utf8'))).toEqual([]);
+  });
+
+  it('every caged_triad_* catalog message is used outside the catalog', () => {
+    const sources = [
+      ...svelteFiles('src'),
+      'src/lib/state/caged-triad.ts',
+      'src/lib/state/caged-model.ts',
+      'src/lib/state/caged.svelte.ts'
+    ]
+      .map((file) => readFileSync(file, 'utf8'))
+      .join('\n');
+    expect(triadKeys.length).toBeGreaterThan(0);
+    for (const key of triadKeys) expect(sources, key).toContain(key);
+  });
+
+  it('the pure theory module imports nothing from the app layers (R-15)', () => {
+    const imports = [
+      ...readFileSync('src/lib/theory/caged-triad.ts', 'utf8').matchAll(/from '([^']+)'/g)
+    ].map((match) => match[1]);
+    expect(imports.length).toBeGreaterThan(0);
+    for (const spec of imports) expect(spec, spec).toMatch(/^\.\.?\//);
+  });
+});

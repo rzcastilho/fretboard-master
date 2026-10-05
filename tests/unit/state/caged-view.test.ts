@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CHORD_ONLY } from '../../../src/lib/state/caged-layers';
 import {
   CAGED_QUALITIES,
   cagedRootSpelling,
@@ -13,6 +14,7 @@ import {
   setLabelType,
   setLayers,
   setQuality,
+  setTriadSet,
   switchSpelling,
   type CagedViewState
 } from '../../../src/lib/state/caged-view';
@@ -30,7 +32,8 @@ describe('caged view state', () => {
       quality: 'major',
       focus: null,
       connections: false,
-      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false },
+      layers: { chord: true, arpeggio: false, pentatonic: false, scale: false, triad: false },
+      triadSet: null,
       labelType: 'interval'
     });
     expect(CAGED_QUALITIES).toEqual(['major', 'minor']);
@@ -174,7 +177,7 @@ describe('caged view state', () => {
 });
 
 describe('caged view: layers and label type', () => {
-  const all = { chord: true, arpeggio: true, pentatonic: true, scale: true };
+  const all = { chord: true, arpeggio: true, pentatonic: true, scale: true, triad: false };
 
   it('CAGED_LABEL_TYPES', () => {
     expect(CAGED_LABEL_TYPES).toEqual(['interval', 'name']);
@@ -214,5 +217,41 @@ describe('caged view: layers and label type', () => {
     expect(equalsCagedView(s, setLayers(s, all))).toBe(false);
     expect(equalsCagedView(s, setLabelType(s, 'name'))).toBe(false);
     expect(equalsCagedView(s, { ...s, layers: { ...s.layers } })).toBe(true);
+  });
+});
+
+describe('triad layer view state (data-model §2)', () => {
+  it('Triad is off and triadSet null initially and after reset', () => {
+    const s = initialCagedView();
+    expect(s.layers.triad).toBe(false);
+    expect(s.triadSet).toBeNull();
+    const on = { ...s, layers: { ...s.layers, triad: true }, triadSet: 3 };
+    const r = resetCaged();
+    expect(r.layers.triad).toBe(false);
+    expect(r.triadSet).toBeNull();
+    expect(equalsCagedView(on, r)).toBe(false);
+  });
+
+  it('CHORD_ONLY.triad is false', () => {
+    expect(CHORD_ONLY.triad).toBe(false);
+  });
+
+  it('setTriadSet returns the same reference when equal', () => {
+    const s = initialCagedView();
+    expect(setTriadSet(s, null)).toBe(s);
+    const t = setTriadSet(s, 3);
+    expect(t).not.toBe(s);
+    expect(t.triadSet).toBe(3);
+    expect(setTriadSet(t, 3)).toBe(t);
+    expect(setTriadSet(t, null).triadSet).toBeNull();
+  });
+
+  it('equalsLayers and equalsCagedView compare triad and triadSet', () => {
+    const a = initialCagedView();
+    expect(equalsLayers(a.layers, { ...a.layers, triad: true })).toBe(false);
+    expect(equalsLayers(a.layers, { ...a.layers })).toBe(true);
+    expect(equalsCagedView(a, setLayers(a, { ...a.layers, triad: true }))).toBe(false);
+    expect(equalsCagedView(a, setTriadSet(a, 4))).toBe(false);
+    expect(equalsCagedView(setTriadSet(a, 4), setTriadSet(a, 4))).toBe(true);
   });
 });

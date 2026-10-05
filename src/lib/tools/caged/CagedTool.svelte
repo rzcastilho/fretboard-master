@@ -7,7 +7,7 @@
   import { STANDARD_GUITAR, type Position } from '$lib/instrument/instrument';
   import { maybeFault } from '$lib/shell/fault';
   import { caged } from '$lib/state/caged.svelte';
-  import { openTriadsFromCaged } from '$lib/state/links.svelte';
+  import { openTriadsFromCaged, openTriadsFromCagedTriad } from '$lib/state/links.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { preferences } from '$lib/state/preferences.svelte';
@@ -19,6 +19,7 @@
   import CagedControls from './CagedControls.svelte';
   import CagedFocusControls from './CagedFocusControls.svelte';
   import CagedLayerList from './CagedLayerList.svelte';
+  import CagedTriadSets from './CagedTriadSets.svelte';
   import ChoiceGroup from '../ChoiceGroup.svelte';
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
@@ -145,6 +146,13 @@
     extraSampleShown={caged.display.extraSampleShown}
     ontoggle={(layer) => caged.toggleLayer(layer)}
   />
+  {#if caged.display.triad}
+    <CagedTriadSets
+      triad={caged.display.triad}
+      onselect={(set) => caged.selectTriadSet(set)}
+      onopen={() => openTriadsFromCagedTriad()}
+    />
+  {/if}
   <button
     type="button"
     class="conn-switch"

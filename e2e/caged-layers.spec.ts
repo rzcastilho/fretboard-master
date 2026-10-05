@@ -11,20 +11,21 @@ const shape = (page: Page, name: string) =>
 const live = (page: Page) => board(page).locator('[aria-live="polite"]');
 
 test.describe('caged layers US2: layer switches double as the legend', () => {
-  test('US2-1: four rows, Chord on and disabled, the rest off and enabled', async ({ page }) => {
+  test('US2-1: five rows, Chord on and disabled, the rest off and enabled', async ({ page }) => {
     await page.goto('/caged');
     await expect(layers(page).getByRole('switch')).toHaveText([
       /Chord\s*On/,
       /Arpeggio\s*Off/,
       /Pentatonic\s*Off/,
-      /Scale\s*Off/
+      /Scale\s*Off/,
+      /Triad\s*Off/
     ]);
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-checked', 'true');
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-disabled', 'true');
     await expect(layerSwitch(page, 'Chord')).toHaveAccessibleDescription(
       'At least one layer stays on.'
     );
-    for (const name of ['Arpeggio', 'Pentatonic', 'Scale'])
+    for (const name of ['Arpeggio', 'Pentatonic', 'Scale', 'Triad'])
       await expect(layerSwitch(page, name)).not.toHaveAttribute('aria-disabled', 'true');
   });
 
@@ -44,8 +45,8 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
   test('US2-3: every row carries an aria-hidden 44x44 sample marker', async ({ page }) => {
     await page.goto('/caged');
     const rows = layers(page).getByRole('switch');
-    await expect(rows).toHaveCount(4);
-    for (let i = 0; i < 4; i++) {
+    await expect(rows).toHaveCount(5);
+    for (let i = 0; i < 5; i++) {
       const sample = rows.nth(i).locator('svg.marker-sample');
       await expect(sample).toHaveAttribute('aria-hidden', 'true');
       const box = await sample.boundingBox();

@@ -147,8 +147,11 @@ describe('CAGED layer change sentence (US2, R-12)', () => {
     const ctx = { tuningName: 'Standard', temporary: false };
     const view = initialCagedView();
     const text = (change: { layer: 'chord' | 'arpeggio'; on: boolean } | null) =>
-      buildCagedModel(view, STANDARD_GUITAR, ctx, null, { reveal: null, layerChange: change }).model
-        ?.description as string;
+      buildCagedModel(view, STANDARD_GUITAR, ctx, null, {
+        reveal: null,
+        layerChange: change,
+        triadChange: null
+      }).model?.description as string;
     expect(text({ layer: 'arpeggio', on: true }).startsWith('Arpeggio layer on. ')).toBe(true);
     expect(text({ layer: 'arpeggio', on: false }).startsWith('Arpeggio layer off. ')).toBe(true);
     expect(text({ layer: 'chord', on: true }).startsWith('Chord layer on. ')).toBe(true);
@@ -163,7 +166,7 @@ describe('CAGED layers and counts sentences (US6, R-12)', () => {
     const ctx = { tuningName: 'Standard', temporary: false };
     const view = {
       ...initialCagedView(),
-      layers: { chord: true, arpeggio: true, pentatonic: false, scale: false }
+      layers: { chord: true, arpeggio: true, pentatonic: false, scale: false, triad: false }
     };
     const text = buildCagedModel(view, STANDARD_GUITAR, ctx).model?.description as string;
     const at = (s: string) => text.indexOf(s);

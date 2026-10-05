@@ -24,6 +24,14 @@ import {
 } from './caged-layers';
 import type { CagedLayer } from '../theory/caged-layers';
 import {
+  defaultTriadSet,
+  selectedTriad,
+  settleTriadSet,
+  triadAvailability,
+  triadRevealIds
+} from './caged-triad';
+import type { StringSetId } from '../instrument/string-sets';
+import {
   STEP_WINDOW_MS,
   focusFromLetter,
   focusOfIndex,
@@ -43,8 +51,10 @@ import {
   setLabelType,
   setLayers,
   setQuality,
+  setTriadSet,
   switchSpelling,
   CAGED_LABEL_TYPES,
+  cagedRootSpelling,
   type CagedLabelType,
   type CagedViewState
 } from './caged-view';
@@ -63,6 +73,8 @@ let reveal = $state.raw<CagedExtras['reveal']>(null);
 let revealTimer: ReturnType<typeof setTimeout> | null = null;
 /** The last layer change (or automatic Chord restore), announced first; never part of the view. */
 let layerChange = $state.raw<CagedExtras['layerChange']>(null);
+/** The last Triad set selection, announced first; never part of the view. */
+let triadChange = $state.raw<CagedExtras['triadChange']>(null);
 
 /** Stagger the intro of `ids` for `REVEAL_WINDOW_MS`; nothing to reveal leaves it null. */
 function startReveal(ids: readonly string[]): void {
@@ -82,6 +94,7 @@ function clearLayerTransients(): void {
   }
   reveal = null;
   layerChange = null;
+  triadChange = null;
 }
 let preferred = $state.raw<Instrument>(STANDARD_GUITAR);
 let tuningName = $state<string>('Standard');
@@ -110,7 +123,8 @@ const effectiveName = $derived<string>(
 const display = $derived<CagedDisplay>(
   buildCagedModel(view, instrument, { tuningName: effectiveName, temporary }, transition, {
     reveal,
-    layerChange
+    layerChange,
+    triadChange
   })
 );
 
@@ -120,9 +134,39 @@ const display = $derived<CagedDisplay>(
  */
 function settleLayers(): void {
   const { layers, restoredChord } = ensureDrawable(view.layers, view.focus !== null);
-  if (!restoredChord) return;
-  view = setLayers(view, layers);
-  layerChange = { layer: 'chord', on: true };
+  if (restoredChord) {
+    view = setLayers(view, layers);
+    layerChange = { layer: 'chord', on: true };
+  }
+  settleTriad();
+}
+
+/**
+ * Keep the Triad set valid for the focused occurrence (R-05). A set that became unavailable moves
+ * to the default with an announcement and no reveal; when no set is available the stored set is
+ * kept for the next shape and the unavailable state is announced. Reads the view only.
+ */
+function settleTriad(): void {
+  if (!view.layers.triad || view.focus === null) return;
+  const { set, moved } = settleTriadSet(view.triadSet, currentAvailability());
+  if (moved && set !== null) {
+    const from = view.triadSet ?? set;
+    view = setTriadSet(view, set);
+    triadChange = { kind: 'moved', set, from };
+    return;
+  }
+  if (set !== view.triadSet) view = setTriadSet(view, set);
+  if (set !== null && currentTriad() === null) triadChange = { kind: 'unavailable', set };
+}
+
+/** Triad availability of every string set for the focused occurrence. */
+function currentAvailability(): ReturnType<typeof triadAvailability> {
+  return triadAvailability(display.focused, instrument, cagedRootSpelling(view), view.quality);
+}
+
+/** The triad of the selected set for the focused occurrence, else null. */
+function currentTriad(): ReturnType<typeof selectedTriad> {
+  return selectedTriad(view.triadSet, currentAvailability());
 }
 
 /** Apply a transition; a changed view stops playback, a no-op does nothing. */
@@ -215,7 +259,29 @@ export const caged = {
     clearLayerTransients();
     view = setLayers(view, next);
     layerChange = { layer, on: next[layer] };
+    if (layer === 'triad') {
+      view = setTriadSet(view, next.triad ? defaultTriadSet(currentAvailability()) : null);
+      if (next.triad) startReveal(triadRevealIds(currentTriad()));
+      return;
+    }
     if (next[layer]) startReveal(revealOrder(before, display.positions));
+  },
+  /** The last Triad set change to announce, else null. */
+  get triadChange(): CagedExtras['triadChange'] {
+    return triadChange;
+  },
+  /**
+   * Pick a Triad string set. A no-op while Triad is off, for an unavailable set or the set already
+   * selected. Never stops playback (R-15).
+   */
+  selectTriadSet(id: StringSetId): void {
+    if (!view.layers.triad || view.focus === null || view.triadSet === id) return;
+    if (!currentAvailability().some((a) => a.set === id && a.triad !== null)) return;
+    clearTransition();
+    clearLayerTransients();
+    view = setTriadSet(view, id);
+    triadChange = { kind: 'selected', set: id };
+    startReveal(triadRevealIds(currentTriad()));
   },
   switchSpelling(): void {
     apply(switchSpelling(view));
@@ -281,6 +347,7 @@ export const caged = {
     const occs = cagedOccurrencesFor(view, instrument);
     const focus = reresolveFocus(prev, prevFocus, occs);
     commitFocus(focus);
+    settleTriad();
     if (prev === null || focus === null) return false;
     const now = display.focused;
     return now !== null && (now.shape.id !== prev.shape.id || now.start !== prev.start);
@@ -306,6 +373,7 @@ export const caged = {
     temporary = false;
     clearTransition();
     clearFocusIfUnsupported();
+    settleTriad();
     playback.stop('instrument');
   },
   /** A real screen change ends the temporary view. */

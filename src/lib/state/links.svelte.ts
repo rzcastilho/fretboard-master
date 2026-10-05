@@ -48,6 +48,17 @@ export async function openTriadsFromCaged(): Promise<void> {
   await goto(resolve('/triads'));
 }
 
+/**
+ * CAGED "Open in Triads": carry the drawn triad (root, quality, inversion, set, occurrence) into
+ * Triads, then open it. CAGED state is untouched; no handoff (no triad, temporary view) is a no-op.
+ */
+export async function openTriadsFromCagedTriad(): Promise<void> {
+  const h = caged.display.triad?.handoff ?? null;
+  if (h === null) return;
+  triads.carryCagedTriad(h);
+  await goto(resolve('/triads'));
+}
+
 /** Reset the given tool's store (failure-view Reset tool, EC-1.3). */
 export function resetTool(tool: LinkedTool): void {
   if (tool === 'notes') notes.reset();

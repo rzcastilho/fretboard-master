@@ -1,3 +1,4 @@
+import { must } from '../must';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AF_4, NC_UNISON, SHORT_7 } from '../../../src/lib/instrument/fixtures';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
@@ -5,6 +6,8 @@ import type { Offsets } from '../../../src/lib/instrument/custom-tuning';
 import { tuningFromOffsets, tuningInstrument } from '../../../src/lib/instrument/tunings';
 import { LISTEN_BPM } from '../../../src/lib/state/listen';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
+import { carryCagedTriad } from '../../../src/lib/state/links';
+import type { TriadsHandoff } from '../../../src/lib/state/caged-triad';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
 
 beforeEach(() => {
@@ -527,5 +530,37 @@ describe('triads store with unusual custom tunings (011 US4)', () => {
     triads.useInstrument(tuned([0, 0, 0, 4, 0, 0]));
     expect(triads.state.stringSet).toBe(5);
     expect(triads.display.shape.kind).toBe('shown');
+  });
+});
+
+describe('triads store: carryCagedTriad (US3)', () => {
+  const base: TriadsHandoff = {
+    rootPc: 0,
+    spelling: 'none',
+    quality: 'major',
+    inversion: 'root',
+    stringSet: 3,
+    occurrence: 0
+  };
+
+  it('applies the carry without a notice when Compare stays', () => {
+    triads.carryCagedTriad({ ...base, quality: 'minor', stringSet: 4 });
+    expect(triads.state).toMatchObject({ quality: 'minor', stringSet: 4, view: 'isolated' });
+    expect(triads.notice).toBeNull();
+  });
+
+  it('raises compare-off-for-shape only when Compare had to go off', () => {
+    triads.setCompare(true);
+    let h: TriadsHandoff | null = null;
+    for (const inversion of ['root', 'first', 'second'] as const)
+      for (let stringSet = 3; stringSet <= 6; stringSet++)
+        for (let occurrence = 0; occurrence < 3; occurrence++) {
+          const c = { ...base, inversion, stringSet, occurrence };
+          if (h === null && carryCagedTriad(triads.state, c, STANDARD_GUITAR).compareOff) h = c;
+        }
+    expect(h).not.toBeNull();
+    triads.carryCagedTriad(must(h));
+    expect(triads.state.compare.on).toBe(false);
+    expect(triads.notice).toEqual({ kind: 'compare-off-for-shape' });
   });
 });
