@@ -10,6 +10,7 @@ import type { ToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
 import { instrument } from './instrument.svelte';
 import { language } from './language.svelte';
+import { notation } from './notation.svelte';
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
 import { triads } from './triads.svelte';
@@ -19,6 +20,8 @@ let lastTool = $state<ToolId | null>(null);
 let noticeVisible = $state(false);
 /** Rotate hint (016): recorded value, or set for this load when storage is unavailable. */
 let rotateHintShown = $state(false);
+/** CAGED solfège note (021): recorded value, or set for this load when storage is unavailable. */
+let cagedNoteShown = $state(false);
 /** Set once, on the first unavailable start; never reset during the session (FR-012). */
 let noticeShown = false;
 
@@ -31,6 +34,9 @@ export const preferences = {
   },
   get rotateHintShown(): boolean {
     return rotateHintShown;
+  },
+  get cagedNoteShown(): boolean {
+    return cagedNoteShown;
   },
 
   /** Read once, apply, never write. Idempotent. */
@@ -51,8 +57,10 @@ export const preferences = {
     caged.restoreLabelType(p.labels.caged);
     caged.restoreTempo(p.tempo);
     language.start(p.language);
+    notation.start({ notation: p.notation, accidentals: p.accidentals });
     lastTool = p.lastTool;
     rotateHintShown = p.rotateHintShown;
+    cagedNoteShown = p.cagedNoteShown;
     if (!session.available && !noticeShown) {
       noticeShown = true;
       noticeVisible = true;
@@ -70,6 +78,13 @@ export const preferences = {
     if (rotateHintShown) return;
     rotateHintShown = true;
     session?.remember({ rotateHintShown: true });
+  },
+
+  /** Idempotent, fire-and-forget; the in-load flag holds even when storage is unavailable. */
+  markCagedNoteShown(): void {
+    if (cagedNoteShown) return;
+    cagedNoteShown = true;
+    session?.remember({ cagedNoteShown: true });
   },
 
   dismissNotice(): void {
@@ -101,8 +116,10 @@ export const preferences = {
       caged.restoreTempo(d.tempo);
     }
     language.restore(null);
+    notation.restore(null, 'sharps');
     lastTool = null;
     rotateHintShown = false;
+    cagedNoteShown = false;
   },
 
   remember(patch: PreferencesPatch): void {
@@ -115,6 +132,7 @@ export function resetPreferencesForTests(): void {
   session = null;
   lastTool = null;
   rotateHintShown = false;
+  cagedNoteShown = false;
   noticeVisible = false;
   noticeShown = false;
 }

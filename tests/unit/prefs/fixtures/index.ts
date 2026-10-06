@@ -7,6 +7,7 @@ import type { CagedLabelType } from '$lib/state/caged-view';
 import type { ToolId } from '$lib/shell/tools';
 import type { Tempo } from '$lib/state/listen';
 import type { LanguageTag } from '$lib/i18n/languages';
+import type { AccidentalPolicy, Notation } from '$lib/notation/policy';
 
 /**
  * Seed fixtures from specs/010-remembered-preferences/contracts/storage-format.md.
@@ -40,6 +41,12 @@ export interface ExpectedPreferences {
   readonly tempo: Tempo;
   /** 020: absent or invalid in a record → null (no stored choice). */
   readonly language: LanguageTag | null;
+  /** 021: absent or invalid in a record → null (follow the language). */
+  readonly notation: Notation | null;
+  /** 021: absent or invalid in a record → 'sharps'. */
+  readonly accidentals: AccidentalPolicy;
+  /** 021: stored as `cagedNote`; absent or invalid in a record → false. */
+  readonly cagedNoteShown: boolean;
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -69,7 +76,10 @@ const defaults: ExpectedPreferences = {
   orientation: 'highest-top',
   rotateHintShown: false,
   tempo: 'medium',
-  language: null
+  language: null,
+  notation: null,
+  accidentals: 'sharps',
+  cagedNoteShown: false
 };
 
 function load(name: string): string {
@@ -103,7 +113,10 @@ export const FIXTURES: readonly PrefsFixture[] = [
     orientation: 'highest-top',
     rotateHintShown: false,
     tempo: 'medium',
-    language: null
+    language: null,
+    notation: null,
+    accidentals: 'sharps',
+    cagedNoteShown: false
   }),
   fixture('bad-volume', { ...defaults, tuningId: 'AF-2' }),
   fixture('garbage', defaults),
@@ -185,7 +198,15 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('language-pt', { ...defaults, language: 'pt-BR' }),
   fixture('language-es', { ...defaults, language: 'es' }),
   fixture('bad-language', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
-  fixture('language-number', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true })
+  fixture('language-number', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
+  // 021 notation, accidentals and CAGED note: each written only when non-default
+  fixture('notation-solfege', { ...defaults, notation: 'solfege' }),
+  fixture('notation-letters', { ...defaults, notation: 'letters' }),
+  fixture('accidentals-flats', { ...defaults, accidentals: 'flats' }),
+  fixture('accidentals-both', { ...defaults, accidentals: 'both' }),
+  fixture('bad-notation', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
+  fixture('bad-accidentals', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
+  fixture('caged-note', { ...defaults, cagedNoteShown: true })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

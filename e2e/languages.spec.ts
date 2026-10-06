@@ -283,20 +283,23 @@ for (const tag of ['en', 'pt-BR', 'es'] as const) {
       await expect(
         dialog.getByRole('radio', { name: new RegExp(`^${text(tag, 'tuning_af1')}:`) })
       ).toBeAttached();
-      await expect(dialog.getByRole('radio', { name: /^Drop D:/ })).toBeAttached();
-      expect(text(tag, 'tuning_af4')).toBe('Drop D');
+      // 021: the tuning's note follows the default notation (solfège in es only).
+      const drop = { en: 'Drop D', 'pt-BR': 'Drop D', es: 'Drop Re' }[tag];
+      await expect(dialog.getByRole('radio', { name: new RegExp(`^${drop}:`) })).toBeAttached();
+      expect(text(tag, 'tuning_af4')).toBe('Drop {note}');
     });
 
-    test('root label is R in English and T in Portuguese and Spanish; note names unchanged', async ({
+    test('root label is R in English and T in Portuguese and Spanish; note names follow the language default', async ({
       page
     }) => {
       await page.goto('/triads');
       const root = tag === 'en' ? 'R' : 'T';
       expect(text(tag, 'interval_root')).toBe(root);
       await expect(board(page).getByText(root, { exact: true }).first()).toBeAttached();
-      // Letter note names, never solfège (slice 002).
-      await expect(board(page).getByRole('gridcell', { name: /^C\b/ }).first()).toBeAttached();
-      await expect(board(page).getByText(/^(Dó|Do|Ré|Re)$/)).toHaveCount(0);
+      // 021: note names follow the language default: letters in en and pt-BR, solfège in es.
+      const c = { en: /^C\b/, 'pt-BR': /^C\b/, es: /^Do\b/ }[tag];
+      await expect(board(page).getByRole('gridcell', { name: c }).first()).toBeAttached();
+      if (tag !== 'es') await expect(board(page).getByText(/^(Dó|Do|Ré|Re)$/)).toHaveCount(0);
     });
 
     test('accidental symbols are unchanged in every language', async ({ page }) => {

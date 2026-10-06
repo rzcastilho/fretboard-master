@@ -3,6 +3,7 @@
   import AppNav from './AppNav.svelte';
   import InstrumentButton from './InstrumentButton.svelte';
   import LanguagePanel from './LanguagePanel.svelte';
+  import NotationToggle from './NotationToggle.svelte';
   import TuningBadge from './TuningBadge.svelte';
   import FailureView from './FailureView.svelte';
   import { recordFailure } from './failure';
@@ -31,6 +32,7 @@
   <TuningBadge />
   <StopButton />
   <SoundControl />
+  <NotationToggle />
   <LanguagePanel />
 </header>
 

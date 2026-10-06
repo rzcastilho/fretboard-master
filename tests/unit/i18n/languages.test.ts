@@ -5,6 +5,7 @@ import {
   BASE_LANGUAGE,
   LANGUAGES,
   LANGUAGE_TAGS,
+  defaultNotation,
   isLanguageTag,
   matchDeviceLanguage
 } from '../../../src/lib/i18n/languages';
@@ -83,5 +84,17 @@ describe('LANGUAGES', () => {
     ) as { locales: string[] };
     expect([...locales]).toEqual([...LANGUAGE_TAGS]);
     expect(settings.locales).toEqual([...LANGUAGE_TAGS]);
+  });
+});
+
+describe('defaultNotation (021)', () => {
+  it('gives letters for English and Brazilian Portuguese, solfège for Spanish', () => {
+    expect(defaultNotation('en')).toBe('letters');
+    expect(defaultNotation('pt-BR')).toBe('letters');
+    expect(defaultNotation('es')).toBe('solfege');
+  });
+
+  it('every language entry carries a notation', () => {
+    for (const l of LANGUAGES) expect(['letters', 'solfege']).toContain(l.notation);
   });
 });

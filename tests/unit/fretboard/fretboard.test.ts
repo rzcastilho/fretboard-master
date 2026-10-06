@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { readFileSync } from 'node:fs';
 import { tick } from 'svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  overwriteNotationSource,
+  resetNotationSourceForTests
+} from '../../../src/lib/notation/notation';
+import type { AccidentalPolicy } from '../../../src/lib/notation/policy';
 import {
   DEFAULT_METRICS,
   layoutFretboard,
@@ -2228,5 +2233,153 @@ describe('Fretboard triad layer (018 US1)', () => {
     const { container } = render(MarkerSample, { fn: 'root', layer: 'triad' });
     expect(container.querySelector('svg.layer-triad')).not.toBeNull();
     expect(container.querySelector('svg.layer-arpeggio')).toBeNull();
+  });
+});
+
+describe('Fretboard accidental policy (021 F-1, F-2, F-4)', () => {
+  const policy = (accidentals: AccidentalPolicy) =>
+    overwriteNotationSource(() => ({ notation: 'letters', accidentals }));
+  afterEach(() => resetNotationSourceForTests());
+
+  // string 1 fret 2 = F♯ (unspelled)
+  const model = (spellingPolicy?: 'preference'): DisplayModel => ({
+    markers: [{ string: 1, fret: 2, function: 'neutral', emphasis: 'highlighted' }],
+    labelMode: 'note',
+    ...(spellingPolicy ? { spellingPolicy } : {})
+  });
+  const labelOf = (container: Element) =>
+    [...container.querySelectorAll('.marker-label')].map((n) => n.textContent);
+
+  it('F-1: without spellingPolicy the output ignores the preference', () => {
+    policy('flats');
+    const { container } = render(Fretboard, { instrument: STANDARD_GUITAR, model: model() });
+    expect(labelOf(container)).toEqual(['F♯']);
+    expect(screen.getByRole('gridcell', { name: 'F sharp, string 1, fret 2, note' })).toBeTruthy();
+  });
+
+  it('F-2: preference draws the marker label per policy', () => {
+    for (const [p, label] of [
+      ['sharps', 'F♯'],
+      ['flats', 'G♭'],
+      ['both', 'F♯G♭']
+    ] as const) {
+      policy(p);
+      const { container, unmount } = render(Fretboard, {
+        instrument: STANDARD_GUITAR,
+        model: model('preference')
+      });
+      expect(labelOf(container)).toEqual([label]);
+      unmount();
+    }
+  });
+
+  it('T052: labels render through fitMarkerLabel with a size class, stacked as two tspans', () => {
+    policy('both');
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model('preference')
+    });
+    const label = container.querySelector('text.marker-label');
+    expect(label?.classList.contains('min')).toBe(true);
+    expect([...(label?.querySelectorAll('tspan') ?? [])].map((t) => t.textContent)).toEqual([
+      'F♯',
+      'G♭'
+    ]);
+    expect(label?.getAttribute('aria-hidden')).toBe('true');
+    // Accessible name carries the full spoken pair, never the abbreviation.
+    expect(
+      screen.getByRole('gridcell', { name: 'F sharp or G flat, string 1, fret 2, note' })
+    ).toBeTruthy();
+  });
+
+  it('T052: a single short label is normal size on one text node', () => {
+    policy('sharps');
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: model('preference')
+    });
+    const label = container.querySelector('text.marker-label');
+    expect(label?.classList.contains('normal')).toBe(true);
+    expect(label?.querySelectorAll('tspan')).toHaveLength(0);
+  });
+
+  it('T052: a long label is abbreviated visually but named in full', () => {
+    overwriteNotationSource(() => ({ notation: 'solfege', accidentals: 'sharps' }));
+    const { container } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: {
+        markers: [{ string: 1, fret: 4, function: 'neutral', emphasis: 'highlighted' }],
+        labelMode: 'octave',
+        spellingPolicy: 'preference'
+      }
+    });
+    expect(container.querySelector('text.marker-label')?.textContent).toBe('So♯4');
+    expect(
+      screen.getByRole('gridcell', { name: 'Sol sharp, string 1, fret 4, note' })
+    ).toBeTruthy();
+  });
+
+  it('F-2: cell name uses the spoken pair under both, single spelling otherwise', () => {
+    policy('both');
+    render(Fretboard, { instrument: STANDARD_GUITAR, model: model('preference') });
+    expect(
+      screen.getByRole('gridcell', { name: 'F sharp or G flat, string 1, fret 2, note' })
+    ).toBeTruthy();
+  });
+
+  it('F-2: the hover hint shows the single spelling (sharp under both, flat under flats)', async () => {
+    for (const [p, hint] of [
+      ['both', 'F♯'],
+      ['flats', 'G♭']
+    ] as const) {
+      policy(p);
+      const { container, unmount } = render(Fretboard, {
+        instrument: STANDARD_GUITAR,
+        model: model('preference')
+      });
+      const svg = screen.getByRole('grid');
+      ptr(svg, 'pointermove', { ...center(1, 2), type: 'mouse' });
+      await tick();
+      expect(container.querySelector('.hover-hint')?.textContent).toBe(hint);
+      unmount();
+    }
+  });
+
+  it('F-4: nut labels follow the policy only for a custom (non-fixed) tuning', () => {
+    policy('flats');
+    const custom = {
+      ...STANDARD_GUITAR,
+      fixedSpelling: false,
+      openStrings: [
+        ...STANDARD_GUITAR.openStrings.slice(0, 5),
+        { letter: 'D', accidental: 1, octave: 2 } as const
+      ]
+    };
+    const labels = (instrument: typeof custom, spellingPolicy?: 'preference') => {
+      const { container, unmount } = render(Fretboard, {
+        instrument,
+        model: { markers: [], labelMode: 'note', ...(spellingPolicy ? { spellingPolicy } : {}) }
+      });
+      const out = [...container.querySelectorAll('.string-label')].map((n) => n.textContent);
+      unmount();
+      return out[5];
+    };
+    expect(labels(custom, 'preference')).toBe('6 E♭');
+    expect(labels({ ...custom, fixedSpelling: true }, 'preference')).toBe('6 D♯');
+    expect(labels(custom)).toBe('6 D♯');
+  });
+
+  it('F-4: a preset keeps its own spelling (Half step down is E♭ under every policy)', () => {
+    const half = presetInstrument('AF-2', 6, 22);
+    for (const p of ['sharps', 'flats', 'both'] as const) {
+      policy(p);
+      const { container, unmount } = render(Fretboard, {
+        instrument: half,
+        model: { markers: [], labelMode: 'note', spellingPolicy: 'preference' }
+      });
+      const labels = [...container.querySelectorAll('.string-label')].map((n) => n.textContent);
+      expect(labels).toEqual(['1 E♭', '2 B♭', '3 G♭', '4 D♭', '5 A♭', '6 E♭']);
+      unmount();
+    }
   });
 });

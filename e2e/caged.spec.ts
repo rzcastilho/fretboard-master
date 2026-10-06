@@ -581,3 +581,80 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
     await expect(tags(page)).toHaveCount(9);
   });
 });
+
+test.describe('caged US5 (021): solfège note', () => {
+  const PREFS_KEY = 'fretboard-master:prefs';
+  const NOTE = /The shapes are named after the open chords C \(Do\), A \(La\), G \(Sol\)/;
+  const base = {
+    version: 1,
+    tuning: 'AF-1',
+    frets: 22,
+    muted: false,
+    volume: 0.8,
+    labels: { notes: 'name', triads: 'interval' }
+  };
+  const seed = (page: Page, extra: object) =>
+    page.addInitScript(
+      ([key, value]) => {
+        if (localStorage.getItem(key as string) === null) {
+          localStorage.setItem(key as string, value as string);
+        }
+      },
+      [PREFS_KEY, JSON.stringify({ ...base, ...extra })]
+    );
+  const stored = (page: Page) => page.evaluate((k) => localStorage.getItem(k) ?? '', PREFS_KEY);
+  const note = (page: Page) => page.getByRole('status').filter({ hasText: NOTE });
+
+  test('US5-1/2: tags keep "E shape"; the note shows once, then never after a reload', async ({
+    page
+  }) => {
+    await seed(page, { notation: 'solfege' });
+    await page.goto('/caged');
+    await expect(note(page)).toBeVisible();
+    await expect(
+      board(page)
+        .getByText(/^E shape/)
+        .first()
+    ).toBeVisible();
+    await expect(board(page).getByText(/^Mi shape/)).toHaveCount(0);
+    await expect.poll(() => stored(page)).toContain('"cagedNote":true');
+    await page.reload();
+    await expect(board(page)).toBeVisible();
+    await expect(note(page)).toHaveCount(0);
+  });
+
+  test('US5-3: shows on a letters → solfège switch while CAGED is open', async ({ page }) => {
+    await page.goto('/caged');
+    await expect(board(page)).toBeVisible();
+    await expect(note(page)).toHaveCount(0);
+    await page
+      .getByRole('button', { name: /^Language/ })
+      .first()
+      .click();
+    await page
+      .locator('div[role="region"][id^="language-panel-"]')
+      .getByRole('radio', { name: 'Solfège' })
+      .check();
+    await expect(note(page)).toBeVisible();
+    await expect(note(page).getByRole('button', { name: 'Dismiss' })).toBeVisible();
+  });
+
+  test('US5-4: absent in letters', async ({ page }) => {
+    await page.goto('/caged');
+    await expect(board(page)).toBeVisible();
+    await expect(note(page)).toHaveCount(0);
+  });
+
+  test('US5-5: after Erase my preferences it may show again', async ({ page }) => {
+    await seed(page, { notation: 'solfege' });
+    await page.goto('/caged');
+    await expect(note(page)).toBeVisible();
+    await page.goto('/about');
+    await page.getByRole('button', { name: 'Erase my preferences' }).click();
+    await page.getByRole('button', { name: 'Erase', exact: true }).click();
+    await expect(page).toHaveURL('/');
+    expect(await stored(page)).not.toContain('cagedNote');
+    await page.goto('/caged');
+    await expect(note(page)).toBeVisible();
+  });
+});

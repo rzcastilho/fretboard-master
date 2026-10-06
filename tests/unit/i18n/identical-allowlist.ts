@@ -31,8 +31,12 @@ const SHARED: readonly string[] = [
   'caged_key_name'
 ];
 
+/** 021: syllables spelled the same as English (es: all seven; pt-BR: Mi, Sol, Si only). */
+const SOLFEGE_ES = ['c', 'd', 'e', 'f', 'g', 'a', 'b'].map((l) => `note_name_solfege_${l}`);
+const SOLFEGE_PT = ['e', 'g', 'b'].map((l) => `note_name_solfege_${l}`);
+
 export const IDENTICAL_ALLOWLIST: Readonly<Record<'pt-BR' | 'es', readonly string[]>> = {
   // "Volume" is the same word in Brazilian Portuguese.
-  'pt-BR': [...SHARED, 'sound_volume'],
-  es: SHARED
+  'pt-BR': [...SHARED, 'sound_volume', ...SOLFEGE_PT],
+  es: [...SHARED, ...SOLFEGE_ES]
 };

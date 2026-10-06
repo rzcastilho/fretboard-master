@@ -31,7 +31,8 @@ export const AF_21: Instrument = /* @__PURE__ */ Object.freeze({
     /* @__PURE__ */ open('B', 1)
   ]),
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  fixedSpelling: true
 });
 
 /** Drop D, strings 1 → 6, 22 frets (wide stretch, TM-5.7; the AF-4 preset). */
@@ -62,7 +63,8 @@ export const NC_UNISON: Instrument = /* @__PURE__ */ Object.freeze({
     /* @__PURE__ */ open('E', 2)
   ]),
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  fixedSpelling: true
 });
 
 /** Open G (D4 B3 G3 D3 G2 D2), strings 1 → 6, 22 frets. */
@@ -78,7 +80,8 @@ export const AF_8: Instrument = /* @__PURE__ */ Object.freeze({
     /* @__PURE__ */ open('D', 2)
   ]),
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  fixedSpelling: true
 });
 
 /** Standard tuning with only 7 frets (US5-3: few inversions fit, no message). */

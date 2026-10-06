@@ -3,16 +3,20 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LanguagePanel from '../../src/lib/shell/LanguagePanel.svelte';
 import { language, resetLanguageForTests } from '../../src/lib/state/language.svelte';
+import { notation, resetNotationForTests } from '../../src/lib/state/notation.svelte';
 import { resetPreferencesForTests } from '../../src/lib/state/preferences.svelte';
 
 beforeEach(() => {
   vi.restoreAllMocks();
   resetPreferencesForTests();
   resetLanguageForTests();
+  resetNotationForTests();
   language.start('en');
+  notation.start({ notation: null, accidentals: 'sharps' });
 });
 
 afterEach(() => {
+  resetNotationForTests();
   resetLanguageForTests();
 });
 
@@ -23,25 +27,29 @@ describe('LanguageButton + LanguagePanel', () => {
     render(LanguagePanel);
     expect(button().getAttribute('aria-expanded')).toBe('false');
     expect(button().getAttribute('aria-controls')).toBeTruthy();
-    expect(screen.queryByRole('region', { name: 'Language settings' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Language and notation' })).toBeNull();
   });
 
   it('opens a non-modal region (not a dialog) controlled by the button', async () => {
     const { container } = render(LanguagePanel);
     await fireEvent.click(button());
-    const panel = screen.getByRole('region', { name: 'Language settings' });
+    const panel = screen.getByRole('region', { name: 'Language and notation' });
     expect(button().getAttribute('aria-expanded')).toBe('true');
     expect(button().getAttribute('aria-controls')).toBe(panel.id);
     expect(container.querySelector('dialog')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(within(panel).getAllByRole('radio')).toHaveLength(3);
+    // 3 languages + 2 notations (accidentals arrive with US3)
+    expect(within(panel).getAllByRole('radio').length).toBeGreaterThanOrEqual(5);
+    expect(within(panel).getByRole('group', { name: 'Note names' })).toBeTruthy();
   });
 
   it('close button closes and returns focus to the language button', async () => {
     render(LanguagePanel);
     await fireEvent.click(button());
-    const panel = screen.getByRole('region', { name: 'Language settings' });
-    await fireEvent.click(within(panel).getByRole('button', { name: 'Close language settings' }));
+    const panel = screen.getByRole('region', { name: 'Language and notation' });
+    await fireEvent.click(
+      within(panel).getByRole('button', { name: 'Close language and notation settings' })
+    );
     flushSync();
     expect(screen.queryByRole('region')).toBeNull();
     expect(button().getAttribute('aria-expanded')).toBe('false');
@@ -51,7 +59,7 @@ describe('LanguageButton + LanguagePanel', () => {
   it('Escape inside the panel closes it and returns focus to the button', async () => {
     render(LanguagePanel);
     await fireEvent.click(button());
-    const panel = screen.getByRole('region', { name: 'Language settings' });
+    const panel = screen.getByRole('region', { name: 'Language and notation' });
     const radio = within(panel).getAllByRole('radio')[0] as HTMLElement;
     radio.focus();
     await fireEvent.keyDown(radio, { key: 'Escape' });
@@ -66,10 +74,19 @@ describe('LanguageButton + LanguagePanel', () => {
     await fireEvent.click(screen.getByRole('radio', { name: 'Español' }));
     flushSync();
     expect(language.current).toBe('es');
-    expect(screen.getByRole('region', { name: 'Ajustes de idioma' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Idioma y notación' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Idioma' }).getAttribute('aria-expanded')).toBe(
       'true'
     );
+  });
+
+  it('renders NotationSelector under the language selector', async () => {
+    render(LanguagePanel);
+    await fireEvent.click(button());
+    const panel = screen.getByRole('region', { name: 'Language and notation' });
+    const groups = within(panel).getAllByRole('group');
+    expect(groups[0]).toBe(within(panel).getByRole('group', { name: 'Language' }));
+    expect(groups[1]).toBe(within(panel).getByRole('group', { name: 'Note names' }));
   });
 
   it('opening and closing changes no history or URL', async () => {
@@ -79,7 +96,9 @@ describe('LanguageButton + LanguagePanel', () => {
     const length = history.length;
     render(LanguagePanel);
     await fireEvent.click(button());
-    await fireEvent.click(screen.getByRole('button', { name: 'Close language settings' }));
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Close language and notation settings' })
+    );
     flushSync();
     expect(push).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();

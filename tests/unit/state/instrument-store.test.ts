@@ -719,35 +719,44 @@ describe('instrument store: caged (US4)', () => {
 });
 
 describe('instrument store: CAGED tuning name (slice 015)', () => {
-  it('confirm passes the tuning label to caged.applyInstrument', () => {
+  it('confirm passes the Tuning to caged.applyInstrument', () => {
     const apply = vi.spyOn(caged, 'applyInstrument');
     instrument.open();
     instrument.selectTuning('AF-4');
     instrument.confirm('caged');
-    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-4', 6, 22), 'Drop D');
+    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-4', 6, 22), {
+      kind: 'preset',
+      id: 'AF-4'
+    });
   });
 
-  it('confirm of a presentation-only change also passes the label', () => {
+  it('confirm of a presentation-only change also passes the Tuning', () => {
     const apply = vi.spyOn(caged, 'applyInstrument');
     instrument.open();
     instrument.setFrets(12);
     instrument.confirm('caged');
-    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-1', 6, 12), 'Standard');
+    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-1', 6, 12), {
+      kind: 'preset',
+      id: 'AF-1'
+    });
   });
 
-  it('restore passes the label', () => {
+  it('restore passes the Tuning', () => {
     const apply = vi.spyOn(caged, 'applyInstrument');
     instrument.restore({
       ...DEFAULT_CONFIG,
       tuning: { kind: 'preset', id: 'AF-4' }
     });
-    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-4', 6, 22), 'Drop D');
+    expect(apply).toHaveBeenCalledWith(presetInstrument('AF-4', 6, 22), {
+      kind: 'preset',
+      id: 'AF-4'
+    });
   });
 });
 
 describe('instrument store: CAGED temporary tuning (slice 015 US1)', () => {
   const temporaryOpenG = () => {
-    resetCagedForTests(AF_8, 'Open G');
+    resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
     caged.viewInStandard();
     expect(caged.temporary).toBe(true);
   };
@@ -776,7 +785,7 @@ describe('instrument store: CAGED temporary tuning (slice 015 US1)', () => {
 
   it('viewInStandard and endTemporary never write preferences (SC-005)', () => {
     const remember = vi.spyOn(preferences, 'remember');
-    resetCagedForTests(AF_8, 'Open G');
+    resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
     caged.viewInStandard();
     caged.endTemporary();
     expect(remember).not.toHaveBeenCalled();

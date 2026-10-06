@@ -6,7 +6,13 @@
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
   import { HANDEDNESS, ORIENTATIONS } from '$lib/instrument/instrument';
   import { offsetsOfTuning, type StringCount } from '$lib/instrument/tunings';
-  import { noteLabel, pitchLabel, spokenNote, spokenNoteList } from '$lib/notation/notation';
+  import {
+    noteLabel,
+    pitchLabel,
+    spokenNote,
+    spokenNoteList,
+    stringSpelling
+  } from '$lib/notation/notation';
   import { invertedStrings, type StringNumber } from '$lib/instrument/custom-tuning';
   import { instrument } from '$lib/state/instrument.svelte';
   import FretStepper from './FretStepper.svelte';
@@ -26,16 +32,22 @@
 
   const selected = $derived(instrument.selectedRadio);
   const stringRows = $derived(
-    instrument.rows.map((row) => ({
-      ...row,
-      label: pitchLabel(row.pitch, row.pitch.octave),
-      noteName: m.instrument_string_note({
-        string: row.string,
-        note: spokenNote(row.pitch),
-        octave: row.pitch.octave
-      })
-    }))
+    instrument.rows.map((row) => {
+      // A preset keeps its own spelling; an unmatched custom tuning follows the preference.
+      const fixed = instrument.panel.open && instrument.panel.pending.tuning.kind === 'preset';
+      const pitch = { ...stringSpelling(row.pitch, fixed), octave: row.pitch.octave };
+      return {
+        ...row,
+        label: pitchLabel(pitch, pitch.octave),
+        noteName: m.instrument_string_note({
+          string: row.string,
+          note: spokenNote(pitch),
+          octave: pitch.octave
+        })
+      };
+    })
   );
+  const previewModel = { markers: [], labelMode: 'none', spellingPolicy: 'preference' } as const;
   const COUNTS: readonly StringCount[] = [6, 7];
   const outOfOrder = $derived(
     instrument.panel.open &&
@@ -264,7 +276,7 @@
       {#if instrument.preview}
         <figure class="preview">
           <figcaption>{m.instrument_preview_label()}</figcaption>
-          <Fretboard instrument={instrument.preview} variant="preview" />
+          <Fretboard instrument={instrument.preview} model={previewModel} variant="preview" />
         </figure>
       {/if}
       <div class="actions">

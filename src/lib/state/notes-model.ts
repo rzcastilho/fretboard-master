@@ -12,12 +12,13 @@ import {
   type Position
 } from '../instrument/instrument';
 import {
-  defaultSpelling,
-  flatSpelling,
+  markerSpellings,
   noteLabel,
   pitchLabel,
-  spokenNote,
-  spokenNoteList
+  singleSpelling,
+  spellingPair,
+  spokenMarkerList,
+  spokenNote
 } from '../notation/notation';
 import { octaveOf, pitchClass, type PitchClass, type Spelling } from '../theory/pitch';
 import type { Quality } from '../theory/triad';
@@ -31,9 +32,9 @@ export interface CardInfo {
   readonly position: Position;
   /** Pitch class 0–11 (for See every occurrence). */
   readonly pitchClass: PitchClass;
-  /** Sharp spelling. */
+  /** Preferred spelling (sharp under sharps and both, flat under flats). */
   readonly spelling: Spelling;
-  /** Flat spelling of the same pitch class when altered, else `null`. */
+  /** The other spelling of the same pitch class when altered, else `null`. */
   readonly altSpelling: Spelling | null;
   readonly octave: number;
   readonly unisons: readonly Position[];
@@ -54,7 +55,7 @@ export type { Quality };
 export interface DetectedTriad {
   readonly rootPc: PitchClass;
   readonly quality: Quality;
-  /** Notes primary spelling of the root. */
+  /** Root spelling per the accidental preference (sharp under both). */
   readonly rootSpelling: Spelling;
   /** Visible name, e.g. "G♯ augmented". */
   readonly name: string;
@@ -65,7 +66,7 @@ export interface DetectedTriad {
 export function detectedTriad(selection: readonly PitchClass[]): DetectedTriad | null {
   const match = detectTriad(selection);
   if (match === null) return null;
-  const rootSpelling = defaultSpelling(match.rootPc);
+  const rootSpelling = singleSpelling(match.rootPc);
   const quality = qualityName(match.quality);
   return {
     rootPc: match.rootPc,
@@ -97,12 +98,12 @@ export function cardInfo(s: NotesViewState, instrument: Instrument): CardInfo | 
   if (p === null) return null;
   const pitch = positionPitch(instrument, p);
   const pc = pitchClass(pitch);
-  const spelling = defaultSpelling(pc);
+  const [spelling, altSpelling = null] = spellingPair(pc);
   return {
     position: p,
     pitchClass: pc,
     spelling,
-    altSpelling: spelling.accidental === 0 ? null : flatSpelling(pc),
+    altSpelling,
     octave: octaveOf(pitch),
     unisons: unisonsOf(instrument, p),
     selected: s.selection.includes(pc)
@@ -199,7 +200,7 @@ function describe(
     const key = `notes_desc_background_${s.background}` as const;
     return m[key]({ strings, frets });
   }
-  const notes = spokenNoteList(s.selection.map(defaultSpelling));
+  const notes = spokenMarkerList(s.selection);
   const summary =
     highlighted.length === 1
       ? m.notes_desc_selected_one({ notes, strings, frets })
@@ -208,7 +209,10 @@ function describe(
     .sort((a, b) => b.string - a.string || a.fret - b.fret)
     .map((p) => {
       const pitch = positionPitch(instrument, p);
-      const note = pitchLabel(defaultSpelling(pitchClass(pitch)), octaveOf(pitch));
+      const octave = octaveOf(pitch);
+      const note = markerSpellings(pitchClass(pitch))
+        .map((sp) => pitchLabel(sp, octave))
+        .join(' / ');
       return p.fret === 0
         ? m.notes_desc_entry_open({ string: p.string, note })
         : m.notes_desc_entry({ string: p.string, fret: p.fret, note });
@@ -277,6 +281,7 @@ export function buildNotesModel(s: NotesViewState, instrument: Instrument): Note
     model: {
       ...(wholeNeck ? {} : { region: { start: s.region.start, end: s.region.end } }),
       markers,
+      spellingPolicy: 'preference',
       labelMode: s.hideNames ? 'none' : LABEL_MODE[s.labelType],
       hoverHint: !s.hideNames,
       description: info ? `${base} ${cardSentence(info)}` : base

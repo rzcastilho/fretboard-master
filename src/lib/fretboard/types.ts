@@ -68,6 +68,11 @@ export interface DisplayModel {
     /** 'center' → scroll the band to the viewport centre (CAGED focus). */
     readonly align?: 'center';
   };
+  /**
+   * `'preference'` → a marker without an explicit `spelling` follows the accidental preference
+   * (Notes only). Absent → sharps, byte-identical to before (021 F-1, FR-009).
+   */
+  readonly spellingPolicy?: 'preference';
   /** false → no hover hint (Hide names). Default true. */
   readonly hoverHint?: boolean;
   /** Replaces the computed text description verbatim. */

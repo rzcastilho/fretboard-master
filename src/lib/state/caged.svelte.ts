@@ -4,8 +4,13 @@
  * label type, `state/preferences.svelte`.
  */
 import { STANDARD_GUITAR, type Instrument, type Position } from '$lib/instrument/instrument';
-import { standardCounterpart, standardTuningId } from '$lib/instrument/tunings';
-import { tuningName as presetName } from '$lib/shell/tuning-names';
+import {
+  STANDARD_TUNING,
+  standardCounterpart,
+  standardTuningId,
+  type Tuning
+} from '$lib/instrument/tunings';
+import { tuningLabel, tuningName as presetName } from '$lib/shell/tuning-names';
 import { pitchOfSpelling, type PitchClass } from '$lib/theory/pitch';
 import { sharedPositions, type CagedQuality } from '$lib/theory/caged';
 import {
@@ -100,7 +105,8 @@ function clearLayerTransients(): void {
   triadChange = null;
 }
 let preferred = $state.raw<Instrument>(STANDARD_GUITAR);
-let tuningName = $state<string>('Standard');
+/** The applied tuning; the label is derived so a notation or language change updates it. */
+let tuning = $state.raw<Tuning>(STANDARD_TUNING);
 /** CAGED-local temporary standard view; never stored, never in the URL. */
 let temporary = $state<boolean>(false);
 /** Shared positions of the last step, shown for `STEP_WINDOW_MS`; never part of the view state. */
@@ -124,7 +130,9 @@ function clearTransition(): void {
 const instrument = $derived<Instrument>(temporary ? standardCounterpart(preferred) : preferred);
 
 const effectiveName = $derived<string>(
-  temporary ? presetName(standardTuningId(instrument.stringCount === 7 ? 7 : 6)) : tuningName
+  temporary
+    ? presetName(standardTuningId(instrument.stringCount === 7 ? 7 : 6))
+    : tuningLabel(tuning)
 );
 
 const display = $derived<CagedDisplay>(
@@ -418,12 +426,12 @@ export const caged = {
    * focused occurrence existed and the re-resolved one differs in letter or start. A tuning
    * that became non-compatible clears focus and returns false.
    */
-  applyInstrument(next: Instrument, name: string): boolean {
+  applyInstrument(next: Instrument, nextTuning: Tuning): boolean {
     const prev = display.focused;
     const prevFocus = view.focus;
     clearTransition();
     preferred = next;
-    tuningName = name;
+    tuning = nextTuning;
     if (prevFocus === null) return false;
     const occs = cagedOccurrencesFor(view, instrument);
     const focus = reresolveFocus(prev, prevFocus, occs);
@@ -434,10 +442,10 @@ export const caged = {
     return now !== null && (now.shape.id !== prev.shape.id || now.start !== prev.start);
   },
   /** Test-hook switch: stop playback (reason `instrument`), then apply. */
-  useInstrument(next: Instrument, name: string = tuningName): void {
-    if (next === preferred && name === tuningName) return;
+  useInstrument(next: Instrument, nextTuning: Tuning = tuning): void {
+    if (next === preferred && nextTuning === tuning) return;
     playback.stop('instrument');
-    this.applyInstrument(next, name);
+    this.applyInstrument(next, nextTuning);
   },
   /** Show the same key in the standard tuning; only from the non-compatible notice. */
   viewInStandard(): void {
@@ -470,10 +478,10 @@ export const caged = {
 /** Test seam: restore the initial view for `instrument` (Vitest only). */
 export function resetCagedForTests(
   next: Instrument = STANDARD_GUITAR,
-  name: string = 'Standard'
+  nextTuning: Tuning = STANDARD_TUNING
 ): void {
   preferred = next;
-  tuningName = name;
+  tuning = nextTuning;
   temporary = false;
   clearTransition();
   clearLayerTransients();

@@ -183,7 +183,7 @@ describe('InstrumentSummary (handedness)', () => {
 
 describe('TuningBadge: temporary CAGED variant', () => {
   const temporary = () => {
-    resetCagedForTests(AF_8, 'Open G');
+    resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
     caged.viewInStandard();
   };
 

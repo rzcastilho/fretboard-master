@@ -135,7 +135,7 @@ describe('CagedTool', () => {
       "CAGED depends on the standard relationship between the strings, so its shapes don't exist in Open G.";
 
     it('shows the notice and two buttons in zone C, keeping the controls', () => {
-      resetCagedForTests(AF_8, 'Open G');
+      resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
       render(CagedTool);
       const zone = screen.getByRole('region', { name: 'Fretboard' });
       const note = within(zone).getByRole('status');
@@ -160,7 +160,7 @@ describe('CagedTool', () => {
     });
 
     it('View in standard tuning calls viewInStandard and focuses zone C', async () => {
-      resetCagedForTests(AF_8, 'Open G');
+      resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
       const spy = vi.spyOn(caged, 'viewInStandard');
       render(CagedTool);
       await fireEvent.click(screen.getByRole('button', { name: 'View in standard tuning' }));
@@ -171,7 +171,7 @@ describe('CagedTool', () => {
     });
 
     it('Go to Triads calls openTriadsFromCaged', async () => {
-      resetCagedForTests(AF_8, 'Open G');
+      resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
       render(CagedTool);
       await fireEvent.click(screen.getByRole('button', { name: 'Go to Triads' }));
       expect(openTriadsFromCaged).toHaveBeenCalledTimes(1);
@@ -262,7 +262,7 @@ describe('CagedTool', () => {
     });
 
     it('the whole group is aria-disabled for a non-compatible tuning', () => {
-      caged.useInstrument(AF_8, 'Open G');
+      caged.useInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
       render(CagedTool);
       expect(shapeGroup().getAttribute('aria-disabled')).toBe('true');
     });
@@ -302,7 +302,7 @@ describe('CagedTool', () => {
     });
 
     it('both aria-disabled for a non-compatible tuning', () => {
-      caged.useInstrument(AF_8, 'Open G');
+      caged.useInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
       render(CagedTool);
       expect(disabled(prev())).toBe(true);
       expect(disabled(next())).toBe(true);
@@ -328,7 +328,10 @@ describe('CagedTool', () => {
     });
 
     it('labels never flip for left-handed or orientation', async () => {
-      caged.applyInstrument(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'), 'Standard');
+      caged.applyInstrument(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'), {
+        kind: 'preset',
+        id: 'AF-1'
+      });
       render(CagedTool);
       const all = screen.getAllByRole('button');
       expect(all.indexOf(next())).toBe(all.indexOf(prev()) + 1);
@@ -393,7 +396,7 @@ describe('CagedTool: Show connections (016 US3)', () => {
 
   it('is aria-disabled with its value kept for a non-compatible tuning', async () => {
     caged.setConnections(true);
-    caged.applyInstrument(AF_8, 'Open');
+    caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
     render(CagedTool);
     expect(sw().getAttribute('aria-disabled')).toBe('true');
     expect(sw().getAttribute('aria-checked')).toBe('true');
@@ -537,7 +540,7 @@ describe('CagedLayerList (US2)', () => {
 
   it('every switch is disabled with the no-shapes reason in a non-compatible tuning', async () => {
     render(CagedTool);
-    caged.applyInstrument(AF_8, 'Open');
+    caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
     await tick();
     for (const s of layerSwitches()) {
       expect(s.getAttribute('aria-disabled')).toBe('true');
@@ -678,7 +681,7 @@ describe('Open in Triads (018 US3)', () => {
   });
 
   it('is absent in the temporary standard view', async () => {
-    resetCagedForTests(AF_8, 'Open G');
+    resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
     render(CagedTool);
     await fireEvent.click(screen.getByRole('button', { name: 'View in standard tuning' }));
     await tick();
@@ -698,7 +701,7 @@ describe('CagedTool: Listen button (019 US1)', () => {
   });
 
   it('is aria-disabled, focusable and described by the visible reason when no shape fits', async () => {
-    caged.applyInstrument(AF_8, 'AF-8');
+    caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
     render(CagedTool);
     const b = screen.getByRole('button', { name: 'Listen' });
     expect(b.getAttribute('aria-disabled')).toBe('true');

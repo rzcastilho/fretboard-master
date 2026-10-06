@@ -3,6 +3,8 @@ import { serializePreferences, DEFAULT_PREFERENCES } from '../../../src/lib/pref
 import { PREFS_KEY } from '../../../src/lib/prefs/storage';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
 import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
+import { notation, resetNotationForTests } from '../../../src/lib/state/notation.svelte';
+import { language } from '../../../src/lib/state/language.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -17,6 +19,7 @@ beforeEach(() => {
   resetTriadsForTests();
   resetCagedForTests();
   resetInstrumentForTests();
+  resetNotationForTests();
   resetPreferencesForTests();
 });
 
@@ -364,5 +367,80 @@ describe('CAGED label type (017, US1)', () => {
     expect(caged.state.labelType).toBe('name');
     caged.setLabelType('interval');
     expect(JSON.parse(s.data.get(PREFS_KEY) as string).labels.caged).toBeUndefined();
+  });
+});
+
+describe('notation, accidentals and CAGED note (021 P-3, P-4)', () => {
+  it('start calls notation.start after language.start, with the stored values', () => {
+    const order: string[] = [];
+    vi.spyOn(language, 'start').mockImplementation(() => void order.push('language'));
+    const ns = vi.spyOn(notation, 'start').mockImplementation(() => void order.push('notation'));
+    preferences.start(
+      fakeStorage({
+        [PREFS_KEY]: '{"version":1,"notation":"solfege","accidentals":"flats"}'
+      })
+    );
+    expect(order).toEqual(['language', 'notation']);
+    expect(ns).toHaveBeenCalledWith({ notation: 'solfege', accidentals: 'flats' });
+  });
+
+  it('start pushes stored values without writing', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['accidentals-flats'].raw });
+    const before = s.data.get(PREFS_KEY);
+    preferences.start(s);
+    expect(notation.accidentals).toBe('flats');
+    expect(notation.chosen).toBeNull();
+    expect(s.data.get(PREFS_KEY)).toBe(before);
+  });
+
+  it('cagedNoteShown is false by default and true when the record has cagedNote', () => {
+    preferences.start(fakeStorage());
+    expect(preferences.cagedNoteShown).toBe(false);
+    resetPreferencesForTests();
+    preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['caged-note'].raw }));
+    expect(preferences.cagedNoteShown).toBe(true);
+  });
+
+  it('markCagedNoteShown is idempotent and persists cagedNote', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markCagedNoteShown();
+    const writes = s.calls.set;
+    preferences.markCagedNoteShown();
+    expect(s.calls.set).toBe(writes);
+    expect(preferences.cagedNoteShown).toBe(true);
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).cagedNote).toBe(true);
+  });
+
+  it('with storage unavailable it does not throw and the in-load flag holds', () => {
+    const s = fakeStorage();
+    s.fail.get = s.fail.set = s.fail.remove = true;
+    preferences.start(s);
+    expect(() => preferences.markCagedNoteShown()).not.toThrow();
+    expect(preferences.cagedNoteShown).toBe(true);
+  });
+
+  it('erase resets notation, accidentals and cagedNoteShown', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    notation.choose('solfege');
+    notation.chooseAccidentals('both');
+    preferences.markCagedNoteShown();
+    const restore = vi.spyOn(notation, 'restore');
+    preferences.erase();
+    expect(restore).toHaveBeenCalledWith(null, 'sharps');
+    expect(notation.chosen).toBeNull();
+    expect(notation.accidentals).toBe('sharps');
+    expect(preferences.cagedNoteShown).toBe(false);
+    expect(s.data.has(PREFS_KEY)).toBe(false);
+  });
+
+  it('Reset tool does not clear cagedNote', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    preferences.markCagedNoteShown();
+    caged.reset();
+    expect(preferences.cagedNoteShown).toBe(true);
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).cagedNote).toBe(true);
   });
 });

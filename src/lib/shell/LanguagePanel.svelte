@@ -3,6 +3,7 @@
   import { m } from '$lib/paraglide/messages.js';
   import LanguageButton from './LanguageButton.svelte';
   import LanguageSelector from './LanguageSelector.svelte';
+  import NotationSelector from './NotationSelector.svelte';
 
   const uid = $props.id();
   const panelId = `language-panel-${uid}`;
@@ -36,6 +37,7 @@
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div id={panelId} class="panel" role="region" aria-label={m.language_panel_label()} {onkeydown}>
       <LanguageSelector />
+      <NotationSelector />
       <button type="button" class="close" onclick={close}>{m.language_close()}</button>
     </div>
   {/if}

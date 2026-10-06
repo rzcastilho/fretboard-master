@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import { defaultSpelling, flatSpelling, noteLabel, spokenNote } from '$lib/notation/notation';
+  import { labelPair, spellingPair, spokenPair } from '$lib/notation/notation';
 
   interface Props {
     /** Selected pitch classes (0–11, C = 0). */
@@ -12,19 +12,16 @@
 
   let { selected, ontoggle, label }: Props = $props();
 
-  const notes = Array.from({ length: 12 }, (_, pc) => {
-    const sharp = defaultSpelling(pc);
-    const altered = sharp.accidental !== 0;
-    const flat = flatSpelling(pc);
-    return {
+  // Derived so a notation or accidental change relabels the keys in place (N-1).
+  const notes = $derived(
+    Array.from({ length: 12 }, (_, pc) => ({
       pc,
-      altered,
-      label: altered ? `${noteLabel(sharp)} / ${noteLabel(flat)}` : noteLabel(sharp),
-      name: altered
-        ? m.notes_selector_altered_spoken({ sharp: spokenNote(sharp), flat: spokenNote(flat) })
-        : spokenNote(sharp)
-    };
-  });
+      altered: spellingPair(pc).length > 1,
+      // Preferred spelling first, joined with " / " (naturals alone).
+      label: labelPair(pc),
+      name: spokenPair(pc)
+    }))
+  );
 </script>
 
 <div class="selector" role="group" aria-label={label ?? m.notes_selector_label()}>

@@ -54,6 +54,12 @@ The root interval label is the one exception: R / T / T.
 | tempo | andamento | velocidad | `caged_tempo_label` | draft |
 | listen | ouvir | escuchar | `notes_listen`, `triads_listen`, `caged_listen` | draft |
 | language | idioma | idioma | `language_label`, `language_open` | draft |
+| note names / notation | nomes das notas / notação | nombres de las notas / notación | notation_label (added by 021) | draft |
+| letters | letras | letras | notation_letters (added by 021) | draft |
+| solfège | solfejo | solfeo | notation_solfege (added by 021) | draft |
+| accidentals | acidentes | alteraciones | accidentals_label (added by 021) | draft |
+| sharps / flats / both | sustenidos / bemóis / ambos | sostenidos / bemoles / ambos | accidentals_sharps, accidentals_flats, accidentals_both (added by 021) | draft |
+| language and notation | idioma e notação | idioma y notación | language_panel_label (added by 021) | draft |
 <!-- prettier-ignore-end -->
 
 ## Adding a language

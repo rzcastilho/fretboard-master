@@ -16,6 +16,11 @@ export interface Instrument {
   readonly handedness: 'right' | 'left';
   /** Presentation only. */
   readonly orientation: 'highest-top' | 'lowest-top';
+  /**
+   * True when `openStrings` keep their own spelling under every accidental preference (presets);
+   * false for a custom tuning, whose altered strings follow the preference (021 I-1).
+   */
+  readonly fixedSpelling: boolean;
 }
 
 export type Handedness = Instrument['handedness'];
@@ -47,7 +52,8 @@ export const STANDARD_GUITAR: Instrument = Object.freeze({
     open('E', 2)
   ]),
   handedness: 'right',
-  orientation: 'highest-top'
+  orientation: 'highest-top',
+  fixedSpelling: true
 });
 
 export function isValidPosition(instrument: Instrument, p: Position): boolean {

@@ -2,11 +2,13 @@
  * Supported interface languages and device matching (contracts/language-api.md §1).
  * Pure: no DOM, Svelte, Paraglide or storage. Autonyms live in the catalogs (`language_autonym`).
  */
+import type { Notation } from '$lib/notation/policy';
+
 export const LANGUAGES = [
-  { tag: 'en', primary: 'en' },
-  { tag: 'pt-BR', primary: 'pt' },
-  { tag: 'es', primary: 'es' }
-] as const;
+  { tag: 'en', primary: 'en', notation: 'letters' },
+  { tag: 'pt-BR', primary: 'pt', notation: 'letters' },
+  { tag: 'es', primary: 'es', notation: 'solfege' }
+] as const satisfies readonly { tag: string; primary: string; notation: Notation }[];
 
 export type LanguageTag = (typeof LANGUAGES)[number]['tag'];
 
@@ -16,6 +18,11 @@ export const BASE_LANGUAGE: LanguageTag = 'en';
 
 export function isLanguageTag(x: unknown): x is LanguageTag {
   return typeof x === 'string' && (LANGUAGE_TAGS as readonly string[]).includes(x);
+}
+
+/** The notation a language uses until the user picks one (021). */
+export function defaultNotation(tag: LanguageTag): Notation {
+  return LANGUAGES.find((l) => l.tag === tag)?.notation ?? 'letters';
 }
 
 const WELL_FORMED = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;

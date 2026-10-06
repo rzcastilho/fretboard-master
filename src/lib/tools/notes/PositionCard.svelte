@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import { noteLabel, spokenNote } from '$lib/notation/notation';
+  import { labelPair, spokenPair } from '$lib/notation/notation';
   import type { CardInfo } from '$lib/state/notes-model';
 
   interface Props {
@@ -16,17 +16,11 @@
 
   let { info, onaddnote, ontriads, oncaged, onclose }: Props = $props();
 
-  const heading = $derived(
-    info.altSpelling
-      ? {
-          text: `${noteLabel(info.spelling)} / ${noteLabel(info.altSpelling)}`,
-          spoken: m.notes_selector_altered_spoken({
-            sharp: spokenNote(info.spelling),
-            flat: spokenNote(info.altSpelling)
-          })
-        }
-      : { text: noteLabel(info.spelling), spoken: spokenNote(info.spelling) }
-  );
+  // The card always shows both spellings of an altered note, preferred first.
+  const heading = $derived({
+    text: labelPair(info.pitchClass),
+    spoken: spokenPair(info.pitchClass)
+  });
 </script>
 
 <section class="card" aria-labelledby="notes-card-title">

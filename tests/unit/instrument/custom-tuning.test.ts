@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { language, resetLanguageForTests } from '../../../src/lib/state/language.svelte';
+import { notation, resetNotationForTests } from '../../../src/lib/state/notation.svelte';
 import {
   OFFSET_MAX,
   addSeventh,
@@ -233,5 +235,46 @@ describe('seven-string offsets (012)', () => {
     expect(invertedStrings([0, -5, 0, 0, 0, 0, 0])).toBe(false); // string 6 = B1 (35) = string 7: unison
     expect(invertedStrings([0, -6, 0, 0, 0, 0, 0])).toBe(true); // string 6 = A#1 (34) < B1 (35)
     expect(invertedStrings([4, -7, 0, 0, 0, 0, 0])).toBe(true); // D#2 (39) > A1 (33)
+  });
+});
+
+describe('T-1 tuning names follow the notation', () => {
+  const label = (id: 'AF-4' | 'AF-6' | 'AF-8' | 'AF-7') => tuningLabel({ kind: 'preset', id });
+
+  afterEach(() => {
+    resetNotationForTests();
+    resetLanguageForTests();
+  });
+
+  it('solfège in en', () => {
+    resetNotationForTests();
+    resetLanguageForTests();
+    language.start('en');
+    notation.start({ notation: 'solfege', accidentals: 'sharps' });
+    expect(label('AF-4')).toBe('Drop Re');
+    expect(label('AF-6')).toBe('Double Drop Re');
+    expect(label('AF-8')).toBe('Open Sol');
+    expect(tuningLabel({ kind: 'preset', id: 'AF-5' })).toBe('Drop Do');
+  });
+
+  it('solfège in pt-BR and es', () => {
+    resetNotationForTests();
+    resetLanguageForTests();
+    language.start('pt-BR');
+    notation.start({ notation: 'solfege', accidentals: 'sharps' });
+    expect(label('AF-8')).toBe('Aberta em Sol');
+    language.restore('es');
+    expect(label('AF-8')).toBe('Abierta en Sol');
+  });
+
+  it('letters keep the letter, and DADGAD stays literal everywhere', () => {
+    resetNotationForTests();
+    resetLanguageForTests();
+    language.start('en');
+    notation.start({ notation: 'letters', accidentals: 'sharps' });
+    expect(label('AF-4')).toBe('Drop D');
+    expect(label('AF-7')).toBe('DADGAD');
+    notation.choose('solfege');
+    expect(label('AF-7')).toBe('DADGAD');
   });
 });

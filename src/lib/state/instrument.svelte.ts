@@ -40,7 +40,6 @@ import {
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
-import { tuningLabel } from '$lib/shell/tuning-names';
 import { caged } from './caged.svelte';
 import { triads } from './triads.svelte';
 
@@ -195,13 +194,13 @@ export const instrument = {
       // Presentation only (FR-017): views and sound untouched, no notice.
       notes.applyInstrument(inst);
       triads.applyInstrument(inst);
-      caged.applyInstrument(inst, tuningLabel(tuning));
+      caged.applyInstrument(inst, tuning);
       return;
     }
     playback.stop('instrument');
     const adjNotes = notes.applyInstrument(inst);
     const adjTriads = triads.applyInstrument(inst);
-    const adjCaged = caged.applyInstrument(inst, tuningLabel(tuning));
+    const adjCaged = caged.applyInstrument(inst, tuning);
     adjustedIn =
       screen === 'notes' && adjNotes
         ? 'notes'
@@ -221,7 +220,7 @@ export const instrument = {
     const inst = instrumentOf(config);
     notes.applyInstrument(inst);
     triads.applyInstrument(inst);
-    caged.applyInstrument(inst, tuningLabel(config.tuning));
+    caged.applyInstrument(inst, config.tuning);
     adjustedIn = null;
   },
   dismissAdjusted(): void {

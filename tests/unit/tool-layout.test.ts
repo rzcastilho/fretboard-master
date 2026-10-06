@@ -132,3 +132,34 @@ describe('ToolLayout', () => {
     });
   });
 });
+
+describe('ToolLayout notation toggle (US2)', () => {
+  beforeEach(() => {
+    resetInstrumentForTests();
+    resetCagedForTests();
+  });
+
+  it.each(['notes', 'triads', 'caged'] as const)(
+    '%s header renders the toggle before the language button',
+    (tool) => {
+      render(ToolLayout, { tool });
+      const banner = screen.getByRole('banner');
+      const group = within(banner).getByRole('group', { name: 'Note names' });
+      const language = within(banner).getByRole('button', { name: /^Language/ });
+      expect(
+        group.compareDocumentPosition(language) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    }
+  );
+});
+
+describe('Home and About do not render the toggle (US2)', () => {
+  it.each([
+    'src/routes/+page.svelte',
+    'src/routes/about/+page.svelte',
+    'src/lib/shell/HomeScreen.svelte'
+  ])('%s', async (file) => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync(file, 'utf8')).not.toContain('NotationToggle');
+  });
+});
