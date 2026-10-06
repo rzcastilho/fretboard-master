@@ -115,7 +115,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
   });
 
-  test('Back and Forward do not re-apply a carry; reload gives the initial state', async ({
+  test('Back and Forward do not re-apply a carry; a fresh open gives the initial state', async ({
     page
   }) => {
     await page.goto('/notes');
@@ -127,7 +127,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await page.goForward();
     await expect(page.getByText('D major — Root position', { exact: true })).toBeVisible();
-    await page.reload();
+    await page.goto('/triads');
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
   });
 
@@ -466,7 +466,7 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
     await page.goBack();
     await page.goForward();
     await expect(cagedKey(page, 'E')).toHaveAttribute('aria-pressed', 'true');
-    await page.reload();
+    await page.goto('/caged');
     await expect(cagedKey(page, 'C')).toHaveAttribute('aria-pressed', 'true');
     await page.goto('/notes');
     await expect(note(page, 'F')).toHaveAttribute('aria-pressed', 'false');

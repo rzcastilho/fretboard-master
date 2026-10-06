@@ -387,5 +387,10 @@
   "share_title_triads": "{root} {quality} — Tríadas, {inversion}",
   "share_title_notes": "{notes} — Notas",
   "share_title_notes_empty": "Notas",
+  "link_instrument": "Esta vista usa {tuning}",
+  "link_instrument_strings": "Esta vista usa {count} cuerdas: {tuning}",
+  "link_use_mine": "Usar la mía",
+  "link_adopt": "Adoptar esta",
+  "link_incomplete": "Este enlace estaba incompleto; mostramos la vista más cercana posible",
   "language_autonym": "Español"
 }

@@ -5,8 +5,13 @@
   import { rememberOpener } from './instrument-opener';
   import { isStandard } from '$lib/instrument/tunings';
   import { tuningLabel } from './tuning-names';
+  import type { ToolId } from './tools';
 
-  const name = $derived(tuningLabel(instrument.active.tuning));
+  let { tool }: { tool: ToolId } = $props();
+
+  // The tool's own tuning: the received link's while an override is active (023 §2).
+  const tuning = $derived(instrument.effectiveFor(tool).tuning);
+  const name = $derived(tuningLabel(tuning));
   const temporaryName = $derived(caged.temporaryName);
 
   function open(event: MouseEvent): void {
@@ -22,7 +27,7 @@
     aria-label={m.caged_temporary_badge_label({ name: temporaryName })}
     onclick={open}>{m.caged_temporary_badge({ name: temporaryName })}</button
   >
-{:else if !isStandard(instrument.active.tuning)}
+{:else if !isStandard(tuning)}
   <button
     type="button"
     class="tuning-badge"

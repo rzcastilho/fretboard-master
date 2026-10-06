@@ -67,7 +67,7 @@ describe('Notice', () => {
     render(Notice, {
       message: 'There is no C♯ in this region',
       ondismiss: () => {},
-      action: { label: 'Widen region', onclick }
+      actions: [{ label: 'Widen region', onclick }]
     });
     const buttons = screen.getAllByRole('button');
     expect(buttons.map((b) => b.textContent?.trim())).toEqual(['Widen region', 'Dismiss']);
@@ -75,6 +75,33 @@ describe('Notice', () => {
     expect(onclick).toHaveBeenCalledTimes(1);
     const status = screen.getByRole('status');
     expect(status.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('renders several actions in DOM order with Dismiss last', async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    render(Notice, {
+      message: 'This view uses a different tuning',
+      ondismiss: () => {},
+      actions: [
+        { label: 'Use mine', onclick: first },
+        { label: 'Adopt this one', onclick: second }
+      ]
+    });
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.map((b) => b.textContent?.trim())).toEqual([
+      'Use mine',
+      'Adopt this one',
+      'Dismiss'
+    ]);
+    await fireEvent.click(buttons[1]);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+  });
+
+  it('is unchanged without actions or with an empty list', () => {
+    render(Notice, { message: 'Hello', ondismiss: () => {}, actions: [] });
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
   it('is unchanged without an action', () => {

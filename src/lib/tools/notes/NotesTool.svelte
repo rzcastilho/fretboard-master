@@ -96,7 +96,7 @@
     <Notice
       message={noticeMessage}
       ondismiss={() => (noticeDismissed = true)}
-      action={{ label: m.notes_notice_widen(), onclick: notes.widenRegion }}
+      actions={[{ label: m.notes_notice_widen(), onclick: notes.widenRegion }]}
     />
   {/if}
   {#if notes.display.emptyGuidance}

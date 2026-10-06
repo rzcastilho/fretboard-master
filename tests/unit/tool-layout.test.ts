@@ -10,6 +10,7 @@ import {
   share,
   useSharePlatformForTests
 } from '../../src/lib/state/share.svelte';
+import { opening, resetOpeningForTests } from '../../src/lib/state/opening.svelte';
 import ToolLayout from '../../src/lib/shell/ToolLayout.svelte';
 
 describe('ToolLayout', () => {
@@ -33,6 +34,25 @@ describe('ToolLayout', () => {
     expect(
       within(banner2).getByRole('button', { name: 'Tuning: Drop D. Open instrument panel' })
     ).toBeTruthy();
+  });
+
+  describe('incomplete-link notice (US3)', () => {
+    beforeEach(() => resetOpeningForTests());
+
+    it('shows one notice with Dismiss only on the opened tool', async () => {
+      opening.start('http://localhost/caged?v=1&rt=2&q=banana');
+      const { unmount } = render(ToolLayout, { tool: 'notes' });
+      expect(screen.queryByText(/This link was incomplete/)).toBeNull();
+      unmount();
+      render(ToolLayout, { tool: 'caged' });
+      const notice = screen.getByText(/This link was incomplete/).closest('[role="status"]');
+      expect(notice).toBeTruthy();
+      const buttons = within(notice as HTMLElement).getAllByRole('button');
+      expect(buttons.map((b) => b.textContent)).toEqual(['Dismiss']);
+      await fireEvent.click(buttons[0]);
+      expect(screen.queryByText(/This link was incomplete/)).toBeNull();
+      expect(opening.incomplete).toBeNull();
+    });
   });
 
   it('renders application bar with navigation', () => {
@@ -246,5 +266,66 @@ describe('Home and About do not render Share (US1)', () => {
   ])('%s', async (file) => {
     const { readFileSync } = await import('node:fs');
     expect(readFileSync(file, 'utf8')).not.toContain('ShareButton');
+  });
+});
+
+describe('ToolLayout instrument notice (023 US2)', () => {
+  const DROP_D = {
+    stringCount: 6,
+    tuning: { kind: 'preset', id: 'AF-4' },
+    fretCount: 22
+  } as const;
+  const FRETS_ONLY = { ...DROP_D, tuning: { kind: 'preset', id: 'AF-1' }, fretCount: 19 } as const;
+
+  beforeEach(() => {
+    resetInstrumentForTests();
+    resetCagedForTests();
+  });
+
+  it('shows the notice for the opened tool with actions in order', () => {
+    instrument.receive('caged', DROP_D);
+    render(ToolLayout, { tool: 'caged' });
+    const notice = screen.getByText('This view uses Drop D').closest('.notice') as HTMLElement;
+    expect(within(notice).getByText('This view uses Drop D')).toBeTruthy();
+    expect(
+      within(notice)
+        .getAllByRole('button')
+        .map((b) => b.textContent?.trim())
+    ).toEqual(['Use mine', 'Adopt this one', 'Dismiss']);
+  });
+
+  it('does not show for another tool', () => {
+    instrument.receive('caged', DROP_D);
+    render(ToolLayout, { tool: 'notes' });
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+  });
+
+  it('does not show for a fret-count-only override', () => {
+    instrument.receive('notes', FRETS_ONLY);
+    render(ToolLayout, { tool: 'notes' });
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+  });
+
+  it('Dismiss hides it and keeps the override', async () => {
+    instrument.receive('triads', DROP_D);
+    render(ToolLayout, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+    expect(instrument.override).not.toBeNull();
+  });
+
+  it('Use mine and Adopt close the notice and focus the heading', async () => {
+    instrument.receive('triads', DROP_D);
+    const first = render(ToolLayout, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Use mine' }));
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+    first.unmount();
+    resetInstrumentForTests();
+    instrument.receive('triads', DROP_D);
+    render(ToolLayout, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Adopt this one' }));
+    expect(screen.queryByRole('button', { name: 'Adopt this one' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
   });
 });

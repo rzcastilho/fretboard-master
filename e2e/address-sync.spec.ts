@@ -66,12 +66,12 @@ test.describe('address sync US4', () => {
     await expect.poll(() => page.url()).toContain('fr=12');
   });
 
-  test('first load: an incoming link is replaced by the canonical link, history unchanged', async ({
+  test('first load: an incoming link is applied and replaced by the canonical link, history unchanged', async ({
     page
   }) => {
     await page.goto('/triads?v=1&inv=second');
-    await expect(page.getByText('C major — 2nd inversion', { exact: true }).first()).toBeHidden();
-    await expect.poll(() => page.url()).toMatch(/\/triads\?v=1&rt=0&sp=none&q=major&inv=root&/);
+    await expect(page.getByText('C major — 2nd inversion', { exact: true }).first()).toBeVisible();
+    await expect.poll(() => page.url()).toMatch(/\/triads\?v=1&rt=0&sp=none&q=major&inv=second&/);
     expect(await page.evaluate(() => history.length)).toBeLessThanOrEqual(2);
   });
 });

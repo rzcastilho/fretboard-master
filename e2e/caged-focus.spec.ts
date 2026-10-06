@@ -132,7 +132,7 @@ test.describe('caged focus US1: focus on one shape', () => {
     expect(await bandIsCentred(page)).toBe(true);
   });
 
-  test('focus survives Notes → CAGED navigation, resets on reload, never touches prefs', async ({
+  test('focus survives Notes → CAGED navigation, resets on a fresh open, never touches prefs', async ({
     page
   }) => {
     await page.goto('/caged');
@@ -151,7 +151,7 @@ test.describe('caged focus US1: focus on one shape', () => {
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'true');
     expect(await page.evaluate((k) => localStorage.getItem(k), PREFS_KEY)).toBe(before);
 
-    await page.reload();
+    await page.goto('/caged');
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'false');
     await expect(radio(page, 'See all')).toHaveAttribute('aria-checked', 'true');
   });
@@ -352,7 +352,7 @@ test.describe('caged focus US3: show connections', () => {
     expect(await ringKeys(page)).toEqual(sorted(TM_6_3));
   });
 
-  test('switch and focus survive Notes → CAGED, reset on reload, prefs unchanged', async ({
+  test('switch and focus survive Notes → CAGED, reset on a fresh open, prefs unchanged', async ({
     page
   }) => {
     await page.goto('/caged');
@@ -369,7 +369,7 @@ test.describe('caged focus US3: show connections', () => {
     await expect(connSwitch(page)).toHaveAttribute('aria-checked', 'true');
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'true');
     expect(await page.evaluate((k) => localStorage.getItem(k), PREFS_KEY)).toBe(before);
-    await page.reload();
+    await page.goto('/caged');
     await expect(connSwitch(page)).toHaveAttribute('aria-checked', 'false');
     await expect(rings(page)).toHaveCount(0);
   });

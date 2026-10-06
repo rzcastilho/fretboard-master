@@ -130,3 +130,23 @@ describe('triad layer strings (018)', () => {
     for (const spec of imports) expect(spec, spec).toMatch(/^\.\.?\//);
   });
 });
+
+describe('link notices render plain text only (023 US2)', () => {
+  const files = [
+    'src/lib/shell/Notice.svelte',
+    'src/lib/shell/ToolLayout.svelte',
+    'src/lib/shell/link-notice.ts'
+  ];
+
+  for (const file of files) {
+    it(`${file} has no {@html}`, () => {
+      expect(readFileSync(file, 'utf8')).not.toContain('{@html');
+    });
+  }
+
+  it('link-notice.ts takes its text from the catalog', () => {
+    const source = readFileSync('src/lib/shell/link-notice.ts', 'utf8');
+    expect(source).toContain('m.link_instrument(');
+    expect(source).toContain('m.link_instrument_strings(');
+  });
+});

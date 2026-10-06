@@ -656,14 +656,16 @@ test.describe('notes tool: listen, hide names, clear, reset (US5)', () => {
     await expect(board(page).locator('.marker.pulse')).toHaveCount(0);
   });
 
-  test('scenario 28: selection survives /triads and back; reload resets', async ({ page }) => {
+  test('scenario 28: selection survives /triads and back; a fresh open resets', async ({
+    page
+  }) => {
     await note(page, 'G').click();
     const nav = page.getByRole('navigation', { name: 'Tools' });
     await page.getByRole('link', { name: /^Triads/ }).click();
     await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await nav.getByRole('link', { name: 'Fretboard Notes' }).click();
     await expect(note(page, 'G')).toHaveAttribute('aria-pressed', 'true');
-    await page.reload();
+    await page.goto('/notes');
     await expectInitialView(page);
   });
 

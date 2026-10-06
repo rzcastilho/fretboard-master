@@ -17,6 +17,9 @@
   import { resetTool } from '$lib/state/links.svelte';
   import { openToolAddress, scheduleAddress } from '$lib/state/address.svelte';
   import { currentLink, share } from '$lib/state/share.svelte';
+  import { instrument } from '$lib/state/instrument.svelte';
+  import { opening } from '$lib/state/opening.svelte';
+  import { linkNoticeMessage } from './link-notice';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
   import StopButton from './StopButton.svelte';
@@ -26,6 +29,15 @@
   let { tool }: { tool: ToolId } = $props();
 
   const name = $derived(TOOLS.find((t) => t.id === tool)?.name() ?? '');
+
+  // A received link on another instrument than the stored one (023): offer Use mine / Adopt.
+  const instrumentNotice = $derived(instrument.overrideNoticeFor(tool));
+
+  // The notice and its buttons leave the page: hand focus to the tool heading.
+  function resolveInstrument(choose: () => void): void {
+    choose();
+    document.querySelector<HTMLElement>('h1')?.focus();
+  }
 
   // The manual-copy panel shows one link: close it as soon as the view no longer matches.
   $effect(() => {
@@ -51,12 +63,31 @@
   <AppNav current={tool} />
   <ShareButton {tool} />
   <InstrumentButton />
-  <TuningBadge />
+  <TuningBadge {tool} />
   <StopButton />
   <SoundControl />
   <NotationToggle />
   <LanguagePanel />
 </header>
+
+{#if instrumentNotice !== null}
+  <div class="share-notice">
+    <Notice
+      message={linkNoticeMessage(instrumentNotice.link, instrument.active.stringCount)}
+      actions={[
+        { label: m.link_use_mine(), onclick: () => resolveInstrument(() => instrument.useMine()) },
+        { label: m.link_adopt(), onclick: () => resolveInstrument(() => instrument.adopt()) }
+      ]}
+      ondismiss={() => instrument.dismissOverrideNotice()}
+    />
+  </div>
+{/if}
+
+{#if opening.incomplete?.screen === tool}
+  <div class="share-notice">
+    <Notice message={m.link_incomplete()} ondismiss={() => opening.dismissIncomplete()} />
+  </div>
+{/if}
 
 {#if share.notice !== null}
   {#key share.notice.id}

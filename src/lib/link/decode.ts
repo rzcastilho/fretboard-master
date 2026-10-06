@@ -2,7 +2,8 @@
  * Link decoder (specs/022 R-05, data-model §1). Total: never throws. Each field falls back on its
  * own to its default and its key is listed in `fellBack`. Pure: no DOM, Svelte or i18n.
  *
- * Applying a decoded snapshot to the app is slice 006/002; this slice exercises decode in tests.
+ * `decodeToolParams` is shared with the receive side (specs/023): it decodes against a
+ * `DecodeBase` that says which instrument fills missing or invalid instrument fields.
  */
 import * as v from 'valibot';
 import { isOffsets, referencePitches } from '$lib/instrument/custom-tuning';
@@ -67,6 +68,22 @@ const TOOL_PATHS: Readonly<Record<string, LinkTool>> = Object.freeze({
 
 type Raw = Record<string, string | undefined>;
 
+/**
+ * What instrument fields fall back to. `pairInstrument` makes `sc` and `tu` fall back together
+ * (specs/023 R3): a string count and a tuning from different instruments never mix.
+ */
+export interface DecodeBase {
+  readonly instrument: LinkInstrument;
+  readonly pairInstrument: boolean;
+}
+
+/** Slice 022 behaviour: standard 6-string guitar, each instrument field on its own. */
+export const FACTORY_LINK_INSTRUMENT: LinkInstrument = Object.freeze({
+  stringCount: DEFAULT_STRING_COUNT,
+  tuning: Object.freeze({ kind: 'preset', id: standardTuningId(DEFAULT_STRING_COUNT) }),
+  fretCount: DEFAULT_FRETS
+});
+
 /** Takes a parsed field or its default, and records the key when the field was bad. */
 class Fallbacks {
   readonly keys: string[] = [];
@@ -126,19 +143,40 @@ interface Parsed {
 
 function instrumentOf(
   r: { sc: string | Bad; tu: string | Bad; fr: string | Bad },
-  fb: Fallbacks
+  fb: Fallbacks,
+  base: DecodeBase
 ): Parsed {
-  const count = fb.pick<StringCount>(
-    'sc',
-    isBad(r.sc) ? BAD : (Number(r.sc) as StringCount),
-    DEFAULT_STRING_COUNT
+  let count: StringCount;
+  let tuning: Tuning;
+  if (base.pairInstrument) {
+    const sc = isBad(r.sc) ? BAD : (Number(r.sc) as StringCount);
+    const tu = isBad(sc) ? BAD : tuningOf(r.tu, sc);
+    if (isBad(sc) || isBad(tu)) {
+      fb.note('sc');
+      fb.note('tu');
+      count = base.instrument.stringCount;
+      tuning = base.instrument.tuning;
+    } else {
+      count = sc;
+      tuning = tu;
+    }
+  } else {
+    count = fb.pick<StringCount>(
+      'sc',
+      isBad(r.sc) ? BAD : (Number(r.sc) as StringCount),
+      DEFAULT_STRING_COUNT
+    );
+    tuning = fb.pick<Tuning>(
+      'tu',
+      tuningOf(r.tu, count),
+      Object.freeze({ kind: 'preset', id: standardTuningId(count) })
+    );
+  }
+  const fretCount = fb.pick<number>(
+    'fr',
+    intIn(r.fr, MIN_FRETS, MAX_FRETS),
+    base.instrument.fretCount
   );
-  const tuning = fb.pick<Tuning>(
-    'tu',
-    tuningOf(r.tu, count),
-    Object.freeze({ kind: 'preset', id: standardTuningId(count) })
-  );
-  const fretCount = fb.pick<number>('fr', intIn(r.fr, MIN_FRETS, MAX_FRETS), DEFAULT_FRETS);
   return {
     instrument: { stringCount: count, tuning, fretCount },
     inst: tuningInstrument(tuning, count, fretCount)
@@ -147,9 +185,13 @@ function instrumentOf(
 
 /* ---------- tools ---------- */
 
-function decodeNotes(params: URLSearchParams, fb: Fallbacks): ShareSnapshot {
+function decodeNotes(
+  params: URLSearchParams,
+  fb: Fallbacks,
+  instrumentBase: DecodeBase
+): ShareSnapshot {
   const r = v.parse(NotesSchema, rawOf(params, Object.keys(NotesSchema.entries)));
-  const { instrument, inst } = instrumentOf(r, fb);
+  const { instrument, inst } = instrumentOf(r, fb, instrumentBase);
   const base = initialNotesView(inst);
 
   const selection = ((): PitchClass[] | Bad => {
@@ -204,9 +246,13 @@ function decodeNotes(params: URLSearchParams, fb: Fallbacks): ShareSnapshot {
   return { tool: 'notes', view, instrument };
 }
 
-function decodeTriads(params: URLSearchParams, fb: Fallbacks): ShareSnapshot {
+function decodeTriads(
+  params: URLSearchParams,
+  fb: Fallbacks,
+  instrumentBase: DecodeBase
+): ShareSnapshot {
   const r = v.parse(TriadsSchema, rawOf(params, Object.keys(TriadsSchema.entries)));
-  const { instrument, inst } = instrumentOf(r, fb);
+  const { instrument, inst } = instrumentOf(r, fb, instrumentBase);
   const base = initialTriadsView(inst);
 
   const rootPc = fb.pick<PitchClass>('rt', intIn(r.rt, 0, 11), base.rootPc);
@@ -249,9 +295,13 @@ function decodeTriads(params: URLSearchParams, fb: Fallbacks): ShareSnapshot {
   return { tool: 'triads', view, instrument };
 }
 
-function decodeCaged(params: URLSearchParams, fb: Fallbacks): ShareSnapshot {
+function decodeCaged(
+  params: URLSearchParams,
+  fb: Fallbacks,
+  instrumentBase: DecodeBase
+): ShareSnapshot {
   const r = v.parse(CagedSchema, rawOf(params, Object.keys(CagedSchema.entries)));
-  const { instrument } = instrumentOf(r, fb);
+  const { instrument } = instrumentOf(r, fb, instrumentBase);
 
   const focus = ((): CagedFocus | null | Bad => {
     if (isBad(r.fc)) return BAD;
@@ -291,25 +341,43 @@ function decodeCaged(params: URLSearchParams, fb: Fallbacks): ShareSnapshot {
   return { tool: 'caged', view: { ...view, spellingOverride: override }, instrument, temporary };
 }
 
+/** Decode one tool's query parameters against `base`. Throws only on an internal defect. */
+export function decodeToolParams(
+  tool: LinkTool,
+  params: URLSearchParams,
+  base: DecodeBase
+): { readonly snapshot: ShareSnapshot; readonly fellBack: readonly string[] } {
+  const fb = new Fallbacks();
+  const snapshot =
+    tool === 'notes'
+      ? decodeNotes(params, fb, base)
+      : tool === 'triads'
+        ? decodeTriads(params, fb, base)
+        : decodeCaged(params, fb, base);
+  return { snapshot, fellBack: fb.keys };
+}
+
+/** Tool of a pathname (trailing `/` stripped), or `undefined` for any other path. */
+export function toolOfPath(pathname: string): LinkTool | undefined {
+  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  return Object.hasOwn(TOOL_PATHS, path) ? TOOL_PATHS[path] : undefined;
+}
+
 /** Decode a share link. Never throws. */
 export function decodeLink(url: URL): DecodeResult {
   try {
-    const path = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname;
-    const tool = Object.hasOwn(TOOL_PATHS, path) ? TOOL_PATHS[path] : undefined;
+    const tool = toolOfPath(url.pathname);
     if (tool === undefined) return { kind: 'not-a-tool' };
 
     const version = parseVersion(url.searchParams.get('v'));
     if (version === null) return { kind: 'invalid' };
     if (version > 1) return { kind: 'unsupported-version', version };
 
-    const fb = new Fallbacks();
-    const snapshot =
-      tool === 'notes'
-        ? decodeNotes(url.searchParams, fb)
-        : tool === 'triads'
-          ? decodeTriads(url.searchParams, fb)
-          : decodeCaged(url.searchParams, fb);
-    return { kind: 'ok', snapshot, fellBack: fb.keys };
+    const { snapshot, fellBack } = decodeToolParams(tool, url.searchParams, {
+      instrument: FACTORY_LINK_INSTRUMENT,
+      pairInstrument: false
+    });
+    return { kind: 'ok', snapshot, fellBack };
   } catch {
     // Total by contract (Constitution IX): an unforeseen failure is an invalid link, not a crash.
     return { kind: 'invalid' };

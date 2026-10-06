@@ -313,6 +313,20 @@ describe('current snapshot and link', () => {
     expect(Object.keys(snap.instrument).sort()).toEqual(['fretCount', 'stringCount', 'tuning']);
     expect(caged.temporary).toBe(false);
   });
+
+  it('describes what is drawn during an instrument override (023 I6)', () => {
+    const dropD = {
+      stringCount: 6,
+      tuning: { kind: 'preset', id: 'AF-4' },
+      fretCount: 22
+    } as const;
+    instrument.receive('caged', dropD);
+    // The opened tool shows the link's instrument; the other tools still show the stored one.
+    expect(currentSnapshot('caged').instrument).toBe(dropD);
+    expect(currentLink('caged')).toContain('tu=AF-4');
+    expect(currentSnapshot('notes').instrument.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
+    expect(currentLink('notes')).not.toContain('tu=AF-4');
+  });
 });
 
 describe('manual-copy fallback (link-api §2, US2)', () => {

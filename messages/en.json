@@ -387,5 +387,10 @@
   "share_title_triads": "{root} {quality} — Triads, {inversion}",
   "share_title_notes": "{notes} — Notes",
   "share_title_notes_empty": "Notes",
+  "link_instrument": "This view uses {tuning}",
+  "link_instrument_strings": "This view uses {count} strings: {tuning}",
+  "link_use_mine": "Use mine",
+  "link_adopt": "Adopt this one",
+  "link_incomplete": "This link was incomplete; we show the closest view possible",
   "language_autonym": "English"
 }

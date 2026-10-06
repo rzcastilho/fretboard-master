@@ -72,13 +72,13 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
     await expect(layerSwitch(page, 'Arpeggio')).toHaveAttribute('aria-checked', 'true');
   });
 
-  test('US2-5: reload resets to Chord only and stores no layer data', async ({ page }) => {
+  test('US2-5: a fresh open resets to Chord only and stores no layer data', async ({ page }) => {
     await page.goto('/caged');
     await layerSwitch(page, 'Arpeggio').click();
     await layerSwitch(page, 'Scale').click();
     const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }));
     expect(stored.toLowerCase()).not.toMatch(/arpeggio|pentatonic|scale|layers/);
-    await page.reload();
+    await page.goto('/caged');
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-checked', 'true');
     for (const name of ['Arpeggio', 'Pentatonic', 'Scale'])
       await expect(layerSwitch(page, name)).toHaveAttribute('aria-checked', 'false');
@@ -202,6 +202,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
         return raw === null ? null : JSON.parse(raw).labels;
       });
     expect((await storedLabels())?.caged).toBe('name');
+    await expect.poll(() => page.url()).toContain('lb=name');
     await page.reload();
     await expect(labelRadio(page, 'Note names')).toBeChecked();
     await page.getByRole('button', { name: 'Reset tool' }).click();
@@ -691,7 +692,7 @@ test.describe('caged layers quickstart: tunings', () => {
     await page.goto('/caged');
     await layerSwitch(page, 'Scale').click();
     await seedTuning(page, 'AF-8');
-    await page.reload();
+    await page.goto('/caged');
     for (const name of ['Chord', 'Arpeggio', 'Pentatonic', 'Scale'])
       await expect(layerSwitch(page, name)).toHaveAttribute('aria-disabled', 'true');
     await expect(layerSwitch(page, 'Chord')).toHaveAccessibleDescription(

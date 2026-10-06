@@ -142,7 +142,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
     await expect(board(page).locator('.cell[data-string="8"]')).toHaveCount(0);
   });
 
-  test('E7: key and quality changes keep the badge; a reload brings the notice back', async ({
+  test('E7: key and quality changes keep the badge; a fresh open brings the notice back', async ({
     page
   }) => {
     await seed(page, { tuning: 'AF-8' });
@@ -152,7 +152,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
     await quality(page, 'Minor').click();
     await expect(page.getByText('D minor', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Temporary tuning: Standard/ })).toBeVisible();
-    await page.reload();
+    await page.goto('/caged');
     await expect(notice(page, 'Open G')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Temporary tuning/ })).toHaveCount(0);
   });

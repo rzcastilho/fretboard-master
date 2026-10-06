@@ -7,7 +7,7 @@
 // Deep imports on purpose: the `$lib/link` barrel also re-exports the decoder, whose top-level
 // Valibot schemas the bundler keeps (side effects) and which nothing in the app uses yet.
 import { encodeLink } from '$lib/link/encode';
-import { musicalOf, type ShareSnapshot } from '$lib/link/types';
+import type { ShareSnapshot } from '$lib/link/types';
 import type { ToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
 import { instrument } from './instrument.svelte';
@@ -64,7 +64,8 @@ let noticeTimer: unknown = null;
 let opener: HTMLElement | null = null;
 
 export function currentSnapshot(tool: ToolId): ShareSnapshot {
-  const musical = musicalOf(instrument.active);
+  // What is drawn: the link's instrument while a received link overrides it (023 I6).
+  const musical = instrument.effectiveFor(tool);
   switch (tool) {
     case 'notes':
       return { tool: 'notes', view: notes.state, instrument: musical };
