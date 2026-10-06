@@ -1,7 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import type { Instrument } from '$lib/instrument/instrument';
-  import { noteLabel } from '$lib/notation/notation';
+  import { noteLabel, stringSpelling } from '$lib/notation/notation';
 
   interface Props {
     instrument: Instrument;
@@ -15,7 +15,7 @@
   const strings = $derived(
     Array.from({ length: instrument.stringCount }, (_, k) => {
       const string = k + 1;
-      const note = noteLabel(instrument.openStrings[k]);
+      const note = noteLabel(stringSpelling(instrument.openStrings[k], instrument.fixedSpelling));
       return { string, note };
     })
   );

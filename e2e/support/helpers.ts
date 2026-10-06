@@ -60,3 +60,81 @@ export async function injectAudioFault(page: Page, cause: 'context' | 'synth'): 
     globalThis.__fmAudioFault = c;
   }, cause);
 }
+
+/** R-11: emulate a root text-size setting (tokens are rem-based). */
+export async function setTextScale(page: Page, pct: number): Promise<void> {
+  await page.evaluate((p) => {
+    document.documentElement.style.fontSize = `${p}%`;
+  }, pct);
+}
+
+/**
+ * R-11 / SC-004: no clipped or ellipsised text, no overlapping interactive controls, no page-level
+ * horizontal scroll. The fretboard scroller is the only intentional scroll container and is skipped.
+ */
+export async function expectNoTruncationOrOverlap(page: Page): Promise<void> {
+  const problems = await page.evaluate(() => {
+    const found: string[] = [];
+    const describe = (el: Element): string => {
+      const text = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
+      return `<${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/)[0] : ''}> "${text}"`;
+    };
+    const visible = (el: Element): boolean => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 1 || rect.height <= 1) return false; // visually hidden helpers
+      const style = getComputedStyle(el);
+      return style.visibility !== 'hidden' && style.display !== 'none';
+    };
+    // An open modal dialog covers the page behind it: only the dialog is on screen to the user.
+    const dialog = Array.from(document.querySelectorAll('dialog[open], [role="dialog"]')).find(
+      (el) => visible(el)
+    );
+    const inScroller = (el: Element): boolean =>
+      el.closest('.scroller') !== null || (dialog !== undefined && !dialog.contains(el));
+
+    for (const el of document.body.querySelectorAll('*')) {
+      if (!visible(el) || inScroller(el)) continue;
+      const hasOwnText = Array.from(el.childNodes).some(
+        (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== ''
+      );
+      if (!hasOwnText) continue;
+      const style = getComputedStyle(el);
+      if (style.textOverflow === 'ellipsis') found.push(`ellipsis: ${describe(el)}`);
+      const clipsX = style.overflowX !== 'visible';
+      const clipsY = style.overflowY !== 'visible';
+      if (clipsX && el.scrollWidth > el.clientWidth + 1) found.push(`clipped-x: ${describe(el)}`);
+      if (clipsY && el.scrollHeight > el.clientHeight + 1) found.push(`clipped-y: ${describe(el)}`);
+    }
+
+    // Containers that scroll or clip must not hide translated text (non-text-owning wrappers too).
+    for (const el of document.body.querySelectorAll('[role="radiogroup"], nav, header, section')) {
+      if (!visible(el) || inScroller(el)) continue;
+      const style = getComputedStyle(el);
+      if (style.overflowX !== 'visible' && el.scrollWidth > el.clientWidth + 1) {
+        found.push(`scrolls-x: ${describe(el)}`);
+      }
+    }
+
+    const controls = Array.from(
+      document.querySelectorAll('a[href], button, input, select, textarea, [role="radio"]')
+    ).filter((el) => visible(el) && !inScroller(el));
+    const boxes = controls.map((el) => el.getBoundingClientRect());
+    for (let i = 0; i < controls.length; i++) {
+      for (let j = i + 1; j < controls.length; j++) {
+        if (controls[i].contains(controls[j]) || controls[j].contains(controls[i])) continue;
+        const a = boxes[i];
+        const b = boxes[j];
+        const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (overlapX > 1 && overlapY > 1) {
+          found.push(`overlap: ${describe(controls[i])} ∩ ${describe(controls[j])}`);
+        }
+      }
+    }
+
+    const pageOverflow = document.documentElement.scrollWidth - window.innerWidth;
+    if (pageOverflow > 0) found.push(`page-x-overflow: ${pageOverflow}px`);
+    return found;
+  });
+  expect(problems).toEqual([]);
+}

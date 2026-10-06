@@ -1028,3 +1028,51 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
     expect(scrolled.worst).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('notation switch latency (021 US2)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('median toggle click → every marker relabelled ≤ 100 ms at 4× CPU throttle', async ({
+    page
+  }) => {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto('/notes');
+    await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+    const toggle = page.getByRole('banner').getByRole('group', { name: 'Note names' });
+    // Measured in the page (pointerdown → first marker label in the new notation).
+    const times: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const solfege = i % 2 === 0;
+      await page.evaluate((expectSolfege) => {
+        const w = globalThis as unknown as { __notationMs: number | null };
+        w.__notationMs = null;
+        let downAt = 0;
+        document.addEventListener('pointerdown', (e) => (downAt = e.timeStamp), {
+          capture: true,
+          once: true
+        });
+        const grid = document.querySelector('[role="grid"]') as Element;
+        const done = () => {
+          const labels = [...grid.querySelectorAll('.marker text.marker-label')].map(
+            (n) => n.textContent ?? ''
+          );
+          const is = labels.length > 0 && labels.every((l) => /^[A-G]$/.test(l) !== expectSolfege);
+          if (!is) return false;
+          w.__notationMs = performance.now() - downAt;
+          return true;
+        };
+        const observer = new MutationObserver(() => done() && observer.disconnect());
+        observer.observe(grid, { subtree: true, childList: true, characterData: true });
+      }, solfege);
+      await toggle.getByRole('button', { name: solfege ? 'Do Re Mi' : 'C D E' }).click();
+      await page.waitForFunction(
+        () => (globalThis as unknown as { __notationMs: number | null }).__notationMs !== null
+      );
+      times.push(
+        await page.evaluate(() => (globalThis as unknown as { __notationMs: number }).__notationMs)
+      );
+    }
+    expect(median(times)).toBeLessThanOrEqual(100);
+  });
+});

@@ -17,7 +17,10 @@ import {
   type StorageLike
 } from './storage';
 
-/** Any preference field, including `customTuning` (011); `null` clears it. */
+/**
+ * Any preference field, including `customTuning` (011); `null` clears it. 021 adds `{ notation }`,
+ * `{ accidentals }` and `{ cagedNoteShown: true }`, which are covered by the partial.
+ */
 export type PreferencesPatch = Partial<Omit<Preferences, 'labels'>> & {
   labels?: Partial<Preferences['labels']>;
 };

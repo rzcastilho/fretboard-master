@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   STANDARD_GUITAR,
   allPositions,
@@ -24,7 +24,20 @@ import {
 import type { Marker } from '../../../src/lib/fretboard/types';
 import { tuningFromOffsets, tuningInstrument } from '../../../src/lib/instrument/tunings';
 import { pitchClass } from '../../../src/lib/theory/pitch';
-import { defaultSpelling, noteLabel } from '../../../src/lib/notation/notation';
+import {
+  defaultSpelling,
+  noteLabel,
+  overwriteNotationSource,
+  resetNotationSourceForTests
+} from '../../../src/lib/notation/notation';
+import type { AccidentalPolicy } from '../../../src/lib/notation/policy';
+import { buildTriadsModel } from '../../../src/lib/state/triads-model';
+import {
+  initialTriadsView,
+  selectRoot as selectTriadRoot
+} from '../../../src/lib/state/triads-view';
+import { buildCagedModel as buildCaged } from '../../../src/lib/state/caged-model';
+import { initialCagedView, selectRoot as selectCagedRoot } from '../../../src/lib/state/caged-view';
 import { presetInstrument } from '../../../src/lib/instrument/tunings';
 
 const INIT = initialNotesView(STANDARD_GUITAR);
@@ -565,5 +578,76 @@ describe('seven strings (012, US2)', () => {
     expect(buildNotesModel(base, SEVEN).model.description).toBe(
       'Showing natural notes, strings 1 to 7, frets 0 to 22.'
     );
+  });
+});
+
+describe('buildNotesModel: accidental policy (021)', () => {
+  const policy = (accidentals: AccidentalPolicy) =>
+    overwriteNotationSource(() => ({ notation: 'letters', accidentals }));
+  afterEach(() => resetNotationSourceForTests());
+
+  const pairOf = (s: NotesViewState): string[] => {
+    const info = buildNotesModel(s, STANDARD_GUITAR).cardInfo;
+    if (!info?.altSpelling) throw new Error('expected an altered card');
+    return [noteLabel(info.spelling), noteLabel(info.altSpelling)];
+  };
+
+  it('sets spellingPolicy "preference"', () => {
+    expect(build(INIT).model.spellingPolicy).toBe('preference');
+  });
+
+  it('card info lists the preferred spelling first', () => {
+    // string 2 fret 2 = C♯ (pc 1)
+    const s = openCard(INIT, { string: 2, fret: 2 });
+    policy('sharps');
+    expect(pairOf(s)).toEqual(['C♯', 'D♭']);
+    policy('flats');
+    expect(pairOf(s)).toEqual(['D♭', 'C♯']);
+  });
+
+  it('card info for a natural has no alternative under any policy', () => {
+    const s = openCard(INIT, { string: 1, fret: 0 });
+    for (const p of ['sharps', 'flats', 'both'] as const) {
+      policy(p);
+      expect(buildNotesModel(s, STANDARD_GUITAR).cardInfo?.altSpelling).toBeNull();
+    }
+  });
+
+  it('missing-notes and detected-triad root use the single spelling (sharp under both)', () => {
+    const view = select(10, 2, 5); // A♯/B♭, D, F → B♭ major
+    policy('flats');
+    expect(build(view).detected?.name).toBe('B♭ major');
+    policy('sharps');
+    expect(build(view).detected?.name).toBe('A♯ major');
+    policy('both');
+    expect(build(view).detected?.name).toBe('A♯ major');
+  });
+
+  it('description speaks both spellings only under both', () => {
+    const view = select(1);
+    policy('both');
+    expect(build(view).model.description).toContain('C sharp or D flat');
+    policy('flats');
+    expect(build(view).model.description).toContain('D flat');
+    expect(build(view).model.description).not.toContain('C sharp');
+    policy('sharps');
+    expect(build(view).model.description).not.toContain('D flat');
+  });
+
+  it('SC-003: Triads and CAGED keep theory spellings under flats (A major is A–C♯–E)', () => {
+    policy('flats');
+    const triads = buildTriadsModel(
+      selectTriadRoot(initialTriadsView(STANDARD_GUITAR), 9),
+      STANDARD_GUITAR
+    );
+    expect(triads.model.spellingPolicy).toBeUndefined();
+    if (!('composition' in triads)) throw new Error('expected a triads body');
+    const names = triads.composition.notes.map((n) => noteLabel(n.spelling));
+    expect(names).toEqual(['A', 'C♯', 'E']);
+    const caged = buildCaged(selectCagedRoot(initialCagedView(), 9), STANDARD_GUITAR, {
+      tuningName: 'Standard',
+      temporary: false
+    });
+    expect(caged.model?.spellingPolicy).toBeUndefined();
   });
 });

@@ -8,7 +8,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
-  use: { baseURL: `http://localhost:${PORT}`, trace: 'on-first-retry' },
+  use: { baseURL: `http://localhost:${PORT}`, locale: 'en-US', trace: 'on-first-retry' },
   webServer: {
     // Serves the `--mode test` build (fault hook enabled) with host-like 404 routing. Run `pnpm build:test` first.
     command: `node scripts/serve-build.mjs build ${PORT}`,

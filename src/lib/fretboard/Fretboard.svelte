@@ -2,7 +2,16 @@
   import { m } from '$lib/paraglide/messages.js';
   import { onMount, tick, untrack } from 'svelte';
   import { fade } from 'svelte/transition';
-  import { defaultSpelling, intervalLabel, noteLabel, pitchLabel } from '../notation/notation';
+  import {
+    defaultSpelling,
+    intervalLabel,
+    markerSpellings,
+    noteLabel,
+    pitchLabel,
+    singleSpelling,
+    stringSpelling
+  } from '../notation/notation';
+  import { fitMarkerLabel, type FittedLabel, type MarkerSize } from './label-fit';
   import { octaveOf, pitchClass } from '../theory/pitch';
   import {
     isValidPosition,
@@ -386,17 +395,34 @@
   const drawnMap = $derived(firstPerPosition(applyPulses(model.markers, pulses, instrument)));
 
   /** Label rule (contracts/fretboard-model.md §1): explicit `label` wins, else highlighted/normal. */
-  function labelText(mk: DrawnMarker): string | null {
+  function labelLines(mk: DrawnMarker): readonly string[] | null {
     if (model.labelMode === 'none') return null;
     const labeled = mk.label ?? (mk.emphasis === 'highlighted' || mk.emphasis === 'normal');
     if (!labeled) return null;
     if (model.labelMode === 'interval')
-      return mk.interval === undefined ? null : intervalLabel(mk.interval);
+      return mk.interval === undefined ? null : [intervalLabel(mk.interval)];
     const pitch = positionPitch(instrument, mk);
+    if (mk.spelling === undefined && model.spellingPolicy === 'preference') {
+      const octave = octaveOf(pitch);
+      return markerSpellings(pitchClass(pitch)).map((sp) =>
+        model.labelMode === 'octave' ? pitchLabel(sp, octave) : noteLabel(sp)
+      );
+    }
     const spelling = mk.spelling ?? defaultSpelling(pitchClass(pitch));
-    return model.labelMode === 'octave'
-      ? pitchLabel(spelling, octaveOf(pitch))
-      : noteLabel(spelling);
+    return [
+      model.labelMode === 'octave' ? pitchLabel(spelling, octaveOf(pitch)) : noteLabel(spelling)
+    ];
+  }
+
+  /** Marker size class used by the label-fit rule (data-model §11). */
+  function markerSizeOf(mk: DrawnMarker): MarkerSize {
+    if (mk.function === 'root') return 'root';
+    return mk.function === 'degree' ? 'small' : 'medium';
+  }
+
+  function labelFit(mk: DrawnMarker): FittedLabel | null {
+    const lines = labelLines(mk);
+    return lines === null ? null : fitMarkerLabel(lines, markerSizeOf(mk));
   }
 
   /**
@@ -469,7 +495,7 @@
         mk,
         x: layout.columns[mk.fret].center,
         y: rowOf(layout, mk.string).center,
-        label: labelText(mk),
+        label: labelFit(mk),
         tone: mk.emphasis === 'highlighted' ? mk.tone : undefined,
         badge:
           mk.octaveBadge === true && model.labelMode === 'note'
@@ -566,8 +592,12 @@
   const hoverHint = $derived.by(() => {
     if (!hovered || model.hoverHint === false) return null;
     const mk = markerMap[positionKey(hovered)];
+    const hoveredPc = pitchClass(positionPitch(instrument, hovered));
     const text = noteLabel(
-      mk?.spelling ?? defaultSpelling(pitchClass(positionPitch(instrument, hovered)))
+      mk?.spelling ??
+        (model.spellingPolicy === 'preference'
+          ? singleSpelling(hoveredPc)
+          : defaultSpelling(hoveredPc))
     );
     const col = layout.columns[hovered.fret];
     const row = rowOf(layout, hovered.string);
@@ -651,11 +681,14 @@
 
   const diamond = (half: number) => `0,${-half} ${half},0 0,${half} ${-half},0`;
 
-  const openLabel = (string: number) =>
-    noteLabel(
+  const openLabel = (string: number) => {
+    const open =
       instrument.openStrings[string - 1] ??
-        defaultSpelling(pitchClass(positionPitch(instrument, { string, fret: 0 })))
+      defaultSpelling(pitchClass(positionPitch(instrument, { string, fret: 0 })));
+    return noteLabel(
+      model.spellingPolicy === 'preference' ? stringSpelling(open, instrument.fixedSpelling) : open
     );
+  };
 </script>
 
 {#snippet drawing()}
@@ -874,7 +907,16 @@
                   <circle class="connection-ring" aria-hidden="true" style:--ring-base={ringBase} />
                 {/if}
                 {#if d.label}
-                  <text class="marker-label" class:long={d.label.length > 1}>{d.label}</text>
+                  <text
+                    class="marker-label"
+                    class:normal={d.label.size === 'normal'}
+                    class:min={d.label.size === 'min'}
+                    aria-hidden="true"
+                    >{#if d.label.lines.length === 2}<tspan x="0" dy="-0.55em"
+                        >{d.label.lines[0]}</tspan
+                      ><tspan x="0" dy="1.1em">{d.label.lines[1]}</tspan>{:else}{d.label
+                        .lines[0]}{/if}</text
+                  >
                 {/if}
                 {#if d.badge}
                   <text
@@ -940,7 +982,8 @@
                 aria-label={positionName(
                   instrument,
                   { string: row.string, fret: c.fret },
-                  markerMap[`${row.string}:${c.fret}`]
+                  markerMap[`${row.string}:${c.fret}`],
+                  model.spellingPolicy
                 )}
                 x={c.start}
                 y={row.top}
@@ -1378,7 +1421,7 @@
     fill: var(--color-neutral-note-stroke);
   }
 
-  .marker text.marker-label.long {
+  .marker text.marker-label.min {
     font-size: var(--marker-label-min-size);
   }
 </style>

@@ -209,6 +209,23 @@ describe('Tuning union (011)', () => {
     );
   });
 
+  it('I-1: fixedSpelling is true for presets, false for unmatched custom tunings', () => {
+    expect(STANDARD_GUITAR.fixedSpelling).toBe(true);
+    for (const p of TUNING_PRESETS) {
+      expect(presetInstrument(p.id, 6, 20).fixedSpelling).toBe(true);
+    }
+    expect(tuningInstrument(tuningFromOffsets([-1, 0, 0, 0, 0, 2]), 6, 20).fixedSpelling).toBe(
+      false
+    );
+  });
+
+  it('I-1: a custom tuning equal to Half step down builds the preset (fixed)', () => {
+    const halfDown = tuningFromOffsets(offsetsOfTuning({ kind: 'preset', id: 'AF-2' }, 6));
+    expect(halfDown).toEqual({ kind: 'preset', id: 'AF-2' });
+    expect(tuningInstrument(halfDown, 6, 22)).toBe(presetInstrument('AF-2', 6, 22));
+    expect(tuningInstrument(halfDown, 6, 22).fixedSpelling).toBe(true);
+  });
+
   it('property: canonical form and round trip', () => {
     const offsets = fc.tuple(
       ...Array.from({ length: 6 }, () => fc.integer({ min: -7, max: 4 }))

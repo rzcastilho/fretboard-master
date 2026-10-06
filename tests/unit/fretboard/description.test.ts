@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  overwriteNotationSource,
+  resetNotationSourceForTests
+} from '../../../src/lib/notation/notation';
+import { overwriteGetLocale } from '../../../src/lib/paraglide/runtime.js';
+import type { AccidentalPolicy } from '../../../src/lib/notation/policy';
 import { describeView, positionName } from '../../../src/lib/fretboard/description';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
@@ -173,5 +179,80 @@ describe('CAGED layers and counts sentences (US6, R-12)', () => {
     expect(at('Layers on: Chord and Arpeggio.')).toBeGreaterThan(at('shapes along the neck.'));
     expect(at('Across the neck:')).toBeGreaterThan(at('Layers on:'));
     expect(at('C shape, frets')).toBeGreaterThan(at('Across the neck:'));
+  });
+});
+
+describe('accidental policy (021 F-1, F-2)', () => {
+  const policy = (accidentals: AccidentalPolicy) =>
+    overwriteNotationSource(() => ({ notation: 'letters', accidentals }));
+  afterEach(() => resetNotationSourceForTests());
+  const FSHARP = { string: 1, fret: 2 };
+
+  it('F-1: absent spellingPolicy ignores the preference', () => {
+    policy('flats');
+    expect(positionName(STANDARD_GUITAR, FSHARP)).toBe('F sharp, string 1, fret 2');
+    expect(positionName(STANDARD_GUITAR, FSHARP, marker({}), undefined)).toBe(
+      'F sharp, string 1, fret 2, third'
+    );
+    const model: DisplayModel = { markers: [marker({})], labelMode: 'note' };
+    expect(describeView(STANDARD_GUITAR, model)).toContain('F sharp');
+    expect(describeView(STANDARD_GUITAR, model)).not.toContain('G flat');
+  });
+
+  it('F-2: preference gives flat under flats, sharp under sharps, both under both', () => {
+    policy('flats');
+    expect(positionName(STANDARD_GUITAR, FSHARP, undefined, 'preference')).toBe(
+      'G flat, string 1, fret 2'
+    );
+    policy('sharps');
+    expect(positionName(STANDARD_GUITAR, FSHARP, undefined, 'preference')).toBe(
+      'F sharp, string 1, fret 2'
+    );
+    policy('both');
+    expect(positionName(STANDARD_GUITAR, FSHARP, undefined, 'preference')).toBe(
+      'F sharp or G flat, string 1, fret 2'
+    );
+  });
+
+  it('F-2: naturals are unchanged and an explicit spelling wins', () => {
+    policy('both');
+    expect(positionName(STANDARD_GUITAR, { string: 6, fret: 0 }, undefined, 'preference')).toBe(
+      'E, string 6, open'
+    );
+    const explicit = marker({ spelling: { letter: 'E', accidental: 1 }, function: 'root' });
+    expect(positionName(STANDARD_GUITAR, FSHARP, explicit, 'preference')).toBe(
+      'E sharp, string 1, fret 2, root'
+    );
+  });
+
+  it('F-2: describeView follows the preference', () => {
+    policy('both');
+    const model: DisplayModel = {
+      markers: [marker({})],
+      labelMode: 'note',
+      spellingPolicy: 'preference'
+    };
+    expect(describeView(STANDARD_GUITAR, model)).toContain('F sharp or G flat');
+    policy('flats');
+    expect(describeView(STANDARD_GUITAR, model)).toContain('G flat');
+  });
+
+  it('T053: spoken text is never abbreviated, preferred spelling first under both', () => {
+    policy('both');
+    const model: DisplayModel = {
+      markers: [marker({})],
+      labelMode: 'octave',
+      spellingPolicy: 'preference'
+    };
+    expect(describeView(STANDARD_GUITAR, model)).toContain('F sharp or G flat');
+    expect(describeView(STANDARD_GUITAR, model)).not.toMatch(/[♯♭#]|\bF♯|\bFs\b/);
+    overwriteNotationSource(() => ({ notation: 'solfege', accidentals: 'both' }));
+    overwriteGetLocale(() => 'es');
+    try {
+      const es = positionName(STANDARD_GUITAR, { string: 5, fret: 4 }, undefined, 'preference');
+      expect(es).toContain('Do sostenido o Re bemol');
+    } finally {
+      overwriteGetLocale(() => 'en');
+    }
   });
 });

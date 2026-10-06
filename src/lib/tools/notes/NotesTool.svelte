@@ -6,7 +6,7 @@
   import { STANDARD_GUITAR } from '$lib/instrument/instrument';
   import type { DisplayModel } from '$lib/fretboard/types';
   import type { Position } from '$lib/instrument/instrument';
-  import { defaultSpelling, noteList } from '$lib/notation/notation';
+  import { noteList, singleSpelling } from '$lib/notation/notation';
   import { instrument } from '$lib/state/instrument.svelte';
   import Notice from '$lib/shell/Notice.svelte';
   import NoteSelector from '$lib/tools/NoteSelector.svelte';
@@ -55,7 +55,7 @@
   const noticeMessage = $derived(
     missing.length > 3
       ? m.notes_notice_missing_count({ count: missing.length })
-      : m.notes_notice_missing({ notes: noteList(missing.map(defaultSpelling)) })
+      : m.notes_notice_missing({ notes: noteList(missing.map(singleSpelling)) })
   );
 
   let board: { focusPosition(p: Position): void } | undefined = $state();

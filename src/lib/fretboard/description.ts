@@ -7,7 +7,7 @@ import {
   type Instrument,
   type Position
 } from '../instrument/instrument';
-import { defaultSpelling, spokenNote } from '../notation/notation';
+import { defaultSpelling, spokenMarker, spokenNote } from '../notation/notation';
 import { pitchClass } from '../theory/pitch';
 import type { DisplayModel, Marker, NoteFunction } from './types';
 
@@ -19,10 +19,28 @@ const FUNCTION_NAME: Readonly<Record<NoteFunction, () => string>> = {
   neutral: () => m.fretboard_function_neutral()
 };
 
-export function positionName(instrument: Instrument, position: Position, marker?: Marker): string {
-  const spelling =
-    marker?.spelling ?? defaultSpelling(pitchClass(positionPitch(instrument, position)));
-  const note = spokenNote(spelling);
+/**
+ * Spoken note of an instrument position. An explicit marker spelling always wins; otherwise
+ * `'preference'` follows the accidental preference and absent keeps sharps (021 F-1, F-2).
+ */
+function spokenAt(
+  instrument: Instrument,
+  position: Position,
+  marker: Marker | undefined,
+  policy: DisplayModel['spellingPolicy']
+): string {
+  if (marker?.spelling) return spokenNote(marker.spelling);
+  const pc = pitchClass(positionPitch(instrument, position));
+  return policy === 'preference' ? spokenMarker(pc) : spokenNote(defaultSpelling(pc));
+}
+
+export function positionName(
+  instrument: Instrument,
+  position: Position,
+  marker?: Marker,
+  policy?: DisplayModel['spellingPolicy']
+): string {
+  const note = spokenAt(instrument, position, marker, policy);
   const name =
     position.fret === 0
       ? m.fretboard_position_name_open({ note, string: position.string })
@@ -53,9 +71,7 @@ export function describeView(instrument: Instrument, model: DisplayModel): strin
     })
     .sort((a, b) => b.string - a.string || a.fret - b.fret)
     .map((mk) => {
-      const note = spokenNote(
-        mk.spelling ?? defaultSpelling(pitchClass(positionPitch(instrument, mk)))
-      );
+      const note = spokenAt(instrument, mk, mk, model.spellingPolicy);
       const fn = FUNCTION_NAME[mk.function]();
       return mk.fret === 0
         ? m.fretboard_description_entry_open({ string: mk.string, note, function: fn })

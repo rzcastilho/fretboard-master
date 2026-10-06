@@ -24,6 +24,13 @@ import type { CagedLabelType } from '$lib/state/caged-view';
 import type { TriadsLabelType } from '$lib/state/triads-view';
 import type { ToolId } from '$lib/shell/tools';
 import type { Tempo } from '$lib/state/listen';
+import { LANGUAGE_TAGS, type LanguageTag } from '$lib/i18n/languages';
+import {
+  ACCIDENTAL_POLICIES,
+  NOTATIONS,
+  type AccidentalPolicy,
+  type Notation
+} from '$lib/notation/policy';
 
 export interface Preferences {
   /** 6 or 7 (012); absent or invalid in a stored record → 6. */
@@ -51,6 +58,14 @@ export interface Preferences {
   readonly rotateHintShown: boolean;
   /** 019; absent or invalid in a stored record → 'medium'. Stored only when not 'medium'. */
   readonly tempo: Tempo;
+  /** 020; absent or invalid in a stored record → null (no stored choice). Stored only when non-null. */
+  readonly language: LanguageTag | null;
+  /** 021; absent or invalid in a stored record → null (follow the language). Stored only when non-null. */
+  readonly notation: Notation | null;
+  /** 021; absent or invalid in a stored record → 'sharps'. Stored only when not 'sharps'. */
+  readonly accidentals: AccidentalPolicy;
+  /** 021; absent or invalid in a stored record → false. Stored as `cagedNote`, only when true. */
+  readonly cagedNoteShown: boolean;
 }
 
 export const PREFS_VERSION = 1 as const;
@@ -71,7 +86,11 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   handedness: 'right',
   orientation: 'highest-top',
   rotateHintShown: false,
-  tempo: 'medium'
+  tempo: 'medium',
+  language: null,
+  notation: null,
+  accidentals: 'sharps',
+  cagedNoteShown: false
 });
 
 const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
@@ -116,7 +135,11 @@ const recordSchema = v.object({
   handedness: v.fallback(v.picklist(['right', 'left']), d.handedness),
   orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation),
   rotateHint: v.fallback(v.boolean(), d.rotateHintShown),
-  tempo: v.fallback(v.picklist(TEMPO_VALUES), d.tempo)
+  tempo: v.fallback(v.picklist(TEMPO_VALUES), d.tempo),
+  language: v.fallback(v.nullable(v.picklist(LANGUAGE_TAGS)), null),
+  notation: v.fallback(v.nullable(v.picklist(NOTATIONS)), null),
+  accidentals: v.fallback(v.picklist(ACCIDENTAL_POLICIES), d.accidentals),
+  cagedNote: v.fallback(v.boolean(), d.cagedNoteShown)
 });
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -144,7 +167,11 @@ export function parsePreferences(raw: string | null): Preferences {
       handedness: r.handedness,
       orientation: r.orientation,
       rotateHintShown: r.rotateHint,
-      tempo: r.tempo
+      tempo: r.tempo,
+      language: r.language,
+      notation: r.notation,
+      accidentals: r.accidentals,
+      cagedNoteShown: r.cagedNote
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -165,7 +192,9 @@ export function tuningOfPreferences(p: Preferences): Tuning {
  * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
  * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013),
  * `rotateHint` only when true (016), `labels.caged` only when `'name'` (017),
- * `tempo` (after `rotateHint`) only when not `'medium'` (019).
+ * `tempo` (after `rotateHint`) only when not `'medium'` (019), `language` (after `tempo`) only
+ * when non-null (020), then `notation` (non-null), `accidentals` (not `'sharps'`) and
+ * `cagedNote` (true only) (021).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -185,6 +214,10 @@ export function serializePreferences(p: Preferences): string {
     ...(p.handedness === 'left' ? { handedness: 'left' } : {}),
     ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {}),
     ...(p.rotateHintShown ? { rotateHint: true } : {}),
-    ...(p.tempo === 'medium' ? {} : { tempo: p.tempo })
+    ...(p.tempo === 'medium' ? {} : { tempo: p.tempo }),
+    ...(p.language === null ? {} : { language: p.language }),
+    ...(p.notation === null ? {} : { notation: p.notation }),
+    ...(p.accidentals === 'sharps' ? {} : { accidentals: p.accidentals }),
+    ...(p.cagedNoteShown ? { cagedNote: true } : {})
   });
 }

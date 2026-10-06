@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import { defaultSpelling, flatSpelling, noteLabel, spokenNote } from '$lib/notation/notation';
+  import { labelPair, spellingPair, spokenPair } from '$lib/notation/notation';
 
   interface Props {
     /** Selected pitch classes (0–11, C = 0). */
@@ -12,19 +12,16 @@
 
   let { selected, ontoggle, label }: Props = $props();
 
-  const notes = Array.from({ length: 12 }, (_, pc) => {
-    const sharp = defaultSpelling(pc);
-    const altered = sharp.accidental !== 0;
-    const flat = flatSpelling(pc);
-    return {
+  // Derived so a notation or accidental change relabels the keys in place (N-1).
+  const notes = $derived(
+    Array.from({ length: 12 }, (_, pc) => ({
       pc,
-      altered,
-      label: altered ? `${noteLabel(sharp)} / ${noteLabel(flat)}` : noteLabel(sharp),
-      name: altered
-        ? m.notes_selector_altered_spoken({ sharp: spokenNote(sharp), flat: spokenNote(flat) })
-        : spokenNote(sharp)
-    };
-  });
+      altered: spellingPair(pc).length > 1,
+      // Preferred spelling first, joined with " / " (naturals alone).
+      label: labelPair(pc),
+      name: spokenPair(pc)
+    }))
+  );
 </script>
 
 <div class="selector" role="group" aria-label={label ?? m.notes_selector_label()}>
@@ -43,16 +40,12 @@
 </div>
 
 <style>
+  /* Track floor is rem-based, so it grows with the user's text size: at 100 % six keys fit a
+     320 px row; at 200 % they wrap to more rows instead of overlapping (US4). */
   .selector {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(2.2rem, 1fr));
     gap: var(--space-2);
-  }
-
-  @media (min-width: 600px) {
-    .selector {
-      grid-template-columns: repeat(12, minmax(0, 1fr));
-    }
   }
 
   button {

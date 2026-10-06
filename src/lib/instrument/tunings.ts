@@ -151,13 +151,19 @@ export function clampFrets(n: number): number {
 const cache = new Map<string, Instrument>();
 
 /** Frozen; `lowToHigh` is reversed so string 1 (highest) comes first. */
-const build = (count: StringCount, frets: number, lowToHigh: readonly SpelledPitch[]): Instrument =>
+const build = (
+  count: StringCount,
+  frets: number,
+  lowToHigh: readonly SpelledPitch[],
+  fixedSpelling: boolean
+): Instrument =>
   Object.freeze({
     stringCount: count,
     fretCount: frets,
     openStrings: Object.freeze([...lowToHigh].reverse()),
     handedness: 'right',
-    orientation: 'highest-top'
+    orientation: 'highest-top',
+    fixedSpelling
   });
 
 /** Memoized and frozen; string 1 (highest) first. `('AF-1', 6, 22)` is `STANDARD_GUITAR`. */
@@ -169,7 +175,7 @@ export function presetInstrument(id: TuningId, count: StringCount, fretCount: nu
   const made: Instrument =
     id === 'AF-1' && count === 6 && frets === DEFAULT_FRETS
       ? STANDARD_GUITAR
-      : build(count, frets, presetStrings(id, count));
+      : build(count, frets, presetStrings(id, count), true);
   cache.set(key, made);
   return made;
 }
@@ -231,7 +237,7 @@ export function tuningInstrument(t: Tuning, count: StringCount, fretCount: numbe
   const key = `${t.offsets.join(',')}|${count}|${frets}`;
   const hit = customCache.get(key);
   if (hit) return hit;
-  const made = build(count, frets, tuningStrings(t, count));
+  const made = build(count, frets, tuningStrings(t, count), false);
   customCache.set(key, made);
   return made;
 }

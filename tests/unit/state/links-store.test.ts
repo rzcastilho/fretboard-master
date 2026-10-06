@@ -16,12 +16,14 @@ import {
 } from '../../../src/lib/state/links.svelte';
 import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
+import { notation, resetNotationForTests } from '../../../src/lib/state/notation.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
 
 beforeEach(() => {
   goto.mockClear();
   resetPlaybackForTests();
+  resetNotationForTests();
   resetNotesForTests();
   resetTriadsForTests();
   resetCagedForTests();
@@ -235,6 +237,17 @@ describe('session memory and Reset tool (US4)', () => {
     resetTool('notes');
     expect(triads.instrument).toBe(AF_7);
     expect(notes.instrument).toBe(AF_7);
+  });
+
+  it('Reset tool never changes notation or accidentals (FR-1.11), and no link carries them (DM-17)', () => {
+    notation.choose('solfege');
+    notation.chooseAccidentals('flats');
+    for (const id of ['notes', 'triads', 'caged'] as const) resetTool(id);
+    expect(notation.chosen).toBe('solfege');
+    expect(notation.accidentals).toBe('flats');
+    for (const call of goto.mock.calls as unknown[][]) {
+      expect(String(call[0])).not.toMatch(/notation|accidental|solfege|flats/i);
+    }
   });
 
   it('after reset, a switch away and back reopens the initial state', () => {

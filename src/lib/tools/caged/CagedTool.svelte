@@ -10,6 +10,8 @@
   import { openTriadsFromCaged, openTriadsFromCagedTriad } from '$lib/state/links.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { playback } from '$lib/state/playback.svelte';
+  import { notation } from '$lib/state/notation.svelte';
+  import { solfegeName } from '$lib/notation/notation';
   import { preferences } from '$lib/state/preferences.svelte';
   import { isPhonePortrait } from '$lib/state/rotate-hint';
   import Notice from '$lib/shell/Notice.svelte';
@@ -46,6 +48,15 @@
     else if (!hintOpen && !preferences.rotateHintShown) {
       hintOpen = true;
       preferences.markRotateHintShown();
+    }
+  });
+
+  // Solfège note (021 US5): shapes keep letter names; explained once, recorded the moment it appears.
+  let noteOpen = $state(false);
+  $effect(() => {
+    if (notation.effective === 'solfege' && !preferences.cagedNoteShown) {
+      noteOpen = true;
+      preferences.markCagedNoteShown();
     }
   });
 
@@ -143,6 +154,18 @@
   </div>
   {#if instrument.adjustedIn === 'caged'}
     <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
+  {/if}
+  {#if noteOpen}
+    <Notice
+      message={m.caged_solfege_note({
+        c: solfegeName('C'),
+        a: solfegeName('A'),
+        g: solfegeName('G'),
+        e: solfegeName('E'),
+        d: solfegeName('D')
+      })}
+      ondismiss={() => (noteOpen = false)}
+    />
   {/if}
   {#if hintOpen}
     <Notice message={m.caged_rotate_hint()} ondismiss={() => (hintOpen = false)} />

@@ -124,6 +124,33 @@ export default tseslint.config(
     }
   },
   {
+    files: ['src/lib/i18n/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            'svelte',
+            'svelte/*',
+            '$app/*',
+            '$lib/paraglide/*',
+            '$lib/fretboard/*',
+            '$lib/instrument/*',
+            '$lib/prefs/*',
+            '$lib/audio/engine'
+          ]
+        }
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'i18n code must be DOM-free.' },
+        { name: 'document', message: 'i18n code must be DOM-free.' },
+        { name: 'localStorage', message: 'i18n code must be DOM-free.' },
+        { name: 'navigator', message: 'i18n code must be DOM-free.' }
+      ]
+    }
+  },
+  {
     // Playback contract §4: audio is pure Web Audio/DSP; only state/playback owns the engine.
     files: ['src/lib/audio/**'],
     rules: {

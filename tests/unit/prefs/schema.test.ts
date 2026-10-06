@@ -14,7 +14,7 @@ import { OFFSET_MAX, OFFSET_MIN, type Offsets } from '../../../src/lib/instrumen
 import { TOOLS } from '../../../src/lib/shell/tools';
 import { TUNING_PRESETS, tuningFromOffsets } from '../../../src/lib/instrument/tunings';
 import { DEFAULT_TEMPO, TEMPOS } from '../../../src/lib/state/listen';
-import { FIXTURES } from './fixtures';
+import { FIXTURES, FIXTURE_BY_NAME } from './fixtures';
 
 const rec = (o: unknown): string => JSON.stringify(o);
 
@@ -35,7 +35,11 @@ describe('constants and defaults (FR-018)', () => {
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false,
-      tempo: 'medium'
+      tempo: 'medium',
+      language: null,
+      notation: null,
+      accidentals: 'sharps',
+      cagedNoteShown: false
     });
   });
 
@@ -142,6 +146,168 @@ describe('raw handling', () => {
   });
 });
 
+describe('language (020)', () => {
+  it('parses valid tags from fixtures', () => {
+    expect(parsePreferences(FIXTURE_BY_NAME['language-pt'].raw).language).toBe('pt-BR');
+    expect(parsePreferences(FIXTURE_BY_NAME['language-es'].raw).language).toBe('es');
+  });
+
+  it('invalid language falls back to null and keeps other fields', () => {
+    for (const name of ['bad-language', 'language-number']) {
+      const p = parsePreferences(FIXTURE_BY_NAME[name].raw);
+      expect(p.language).toBeNull();
+      expect(p.tuningId).toBe('AF-3');
+      expect(p.fretCount).toBe(20);
+      expect(p.muted).toBe(true);
+    }
+  });
+
+  it('record without language serializes byte-identically to slice 019', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, tempo: 'fast' })).not.toContain(
+      'language'
+    );
+  });
+
+  it('serializes language after tempo only when non-null', () => {
+    const raw = serializePreferences({ ...DEFAULT_PREFERENCES, tempo: 'fast', language: 'es' });
+    expect(raw).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"tempo":"fast","language":"es"}'
+    );
+    expect(serializePreferences(parsePreferences(FIXTURE_BY_NAME['language-pt'].raw))).toBe(
+      FIXTURE_BY_NAME['language-pt'].raw
+    );
+  });
+});
+
+describe('notation, accidentals and CAGED note (021 P-1, P-2)', () => {
+  const p = (o: unknown) => parsePreferences(rec({ version: 1, ...(o as object) }));
+
+  it('parses each fixture', () => {
+    expect(parsePreferences(FIXTURE_BY_NAME['notation-solfege'].raw).notation).toBe('solfege');
+    expect(parsePreferences(FIXTURE_BY_NAME['notation-letters'].raw).notation).toBe('letters');
+    expect(parsePreferences(FIXTURE_BY_NAME['accidentals-flats'].raw).accidentals).toBe('flats');
+    expect(parsePreferences(FIXTURE_BY_NAME['accidentals-both'].raw).accidentals).toBe('both');
+    expect(parsePreferences(FIXTURE_BY_NAME['caged-note'].raw).cagedNoteShown).toBe(true);
+  });
+
+  it('absent fields give null, sharps and false', () => {
+    const r = p({});
+    expect(r.notation).toBeNull();
+    expect(r.accidentals).toBe('sharps');
+    expect(r.cagedNoteShown).toBe(false);
+  });
+
+  it.each(['hindi', 1, true, [], {}, ''])('invalid notation %j → null, others kept', (bad) => {
+    const r = p({ notation: bad, accidentals: 'flats', cagedNote: true, frets: 18 });
+    expect(r.notation).toBeNull();
+    expect(r.accidentals).toBe('flats');
+    expect(r.cagedNoteShown).toBe(true);
+    expect(r.fretCount).toBe(18);
+  });
+
+  it.each(['quarter', 1, null, [], {}, ''])(
+    'invalid accidentals %j → sharps, others kept',
+    (bad) => {
+      const r = p({ notation: 'solfege', accidentals: bad, cagedNote: true, frets: 18 });
+      expect(r.accidentals).toBe('sharps');
+      expect(r.notation).toBe('solfege');
+      expect(r.cagedNoteShown).toBe(true);
+      expect(r.fretCount).toBe(18);
+    }
+  );
+
+  it.each(['yes', 1, null, [], {}])('invalid cagedNote %j → false, others kept', (bad) => {
+    const r = p({ notation: 'solfege', accidentals: 'both', cagedNote: bad });
+    expect(r.cagedNoteShown).toBe(false);
+    expect(r.notation).toBe('solfege');
+    expect(r.accidentals).toBe('both');
+  });
+
+  it('bad fixtures fall back to defaults and keep other fields', () => {
+    for (const name of ['bad-notation', 'bad-accidentals']) {
+      const r = parsePreferences(FIXTURE_BY_NAME[name].raw);
+      expect(r.notation).toBeNull();
+      expect(r.accidentals).toBe('sharps');
+      expect(r.tuningId).toBe('AF-3');
+      expect(r.fretCount).toBe(20);
+      expect(r.muted).toBe(true);
+      expect(serializePreferences(r)).not.toMatch(/notation|accidentals/);
+    }
+  });
+
+  it('writes no field at its default', () => {
+    const raw = serializePreferences(DEFAULT_PREFERENCES);
+    expect(raw).not.toMatch(/notation|accidentals|cagedNote/);
+  });
+
+  it('writes the fields after language, in order notation, accidentals, cagedNote', () => {
+    const raw = serializePreferences({
+      ...DEFAULT_PREFERENCES,
+      language: 'es',
+      notation: 'letters',
+      accidentals: 'both',
+      cagedNoteShown: true
+    });
+    expect(Object.keys(JSON.parse(raw)).slice(-4)).toEqual([
+      'language',
+      'notation',
+      'accidentals',
+      'cagedNote'
+    ]);
+    expect(raw).toContain('"cagedNote":true');
+  });
+
+  it('writes notation even when it equals the language default (explicit pick)', () => {
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, notation: 'letters' })).toContain(
+      '"notation":"letters"'
+    );
+  });
+
+  it('new fixtures round-trip byte-identically', () => {
+    for (const name of [
+      'notation-solfege',
+      'notation-letters',
+      'accidentals-flats',
+      'accidentals-both',
+      'caged-note'
+    ]) {
+      const f = FIXTURE_BY_NAME[name];
+      expect(serializePreferences(parsePreferences(f.raw))).toBe(f.raw);
+    }
+  });
+
+  it('every pre-existing fixture re-serializes without the new keys', () => {
+    const added = [
+      'notation-solfege',
+      'notation-letters',
+      'accidentals-flats',
+      'accidentals-both',
+      'bad-notation',
+      'bad-accidentals',
+      'caged-note'
+    ];
+    for (const f of FIXTURES) {
+      if (added.includes(f.name) || f.raw.length > MAX_RAW_LENGTH) continue;
+      expect(serializePreferences(parsePreferences(f.raw))).not.toMatch(
+        /notation|accidentals|cagedNote/
+      );
+    }
+  });
+
+  it('never throws on arbitrary values', () => {
+    fc.assert(
+      fc.property(fc.anything(), fc.anything(), fc.anything(), (a, b, c) => {
+        expect(() =>
+          parsePreferences(JSON.stringify({ notation: a, accidentals: b, cagedNote: c }))
+        ).not.toThrow();
+      })
+    );
+  });
+});
+
 describe('serializePreferences', () => {
   it('writes customTuning after tuning when present, in contract order', () => {
     const p: Preferences = {
@@ -169,7 +335,11 @@ describe('serializePreferences', () => {
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false,
-      tempo: 'medium'
+      tempo: 'medium',
+      language: null,
+      notation: null,
+      accidentals: 'sharps',
+      cagedNoteShown: false
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -219,7 +389,11 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       handedness: 'right',
       orientation: 'highest-top',
       rotateHintShown: false,
-      tempo: 'medium'
+      tempo: 'medium',
+      language: null,
+      notation: null,
+      accidentals: 'sharps',
+      cagedNoteShown: false
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -492,7 +666,11 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   handedness: fc.constantFrom('right', 'left'),
   orientation: fc.constantFrom('highest-top', 'lowest-top'),
   rotateHintShown: fc.boolean(),
-  tempo: fc.constantFrom('slow', 'medium', 'fast')
+  tempo: fc.constantFrom('slow', 'medium', 'fast'),
+  language: fc.constantFrom(null, 'en', 'pt-BR', 'es'),
+  notation: fc.constantFrom(null, 'letters', 'solfege'),
+  accidentals: fc.constantFrom('sharps', 'flats', 'both'),
+  cagedNoteShown: fc.boolean()
 });
 
 function isValid(p: Preferences): boolean {

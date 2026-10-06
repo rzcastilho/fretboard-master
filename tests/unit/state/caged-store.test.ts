@@ -7,6 +7,9 @@ import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import type { StorageLike } from '../../../src/lib/prefs/storage';
 import { sharedPositions } from '../../../src/lib/theory/caged';
+import { language, resetLanguageForTests } from '../../../src/lib/state/language.svelte';
+import { notation, resetNotationForTests } from '../../../src/lib/state/notation.svelte';
+import type { Tuning } from '../../../src/lib/instrument/tunings';
 
 beforeEach(() => {
   resetPlaybackForTests();
@@ -46,7 +49,7 @@ describe('caged store: instrument changes (US4)', () => {
     caged.selectRoot(1);
     caged.setQuality('minor');
     const before = caged.state;
-    expect(caged.applyInstrument(AF_1_12, 'Standard')).toBe(false);
+    expect(caged.applyInstrument(AF_1_12, { kind: 'preset', id: 'AF-1' })).toBe(false);
     expect(caged.state).toBe(before);
     expect(caged.instrument).toBe(AF_1_12);
     expect(caged.display.fitNote).toBe('With 12 frets, 4 shapes fit on the fretboard');
@@ -54,7 +57,10 @@ describe('caged store: instrument changes (US4)', () => {
 
   it('redraws for handedness and orientation changes', () => {
     const base = caged.display.model;
-    caged.applyInstrument(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'), 'Standard');
+    caged.applyInstrument(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'), {
+      kind: 'preset',
+      id: 'AF-1'
+    });
     expect(caged.display.model).toEqual(base);
     expect(caged.instrument.handedness).toBe('left');
     expect(caged.instrument.orientation).toBe('lowest-top');
@@ -95,29 +101,29 @@ describe('caged store: tuning name (slice 015)', () => {
   it('applyInstrument stores preferred and tuningName, keeps the view, returns false', () => {
     caged.selectRoot(3);
     const before = caged.state;
-    expect(caged.applyInstrument(AF_1_12, 'Standard')).toBe(false);
+    expect(caged.applyInstrument(AF_1_12, { kind: 'preset', id: 'AF-1' })).toBe(false);
     expect(caged.state).toBe(before);
     expect(caged.instrument).toBe(AF_1_12);
     expect(caged.display.tuningName).toBe('Standard');
-    expect(caged.applyInstrument(AF_1_12, 'Drop D')).toBe(false);
+    expect(caged.applyInstrument(AF_1_12, { kind: 'preset', id: 'AF-4' })).toBe(false);
     expect(caged.display.tuningName).toBe('Drop D');
   });
 
   it('useInstrument(next, tuningName) applies the name', () => {
-    caged.useInstrument(AF_1_12, 'Half step down');
+    caged.useInstrument(AF_1_12, { kind: 'preset', id: 'AF-2' });
     expect(caged.instrument).toBe(AF_1_12);
     expect(caged.display.tuningName).toBe('Half step down');
   });
 
   it('resetCagedForTests(next, tuningName) sets both', () => {
-    resetCagedForTests(AF_1_12, 'Custom');
+    resetCagedForTests(AF_1_12, { kind: 'custom', offsets: [1, 0, 0, 0, 0, 0] });
     expect(caged.instrument).toBe(AF_1_12);
     expect(caged.display.tuningName).toBe('Custom');
   });
 });
 
 describe('caged store: temporary standard view (slice 015 US1)', () => {
-  const openG = () => resetCagedForTests(AF_8, 'Open G');
+  const openG = () => resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
 
   it('viewInStandard is a no-op unless the class is non-compatible', () => {
     const stop = vi.spyOn(playback, 'stop');
@@ -238,7 +244,7 @@ describe('caged store: shape focus (016 US1)', () => {
     resetCagedForTests(AF_1_24);
     caged.toggleTag('A@15');
     expect(caged.state.focus).toEqual({ letter: 'A', ordinal: 1 });
-    expect(caged.applyInstrument(AF_1_12, 'Standard')).toBe(true);
+    expect(caged.applyInstrument(AF_1_12, { kind: 'preset', id: 'AF-1' })).toBe(true);
     expect(caged.display.focused?.shape.id).toBe('A');
     expect(caged.display.focused?.start).toBe(3);
   });
@@ -247,19 +253,22 @@ describe('caged store: shape focus (016 US1)', () => {
     caged.chooseShape('E');
     const f = caged.state.focus;
     expect(
-      caged.applyInstrument(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'), 'Standard')
+      caged.applyInstrument(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'), {
+        kind: 'preset',
+        id: 'AF-1'
+      })
     ).toBe(false);
     expect(caged.state.focus).toEqual(f);
   });
 
   it('applyInstrument: a non-compatible tuning clears focus and returns false', () => {
     caged.chooseShape('E');
-    expect(caged.applyInstrument(AF_8, 'Open G')).toBe(false);
+    expect(caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' })).toBe(false);
     expect(caged.state.focus).toBeNull();
   });
 
   it('endTemporary clears focus when the preferred tuning is non-compatible', () => {
-    resetCagedForTests(AF_8, 'Open G');
+    resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
     caged.viewInStandard();
     caged.chooseShape('E');
     expect(caged.state.focus?.letter).toBe('E');
@@ -369,7 +378,7 @@ describe('caged store: step transition (016 US2)', () => {
     ['reset', () => caged.reset()],
     ['selectRoot', () => caged.selectRoot(7)],
     ['setQuality', () => caged.setQuality('minor')],
-    ['applyInstrument', () => caged.applyInstrument(AF_1_12, 'Standard')],
+    ['applyInstrument', () => caged.applyInstrument(AF_1_12, { kind: 'preset', id: 'AF-1' })],
     ['resetCagedForTests', () => resetCagedForTests()]
   ])('%s clears the transition immediately', (_name, act) => {
     stepped();
@@ -424,11 +433,11 @@ describe('caged store: connections (016 US3)', () => {
 
   it('a non-compatible tuning keeps its value', () => {
     caged.setConnections(true);
-    caged.applyInstrument(AF_8, 'Open');
+    caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
     expect(caged.display.tuningClass).toBe('non-compatible');
     expect(caged.state.connections).toBe(true);
     expect(caged.display.connections).toEqual([]);
-    caged.applyInstrument(STANDARD_GUITAR, 'Standard');
+    caged.applyInstrument(STANDARD_GUITAR, { kind: 'preset', id: 'AF-1' });
     expect(caged.state.connections).toBe(true);
   });
 });
@@ -514,14 +523,14 @@ describe('caged store: layers (US2)', () => {
     caged.chooseShape('E');
     caged.toggleLayer('scale');
     caged.toggleLayer('chord');
-    caged.applyInstrument(AF_8, 'Open');
+    caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
     expect(caged.state.focus).toBeNull();
     expect(caged.state.layers.chord).toBe(true);
     expect(caged.layerChange).toEqual({ layer: 'chord', on: true });
   });
 
   it('restores Chord when viewInStandard or endTemporary clears the focus', () => {
-    caged.applyInstrument(AF_8, 'Open');
+    caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
     caged.viewInStandard();
     caged.chooseShape('E');
     caged.toggleLayer('scale');
@@ -534,7 +543,7 @@ describe('caged store: layers (US2)', () => {
   it('layers survive an instrument change and no layer data reaches storage', () => {
     const before = JSON.stringify({ ...localStorage });
     caged.toggleLayer('arpeggio');
-    caged.applyInstrument(AF_1_12, 'Standard');
+    caged.applyInstrument(AF_1_12, { kind: 'preset', id: 'AF-1' });
     expect(caged.state.layers.arpeggio).toBe(true);
     expect(JSON.stringify({ ...localStorage })).toBe(before);
   });
@@ -847,7 +856,7 @@ describe('caged store: triad settle (018 US2)', () => {
   it('instrument change settles the set', () => {
     caged.chooseShape('A');
     caged.toggleLayer('triad');
-    caged.applyInstrument(AF_1_12, 'Standard');
+    caged.applyInstrument(AF_1_12, { kind: 'preset', id: 'AF-1' });
     const sel = caged.display.triad?.selected ?? null;
     const set = caged.state.triadSet;
     if (sel !== null) expect(sel).toBe(set);
@@ -942,7 +951,7 @@ describe('caged store: Listen (019 US1)', () => {
 
   it('is a no-op when no shape is drawn', () => {
     const { seq, tl } = stubs();
-    caged.applyInstrument(AF_8, 'AF-8');
+    caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
     expect(caged.display.listen.source).toBeNull();
     caged.listen();
     expect(seq).not.toHaveBeenCalled();
@@ -1088,14 +1097,14 @@ describe('caged store: stop matrix and tempo (019 US2, R-09)', () => {
     it('useInstrument', () => {
       caged.chooseShape('E');
       const stop = setup(true);
-      caged.useInstrument(AF_1_24, 'AF-1');
+      caged.useInstrument(AF_1_24, { kind: 'preset', id: 'AF-1' });
       expect(stop).toHaveBeenCalledWith('instrument');
       expect(stop).not.toHaveBeenCalledWith('view');
     });
 
     it('viewInStandard and endTemporary', () => {
       caged.chooseShape('E');
-      caged.applyInstrument(AF_8, 'AF-8');
+      caged.applyInstrument(AF_8, { kind: 'preset', id: 'AF-8' });
       const stop = setup(true);
       caged.viewInStandard();
       expect(stop).toHaveBeenCalledWith('instrument');
@@ -1217,7 +1226,7 @@ describe('caged store: showTriadLayer (019 US4, R-12)', () => {
   });
 
   it('is a no-op in a non-compatible tuning', () => {
-    resetCagedForTests(AF_8, 'Open G');
+    resetCagedForTests(AF_8, { kind: 'preset', id: 'AF-8' });
     expect(caged.display.tuningClass).toBe('non-compatible');
     const before = caged.state;
     caged.showTriadLayer();
@@ -1230,5 +1239,42 @@ describe('caged store: showTriadLayer (019 US4, R-12)', () => {
     const { chord, arpeggio, pentatonic, scale } = caged.state.layers;
     caged.showTriadLayer();
     expect(caged.state.layers).toEqual({ chord, arpeggio, pentatonic, scale, triad: true });
+  });
+});
+
+describe('caged store: tuning label follows notation (021 T-2)', () => {
+  const OPEN_G: Tuning = { kind: 'preset', id: 'AF-8' };
+
+  beforeEach(() => {
+    resetLanguageForTests();
+    resetNotationForTests();
+    language.start('en');
+    notation.start({ notation: null, accidentals: 'sharps' });
+  });
+
+  afterEach(() => {
+    resetNotationForTests();
+    resetLanguageForTests();
+  });
+
+  it('applyInstrument stores the Tuning and derives the label', () => {
+    caged.applyInstrument(AF_8, OPEN_G);
+    expect(caged.display.tuningName).toBe('Open G');
+  });
+
+  it('a notation change updates the label and the unsupported-tuning notice', () => {
+    caged.applyInstrument(AF_8, OPEN_G);
+    expect(caged.display.unsupportedNotice).toContain('Open G');
+    notation.choose('solfege');
+    expect(caged.display.tuningName).toBe('Open Sol');
+    expect(caged.display.unsupportedNotice).toContain('Open Sol');
+  });
+
+  it('a language change updates the label', () => {
+    caged.applyInstrument(AF_8, OPEN_G);
+    language.restore('pt-BR');
+    expect(caged.display.tuningName).toBe('Aberta em G');
+    notation.choose('solfege');
+    expect(caged.display.tuningName).toBe('Aberta em Sol');
   });
 });

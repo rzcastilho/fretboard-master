@@ -2,6 +2,7 @@
   import { m } from '$lib/paraglide/messages.js';
   import AppNav from '$lib/shell/AppNav.svelte';
   import ErasePreferences from '$lib/shell/ErasePreferences.svelte';
+  import LanguagePanel from '$lib/shell/LanguagePanel.svelte';
   import SoundControl from '$lib/shell/SoundControl.svelte';
   import StopButton from '$lib/shell/StopButton.svelte';
   import { screenTitle } from '$lib/shell/screens';
@@ -15,6 +16,7 @@
   <AppNav current="about" />
   <StopButton />
   <SoundControl />
+  <LanguagePanel />
 </header>
 
 <main>

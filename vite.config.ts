@@ -3,10 +3,26 @@ import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { svelteTesting } from '@testing-library/svelte/vite';
 import { defineConfig } from 'vitest/config';
+import { findMissingKeys, type Catalog } from './src/lib/i18n/gaps';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
   version: string;
 };
+
+const readCatalog = (locale: string): Catalog =>
+  JSON.parse(
+    readFileSync(new URL(`./messages/${locale}.json`, import.meta.url), 'utf8')
+  ) as Catalog;
+
+/** Per-locale message keys still missing text (falls back to English); `en` is the base: always []. */
+function missingText(): Record<'en' | 'pt-BR' | 'es', string[]> {
+  const base = readCatalog('en');
+  return {
+    en: [],
+    'pt-BR': findMissingKeys(base, readCatalog('pt-BR')),
+    es: findMissingKeys(base, readCatalog('es'))
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const override = process.env.FM_APP_VERSION;
@@ -27,7 +43,8 @@ export default defineConfig(({ mode }) => {
     ],
     define: {
       __APP_VERSION__: JSON.stringify(version),
-      __FM_FAULT_INJECTION__: JSON.stringify(mode === 'test' || mode === 'development')
+      __FM_FAULT_INJECTION__: JSON.stringify(mode === 'test' || mode === 'development'),
+      __FM_MISSING_TEXT__: JSON.stringify(missingText())
     },
     test: {
       environment: 'jsdom',
