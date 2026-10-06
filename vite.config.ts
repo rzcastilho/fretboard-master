@@ -24,6 +24,15 @@ function missingText(): Record<'en' | 'pt-BR' | 'es', string[]> {
   };
 }
 
+/** Worker cap from an env value ("4" or "50%"), else the fallback. */
+function workerCap(
+  env: string | undefined,
+  fallback: string | undefined
+): number | string | undefined {
+  if (!env) return fallback;
+  return /^\d+$/.test(env) ? Number(env) : env;
+}
+
 export default defineConfig(({ mode }) => {
   const override = process.env.FM_APP_VERSION;
   if (override && mode !== 'test') {
@@ -47,7 +56,12 @@ export default defineConfig(({ mode }) => {
       __FM_MISSING_TEXT__: JSON.stringify(missingText())
     },
     test: {
-      environment: 'jsdom',
+      // Pure tests run in node; files that render or touch the DOM opt in with
+      // `// @vitest-environment jsdom` (jsdom setup was ~36% of suite time).
+      environment: 'node',
+      // Several worktrees share one machine locally; cap workers so parallel runs do not
+      // starve each other into timeouts. CI keeps the default. Override: VITEST_MAX_WORKERS.
+      maxWorkers: workerCap(process.env.VITEST_MAX_WORKERS, process.env.CI ? undefined : '50%'),
       include: ['tests/unit/**/*.test.ts'],
       setupFiles: ['tests/unit/setup.ts'],
       coverage: {

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeLink, linkPath, LINK_VERSION, type ShareSnapshot } from '$lib/link';
 import { STANDARD_TUNING, tuningFromOffsets } from '$lib/instrument/tunings';

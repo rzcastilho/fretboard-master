@@ -10,14 +10,16 @@
   --color-surface-raised: #f3f4f6;
   --color-text: #1a1d21;
   --color-text-muted: #4b5563;
-  --color-accent: #0b5cad;
+  --color-accent: #13466a;
   --color-accent-text: #ffffff;
   --color-border: #9ca3af;
   /* Disabled controls: greyed, never error red (feature 006) */
   --color-disabled-text: #6b7280;
   --color-disabled-border: #d1d5db;
   --disabled-opacity: 0.6;
-  --color-focus-ring: #0b5cad;
+  --color-focus-ring: #1a1d21;
+  --color-focus-ring-outer: #1a1d21;
+  --color-focus-ring-inner: #ffffff;
   --color-notice-surface: #e8eef6;
   --color-notice-text: #1a1d21;
   --color-notice-border: #6b7f99;
@@ -101,7 +103,7 @@
   --color-inlay: #b8a888;
   --color-root: #b3261e;
   --color-third: #0b5cad;
-  --color-fifth: #1b6e3a;
+  --color-fifth: #188450;
   --color-neutral-note: #ffffff;
   --color-neutral-note-stroke: #1a1d21;
   --color-degree-stroke: #1a1d21;
@@ -169,12 +171,14 @@
     --color-surface-raised: #1b2027;
     --color-text: #eef0f3;
     --color-text-muted: #b3bac4;
-    --color-accent: #7ab4f0;
+    --color-accent: #c2e0f8;
     --color-accent-text: #101317;
     --color-border: #6b7480;
     --color-disabled-text: #8a929e;
     --color-disabled-border: #3a414b;
-    --color-focus-ring: #9cc8f7;
+    --color-focus-ring: #ffffff;
+    --color-focus-ring-outer: #ffffff;
+    --color-focus-ring-inner: #101317;
     --color-notice-surface: #1f2a38;
     --color-notice-text: #eef0f3;
     --color-notice-border: #7f93ad;
@@ -184,7 +188,7 @@
     --color-inlay: #8a7a5c;
     --color-root: #ff8a80;
     --color-third: #7ab4f0;
-    --color-fifth: #7fd49a;
+    --color-fifth: #94ecbc;
     --color-neutral-note: #1b2027;
     --color-neutral-note-stroke: #eef0f3;
     --color-degree-stroke: #eef0f3;
@@ -217,6 +221,8 @@
     --connection-ring: CanvasText;
     --border-width: 2px;
     --focus-ring-width: 4px;
+    --color-focus-ring-outer: CanvasText;
+    --color-focus-ring-inner: Canvas;
     --color-fretboard-wood: Canvas;
     --color-fretboard-line: CanvasText;
     --color-nut: CanvasText;

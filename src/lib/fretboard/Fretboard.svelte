@@ -20,6 +20,8 @@
     type Position
   } from '../instrument/instrument';
   import { describeView, positionName } from './description';
+  import ViewAids from './ViewAids.svelte';
+  import { legendGroups } from './legend';
   import {
     DEFAULT_METRICS,
     DOUBLE_INLAY_FRETS,
@@ -67,7 +69,6 @@
     ontag
   }: FretboardProps = $props();
 
-  const uid = $props.id();
   const thumb = $derived(variant === 'thumbnail');
   const preview = $derived(variant === 'preview');
   /** Decorative variants: no markers, tags, band, arrows, scrolling or handlers. */
@@ -662,22 +663,6 @@
   }
 
   const description = $derived(model.description ?? describeView(instrument, model));
-  let liveText = $state('');
-  let lastDescription: string | undefined;
-  let showDescription = $state(false);
-
-  // Announce only after the first render and only when the description actually changes.
-  $effect(() => {
-    const d = description;
-    if (lastDescription === undefined) {
-      lastDescription = d;
-      return;
-    }
-    if (d !== lastDescription) {
-      lastDescription = d;
-      liveText = d;
-    }
-  });
 
   const diamond = (half: number) => `0,${-half} ${half},0 0,${half} ${-half},0`;
 
@@ -960,15 +945,17 @@
           </g>
         {/if}
         {#if inside}
-          <rect
-            class="focus-ring"
-            aria-hidden="true"
-            x={layout.columns[stop.fret].start + 1.5}
-            y={rowOf(layout, stop.string).top + 1.5}
-            width={layout.columns[stop.fret].end - layout.columns[stop.fret].start - 3}
-            height={rowOf(layout, stop.string).bottom - rowOf(layout, stop.string).top - 3}
-            rx="4"
-          />
+          {#each ['focus-ring-outer', 'focus-ring-inner'] as ring (ring)}
+            <rect
+              class="focus-ring {ring}"
+              aria-hidden="true"
+              x={layout.columns[stop.fret].start + 1.5}
+              y={rowOf(layout, stop.string).top + 1.5}
+              width={layout.columns[stop.fret].end - layout.columns[stop.fret].start - 3}
+              height={rowOf(layout, stop.string).bottom - rowOf(layout, stop.string).top - 3}
+              rx="4"
+            />
+          {/each}
         {/if}
         {#each layout.rows as row (row.string)}
           <g role="row" data-string={row.string}>
@@ -1001,17 +988,7 @@
         <div class="hold" aria-hidden="true" style:inline-size={`${holdWidth}px`}></div>
       {/if}
     </div>
-    <div class="sr-only" aria-live="polite" aria-atomic="true">{liveText}</div>
-    <button
-      type="button"
-      class="description-toggle"
-      aria-expanded={showDescription}
-      aria-controls="{uid}-description"
-      onclick={() => (showDescription = !showDescription)}
-    >
-      {showDescription ? m.fretboard_description_hide() : m.fretboard_description_show()}
-    </button>
-    <p class="description" id="{uid}-description" hidden={!showDescription}>{description}</p>
+    <ViewAids {description} legend={legendGroups(model)} />
   </div>
 {/if}
 
@@ -1191,38 +1168,18 @@
 
   .focus-ring {
     fill: none;
-    stroke: var(--color-focus-ring);
-    stroke-width: var(--focus-ring-width);
     pointer-events: none;
   }
 
-  .sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  /* Two-tone ring: wide outer stroke under a narrow inner stroke, visible on any fill. */
+  .focus-ring-outer {
+    stroke: var(--color-focus-ring-outer);
+    stroke-width: var(--focus-ring-width);
   }
 
-  .description-toggle {
-    min-block-size: 44px;
-    min-inline-size: 44px;
-    margin-block-start: var(--space-2, 0.5rem);
-    padding-inline: var(--space-3, 0.75rem);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    cursor: pointer;
-  }
-
-  .description {
-    margin-block: var(--space-2, 0.5rem) 0;
-    overflow-wrap: anywhere;
+  .focus-ring-inner {
+    stroke: var(--color-focus-ring-inner);
+    stroke-width: calc(var(--focus-ring-width) / 3);
   }
 
   .marker {

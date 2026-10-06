@@ -244,9 +244,9 @@ test.describe('switch language anywhere (US2)', () => {
 /** US3 / contracts/language-ui.md §6: texts read from the catalogs by key, per language. */
 const SCREEN_SAMPLES: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['/', ['tool_notes_name', 'tool_triads_question', 'nav_about', 'language_label']],
-  ['/notes', ['nav_home', 'nav_about', 'fretboard_description_show']],
-  ['/triads', ['nav_home', 'nav_about', 'fretboard_description_show']],
-  ['/caged', ['nav_home', 'nav_about', 'fretboard_description_show']],
+  ['/notes', ['nav_home', 'nav_about', 'fretboard_describe']],
+  ['/triads', ['nav_home', 'nav_about', 'fretboard_describe']],
+  ['/caged', ['nav_home', 'nav_about', 'fretboard_describe']],
   ['/about', ['nav_home', 'nav_about', 'about_heading']]
 ];
 

@@ -150,7 +150,9 @@ test.describe('TM-9 triads on seven strings (feature 012)', () => {
     await expect(panel(page).getByRole('list', { name: 'Notes' }).getByRole('listitem')).toHaveText(
       ['E', 'G', 'B']
     );
-    await expect(page.locator('.description')).toContainText(/frets 5,? ?3,? ?2/);
+    await expect(page.locator('.description')).toContainText(
+      /string 7, fret 5,.*string 6, fret 3,.*string 5, fret 2/
+    );
     await page.getByRole('button', { name: 'Listen', exact: true }).click();
     await expect
       .poll(async () => (await readAudioLog(page)).filter((e) => e.type === 'step').length)

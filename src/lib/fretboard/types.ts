@@ -2,6 +2,7 @@ import type { Instrument, Position } from '../instrument/instrument';
 import type { Spelling } from '../theory/pitch';
 import type { ScaleDegree } from '../theory/caged-layers';
 import type { IntervalId } from '../theory/triad';
+import type { LegendGroup } from './legend';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
 export type Emphasis = 'highlighted' | 'normal' | 'dimmed' | 'hidden';
@@ -85,6 +86,10 @@ export interface DisplayModel {
   readonly arrows?: readonly FretboardArrow[];
   /** Visible text marks beside a string's label (CAGED "altered"). Aria-hidden; the description carries the meaning. */
   readonly stringMarks?: readonly { readonly string: number; readonly label: string }[];
+  /** Triads: a shown shape needs a wide stretch. Feeds the Legend. */
+  readonly wideStretch?: boolean;
+  /** CAGED: Legend groups by drawn layer; absent → one flat group. */
+  readonly legendGroups?: readonly LegendGroup[];
   /** Keyed auto-scroll: re-runs only when `key` changes (replaces the highlighted-set trigger). */
   readonly autoScroll?: {
     readonly key: string;

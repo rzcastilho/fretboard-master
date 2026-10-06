@@ -164,8 +164,8 @@ test.describe('US2: switch notation from anywhere, instantly', () => {
     await storeLanguage(page, 'en', { tuning: 'AF-4', notation: 'solfege' });
     await page.goto('/triads');
     await expect(page.getByRole('button', { name: /^Tuning: Drop Re/ })).toBeVisible();
-    const live = page.locator('[aria-live]');
-    const text = (await live.allTextContents()).join(' ');
+    // The live region stays silent until a change; the panel text is always current.
+    const text = (await page.locator('.description').allTextContents()).join(' ');
     expect(text).not.toMatch(/\b[A-G] (major|minor|diminished|augmented)\b/);
     await page.goto('/notes');
     for (const name of SOLFEGE) {
@@ -215,7 +215,7 @@ test.describe('US3: sharps, flats, or both for single notes', () => {
     const altered = (await markerLabels(page)).filter((l) => /[♯♭]/.test(l));
     expect(altered.length).toBeGreaterThan(0);
     expect(altered.every((l) => l === 'D♭')).toBe(true);
-    expect((await page.locator('[aria-live]').allTextContents()).join(' ')).not.toContain(
+    expect((await page.locator('.description').allTextContents()).join(' ')).not.toContain(
       'C sharp'
     );
 
@@ -223,7 +223,7 @@ test.describe('US3: sharps, flats, or both for single notes', () => {
     await page.goto('/triads');
     await triadRoot(page).getByRole('button', { name: 'A', exact: true }).click();
     // The root selector lists pairs (preferred first); the board and descriptions keep theory.
-    const described = (await page.locator('[aria-live]').allInnerTexts()).join(' ');
+    const described = (await page.locator('.description').allTextContents()).join(' ');
     expect(described).toContain('C sharp');
     expect(described).not.toContain('D flat');
     await expect(
@@ -239,7 +239,7 @@ test.describe('US3: sharps, flats, or both for single notes', () => {
     const altered = (await markerLabels(page)).filter((l) => /[♯♭]/.test(l));
     expect(altered.length).toBeGreaterThan(0);
     expect(altered.every((l) => l.includes('C♯') && l.includes('D♭'))).toBe(true);
-    const description = (await page.locator('[aria-live]').allTextContents()).join(' ');
+    const description = (await page.locator('.description').allTextContents()).join(' ');
     expect(description).toContain('C sharp or D flat');
   });
 
@@ -339,7 +339,7 @@ test.describe('US4: real accidental symbols, legible and spoken in full', () => 
     await storeLanguage(page, 'es', { accidentals: 'both' });
     await page.goto('/notes');
     await selector(page).getByRole('button', { name: 'Do sostenido o Re bemol' }).click();
-    const spoken = (await page.locator('[aria-live]').allTextContents()).join(' ');
+    const spoken = (await page.locator('.description').allTextContents()).join(' ');
     expect(spoken).toContain('Do sostenido o Re bemol');
     await expect(
       page.getByRole('gridcell', { name: /^Do sostenido o Re bemol, cuerda/ }).first()

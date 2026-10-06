@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PREFS_KEY } from '../../src/lib/prefs/storage';
 import { GAP_WARNING } from '../../src/lib/i18n/gaps';

@@ -528,7 +528,9 @@ test.describe('triads on seven strings (012 US3)', () => {
     await expect(sets.getByRole('radio')).toHaveText(['7-6-5', '6-5-4', '5-4-3', '4-3-2', '3-2-1']);
     await sets.getByRole('radio', { name: '7-6-5' }).click();
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
-    await expect(page.locator('.description')).toContainText(/frets 13,? ?12,? ?10/);
+    await expect(page.locator('.description')).toContainText(
+      /string 7, fret 13,.*string 6, fret 12,.*string 5, fret 10/
+    );
     await expect(board(page).locator('.marker.normal, .marker').first()).toBeVisible();
 
     await page
@@ -537,7 +539,9 @@ test.describe('triads on seven strings (012 US3)', () => {
       .click();
     await page.getByRole('radio', { name: 'minor' }).click();
     await expect(page.getByText('E minor — Root position', { exact: true })).toBeVisible();
-    await expect(page.locator('.description')).toContainText(/frets 5,? ?3,? ?2/);
+    await expect(page.locator('.description')).toContainText(
+      /string 7, fret 5,.*string 6, fret 3,.*string 5, fret 2/
+    );
     await runAxe(page);
   });
 

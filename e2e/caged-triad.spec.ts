@@ -468,9 +468,20 @@ test.describe('caged triad polish: accessibility and persistence', () => {
     expect(await triadKeys(page)).toEqual(['2:5', '3:5', '4:5']);
   });
 
-  test('T052: reload turns Triad off (Chord only)', async ({ page }) => {
+  test('T052: reload of the synced address keeps Triad on (ADR 0021)', async ({ page }) => {
     await aShapeTriad(page);
+    const before = await triadKeys(page);
+    // The address bar follows the view after a 150 ms debounce; reload once it carries the link.
+    await expect(page).toHaveURL(/\/caged\?v=1&/);
     await page.reload();
+    await expect(layerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'true');
+    await expect(setOption(page, '3-2-1')).toBeChecked();
+    expect(await triadKeys(page)).toEqual(before);
+  });
+
+  test('T052: opening /caged without a link turns Triad off (Chord only)', async ({ page }) => {
+    await aShapeTriad(page);
+    await page.goto('/caged');
     await expect(layerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'false');
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-checked', 'true');
     await expect(sets(page)).toHaveCount(0);

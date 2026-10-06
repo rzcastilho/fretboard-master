@@ -578,6 +578,8 @@ test.describe('caged layers US6: readable with everything on', () => {
 
   test('US6-3: the description lists the layers and the region counts', async ({ page }) => {
     await allOn(page);
+    // The live region announces the settled description 500 ms after the last change.
+    await expect(live(page)).toContainText('Layers on: Chord, Arpeggio, Pentatonic, and Scale.');
     const text = (await live(page).textContent()) ?? '';
     expect(text).toContain('Layers on: Chord, Arpeggio, Pentatonic, and Scale.');
     const m = text.match(

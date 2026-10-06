@@ -5,7 +5,12 @@ import {
 } from '../../../src/lib/notation/notation';
 import { overwriteGetLocale } from '../../../src/lib/paraglide/runtime.js';
 import type { AccidentalPolicy } from '../../../src/lib/notation/policy';
-import { describeView, positionName } from '../../../src/lib/fretboard/description';
+import {
+  describeEntries,
+  describeView,
+  positionName,
+  spokenList
+} from '../../../src/lib/fretboard/description';
 import type { DisplayModel, Marker } from '../../../src/lib/fretboard/types';
 import { STANDARD_GUITAR } from '../../../src/lib/instrument/instrument';
 import { presetInstrument } from '../../../src/lib/instrument/tunings';
@@ -60,7 +65,7 @@ describe('describeView', () => {
   });
 
   it('says no positions are marked when empty', () => {
-    expect(describeView(STANDARD_GUITAR, model([]))).toBe('No positions marked.');
+    expect(describeView(STANDARD_GUITAR, model([]))).toBe('Nothing is displayed.');
   });
 
   it('orders string 6→1 then fret ascending', () => {
@@ -105,7 +110,7 @@ describe('describeView', () => {
 
   it('prefixes the summary', () => {
     expect(describeView(STANDARD_GUITAR, model([], 'C major triad.'))).toBe(
-      'C major triad. No positions marked.'
+      'C major triad. Nothing is displayed.'
     );
     expect(
       describeView(
@@ -254,5 +259,89 @@ describe('accidental policy (021 F-1, F-2)', () => {
     } finally {
       overwriteGetLocale(() => 'en');
     }
+  });
+});
+
+describe('spokenList', () => {
+  afterEach(() => overwriteGetLocale(() => 'en'));
+
+  it('joins 0/1/2/3+ items in English', () => {
+    expect(spokenList([])).toBe('');
+    expect(spokenList(['a'])).toBe('a');
+    expect(spokenList(['a', 'b'])).toBe('a and b');
+    expect(spokenList(['a', 'b', 'c'])).toBe('a, b, and c');
+    expect(spokenList(['a', 'b', 'c', 'd'])).toBe('a, b, c, and d');
+  });
+
+  it('uses the pt-BR conjunction', () => {
+    overwriteGetLocale(() => 'pt-BR');
+    expect(spokenList(['a', 'b'])).toBe('a e b');
+    expect(spokenList(['a', 'b', 'c'])).toBe('a, b, e c');
+  });
+
+  it('uses the es conjunction', () => {
+    overwriteGetLocale(() => 'es');
+    expect(spokenList(['a', 'b'])).toBe('a y b');
+    expect(spokenList(['a', 'b', 'c'])).toBe('a, b, y c');
+  });
+});
+
+describe('describeEntries', () => {
+  it('orders string descending then fret ascending, fret 0 as open', () => {
+    expect(
+      describeEntries(STANDARD_GUITAR, [
+        marker({ string: 1, fret: 2, function: 'third' }),
+        marker({ string: 6, fret: 5, function: 'fifth' }),
+        marker({ string: 6, fret: 0, function: 'root' }),
+        marker({ string: 6, fret: 3, function: 'root' })
+      ])
+    ).toEqual([
+      'string 6, open, E, root',
+      'string 6, fret 3, G, root',
+      'string 6, fret 5, A, fifth',
+      'string 1, fret 2, F sharp, third'
+    ]);
+  });
+
+  it('keeps only highlighted and normal markers', () => {
+    expect(
+      describeEntries(STANDARD_GUITAR, [
+        marker({ string: 2, fret: 1, emphasis: 'dimmed' }),
+        marker({ string: 3, fret: 1, emphasis: 'hidden' }),
+        marker({ string: 4, fret: 1, emphasis: 'highlighted', function: 'root' }),
+        marker({ string: 5, fret: 1, emphasis: 'normal', function: 'fifth' })
+      ])
+    ).toEqual(['string 5, fret 1, A sharp, fifth', 'string 4, fret 1, D sharp, root']);
+  });
+
+  it('dedupes by position, first wins', () => {
+    expect(
+      describeEntries(STANDARD_GUITAR, [
+        marker({ string: 1, fret: 2, function: 'root' }),
+        marker({ string: 1, fret: 2, function: 'fifth' })
+      ])
+    ).toEqual(['string 1, fret 2, F sharp, root']);
+  });
+
+  it('is empty for no markers', () => {
+    expect(describeEntries(STANDARD_GUITAR, [])).toEqual([]);
+  });
+
+  it('does not depend on input order (handedness/orientation are layout only)', () => {
+    const markers = [
+      marker({ string: 1, fret: 2 }),
+      marker({ string: 6, fret: 3, function: 'root' })
+    ];
+    expect(describeEntries(STANDARD_GUITAR, [...markers].reverse())).toEqual(
+      describeEntries(STANDARD_GUITAR, markers)
+    );
+  });
+});
+
+describe('describeView never empty (FR-007)', () => {
+  it('returns the localized empty text when nothing is displayed', () => {
+    expect(describeView(STANDARD_GUITAR, { markers: [], labelMode: 'note' })).toBe(
+      'Nothing is displayed.'
+    );
   });
 });

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { readFileSync } from 'node:fs';
 import { tick } from 'svelte';
@@ -544,7 +545,8 @@ describe('Fretboard keyboard and description', () => {
     expect(container.querySelector('.focus-ring')).toBeTruthy();
   });
 
-  it('live region is empty at first and updates when the description changes', async () => {
+  it('live region is empty at first and updates 500 ms after the description changes', async () => {
+    vi.useFakeTimers();
     const view = render(Fretboard, { instrument: STANDARD_GUITAR });
     const live = view.container.querySelector('[aria-live="polite"]');
     if (!live) throw new Error('missing live region');
@@ -558,20 +560,24 @@ describe('Fretboard keyboard and description', () => {
       }
     });
     await tick();
+    vi.advanceTimersByTime(499);
+    expect(live.textContent).toBe('');
+    vi.advanceTimersByTime(1);
+    await tick();
     expect(live.textContent).toContain('string 2, fret 1');
   });
 
-  it('toggle flips aria-expanded and label; empty board says no positions', async () => {
+  it('toggle flips aria-expanded with a constant label; empty board says no positions', async () => {
     const { container } = render(Fretboard, { instrument: STANDARD_GUITAR });
-    const btn = screen.getByRole('button', { name: 'Show text description' });
+    const btn = screen.getByRole('button', { name: 'Describe this view' });
     expect(btn.getAttribute('aria-expanded')).toBe('false');
     const para = container.querySelector(`#${btn.getAttribute('aria-controls')}`) as HTMLElement;
     expect(para.hidden).toBe(true);
     await fireEvent.click(btn);
     expect(btn.getAttribute('aria-expanded')).toBe('true');
-    expect(btn.textContent).toContain('Hide text description');
+    expect(btn.textContent).toContain('Describe this view');
     expect(para.hidden).toBe(false);
-    expect(para.textContent).toBe('No positions marked.');
+    expect(para.textContent).toBe('Nothing is displayed.');
   });
 });
 
@@ -622,9 +628,12 @@ describe('Fretboard pulses (US2)', () => {
   });
 
   it('does not change the live region when a pulse starts', async () => {
+    vi.useFakeTimers();
     const view = render(Fretboard, { instrument: STANDARD_GUITAR });
     const live = view.container.querySelector('[aria-live="polite"]');
     await view.rerender({ instrument: STANDARD_GUITAR, pulses: [pulse(1, 6, 0)] });
+    await tick();
+    vi.advanceTimersByTime(2000);
     await tick();
     expect(live?.textContent).toBe('');
   });
@@ -1993,8 +2002,11 @@ describe('Fretboard screen-reader parity (013 US3)', () => {
     async (h, o) => {
       const next: DisplayModel = { ...model, markers: [model.markers[0]] };
       const run = async (inst: typeof STANDARD_GUITAR) => {
+        vi.useFakeTimers();
         const r = render(Fretboard, { instrument: inst, model });
         await r.rerender({ instrument: inst, model: next });
+        await tick();
+        vi.advanceTimersByTime(500);
         await tick();
         const t = r.container.querySelector('[aria-live]')?.textContent ?? '';
         r.unmount();
@@ -2239,7 +2251,10 @@ describe('Fretboard triad layer (018 US1)', () => {
 describe('Fretboard accidental policy (021 F-1, F-2, F-4)', () => {
   const policy = (accidentals: AccidentalPolicy) =>
     overwriteNotationSource(() => ({ notation: 'letters', accidentals }));
-  afterEach(() => resetNotationSourceForTests());
+  afterEach(() => {
+    vi.useRealTimers();
+    resetNotationSourceForTests();
+  });
 
   // string 1 fret 2 = F♯ (unspelled)
   const model = (spellingPolicy?: 'preference'): DisplayModel => ({

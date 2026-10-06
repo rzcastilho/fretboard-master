@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PREFS_KEY } from '../../../src/lib/prefs/storage';
 import { noteLabel, spokenNote } from '../../../src/lib/notation/notation';

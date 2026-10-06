@@ -1,0 +1,133 @@
+<script lang="ts">
+  import { onDestroy } from 'svelte';
+  import { m } from '$lib/paraglide/messages.js';
+  import { ANNOUNCE_DELAY_MS, createAnnouncer } from './announce';
+  import LegendPanel from './LegendPanel.svelte';
+  import type { LegendGroup } from './legend';
+
+  interface Props {
+    /** Locale-reactive text equivalent of the view (never empty). */
+    description: string;
+    /** Legend groups for the view as drawn (`legendGroups(model)`). */
+    legend: readonly LegendGroup[];
+  }
+
+  let { description, legend }: Props = $props();
+
+  const uid = $props.id();
+  /** Component-local: closed on every mount, never persisted or shared. */
+  let showDescription = $state(false);
+  let legendOpen = $state(false);
+  let legendButton: HTMLButtonElement | undefined = $state();
+  /** Debounced polite announcement text; empty until the first settled change. */
+  let liveText = $state('');
+
+  const announcer = createAnnouncer({
+    delayMs: ANNOUNCE_DELAY_MS,
+    timer: {
+      set: (fn, ms) => setTimeout(fn, ms),
+      clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>)
+    },
+    emit: (t) => (liveText = t)
+  });
+
+  $effect(() => {
+    announcer.update(description);
+  });
+
+  onDestroy(() => announcer.dispose());
+
+  /** Escape inside the panel closes it and returns focus to its button; no trap, Tab is untouched. */
+  function onLegendKeydown(e: KeyboardEvent) {
+    if (e.key !== 'Escape') return;
+    legendOpen = false;
+    legendButton?.focus();
+  }
+</script>
+
+<div class="view-aids">
+  <div class="sr-only" aria-live="polite" aria-atomic="true">{liveText}</div>
+  <div class="buttons">
+    <button
+      type="button"
+      aria-expanded={showDescription}
+      aria-controls="{uid}-description"
+      onclick={() => (showDescription = !showDescription)}
+    >
+      {m.fretboard_describe()}
+    </button>
+    <button
+      type="button"
+      bind:this={legendButton}
+      aria-expanded={legendOpen}
+      aria-controls="{uid}-legend"
+      onclick={() => (legendOpen = !legendOpen)}
+    >
+      {m.fretboard_legend()}
+    </button>
+  </div>
+  <p class="description" id="{uid}-description" hidden={!showDescription}>{description}</p>
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <section
+    class="legend"
+    id="{uid}-legend"
+    aria-labelledby="{uid}-legend-heading"
+    hidden={!legendOpen}
+    onkeydown={onLegendKeydown}
+  >
+    <h2 id="{uid}-legend-heading">{m.fretboard_legend()}</h2>
+    {#if legendOpen}
+      <LegendPanel groups={legend} />
+    {/if}
+  </section>
+</div>
+
+<style>
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-block-start: var(--space-2);
+  }
+
+  button {
+    min-block-size: 44px;
+    min-inline-size: 44px;
+    padding-inline: var(--space-3);
+    font: inherit;
+    color: var(--color-text);
+    background: transparent;
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .legend {
+    margin-block-start: var(--space-2);
+  }
+
+  .legend[hidden] {
+    display: none;
+  }
+
+  .legend h2 {
+    margin-block: 0 var(--space-2);
+    font-size: inherit;
+  }
+
+  .description {
+    margin-block: var(--space-2) 0;
+    overflow-wrap: anywhere;
+  }
+</style>

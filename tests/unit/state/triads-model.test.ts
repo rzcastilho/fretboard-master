@@ -71,7 +71,7 @@ describe('triads model (US1)', () => {
 
   it('description summary names the triad and lists the positions', () => {
     expect(display.model.summary).toContain('C major');
-    expect(display.model.summary).toContain('Root position');
+    expect(display.model.summary).toContain('root position');
   });
 });
 
@@ -982,8 +982,9 @@ describe('triads model Compare in Isolated (US1)', () => {
     expect(text).not.toMatch(/[♭♯]/);
   });
 
-  it('no comparison description when Compare is off', () => {
-    expect(display.model.description).toBeUndefined();
+  it('without Compare the description is the summary, never the compare sentence', () => {
+    expect(display.model.description).toBe(display.model.summary);
+    expect(display.model.description).not.toMatch(/Comparing/);
   });
 });
 

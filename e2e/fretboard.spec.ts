@@ -371,7 +371,7 @@ test.describe('keyboard operation (US5)', () => {
 
   test('focus ring is visible on an unmarked cell, within 100 ms (SC-007)', async ({ page }) => {
     await cellAt(page, 4, 2).focus();
-    const ring = page.locator('.focus-ring');
+    const ring = page.locator('.focus-ring-outer');
     await expect(ring).toBeVisible();
     const times: number[] = [];
     for (let i = 0; i < 5; i++) {
@@ -417,15 +417,15 @@ test.describe('keyboard operation (US5)', () => {
   test('toggle shows the description text', async ({ page }) => {
     await withFixture(page, 'empty'); // blank board: the empty description
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
-    const toggle = page.getByRole('button', { name: 'Show text description' });
+    const toggle = page.getByRole('button', { name: 'Describe this view' });
     await toggle.click();
-    await expect(page.getByRole('button', { name: 'Hide text description' })).toHaveAttribute(
+    await expect(page.getByRole('button', { name: 'Describe this view' })).toHaveAttribute(
       'aria-expanded',
       'true'
     );
     const description = page.locator('p.description');
     await expect(description).toBeVisible();
-    await expect(description).toHaveText('No positions marked.');
+    await expect(description).toHaveText('Nothing is displayed.');
   });
 });
 
@@ -437,7 +437,7 @@ test.describe('accessibility and responsive (US5)', () => {
         await page.goto(path);
         if (path !== '/') {
           await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
-          await page.getByRole('button', { name: 'Show text description' }).click();
+          await page.getByRole('button', { name: 'Describe this view' }).click();
         }
         await runAxe(page);
       });

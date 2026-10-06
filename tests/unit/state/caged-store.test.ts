@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AF_1_12, AF_1_24, AF_8 } from '../../../src/lib/instrument/fixtures';
 import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/instrument';

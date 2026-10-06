@@ -99,8 +99,8 @@ describe('buildCagedModel: C major, standard, 22 frets', () => {
     expect(model.description.indexOf('C shape')).toBeLessThan(
       model.description.indexOf('A shape, frets')
     );
-    expect(model.description).toContain('string 5 fret 3 root');
-    expect(model.description).toContain('string 3 open fifth');
+    expect(model.description).toContain('string 5, fret 3, C, root');
+    expect(model.description).toContain('string 3, open, G, fifth');
   });
 
   it('is null-free of fit note and switch for now', () => {

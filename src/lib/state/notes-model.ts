@@ -197,6 +197,7 @@ function describe(
   const strings = stringsText(s.activeStrings);
   const frets = fretsText(s.region.start, s.region.end);
   if (s.selection.length === 0) {
+    if (s.background === 'none') return m.notes_desc_empty();
     const key = `notes_desc_background_${s.background}` as const;
     return m[key]({ strings, frets });
   }

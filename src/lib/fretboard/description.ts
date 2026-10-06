@@ -57,10 +57,25 @@ export function positionName(
   return name;
 }
 
-/** Positions are listed from the lowest string (highest number) to string 1, then fret ascending (data-model §8). */
-export function describeView(instrument: Instrument, model: DisplayModel): string {
+/** Localized "a", "a and b", "a, b, and c" (no `Intl.ListFormat`; catalog keys only). */
+export function spokenList(items: readonly string[]): string {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return m.list_and_two({ a: items[0], b: items[1] });
+  return m.list_and_many({ head: items.slice(0, -1).join(', '), last: items[items.length - 1] });
+}
+
+/**
+ * "string N, fret F, note, function" entries, string descending then fret ascending (FR-004).
+ * Only highlighted/normal markers at valid positions; first marker per position wins.
+ */
+export function describeEntries(
+  instrument: Instrument,
+  markers: readonly Marker[],
+  policy?: DisplayModel['spellingPolicy']
+): readonly string[] {
   const seen = new Set<string>();
-  const entries = model.markers
+  return markers
     .filter((mk) => {
       if (mk.emphasis !== 'highlighted' && mk.emphasis !== 'normal') return false;
       if (!isValidPosition(instrument, mk)) return false;
@@ -71,12 +86,17 @@ export function describeView(instrument: Instrument, model: DisplayModel): strin
     })
     .sort((a, b) => b.string - a.string || a.fret - b.fret)
     .map((mk) => {
-      const note = spokenAt(instrument, mk, mk, model.spellingPolicy);
+      const note = spokenAt(instrument, mk, mk, policy);
       const fn = FUNCTION_NAME[mk.function]();
       return mk.fret === 0
         ? m.fretboard_description_entry_open({ string: mk.string, note, function: fn })
         : m.fretboard_description_entry({ string: mk.string, fret: mk.fret, note, function: fn });
     });
+}
+
+/** Never returns an empty string (FR-007). */
+export function describeView(instrument: Instrument, model: DisplayModel): string {
+  const entries = describeEntries(instrument, model.markers, model.spellingPolicy);
   const body = entries.length > 0 ? entries.join('; ') : m.fretboard_description_empty();
   return model.summary ? `${model.summary} ${body}` : body;
 }
