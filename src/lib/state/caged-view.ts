@@ -17,7 +17,7 @@ export interface CagedFocus {
   readonly ordinal: number;
 }
 
-/** Which layers are switched on (FR-002). Never serialized. */
+/** Which layers are switched on (FR-002). Not persisted; encoded in share links by `src/lib/link` (`ly`). */
 export interface LayersOn {
   readonly chord: boolean;
   readonly arpeggio: boolean;
@@ -39,7 +39,7 @@ export interface CagedViewState {
   readonly connections: boolean;
   /** Layer switches; initial `CHORD_ONLY`. */
   readonly layers: LayersOn;
-  /** Effective Triad string set; null while Triad is off or after reset. Never serialized. */
+  /** Effective Triad string set; null while Triad is off or after reset. Not persisted; encoded in share links by `src/lib/link` (`ts`). */
   readonly triadSet: StringSetId | null;
   /** Marker label kind; initial = the preferred label. */
   readonly labelType: CagedLabelType;

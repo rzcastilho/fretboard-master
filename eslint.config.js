@@ -98,6 +98,34 @@ export default tseslint.config(
     }
   },
   {
+    // Link codec is pure and language-free (specs/022 R-01).
+    files: ['src/lib/link/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            'svelte',
+            'svelte/*',
+            '$app/*',
+            '$lib/paraglide/*',
+            '$lib/notation/*',
+            '$lib/prefs/*',
+            '$lib/shell/*'
+          ]
+        }
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'Link codec must be DOM-free.' },
+        { name: 'document', message: 'Link codec must be DOM-free.' },
+        { name: 'navigator', message: 'Link codec must be DOM-free.' },
+        { name: 'location', message: 'Link codec must be DOM-free.' },
+        { name: 'history', message: 'Link codec must be DOM-free.' }
+      ]
+    }
+  },
+  {
     files: ['src/lib/notation/**'],
     rules: {
       'no-restricted-imports': [

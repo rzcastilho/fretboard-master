@@ -5,8 +5,10 @@
   import { SCREENS } from '$lib/shell/screens';
   import PlaybackHost from '$lib/shell/PlaybackHost.svelte';
   import PrefsNotice from '$lib/shell/PrefsNotice.svelte';
+  import { cancelAddress } from '$lib/state/address.svelte';
   import { caged } from '$lib/state/caged.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
+  import { opening } from '$lib/state/opening.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { preferences } from '$lib/state/preferences.svelte';
   import { TOOLS } from '$lib/shell/tools';
@@ -23,8 +25,10 @@
   // Shallow pops (instrument panel Back) keep the same path and are not screen changes.
   beforeNavigate(({ from, to }) => {
     if (from && to && from.url.pathname === to.url.pathname) return;
+    cancelAddress();
     playback.stop('navigate');
     instrument.screenChanged();
+    opening.screenChanged();
     caged.screenChanged();
     preferences.screenChanged();
   });

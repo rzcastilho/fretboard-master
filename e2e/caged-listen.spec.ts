@@ -444,7 +444,7 @@ test.describe('caged listen polish: link buttons by keyboard', () => {
       const link = page.getByRole('button', { name: 'CAGED in this key', exact: true });
       await tabTo(page, link, 150);
       await page.keyboard.press(key);
-      await expect(page).toHaveURL(/\/caged$/);
+      await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     }
   });
 
@@ -455,7 +455,7 @@ test.describe('caged listen polish: link buttons by keyboard', () => {
       await link.focus();
       await expect(link).toBeFocused();
       await page.keyboard.press(key);
-      await expect(page).toHaveURL(/\/caged$/);
+      await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     }
   });
 });

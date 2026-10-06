@@ -1,20 +1,19 @@
 <!--
 Sync Impact Report
-- Version change: 1.7.0 → 1.8.0 (MINOR: Principle VI initial JS budget raised from 94 KB to
-  120 KB gzip)
-- Modified principles: VI (Performance Budgets) — initial JavaScript, gzip: ≤ 94 KB → ≤ 120 KB.
-  Slice 017 (CAGED layers) adds about 3.9 KB gzip with no dependency (92.8 → 96.7 KB,
-  measured at the end of the slice), above its +1.6–2.4 KB estimate, and crosses both the
-  94 KB cap and the 96 KB contingency recorded in its plan. The slice's required behavior
-  (four layer switches doubling as the legend, scale/arpeggio/pentatonic layers, reveal
-  motion) was not trimmed. The maintainer chose 120 KB to stop amending the cap slice by slice;
-  ADR 0002 keeps a single bundle, so every screen counts toward the cap.
+- Version change: 1.8.0 → 1.9.0 (MINOR: Principle VI initial JS budget raised from 120 KB to
+  128 KB gzip)
+- Modified principles: VI (Performance Budgets) — initial JavaScript, gzip: ≤ 120 KB → ≤ 128 KB.
+  Slice 023 (open a shared view) ships the link decoder, the receive-side validation and the
+  session instrument override in the initial bundle, because ADR 0002 keeps a single bundle and
+  the link is applied before hydration (research R-08). The slice's required behavior was not
+  trimmed.
 - Modified sections: none
 - Added sections: none
 - Removed sections: none
 - Dependent guidance updated: `scripts/check-bundle-size.mjs` (limit and messages),
   `docs/adr/0002-single-bundle-for-version-continuity.md` (cap history)
-- Prior amendments: 1.6.0 → 1.7.0 raised the initial JS budget from 92 KB to 94 KB (slice 016);
+- Prior amendments: 1.7.0 → 1.8.0 raised the initial JS budget from 94 KB to 120 KB (slice 017);
+  1.6.0 → 1.7.0 raised it from 92 KB to 94 KB (slice 016);
   1.5.0 → 1.6.0 raised it from 90 KB to 92 KB (slice 015);
   1.4.0 → 1.5.0 added the "Verification tiers" rule (local runs target touched
   specs on one Chromium project; full matrix is CI-only); 1.3.0 → 1.4.0 raised the initial JS
@@ -132,7 +131,7 @@ enforce these budgets:
 | Control change to fretboard update | ≤ 100 ms |
 | Instrument change | ≤ 300 ms |
 | Tap to sound, after audio unlock | ≤ 100 ms |
-| Initial JavaScript, gzip | ≤ 120 KB |
+| Initial JavaScript, gzip | ≤ 128 KB |
 | Lighthouse mobile performance score | ≥ 90 |
 
 - Sound material MUST NOT block the fretboard from becoming interactive.
@@ -318,4 +317,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.8.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-05
+**Version**: 1.9.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-06

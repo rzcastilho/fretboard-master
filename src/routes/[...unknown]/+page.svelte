@@ -3,6 +3,7 @@
   import { m } from '$lib/paraglide/messages.js';
   import HomeScreen from '$lib/shell/HomeScreen.svelte';
   import Notice from '$lib/shell/Notice.svelte';
+  import { opening } from '$lib/state/opening.svelte';
 
   // R-03: show "/" in the address bar without adding a history entry; the notice stays rendered.
   // SvelteKit's replaceState() keeps `sveltekit:pageurl` pointing at the unknown path, so Back to
@@ -20,6 +21,10 @@
 
 <HomeScreen>
   {#snippet notice()}
-    <Notice message={m.notice_not_found()} ondismiss={() => {}} />
+    {#if opening.incomplete?.screen === 'home'}
+      <Notice message={m.link_incomplete()} ondismiss={() => opening.dismissIncomplete()} />
+    {:else}
+      <Notice message={m.notice_not_found()} ondismiss={() => {}} />
+    {/if}
   {/snippet}
 </HomeScreen>

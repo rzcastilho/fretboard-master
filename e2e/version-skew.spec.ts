@@ -50,9 +50,9 @@ test('open session keeps its version across a publish; reload picks up the new o
 
   const nav = page.getByRole('navigation', { name: 'Tools' });
   await page.getByRole('link', { name: /^Triads/ }).click();
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   await nav.getByRole('link', { name: 'Fretboard Notes' }).click();
-  await expect(page).toHaveURL(/\/notes$/);
+  await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
   await nav.getByRole('link', { name: 'About' }).click();
   await expect(page).toHaveURL(/\/about$/);
   await nav.getByRole('link', { name: 'Home' }).click();

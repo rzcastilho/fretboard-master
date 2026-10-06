@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
   import AppNav from './AppNav.svelte';
   import InstrumentButton from './InstrumentButton.svelte';
   import LanguagePanel from './LanguagePanel.svelte';
   import NotationToggle from './NotationToggle.svelte';
+  import Notice from './Notice.svelte';
+  import ShareButton from './ShareButton.svelte';
+  import ShareFallback from './ShareFallback.svelte';
   import TuningBadge from './TuningBadge.svelte';
   import FailureView from './FailureView.svelte';
   import { recordFailure } from './failure';
@@ -11,6 +15,11 @@
   import TriadsTool from '$lib/tools/triads/TriadsTool.svelte';
   import CagedTool from '$lib/tools/caged/CagedTool.svelte';
   import { resetTool } from '$lib/state/links.svelte';
+  import { openToolAddress, scheduleAddress } from '$lib/state/address.svelte';
+  import { currentLink, share } from '$lib/state/share.svelte';
+  import { instrument } from '$lib/state/instrument.svelte';
+  import { opening } from '$lib/state/opening.svelte';
+  import { linkNoticeMessage } from './link-notice';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
   import StopButton from './StopButton.svelte';
@@ -20,6 +29,30 @@
   let { tool }: { tool: ToolId } = $props();
 
   const name = $derived(TOOLS.find((t) => t.id === tool)?.name() ?? '');
+
+  // A received link on another instrument than the stored one (023): offer Use mine / Adopt.
+  const instrumentNotice = $derived(instrument.overrideNoticeFor(tool));
+
+  // The notice and its buttons leave the page: hand focus to the tool heading.
+  function resolveInstrument(choose: () => void): void {
+    choose();
+    document.querySelector<HTMLElement>('h1')?.focus();
+  }
+
+  // The manual-copy panel shows one link: close it as soon as the view no longer matches.
+  $effect(() => {
+    share.viewChanged(currentLink(tool));
+  });
+
+  // FR-014: the address bar follows the view. Opening the screen replaces it with the canonical
+  // link; later changes are debounced. Only the store is read here, never `url.searchParams`.
+  onMount(() => openToolAddress(tool));
+  $effect(() => {
+    scheduleAddress(currentLink(tool));
+  });
+
+  // Leaving the tool (or the layout) closes it without stealing focus from the new screen.
+  $effect(() => () => share.dismissFallback());
 </script>
 
 <svelte:head>
@@ -28,13 +61,47 @@
 
 <header aria-label={m.zone_app_bar()}>
   <AppNav current={tool} />
+  <ShareButton {tool} />
   <InstrumentButton />
-  <TuningBadge />
+  <TuningBadge {tool} />
   <StopButton />
   <SoundControl />
   <NotationToggle />
   <LanguagePanel />
 </header>
+
+{#if instrumentNotice !== null}
+  <div class="share-notice">
+    <Notice
+      message={linkNoticeMessage(instrumentNotice.link, instrument.active.stringCount)}
+      actions={[
+        { label: m.link_use_mine(), onclick: () => resolveInstrument(() => instrument.useMine()) },
+        { label: m.link_adopt(), onclick: () => resolveInstrument(() => instrument.adopt()) }
+      ]}
+      ondismiss={() => instrument.dismissOverrideNotice()}
+    />
+  </div>
+{/if}
+
+{#if opening.incomplete?.screen === tool}
+  <div class="share-notice">
+    <Notice message={m.link_incomplete()} ondismiss={() => opening.dismissIncomplete()} />
+  </div>
+{/if}
+
+{#if share.notice !== null}
+  {#key share.notice.id}
+    <div class="share-notice">
+      <Notice message={m.share_copied()} ondismiss={() => share.dismissNotice()} />
+    </div>
+  {/key}
+{/if}
+
+{#if share.fallback !== null}
+  <div class="share-notice">
+    <ShareFallback href={share.fallback.href} />
+  </div>
+{/if}
 
 <main>
   <h1 tabindex="-1">{name}</h1>
@@ -69,6 +136,10 @@
     justify-content: space-between;
     gap: var(--space-2) var(--space-4);
     padding: var(--space-2) var(--space-4);
+  }
+
+  .share-notice {
+    padding: var(--space-2) var(--space-4) 0;
   }
 
   main {

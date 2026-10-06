@@ -15,7 +15,7 @@ test.describe('home without JavaScript', () => {
     ] as const) {
       await page.goto('/');
       await page.getByRole('link', { name: new RegExp(`^${name}`) }).click();
-      await page.waitForURL(`**${path}`);
+      await page.waitForURL(new RegExp(`${path}(\\?v=1&.*)?$`));
       await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
     }
   });

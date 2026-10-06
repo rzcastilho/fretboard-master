@@ -7,7 +7,7 @@ const nav = (page: Page) => page.getByRole('navigation', { name: 'Tools' });
 test('card opens tool with five named zones @smoke', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Triads — What is a chord made of?' }).click();
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   await expect(page.getByRole('banner')).toBeVisible();
   for (const name of ['Main controls', 'Fretboard', 'Composition', 'Actions']) {
     await expect(page.getByRole('region', { name })).toBeVisible();
@@ -30,22 +30,22 @@ test('history: Home → Triads → Notes, Back/Forward @smoke', async ({ page })
   await page.goto('/');
   await page.getByRole('link', { name: /^Triads/ }).click();
   await nav(page).getByRole('link', { name: 'Fretboard Notes' }).click();
-  await expect(page).toHaveURL(/\/notes$/);
+  await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
   await page.goBack();
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
   await page.goForward();
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
 });
 
 test('re-selecting current tool adds no history entry @smoke', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: /^Triads/ }).click();
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   const before = await page.evaluate(() => history.length);
   await nav(page).getByRole('link', { name: 'Triads' }).click();
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   expect(await page.evaluate(() => history.length)).toBe(before);
 });
 
@@ -57,13 +57,13 @@ test('keyboard reaches cards and nav; focus lands on h1', async ({ page }) => {
   await card.focus();
   await expect(card).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/notes$/);
+  await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
   await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
   const triads = nav(page).getByRole('link', { name: 'Triads' });
   await triads.focus();
   await expect(triads).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
 });
 
@@ -84,7 +84,7 @@ for (const [path, heading, title] of [
 
 test('/triads/ redirects to /triads', async ({ page }) => {
   await page.goto('/triads/');
-  await expect(page).toHaveURL(/\/triads$/);
+  await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   await expect(page).toHaveTitle('Triads — Fretboard Master');
 });
 

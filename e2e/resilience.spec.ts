@@ -44,7 +44,7 @@ test.describe('unknown addresses', () => {
     await page.goto('/nope');
     await expect(page).toHaveURL(/\/$/); // hydrated: address already replaced with /
     await page.getByRole('link', { name: /^Triads/ }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await page.goBack();
     await expect(page.getByRole('status')).toHaveCount(0);
     await page.reload();
@@ -117,7 +117,7 @@ test.describe('tool failures', () => {
       .getByRole('navigation', { name: 'Tools' })
       .getByRole('link', { name: 'Fretboard Notes' })
       .click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await expect(page.getByRole('region', { name: 'Fretboard' })).toBeVisible();
   });
 });

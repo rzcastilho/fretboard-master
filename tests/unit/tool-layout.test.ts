@@ -5,6 +5,12 @@ import { notes } from '../../src/lib/state/notes.svelte';
 import { caged, resetCagedForTests } from '../../src/lib/state/caged.svelte';
 import { triads } from '../../src/lib/state/triads.svelte';
 import { instrument, resetInstrumentForTests } from '../../src/lib/state/instrument.svelte';
+import {
+  resetShareForTests,
+  share,
+  useSharePlatformForTests
+} from '../../src/lib/state/share.svelte';
+import { opening, resetOpeningForTests } from '../../src/lib/state/opening.svelte';
 import ToolLayout from '../../src/lib/shell/ToolLayout.svelte';
 
 describe('ToolLayout', () => {
@@ -28,6 +34,25 @@ describe('ToolLayout', () => {
     expect(
       within(banner2).getByRole('button', { name: 'Tuning: Drop D. Open instrument panel' })
     ).toBeTruthy();
+  });
+
+  describe('incomplete-link notice (US3)', () => {
+    beforeEach(() => resetOpeningForTests());
+
+    it('shows one notice with Dismiss only on the opened tool', async () => {
+      opening.start('http://localhost/caged?v=1&rt=2&q=banana');
+      const { unmount } = render(ToolLayout, { tool: 'notes' });
+      expect(screen.queryByText(/This link was incomplete/)).toBeNull();
+      unmount();
+      render(ToolLayout, { tool: 'caged' });
+      const notice = screen.getByText(/This link was incomplete/).closest('[role="status"]');
+      expect(notice).toBeTruthy();
+      const buttons = within(notice as HTMLElement).getAllByRole('button');
+      expect(buttons.map((b) => b.textContent)).toEqual(['Dismiss']);
+      await fireEvent.click(buttons[0]);
+      expect(screen.queryByText(/This link was incomplete/)).toBeNull();
+      expect(opening.incomplete).toBeNull();
+    });
   });
 
   it('renders application bar with navigation', () => {
@@ -161,5 +186,146 @@ describe('Home and About do not render the toggle (US2)', () => {
   ])('%s', async (file) => {
     const { readFileSync } = await import('node:fs');
     expect(readFileSync(file, 'utf8')).not.toContain('NotationToggle');
+  });
+});
+
+describe('ToolLayout Share (US1)', () => {
+  beforeEach(() => {
+    resetInstrumentForTests();
+    resetCagedForTests();
+    resetShareForTests();
+  });
+  afterEach(() => resetShareForTests());
+
+  it.each(['notes', 'triads', 'caged'] as const)(
+    '%s header has Share right after the tool navigation',
+    (tool) => {
+      render(ToolLayout, { tool });
+      const banner = screen.getByRole('banner');
+      const button = within(banner).getByRole('button', { name: 'Share' });
+      const nav = within(banner).getByRole('navigation', { name: 'Tools' });
+      expect(nav.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const instrumentButton = within(banner).getByRole('button', { name: 'Instrument' });
+      expect(
+        button.compareDocumentPosition(instrumentButton) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    }
+  );
+
+  it('shows "Link copied" as a status directly under the header after a copy', async () => {
+    useSharePlatformForTests({
+      share: null,
+      writeText: () => Promise.resolve(),
+      coarsePointer: false
+    });
+    render(ToolLayout, { tool: 'caged' });
+    expect(screen.queryByText('Link copied')).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    const text = await screen.findByText('Link copied');
+    expect(text.closest('[role="status"]')).toBeTruthy();
+    const banner = screen.getByRole('banner');
+    const status = text.closest('[role="status"]') as HTMLElement;
+    expect(banner.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('main').contains(status)).toBe(false);
+  });
+
+  it('a second copy keeps exactly one notice in the DOM', async () => {
+    useSharePlatformForTests({
+      share: null,
+      writeText: () => Promise.resolve(),
+      coarsePointer: false
+    });
+    render(ToolLayout, { tool: 'notes' });
+    const button = screen.getByRole('button', { name: 'Share' });
+    await fireEvent.click(button);
+    await screen.findByText('Link copied');
+    await fireEvent.click(button);
+    await vi.waitFor(() => expect(share.busy).toBe(false));
+    expect(screen.getAllByText('Link copied')).toHaveLength(1);
+  });
+
+  it('dismissing the notice clears the store', async () => {
+    useSharePlatformForTests({
+      share: null,
+      writeText: () => Promise.resolve(),
+      coarsePointer: false
+    });
+    render(ToolLayout, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    await screen.findByText('Link copied');
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(share.notice).toBeNull();
+  });
+});
+
+describe('Home and About do not render Share (US1)', () => {
+  it.each([
+    'src/routes/+page.svelte',
+    'src/routes/about/+page.svelte',
+    'src/lib/shell/HomeScreen.svelte'
+  ])('%s', async (file) => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync(file, 'utf8')).not.toContain('ShareButton');
+  });
+});
+
+describe('ToolLayout instrument notice (023 US2)', () => {
+  const DROP_D = {
+    stringCount: 6,
+    tuning: { kind: 'preset', id: 'AF-4' },
+    fretCount: 22
+  } as const;
+  const FRETS_ONLY = { ...DROP_D, tuning: { kind: 'preset', id: 'AF-1' }, fretCount: 19 } as const;
+
+  beforeEach(() => {
+    resetInstrumentForTests();
+    resetCagedForTests();
+  });
+
+  it('shows the notice for the opened tool with actions in order', () => {
+    instrument.receive('caged', DROP_D);
+    render(ToolLayout, { tool: 'caged' });
+    const notice = screen.getByText('This view uses Drop D').closest('.notice') as HTMLElement;
+    expect(within(notice).getByText('This view uses Drop D')).toBeTruthy();
+    expect(
+      within(notice)
+        .getAllByRole('button')
+        .map((b) => b.textContent?.trim())
+    ).toEqual(['Use mine', 'Adopt this one', 'Dismiss']);
+  });
+
+  it('does not show for another tool', () => {
+    instrument.receive('caged', DROP_D);
+    render(ToolLayout, { tool: 'notes' });
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+  });
+
+  it('does not show for a fret-count-only override', () => {
+    instrument.receive('notes', FRETS_ONLY);
+    render(ToolLayout, { tool: 'notes' });
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+  });
+
+  it('Dismiss hides it and keeps the override', async () => {
+    instrument.receive('triads', DROP_D);
+    render(ToolLayout, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+    expect(instrument.override).not.toBeNull();
+  });
+
+  it('Use mine and Adopt close the notice and focus the heading', async () => {
+    instrument.receive('triads', DROP_D);
+    const first = render(ToolLayout, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Use mine' }));
+    expect(screen.queryByRole('button', { name: 'Use mine' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+    first.unmount();
+    resetInstrumentForTests();
+    instrument.receive('triads', DROP_D);
+    render(ToolLayout, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Adopt this one' }));
+    expect(screen.queryByRole('button', { name: 'Adopt this one' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
   });
 });

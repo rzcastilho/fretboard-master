@@ -107,7 +107,10 @@ function clearLayerTransients(): void {
 let preferred = $state.raw<Instrument>(STANDARD_GUITAR);
 /** The applied tuning; the label is derived so a notation or language change updates it. */
 let tuning = $state.raw<Tuning>(STANDARD_TUNING);
-/** CAGED-local temporary standard view; never stored, never in the URL. */
+/**
+ * CAGED-local temporary standard view. Carried in share links (`tmp`, FR-009 supersedes slice
+ * 015), but never written to device storage.
+ */
 let temporary = $state<boolean>(false);
 /** Shared positions of the last step, shown for `STEP_WINDOW_MS`; never part of the view state. */
 let transition = $state.raw<StepTransition | null>(null);
@@ -446,6 +449,18 @@ export const caged = {
     if (next === preferred && nextTuning === tuning) return;
     playback.stop('instrument');
     this.applyInstrument(next, nextTuning);
+  },
+  /**
+   * Open a received link's view (023): startup only. The temporary standard view is kept only
+   * when the tuning has no shapes. No playback stop, no write, `preferredLabel` untouched.
+   */
+  receive(next: CagedViewState, wantTemporary: boolean): void {
+    clearTransition();
+    clearLayerTransients();
+    temporary = false;
+    view = next;
+    temporary = wantTemporary && display.tuningClass === 'non-compatible';
+    settleLayers();
   },
   /** Show the same key in the standard tuning; only from the non-compatible notice. */
   viewInStandard(): void {

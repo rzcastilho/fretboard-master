@@ -240,7 +240,7 @@ test.describe('instrument panel US3 (cancel and restore)', () => {
       for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
       await dismiss();
       await expect(dialog).toBeHidden();
-      await expect(page).toHaveURL(/\/triads$/);
+      await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
       await expect(page.getByRole('heading', { level: 1, name: 'Triads' })).toBeVisible();
       await expect.poll(() => page.evaluate(() => history.length)).toBeLessThanOrEqual(before + 1);
       await expect(page.getByRole('button', { name: /^Tuning:/ })).toHaveCount(0);

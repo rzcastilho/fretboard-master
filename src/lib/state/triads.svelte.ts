@@ -188,6 +188,14 @@ export const triads = {
     playback.stop('instrument');
     this.applyInstrument(next);
   },
+  /**
+   * Open a received link's view (023): startup only. Revalidates against the current instrument;
+   * no playback stop, no write, `preferredLabel` untouched; clears any notice.
+   */
+  receive(next: TriadsViewState): void {
+    view = revalidate(next, instrument);
+    notice = null;
+  },
   /** Sound the shape low → mid → high, then the block (new `sequence` interrupts; no `stop`). */
   listen(): void {
     if (!display.listen.enabled) return;

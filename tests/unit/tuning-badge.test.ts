@@ -23,32 +23,32 @@ beforeEach(() => {
 
 describe('TuningBadge', () => {
   it('is absent for Standard', () => {
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(screen.queryByRole('button')).toBeNull();
   });
 
   it('is absent for Standard at a different fret count', () => {
     applyTuning('AF-1', 24);
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(screen.queryByRole('button')).toBeNull();
   });
 
   it('shows the preset name with the full accessible name', () => {
     applyTuning('AF-4');
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     const badge = screen.getByRole('button', { name: 'Tuning: Drop D. Open instrument panel' });
     expect(badge.textContent?.trim()).toBe('Drop D');
   });
 
   it('is independent of fret count', () => {
     applyTuning('AF-4', 15);
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(screen.getByRole('button', { name: /Drop D/ })).toBeTruthy();
   });
 
   it('opens the panel on activation', async () => {
     applyTuning('AF-4');
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     await fireEvent.click(screen.getByRole('button', { name: /Drop D/ }));
     expect(instrument.panel.open).toBe(true);
   });
@@ -60,7 +60,7 @@ describe('TuningBadge (custom tuning, US3)', () => {
     instrument.chooseCustom();
     for (const n of [6, 5, 4, 3, 2, 1] as const) instrument.stepString(n, -1);
     instrument.confirm('triads');
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(
       screen
         .getByRole('button', { name: 'Tuning: Half step down. Open instrument panel' })
@@ -74,7 +74,7 @@ describe('TuningBadge (custom tuning, US3)', () => {
     instrument.chooseCustom();
     instrument.stepString(1, 1);
     instrument.confirm('triads');
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(screen.getByRole('button', { name: /Custom/ }).textContent?.trim()).toBe('Custom');
   });
 
@@ -84,7 +84,7 @@ describe('TuningBadge (custom tuning, US3)', () => {
     instrument.stepString(1, 1);
     instrument.stepString(1, -1);
     instrument.confirm('triads');
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(screen.queryByRole('button')).toBeNull();
   });
 });
@@ -98,7 +98,7 @@ describe('TuningBadge and summary (seven strings, 012)', () => {
   };
 
   it('is hidden for 6-string standard and for 7-string standard', () => {
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(screen.queryByRole('button')).toBeNull();
     apply('AF-21');
     expect(screen.queryByRole('button')).toBeNull();
@@ -111,7 +111,7 @@ describe('TuningBadge and summary (seven strings, 012)', () => {
     ['AF-11', 'Open A']
   ] as const)('is shown for 7-string %s as "%s"', (id, name) => {
     apply(id);
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(
       screen
         .getByRole('button', { name: `Tuning: ${name}. Open instrument panel` })
@@ -125,7 +125,7 @@ describe('TuningBadge and summary (seven strings, 012)', () => {
     instrument.chooseCustom();
     for (let i = 0; i < 3; i++) instrument.stepString(7, -1);
     instrument.confirm('triads');
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     expect(screen.getByRole('button', { name: /Custom/ }).textContent?.trim()).toBe('Custom');
   });
 
@@ -190,7 +190,7 @@ describe('TuningBadge: temporary CAGED variant', () => {
   it('shows the temporary text and accessible name in place of the tuning badge', () => {
     applyTuning('AF-4');
     temporary();
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     const badge = screen.getByRole('button', {
       name: 'Temporary tuning: Standard. Open instrument panel'
     });
@@ -200,8 +200,34 @@ describe('TuningBadge: temporary CAGED variant', () => {
 
   it('shows even when the stored tuning is Standard, and opens the panel', async () => {
     temporary();
-    render(TuningBadge);
+    render(TuningBadge, { tool: 'notes' });
     await fireEvent.click(screen.getByRole('button', { name: /Temporary tuning/ }));
     expect(instrument.panel.open).toBe(true);
+  });
+});
+
+describe('TuningBadge: link override (023 US2)', () => {
+  const DROP_D = {
+    stringCount: 6,
+    tuning: { kind: 'preset', id: 'AF-4' },
+    fretCount: 22
+  } as const;
+
+  it('labels the link tuning for the opened tool only', () => {
+    instrument.receive('triads', DROP_D);
+    const { unmount } = render(TuningBadge, { tool: 'triads' });
+    expect(screen.getByRole('button', { name: /Drop D/ })).toBeTruthy();
+    unmount();
+    render(TuningBadge, { tool: 'notes' });
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('keeps the panel on the stored instrument', async () => {
+    instrument.receive('triads', DROP_D);
+    render(TuningBadge, { tool: 'triads' });
+    await fireEvent.click(screen.getByRole('button', { name: /Drop D/ }));
+    expect(instrument.panel.open).toBe(true);
+    expect(instrument.stringCount).toBe(6);
+    expect(instrument.active.tuning).toEqual({ kind: 'preset', id: 'AF-1' });
   });
 });

@@ -27,6 +27,7 @@ import { prerender, trailingSlash } from '../../src/routes/+layout';
 import ErrorPage from '../../src/routes/+error.svelte';
 import Layout from '../../src/routes/+layout.svelte';
 import { playback } from '../../src/lib/state/playback.svelte';
+import { opening, resetOpeningForTests } from '../../src/lib/state/opening.svelte';
 import HomePage from '../../src/routes/+page.svelte';
 import NotesPage from '../../src/routes/notes/+page.svelte';
 import TriadsPage from '../../src/routes/triads/+page.svelte';
@@ -106,6 +107,25 @@ describe('pages', () => {
   });
 });
 
+describe('unknown page: incomplete link (US3)', () => {
+  beforeEach(() => resetOpeningForTests());
+
+  it('shows the incomplete-link notice instead of not-found for an unknown tool link', () => {
+    opening.start('http://localhost/scales?v=1&rt=0');
+    render(UnknownPage);
+    const text = within(screen.getByRole('main')).getByRole('status').textContent;
+    expect(text).toContain('This link was incomplete');
+    expect(text).not.toContain('We could not find that page');
+  });
+
+  it('keeps the not-found notice when the path is not a link', () => {
+    opening.start('http://localhost/scales');
+    render(UnknownPage);
+    const text = within(screen.getByRole('main')).getByRole('status').textContent;
+    expect(text).toContain('We could not find that page');
+  });
+});
+
 describe('root layout', () => {
   it('renders children', () => {
     render(Layout, { children: child });
@@ -137,6 +157,15 @@ describe('layout playback navigation (US4-4)', () => {
     expect(beforeNavCallback).toBeTypeOf('function');
     beforeNavCallback?.({ from: nav('/notes'), to: nav('/triads') });
     expect(stop).toHaveBeenCalledWith('navigate');
+  });
+
+  it('beforeNavigate drops the incomplete-link notice on a real screen change', () => {
+    resetOpeningForTests();
+    opening.start('http://localhost/caged?v=1&q=banana');
+    render(Layout, { children: child });
+    expect(opening.incomplete).not.toBeNull();
+    beforeNavCallback?.({ from: nav('/caged'), to: nav('/notes') });
+    expect(opening.incomplete).toBeNull();
   });
 
   it('beforeNavigate ignores shallow pops that keep the same path', () => {

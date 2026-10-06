@@ -17,6 +17,7 @@ import {
   initialNotesView,
   openCard,
   reset,
+  revalidate,
   setBackground,
   setHideNames,
   setLabelType,
@@ -131,6 +132,13 @@ export const notes = {
     if (next === instrument) return;
     playback.stop('instrument');
     this.applyInstrument(next);
+  },
+  /**
+   * Open a received link's view (023): startup only. Revalidates against the current instrument;
+   * no playback stop, no write, `preferredLabel` untouched.
+   */
+  receive(next: NotesViewState): void {
+    view = revalidate(next, instrument);
   },
   /** Play the position and open its card. `note` interrupts playback itself (no `stop`). */
   activate(p: Position): void {

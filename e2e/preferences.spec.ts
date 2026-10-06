@@ -169,7 +169,7 @@ test.describe('remembered preferences: US2', () => {
     await expect(standardSummary(page)).toBeVisible();
     await runAxe(page);
     await card(page, /Triads/).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(notice(page)).toHaveCount(0);
     await page.getByRole('link', { name: 'Home' }).first().click();
     await expect(notice(page)).toHaveCount(0);

@@ -4,7 +4,7 @@
  */
 import type { Instrument } from '../instrument/instrument';
 import { setOpenPitches, type StringSetId } from '../instrument/string-sets';
-import type { PitchClass } from '../theory/pitch';
+import type { PitchClass, Spelling } from '../theory/pitch';
 import {
   QUALITIES,
   choiceOf,
@@ -46,7 +46,7 @@ export interface TriadsViewState {
   readonly occurrence: number;
   /** Not persisted (C14, FR-019). */
   readonly view: TriadsView;
-  /** Not persisted and not in share links (FR-018). */
+  /** Not persisted to device storage; encoded in share links by `src/lib/link` (`cmp`, `cq`). */
   readonly compare: TriadsCompare;
 }
 
@@ -220,4 +220,9 @@ export function setCompare(s: TriadsViewState, on: boolean, i: Instrument): Tria
 export function setCompareQuality(s: TriadsViewState, q: Quality, i: Instrument): TriadsViewState {
   if (!s.compare.on || !validCompareQuality(s, q) || q === s.compare.quality) return s;
   return clampOccurrence({ ...s, compare: { on: true, quality: q } }, i);
+}
+
+/** The root as the view spells it: the override when it applies, else the default (FR-003). */
+export function triadsRootSpelling(s: TriadsViewState): Spelling {
+  return effectiveRootSpelling(s.rootPc, s.spellingOverride, s.quality);
 }

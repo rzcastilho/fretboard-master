@@ -22,7 +22,7 @@ test.describe('linked tools: find a triad from selected notes (US1)', () => {
     await pick(page, 'C', 'E', 'G');
     await expect(detected(page)).toContainText('C major');
     await viewAsTriadButton(page).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
   });
 
@@ -79,12 +79,12 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     await radio(page, '1st inversion').click();
     await radio(page, '4-3-2').click();
     await nav(page).getByRole('link', { name: 'Fretboard Notes' }).click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     // Arriving from Triads carries C–E–G; clear it so only A is selected.
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
     await note(page, 'A').click();
     await nav(page).getByRole('link', { name: 'Triads' }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('A major — 1st inversion', { exact: true })).toBeVisible();
     await expect(radio(page, '4-3-2')).toBeChecked();
   });
@@ -115,7 +115,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
   });
 
-  test('Back and Forward do not re-apply a carry; reload gives the initial state', async ({
+  test('Back and Forward do not re-apply a carry; a fresh open gives the initial state', async ({
     page
   }) => {
     await page.goto('/notes');
@@ -124,10 +124,10 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     await expect(page.getByText('A major — Root position', { exact: true })).toBeVisible();
     await rootButton(page, 'D').click();
     await page.goBack();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await page.goForward();
     await expect(page.getByText('D major — Root position', { exact: true })).toBeVisible();
-    await page.reload();
+    await page.goto('/triads');
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
   });
 
@@ -189,7 +189,7 @@ test.describe('linked tools: Triads from this note (US3)', () => {
     await cell(page, 1, 2).click();
     await expect(card(page)).toBeVisible();
     await triadsFromNote(page).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('F♯ major — Root position', { exact: true })).toBeVisible();
   });
 
@@ -206,7 +206,7 @@ test.describe('linked tools: Triads from this note (US3)', () => {
     await expect(card(page)).toBeVisible();
     await triadsFromNote(page).focus();
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('F♯ major — Root position', { exact: true })).toBeVisible();
   });
 
@@ -224,9 +224,9 @@ test.describe('linked tools: session memory and Reset tool (US4)', () => {
     await radio(page, 'minor').click();
     await radio(page, '1st inversion').click();
     await nav(page).getByRole('link', { name: 'Notes' }).click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await nav(page).getByRole('link', { name: 'Triads' }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(radio(page, 'minor')).toHaveAttribute('aria-checked', 'true');
     await expect(radio(page, '1st inversion')).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByText('A minor — 1st inversion', { exact: true })).toBeVisible();
@@ -280,10 +280,10 @@ test.describe('linked tools: history only follows screens (US5)', () => {
       .getByRole('link', { name: /^Notes|^Fretboard Notes/ })
       .first()
       .click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await pick(page, 'A');
     await nav(page).getByRole('link', { name: 'Triads' }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     const before = await historyLength(page);
 
     const changes: Array<() => Promise<unknown>> = [
@@ -314,7 +314,7 @@ test.describe('linked tools: history only follows screens (US5)', () => {
 
     expect(await historyLength(page)).toBe(before);
     await page.goBack();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/$/);
   });
@@ -322,12 +322,12 @@ test.describe('linked tools: history only follows screens (US5)', () => {
   test('Home → Notes → (nav carry) Triads → Back → Notes → Back → Home (Q10)', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('link', { name: /Notes/ }).first().click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await pick(page, 'A');
     await nav(page).getByRole('link', { name: 'Triads' }).click();
     await expect(page.getByText('A major — Root position', { exact: true })).toBeVisible();
     await page.goBack();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/$/);
   });
@@ -339,11 +339,11 @@ test.describe('linked tools: history only follows screens (US5)', () => {
     await pick(page, 'C', 'E', 'G');
     const before = await historyLength(page);
     await viewAsTriadButton(page).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     expect(await historyLength(page)).toBe(before + 1);
     await page.goBack();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
   });
 
   test('Triads from this note adds exactly one history entry; the carry adds none (FR-015)', async ({
@@ -355,11 +355,11 @@ test.describe('linked tools: history only follows screens (US5)', () => {
     await expect(card(page)).toBeVisible();
     const before = await historyLength(page);
     await triadsFromNote(page).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('F♯ major — Root position', { exact: true })).toBeVisible();
     expect(await historyLength(page)).toBe(before + 1);
     await page.goBack();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
   });
 });
 
@@ -381,9 +381,9 @@ test.describe('linked tools: CAGED triad round trip (018 US3)', () => {
       .getByRole('radio', { name: '4-3-2', exact: true })
       .click();
     await page.getByRole('button', { name: 'Open in Triads', exact: true }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await page.goBack();
-    await expect(page).toHaveURL(/\/caged$/);
+    await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     await expect(
       page
         .getByRole('group', { name: 'Layers' })
@@ -466,7 +466,7 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
     await page.goBack();
     await page.goForward();
     await expect(cagedKey(page, 'E')).toHaveAttribute('aria-pressed', 'true');
-    await page.reload();
+    await page.goto('/caged');
     await expect(cagedKey(page, 'C')).toHaveAttribute('aria-pressed', 'true');
     await page.goto('/notes');
     await expect(note(page, 'F')).toHaveAttribute('aria-pressed', 'false');
@@ -503,10 +503,10 @@ test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
     await cell(page, 1, 3).click(); // string 1, fret 3 = G
     await expect(card(page)).toBeVisible();
     await cagedInThisKey(page).click();
-    await expect(page).toHaveURL(/\/caged$/);
+    await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     await expect(cagedKey(page, 'G')).toHaveAttribute('aria-pressed', 'true');
     await page.goBack();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
   });
 
   test('Triads B♭ minor → View in CAGED → CAGED B♭ minor, Triad on, a shape focused', async ({
@@ -516,7 +516,7 @@ test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
     await rootButton(page, 'A sharp or B flat').click();
     await radio(page, 'minor').click();
     await viewInCaged(page).click();
-    await expect(page).toHaveURL(/\/caged$/);
+    await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     await expect(cagedKey(page, 'A sharp or B flat')).toHaveAttribute('aria-pressed', 'true');
     await expect(cagedQuality(page, 'Minor')).toBeChecked();
     await expect(cagedLayerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'true');
@@ -543,7 +543,7 @@ test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
       await btn.focus();
       await expect(btn).toBeFocused();
       await btn.click({ force: true }); // aria-disabled: Playwright treats as not enabled
-      await expect(page).toHaveURL(/\/triads$/);
+      await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     });
   }
 

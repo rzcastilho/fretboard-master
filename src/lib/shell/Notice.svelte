@@ -4,11 +4,11 @@
   interface Props {
     message: string;
     ondismiss?: () => void;
-    /** Optional button shown before Dismiss. */
-    action?: { label: string; onclick: () => void };
+    /** Optional buttons shown, in order, before Dismiss. */
+    actions?: readonly { label: string; onclick: () => void }[];
   }
 
-  let { message, ondismiss, action }: Props = $props();
+  let { message, ondismiss, actions }: Props = $props();
   let visible = $state(true);
 
   function dismiss(event: MouseEvent) {
@@ -25,9 +25,9 @@
 {#if visible}
   <div class="notice" role="status" aria-live="polite">
     <p>{message}</p>
-    {#if action}
+    {#each actions ?? [] as action (action.label)}
       <button type="button" onclick={action.onclick}>{action.label}</button>
-    {/if}
+    {/each}
     {#if ondismiss}
       <button type="button" onclick={dismiss}>{m.notice_dismiss()}</button>
     {/if}
