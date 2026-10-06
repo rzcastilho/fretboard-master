@@ -206,7 +206,7 @@ test.describe('caged triad US3: jump to the Triads tool', () => {
     await aShapeTriad(page);
     await expect(openButton(page)).toBeVisible();
     await openButton(page).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     await expect(triadsSet(page).getByRole('radio', { name: '3-2-1' })).toBeChecked();
   });
@@ -228,7 +228,7 @@ test.describe('caged triad US3: jump to the Triads tool', () => {
     await layerSwitch(page, 'Triad').click();
     await setOption(page, '3-2-1').click();
     await openButton(page).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('C major — 2nd inversion', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Octave up' })).toBeDisabled();
   });
@@ -434,7 +434,7 @@ test.describe('caged triad polish: accessibility and persistence', () => {
     await openButton(page).focus();
     await expect(openButton(page)).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   });
 
   test('T051: 200% zoom wraps without horizontal scroll', async ({ page }) => {
@@ -457,7 +457,7 @@ test.describe('caged triad polish: accessibility and persistence', () => {
       .first()
       .getByRole('link', { name: 'Triads', exact: true })
       .click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await page
       .getByRole('navigation')
       .first()

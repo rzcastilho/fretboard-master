@@ -378,5 +378,14 @@
   "accidentals_flats": "Flats",
   "accidentals_both": "Both",
   "caged_solfege_note": "The shapes are named after the open chords C ({c}), A ({a}), G ({g}), E ({e}), and D ({d})",
+  "share_button": "Share",
+  "share_copied": "Link copied",
+  "share_fallback_label": "Copy this address",
+  "share_fallback_region": "Share link",
+  "share_title_caged": "{key} {quality} — CAGED",
+  "share_title_caged_shape": "{key} {quality} — CAGED, {shape} shape",
+  "share_title_triads": "{root} {quality} — Triads, {inversion}",
+  "share_title_notes": "{notes} — Notes",
+  "share_title_notes_empty": "Notes",
   "language_autonym": "English"
 }

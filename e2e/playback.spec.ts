@@ -27,9 +27,9 @@ test.describe('note playback (US1)', () => {
       .getByRole('link', { name: /triads/i })
       .first()
       .click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await page.goBack();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     const log = await readAudioLog(page);
     expect(log.filter((e) => e.type === 'unlock')).toEqual([]);
   });
@@ -243,7 +243,7 @@ test.describe('interruption, stop, and hidden app (US4)', () => {
       .getByRole('link', { name: /triads/i })
       .first()
       .click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     const entries = await stops(page);
     expect(entries).toHaveLength(1);
     if (entries[0]?.type !== 'stop') throw new Error('not a stop');

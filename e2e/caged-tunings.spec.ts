@@ -92,7 +92,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
     await expect(tags(page).first()).toBeVisible();
     const nav = page.getByRole('navigation', { name: 'Tools' });
     await nav.getByRole('link', { name: 'Fretboard Notes' }).click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await expect(page.getByRole('button', { name: /^Temporary tuning/ })).toHaveCount(0);
     await nav.getByRole('link', { name: 'CAGED' }).click();
     await expect(notice(page, 'Open G')).toBeVisible();
@@ -102,7 +102,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
     await page.getByRole('button', { name: 'Go to Triads' }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(
       page.getByRole('button', { name: 'Tuning: Open G. Open instrument panel' })
     ).toHaveText('Open G');

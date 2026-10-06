@@ -146,7 +146,7 @@ test.describe('caged focus US1: focus on one shape', () => {
 
     const nav = page.getByRole('navigation', { name: 'Tools' });
     await nav.getByRole('link', { name: 'Fretboard Notes' }).click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await nav.getByRole('link', { name: 'CAGED' }).click();
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'true');
     expect(await page.evaluate((k) => localStorage.getItem(k), PREFS_KEY)).toBe(before);
@@ -364,7 +364,7 @@ test.describe('caged focus US3: show connections', () => {
     await tag(page, E_TAG).click();
     const nav = page.getByRole('navigation', { name: 'Tools' });
     await nav.getByRole('link', { name: 'Fretboard Notes' }).click();
-    await expect(page).toHaveURL(/\/notes$/);
+    await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await nav.getByRole('link', { name: 'CAGED' }).click();
     await expect(connSwitch(page)).toHaveAttribute('aria-checked', 'true');
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'true');
@@ -469,7 +469,7 @@ test.describe('caged rotate hint US4', () => {
     await page.getByRole('link', { name: 'Home' }).first().click();
     await expect(page).toHaveURL('/');
     await page.getByRole('link', { name: /CAGED/ }).first().click();
-    await expect(page).toHaveURL(/\/caged$/);
+    await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     await expect(board(page)).toBeVisible();
     await expect(hint(page)).toHaveCount(0);
   });

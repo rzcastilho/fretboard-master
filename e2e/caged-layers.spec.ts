@@ -67,7 +67,7 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
     await layerSwitch(page, 'Arpeggio').click();
     const nav = page.getByRole('navigation', { name: 'Tools' });
     await nav.getByRole('link', { name: 'Triads' }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await nav.getByRole('link', { name: 'CAGED' }).click();
     await expect(layerSwitch(page, 'Arpeggio')).toHaveAttribute('aria-checked', 'true');
   });

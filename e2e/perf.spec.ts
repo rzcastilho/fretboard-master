@@ -1076,3 +1076,40 @@ test.describe('notation switch latency (021 US2)', () => {
     expect(median(times)).toBeLessThanOrEqual(100);
   });
 });
+
+test.describe('address sync under rapid change (SC-007)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+  test('200 rapid changes keep controls within budget and the address settles on the final view', async ({
+    page
+  }) => {
+    const errors: string[] = [];
+    page.on(
+      'console',
+      (m) =>
+        m.type() === 'error' &&
+        !/Content Security Policy|404/.test(m.text()) &&
+        errors.push(m.text())
+    );
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('/triads');
+    const inversions = ['root position', '1st inversion', '2nd inversion'];
+    const worst = await page.evaluate(async (names) => {
+      let max = 0;
+      for (let i = 0; i < 200; i++) {
+        const radio = [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find(
+          (r) => r.textContent?.trim() === names[i % names.length]
+        );
+        const start = performance.now();
+        radio?.click();
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+        max = Math.max(max, performance.now() - start);
+      }
+      return max;
+    }, inversions);
+    expect(worst).toBeLessThanOrEqual(100);
+    // i = 199 → 199 % 3 = 1 → "1st inversion"
+    await expect.poll(() => page.url(), { timeout: 150 + 500 }).toContain('inv=first');
+    expect(errors).toEqual([]);
+  });
+});

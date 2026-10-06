@@ -107,7 +107,10 @@ function clearLayerTransients(): void {
 let preferred = $state.raw<Instrument>(STANDARD_GUITAR);
 /** The applied tuning; the label is derived so a notation or language change updates it. */
 let tuning = $state.raw<Tuning>(STANDARD_TUNING);
-/** CAGED-local temporary standard view; never stored, never in the URL. */
+/**
+ * CAGED-local temporary standard view. Carried in share links (`tmp`, FR-009 supersedes slice
+ * 015), but never written to device storage.
+ */
 let temporary = $state<boolean>(false);
 /** Shared positions of the last step, shown for `STEP_WINDOW_MS`; never part of the view state. */
 let transition = $state.raw<StepTransition | null>(null);

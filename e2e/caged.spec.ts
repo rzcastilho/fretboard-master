@@ -12,7 +12,7 @@ test.describe('caged US1: five linked shapes', () => {
     await expect(cards).toHaveCount(3);
     await expect(cards.nth(2)).toHaveAccessibleName('CAGED — How does the whole neck connect?');
     await cards.nth(2).click();
-    await expect(page).toHaveURL(/\/caged$/);
+    await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     const nav = page.getByRole('navigation', { name: 'Tools' });
     await expect(nav.getByRole('link')).toHaveText([
       'Home',
@@ -391,10 +391,10 @@ test.describe('caged US6: behaves like the other tools', () => {
     await qualityRadio(page, 'Minor').click();
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
     await nav(page).getByRole('link', { name: 'Triads' }).click();
-    await expect(page).toHaveURL(/\/triads$/);
+    await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(page.getByText('G minor — Root position', { exact: true })).toBeVisible();
     await nav(page).getByRole('link', { name: 'CAGED' }).click();
-    await expect(page).toHaveURL(/\/caged$/);
+    await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
   });
 
@@ -414,7 +414,7 @@ test.describe('caged US6: behaves like the other tools', () => {
   test('Q22: key changes add no history entries; one Back leaves /caged', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('list').getByRole('link', { name: /CAGED/ }).click();
-    await expect(page).toHaveURL(/\/caged$/);
+    await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
     const before = await page.evaluate(() => history.length);
     for (const pc of [2, 5, 7]) await key(page, pc).click();
     await expect(page.getByText('G major', { exact: true })).toBeVisible();
