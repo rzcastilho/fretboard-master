@@ -13,6 +13,8 @@
   import { print } from '$lib/state/print.svelte';
   import { onMount } from 'svelte';
   import { preferences } from '$lib/state/preferences.svelte';
+  import { matchShortcut, toShortcutEvent } from '$lib/state/shortcuts';
+  import { runShortcut, shortcuts } from '$lib/state/shortcuts.svelte';
   import { TOOLS } from '$lib/shell/tools';
   import ShellFailure from '$lib/shell/ShellFailure.svelte';
   import { recordFailure } from '$lib/shell/failure';
@@ -46,10 +48,26 @@
     }
     if (type === 'enter') return;
     if (from && to && from.url.pathname === to.url.pathname) return;
+    // R-15: a hash link (About#privacy) focuses its section heading instead of the h1.
+    const hash = to?.url.hash.slice(1);
+    const target = hash ? document.getElementById(hash) : null;
+    const heading = target?.querySelector<HTMLElement>('h2') ?? null;
+    if (heading) {
+      // SvelteKit resets the focus start point in a `setTimeout` for deep links; run after it.
+      setTimeout(() => heading.focus({ preventScroll: true }));
+      return;
+    }
     document.querySelector<HTMLElement>('h1')?.focus();
   });
 </script>
 
+<svelte:window
+  onkeydown={(e) => {
+    if (!shortcuts.enabled) return;
+    const action = matchShortcut(toShortcutEvent(e));
+    if (action && runShortcut(action, screen)) e.preventDefault();
+  }}
+/>
 <PlaybackHost />
 <InstrumentPanel {screen} />
 <svelte:boundary onerror={(error) => recordFailure(null, error)}>

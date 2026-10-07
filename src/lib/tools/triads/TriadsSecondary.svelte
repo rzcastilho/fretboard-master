@@ -2,6 +2,7 @@
   import { m } from '$lib/paraglide/messages.js';
   import type { TriadsLabelType } from '$lib/state/triads-view';
   import ChoiceGroup from '../ChoiceGroup.svelte';
+  import { shortcuts } from '$lib/state/shortcuts.svelte';
 
   interface Props {
     labelType: TriadsLabelType;
@@ -52,6 +53,7 @@
     options={labels}
     current={labelType}
     onchoose={onlabeltype}
+    keyshortcuts={shortcuts.enabled ? 'L' : undefined}
   />
   <!-- aria-disabled (not disabled) keeps the commands focusable and visible at the ends. -->
   <button
@@ -80,6 +82,7 @@
   <button
     type="button"
     aria-disabled={!listen.enabled}
+    aria-keyshortcuts={shortcuts.enabled ? 'P' : undefined}
     onclick={() => {
       if (listen.enabled) onlisten();
     }}

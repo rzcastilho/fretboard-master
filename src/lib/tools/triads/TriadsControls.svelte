@@ -15,6 +15,7 @@
   } from '$lib/state/triads-model';
   import type { TriadsViewState } from '$lib/state/triads-view';
   import ChoiceGroup from '../ChoiceGroup.svelte';
+  import { shortcuts } from '$lib/state/shortcuts.svelte';
   import NoteSelector from '../NoteSelector.svelte';
   import { overflow } from '../overflow';
 
@@ -85,6 +86,7 @@
       options={inversions}
       current={view.inversion}
       onchoose={oninversion}
+      keyshortcuts={shortcuts.enabled ? '. ,' : undefined}
       disabled={!controls.inversion}
       describedby={HINT_ID}
     />

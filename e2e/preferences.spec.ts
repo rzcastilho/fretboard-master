@@ -320,7 +320,8 @@ test.describe('remembered preferences: US2', () => {
 });
 
 test.describe('remembered preferences: US3', () => {
-  const erase = (page: Page) => page.getByRole('button', { name: 'Erase my preferences' });
+  const erase = (page: Page) =>
+    page.locator('#privacy').getByRole('button', { name: 'Erase my preferences' });
   const storedKeys = (page: Page) =>
     page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('fretboard-master:')));
 

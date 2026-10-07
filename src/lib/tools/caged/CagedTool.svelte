@@ -30,6 +30,7 @@
   import CagedLayerList from './CagedLayerList.svelte';
   import CagedTriadSets from './CagedTriadSets.svelte';
   import ChoiceGroup from '../ChoiceGroup.svelte';
+  import { shortcuts } from '$lib/state/shortcuts.svelte';
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
   const guard = () => maybeFault('caged');
@@ -154,18 +155,21 @@
         options={labels}
         current={caged.state.labelType}
         onchoose={caged.setLabelType}
+        keyshortcuts={shortcuts.enabled ? 'L' : undefined}
       />
       <div class="steps">
         <button
           type="button"
           class="step"
           aria-disabled={caged.display.steps.previous ? undefined : 'true'}
+          aria-keyshortcuts={shortcuts.enabled ? ',' : undefined}
           onclick={() => caged.step(-1)}>{m.caged_previous_shape()}</button
         >
         <button
           type="button"
           class="step"
           aria-disabled={caged.display.steps.next ? undefined : 'true'}
+          aria-keyshortcuts={shortcuts.enabled ? '.' : undefined}
           onclick={() => caged.step(1)}>{m.caged_next_shape()}</button
         >
       </div>

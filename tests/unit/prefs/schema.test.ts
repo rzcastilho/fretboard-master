@@ -40,7 +40,8 @@ describe('constants and defaults (FR-018)', () => {
       notation: null,
       accidentals: 'sharps',
       cagedNoteShown: false,
-      theme: null
+      theme: null,
+      shortcuts: true
     });
   });
 
@@ -341,7 +342,8 @@ describe('serializePreferences', () => {
       notation: null,
       accidentals: 'sharps',
       cagedNoteShown: false,
-      theme: null
+      theme: null,
+      shortcuts: true
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -396,7 +398,8 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       notation: null,
       accidentals: 'sharps',
       cagedNoteShown: false,
-      theme: null
+      theme: null,
+      shortcuts: true
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -674,7 +677,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   notation: fc.constantFrom(null, 'letters', 'solfege'),
   accidentals: fc.constantFrom('sharps', 'flats', 'both'),
   cagedNoteShown: fc.boolean(),
-  theme: fc.constantFrom(null, 'light', 'dark')
+  theme: fc.constantFrom(null, 'light', 'dark'),
+  shortcuts: fc.boolean()
 });
 
 function isValid(p: Preferences): boolean {
@@ -793,5 +797,93 @@ describe('theme (026)', () => {
         expect(parsePreferences(serializePreferences(x))).toEqual(x);
       })
     );
+  });
+});
+
+describe('shortcuts (027)', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+
+  it('absent → true', () => expect(p({}).shortcuts).toBe(true));
+  it('true is kept', () => expect(p({ shortcuts: true }).shortcuts).toBe(true));
+  it('false is kept', () => expect(p({ shortcuts: false }).shortcuts).toBe(false));
+  it.each(['no', 0, null])('invalid shortcuts %j → true, others unchanged', (bad) => {
+    const r = p({ shortcuts: bad, frets: 18, muted: true, theme: 'dark' });
+    expect(r.shortcuts).toBe(true);
+    expect([r.fretCount, r.muted, r.theme]).toEqual([18, true, 'dark']);
+  });
+  it('true omits the key, byte-identical to slice 026', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('shortcuts');
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, theme: 'dark' })).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"theme":"dark"}'
+    );
+  });
+  it('false is appended last, after theme', () => {
+    const raw = serializePreferences({ ...DEFAULT_PREFERENCES, theme: 'dark', shortcuts: false });
+    expect(raw.endsWith(',"theme":"dark","shortcuts":false}')).toBe(true);
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, shortcuts: false })).toMatch(
+      /,"shortcuts":false\}$/
+    );
+  });
+  it('version stays 1 and the shortcuts-off fixture round-trips', () => {
+    expect(PREFS_VERSION).toBe(1);
+    const f = FIXTURE_BY_NAME['shortcuts-off'];
+    expect(parsePreferences(f.raw).shortcuts).toBe(false);
+    expect(serializePreferences(parsePreferences(f.raw))).toBe(f.raw);
+  });
+});
+
+describe('stored keys (027 FR-019(e))', () => {
+  const KNOWN = [
+    'version',
+    'strings',
+    'tuning',
+    'customTuning',
+    'frets',
+    'muted',
+    'volume',
+    'lastTool',
+    'labels',
+    'handedness',
+    'orientation',
+    'rotateHint',
+    'tempo',
+    'language',
+    'notation',
+    'accidentals',
+    'cagedNote',
+    'theme',
+    'shortcuts'
+  ];
+  const everything: Preferences = {
+    stringCount: 7,
+    tuningId: 'AF-21',
+    customTuning: [-3, 0, 0, 0, 0, 0, 0],
+    fretCount: 24,
+    muted: true,
+    volume: 35,
+    lastTool: 'triads',
+    labels: { notes: 'octave', triads: 'name', caged: 'name' },
+    handedness: 'left',
+    orientation: 'lowest-top',
+    rotateHintShown: true,
+    tempo: 'fast',
+    language: 'es',
+    notation: 'letters',
+    accidentals: 'flats',
+    cagedNoteShown: true,
+    theme: 'dark',
+    shortcuts: false
+  };
+
+  it('writes only known keys, none that identify or time-stamp the visitor', () => {
+    const keys = Object.keys(JSON.parse(serializePreferences(everything)));
+    expect(keys.length).toBe(KNOWN.length);
+    for (const key of keys) {
+      expect(KNOWN).toContain(key);
+      // Per camelCase word: a bare substring match would flag "accidentals".
+      for (const word of key.split(/(?=[A-Z])/)) {
+        expect(word).not.toMatch(/^(id|uuid|time|date|stamp|session|user)/i);
+      }
+    }
   });
 });

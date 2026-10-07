@@ -41,7 +41,7 @@
 
 <svelte:window {onkeydown} />
 
-<section class="erase" data-print="omit">
+<div class="erase" data-print="omit">
   {#if confirming}
     <p>{m.about_erase_question()}</p>
     <div class="actions">
@@ -51,7 +51,7 @@
   {:else}
     <button type="button" bind:this={opener} onclick={open}>{m.about_erase()}</button>
   {/if}
-</section>
+</div>
 
 <style>
   .erase {

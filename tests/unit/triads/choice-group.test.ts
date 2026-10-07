@@ -98,6 +98,22 @@ describe('ChoiceGroup', () => {
     expect(onchoose).toHaveBeenLastCalledWith('c');
   });
 
+  it('keyshortcuts renders aria-keyshortcuts on the radiogroup; absent when omitted', () => {
+    render(ChoiceGroup, {
+      name: 'Letters',
+      options,
+      current: 'a',
+      onchoose: vi.fn(),
+      keyshortcuts: 'L'
+    });
+    expect(screen.getByRole('radiogroup').getAttribute('aria-keyshortcuts')).toBe('L');
+  });
+
+  it('omits aria-keyshortcuts without the prop', () => {
+    setup();
+    expect(screen.getByRole('radiogroup').hasAttribute('aria-keyshortcuts')).toBe(false);
+  });
+
   it('choosing the already-checked option does nothing', async () => {
     const onchoose = setup('b');
     await fireEvent.click(screen.getByRole('radio', { name: 'Beta' }));

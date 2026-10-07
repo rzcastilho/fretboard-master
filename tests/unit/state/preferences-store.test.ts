@@ -8,6 +8,7 @@ import { language } from '../../../src/lib/state/language.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
+import { resetShortcutsForTests, shortcuts } from '../../../src/lib/state/shortcuts.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
 import { FIXTURE_BY_NAME } from '../prefs/fixtures';
 import { fakeStorage } from '../prefs/support';
@@ -21,6 +22,7 @@ beforeEach(() => {
   resetInstrumentForTests();
   resetNotationForTests();
   resetPreferencesForTests();
+  resetShortcutsForTests();
 });
 
 const full = () => fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-full'].raw });
@@ -442,5 +444,32 @@ describe('notation, accidentals and CAGED note (021 P-3, P-4)', () => {
     caged.reset();
     expect(preferences.cagedNoteShown).toBe(true);
     expect(JSON.parse(s.data.get(PREFS_KEY) as string).cagedNote).toBe(true);
+  });
+});
+
+describe('keyboard shortcuts switch (027)', () => {
+  it('start() pushes the stored value through shortcuts.start without writing', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['shortcuts-off'].raw });
+    const before = s.data.get(PREFS_KEY);
+    const start = vi.spyOn(shortcuts, 'start');
+    preferences.start(s);
+    expect(start).toHaveBeenCalledWith(false);
+    expect(shortcuts.enabled).toBe(false);
+    expect(s.data.get(PREFS_KEY)).toBe(before);
+  });
+
+  it('start() with no stored key leaves shortcuts on', () => {
+    preferences.start(fakeStorage());
+    expect(shortcuts.enabled).toBe(true);
+  });
+
+  it('erase() calls shortcuts.restore(true) and removes the key', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['shortcuts-off'].raw });
+    preferences.start(s);
+    const restore = vi.spyOn(shortcuts, 'restore');
+    preferences.erase();
+    expect(restore).toHaveBeenCalledWith(true);
+    expect(shortcuts.enabled).toBe(true);
+    expect(s.data.has(PREFS_KEY)).toBe(false);
   });
 });

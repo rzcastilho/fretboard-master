@@ -49,6 +49,8 @@ export interface ExpectedPreferences {
   /** 021: stored as `cagedNote`; absent or invalid in a record → false. */
   readonly cagedNoteShown: boolean;
   readonly theme: Theme | null;
+  /** 027: absent or invalid in a record → true. */
+  readonly shortcuts: boolean;
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -82,7 +84,8 @@ const defaults: ExpectedPreferences = {
   notation: null,
   accidentals: 'sharps',
   cagedNoteShown: false,
-  theme: null
+  theme: null,
+  shortcuts: true
 };
 
 function load(name: string): string {
@@ -120,7 +123,8 @@ export const FIXTURES: readonly PrefsFixture[] = [
     notation: null,
     accidentals: 'sharps',
     cagedNoteShown: false,
-    theme: null
+    theme: null,
+    shortcuts: true
   }),
   fixture('bad-volume', { ...defaults, tuningId: 'AF-2' }),
   fixture('garbage', defaults),
@@ -210,7 +214,9 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('accidentals-both', { ...defaults, accidentals: 'both' }),
   fixture('bad-notation', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
   fixture('bad-accidentals', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
-  fixture('caged-note', { ...defaults, cagedNoteShown: true })
+  fixture('caged-note', { ...defaults, cagedNoteShown: true }),
+  // 027 keyboard shortcuts switch: written only when false, last key
+  fixture('shortcuts-off', { ...defaults, theme: 'dark', shortcuts: false })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(
