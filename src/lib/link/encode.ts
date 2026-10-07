@@ -112,3 +112,16 @@ export function encodeLink(snapshot: ShareSnapshot, origin: string): string {
   const query = PARAM_ORDER[snapshot.tool].map((key) => `${key}=${fields[key]}`).join('&');
   return `${origin}${linkPath(snapshot.tool)}?${query}`;
 }
+
+/** Instrument keys and the version never belong in a measurement report (R-11). */
+const NOT_VIEW = new Set(['v', 'sc', 'tu', 'fr']);
+
+/** The tool's own view tokens only: no version, no instrument, no origin or path. */
+export function viewParams(snapshot: ShareSnapshot): Record<string, string> {
+  const fields = toolFields(snapshot);
+  const out: Record<string, string> = {};
+  for (const key of PARAM_ORDER[snapshot.tool]) {
+    if (!NOT_VIEW.has(key) && key in fields) out[key] = fields[key];
+  }
+  return out;
+}

@@ -1,0 +1,7 @@
+name = "fretboard-master"
+pages_build_output_dir = "build"
+compatibility_date = "2026-10-01"
+
+[[analytics_engine_datasets]]
+binding = "MEASURE"
+dataset = "fretboard_master_measure"

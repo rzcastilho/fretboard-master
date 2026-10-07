@@ -88,7 +88,14 @@ test.describe('about screen', () => {
           cat.about_privacy_heading ?? '',
           cat.about_version_heading ?? ''
         ]);
-        await expect(page.getByText(cat.about_privacy_not_measured ?? '')).toBeVisible();
+        for (const key of [
+          'about_privacy_measured',
+          'about_privacy_errors',
+          'about_privacy_never',
+          'about_privacy_dnt'
+        ]) {
+          await expect(page.getByText(cat[key] ?? '', { exact: true })).toBeVisible();
+        }
       });
     });
   }

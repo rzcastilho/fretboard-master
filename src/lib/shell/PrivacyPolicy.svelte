@@ -6,7 +6,10 @@
   <li>{m.about_privacy_no_data()}</li>
   <li>{m.about_privacy_stored()}</li>
   <li>{m.about_privacy_erase()}</li>
-  <li>{m.about_privacy_not_measured()}</li>
+  <li>{m.about_privacy_measured()}</li>
+  <li>{m.about_privacy_errors()}</li>
+  <li>{m.about_privacy_never()}</li>
+  <li>{m.about_privacy_dnt()}</li>
   <li>{m.about_privacy_no_ads()}</li>
   <li>{m.about_privacy_no_permissions()}</li>
   <li>{m.about_privacy_hosting()}</li>

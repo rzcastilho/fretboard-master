@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { measure } from '$lib/measure/measure.svelte';
   import { onMount } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
   import AppNav from './AppNav.svelte';
@@ -41,6 +42,11 @@
     choose();
     document.querySelector<HTMLElement>('h1')?.focus();
   }
+
+  // 028: one tool-opened event per tool per load (the facade de-duplicates).
+  $effect(() => {
+    measure.toolOpened(tool);
+  });
 
   // The manual-copy panel shows one link: close it as soon as the view no longer matches.
   $effect(() => {

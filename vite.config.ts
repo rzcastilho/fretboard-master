@@ -39,6 +39,9 @@ export default defineConfig(({ mode }) => {
     throw new Error('FM_APP_VERSION may only be set for `--mode test` builds.');
   }
   const version = mode === 'test' && override ? override : pkg.version;
+  // 028 R-05: Vitest and `vite dev` send nothing; builds default to the same-origin `/m`.
+  const measureEndpoint =
+    process.env.VITEST || mode === 'development' ? '' : (process.env.FM_MEASURE_ENDPOINT ?? '/m');
 
   return {
     plugins: [
@@ -58,7 +61,8 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(version),
       __FM_FAULT_INJECTION__: JSON.stringify(mode === 'test' || mode === 'development'),
-      __FM_MISSING_TEXT__: JSON.stringify(missingText())
+      __FM_MISSING_TEXT__: JSON.stringify(missingText()),
+      __FM_MEASURE_ENDPOINT__: JSON.stringify(measureEndpoint)
     },
     test: {
       // Pure tests run in node; files that render or touch the DOM opt in with

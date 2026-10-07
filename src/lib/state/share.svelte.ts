@@ -8,6 +8,7 @@
 // Valibot schemas the bundler keeps (side effects) and which nothing in the app uses yet.
 import { encodeLink } from '$lib/link/encode';
 import type { ShareSnapshot } from '$lib/link/types';
+import { measure } from '$lib/measure/measure.svelte';
 import type { ToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
 import { instrument } from './instrument.svelte';
@@ -109,17 +110,20 @@ const isAbort = (error: unknown): boolean =>
   (error as { name?: unknown }).name === 'AbortError';
 
 /** Clipboard, then the manual-copy fallback. Never throws. */
-async function copy(href: string): Promise<void> {
+async function copy(href: string, tool: ToolId): Promise<void> {
   const writeText = platform.writeText;
   if (writeText === null) {
     showFallback(href);
+    measure.linkShared(tool);
     return;
   }
   try {
     await writeText(href);
     showNotice();
+    measure.linkShared(tool);
   } catch {
     showFallback(href);
+    measure.linkShared(tool);
   }
 }
 
@@ -129,13 +133,14 @@ async function run(tool: ToolId, title: string): Promise<void> {
   if (shareSheet !== null && platform.coarsePointer) {
     try {
       await shareSheet({ url, title });
+      measure.linkShared(tool);
       return;
     } catch (error) {
       // A dismissed sheet is the person's choice: show nothing and do not copy.
       if (isAbort(error)) return;
     }
   }
-  await copy(url);
+  await copy(url, tool);
 }
 
 export const share = {

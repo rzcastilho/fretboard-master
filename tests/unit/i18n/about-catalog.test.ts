@@ -15,11 +15,20 @@ const JARGON = {
   'pt-BR': ['controlador', 'tratamento', 'base legal'],
   es: ['responsable del tratamiento', 'tratamiento', 'base jurídica']
 } as const;
+const NO_ADS = {
+  en: 'There are no ads, no trackers and no content from other companies.',
+  'pt-BR': 'Não há anúncios, rastreadores nem conteúdo de outras empresas.',
+  es: 'No hay anuncios, ni rastreadores, ni contenido de otras empresas.'
+} as const;
+const THIRD_PARTIES = ['google', 'cloudflare', 'sentry', 'plausible', 'matomo', 'amplitude'];
 const STATEMENTS = [
   'no_data',
   'stored',
   'erase',
-  'not_measured',
+  'measured',
+  'errors',
+  'never',
+  'dnt',
   'no_ads',
   'no_permissions',
   'hosting',
@@ -39,7 +48,23 @@ describe('About catalog (FR-019, SC-006)', () => {
         }
       });
 
-      it(`keeps the nine policy statements within ${CAPS[tag]} words`, () => {
+      it('has twelve statements and drops about_privacy_not_measured', () => {
+        expect(STATEMENTS).toHaveLength(12);
+        expect(cat).not.toHaveProperty('about_privacy_not_measured');
+      });
+
+      it('keeps about_privacy_no_ads byte-identical', () => {
+        expect(cat.about_privacy_no_ads).toBe(NO_ADS[tag]);
+      });
+
+      it('names no third party', () => {
+        const text = STATEMENTS.map((k) => cat[k] ?? '')
+          .join(' ')
+          .toLowerCase();
+        for (const name of THIRD_PARTIES) expect(text).not.toContain(name);
+      });
+
+      it(`keeps the twelve policy statements within ${CAPS[tag]} words`, () => {
         const words = STATEMENTS.map((k) => (cat[k] ?? '').trim().split(/\s+/).length).reduce(
           (a, b) => a + b,
           0

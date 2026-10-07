@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { measure } from '$lib/measure/measure.svelte';
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
   import { fixtureModel } from '$lib/fretboard/fixtures';
@@ -16,6 +17,7 @@
   import StringFilter from '$lib/tools/notes/StringFilter.svelte';
   import PositionCard from '$lib/tools/notes/PositionCard.svelte';
   import { maybeFault } from '$lib/shell/fault';
+  import { markCalculation } from '$lib/shell/failure';
   import { openCagedFromNote, openTriadsFromNote, viewAsTriad } from '$lib/state/links.svelte';
   import { notes } from '$lib/state/notes.svelte';
   import { playback } from '$lib/state/playback.svelte';
@@ -28,8 +30,15 @@
   import { onMount } from 'svelte';
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
-  const guard = () => maybeFault('notes');
+  const guard = () => maybeFault('notes', 'drawing');
   guard();
+
+  // Display-model derivation: an error here is a calculation failure (028 R-09); the test-only
+  // fault hook fires inside it (dead code in production).
+  markCalculation(() => {
+    maybeFault('notes', 'calculation');
+    return notes.display;
+  });
 
   // Test-only hook: render a named fixture model once on mount (dead code in production).
   let fixture: DisplayModel | undefined = $state();
@@ -69,6 +78,7 @@
   // Activation plays the note and opens the card; focus stays on the tapped cell.
   function onactivate(p: Position) {
     notes.activate(p);
+    measure.firstInteraction();
     if (__FM_FAULT_INJECTION__) (globalThis.__fmFretboardEvents ??= []).push({ ...p });
   }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { measure } from '$lib/measure/measure.svelte';
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
   import { fixtureModel } from '$lib/fretboard/fixtures';
@@ -6,6 +7,7 @@
   import { fixtureInstrument } from '$lib/instrument/fixtures';
   import { STANDARD_GUITAR, type Position } from '$lib/instrument/instrument';
   import { maybeFault } from '$lib/shell/fault';
+  import { markCalculation } from '$lib/shell/failure';
   import { caged } from '$lib/state/caged.svelte';
   import { openTriadsFromCaged, openTriadsFromCagedTriad } from '$lib/state/links.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
@@ -33,8 +35,15 @@
   import { shortcuts } from '$lib/state/shortcuts.svelte';
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
-  const guard = () => maybeFault('caged');
+  const guard = () => maybeFault('caged', 'drawing');
   guard();
+
+  // Display-model derivation: an error here is a calculation failure (028 R-09); the test-only
+  // fault hook fires inside it (dead code in production).
+  markCalculation(() => {
+    maybeFault('caged', 'calculation');
+    return caged.display;
+  });
 
   // Test-only hooks: render on a named fixture instrument or board model (dead code in production).
   let fixture: DisplayModel | undefined = $state();
@@ -81,6 +90,7 @@
   // Test-only hook: log activations for e2e assertions (dead code in production).
   function onactivate(p: Position) {
     caged.activate(p);
+    measure.firstInteraction();
     if (__FM_FAULT_INJECTION__) (globalThis.__fmFretboardEvents ??= []).push({ ...p });
   }
 </script>

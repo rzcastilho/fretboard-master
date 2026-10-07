@@ -29,7 +29,8 @@ export default tseslint.config(
         ...globals.browser,
         ...globals.node,
         __APP_VERSION__: 'readonly',
-        __FM_FAULT_INJECTION__: 'readonly'
+        __FM_FAULT_INJECTION__: 'readonly',
+        __FM_MEASURE_ENDPOINT__: 'readonly'
       }
     },
     rules: {
@@ -280,6 +281,17 @@ export default tseslint.config(
         { name: 'document', message: 'notes-view and links must be DOM-free.' },
         { name: 'localStorage', message: 'notes-view and links must be DOM-free.' },
         { name: 'navigator', message: 'notes-view and links must be DOM-free.' }
+      ]
+    }
+  },
+  {
+    // 028: wire and sanitize are shared by the client and the `functions/m.ts` Pages Function,
+    // so they import nothing from the app or framework (relative imports and valibot only).
+    files: ['src/lib/measure/wire.ts', 'src/lib/measure/sanitize.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['$lib', '$lib/*', 'svelte', 'svelte/*', '$app', '$app/*', '$env', '$env/*'] }
       ]
     }
   }

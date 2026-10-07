@@ -13,6 +13,10 @@ const config = {
     // Absolute asset URLs: the prerendered 404.html is served for deep paths like /triads/x.
     paths: { relative: false },
     inlineStyleThreshold: Infinity,
+    typescript: {
+      // 028: type-check the Cloudflare Pages Function (`functions/m.ts`) with `pnpm check`.
+      config: (cfg) => ({ ...cfg, include: [...cfg.include, '../functions/**/*.ts'] })
+    },
     version: { name: version, pollInterval: 0 },
     csp: {
       mode: 'hash',

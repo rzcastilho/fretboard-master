@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { measure } from '$lib/measure/measure.svelte';
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
   import { fixtureModel } from '$lib/fretboard/fixtures';
@@ -6,6 +7,7 @@
   import { fixtureInstrument } from '$lib/instrument/fixtures';
   import { STANDARD_GUITAR, type Position } from '$lib/instrument/instrument';
   import { maybeFault } from '$lib/shell/fault';
+  import { markCalculation } from '$lib/shell/failure';
   import { playback } from '$lib/state/playback.svelte';
   import { fit } from '$lib/state/fit.svelte';
   import { print } from '$lib/state/print.svelte';
@@ -35,8 +37,15 @@
   }
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
-  const guard = () => maybeFault('triads');
+  const guard = () => maybeFault('triads', 'drawing');
   guard();
+
+  // Display-model derivation: an error here is a calculation failure (028 R-09); the test-only
+  // fault hook fires inside it (dead code in production).
+  markCalculation(() => {
+    maybeFault('triads', 'calculation');
+    return triads.display;
+  });
 
   // Test-only hooks: render on a named fixture instrument, or a named fixture board model, once
   // on mount (dead code in production).
@@ -52,6 +61,7 @@
   // Test-only hook: log activations for e2e assertions (dead code in production).
   function onactivate(p: Position) {
     triads.activate(p);
+    measure.firstInteraction();
     if (__FM_FAULT_INJECTION__) (globalThis.__fmFretboardEvents ??= []).push({ ...p });
   }
 

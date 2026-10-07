@@ -16,6 +16,7 @@ import {
   type TuningId
 } from '$lib/instrument/tunings';
 import { musicalOf, type LinkInstrument } from '$lib/link/types';
+import { measure } from '$lib/measure/measure.svelte';
 import type { SpelledPitch } from '$lib/theory/pitch';
 import type { ScreenId } from '$lib/shell/screens';
 import type { ToolId } from '$lib/shell/tools';
@@ -255,18 +256,22 @@ export const instrument = {
   },
   setStringCount(n: number): void {
     panel = setStringCount(panel, n);
+    measure.instrumentEdited();
   },
   selectTuning(id: TuningId): void {
     panel = selectTuning(panel, id);
+    measure.instrumentEdited();
   },
   chooseCustom(): void {
     panel = chooseCustom(panel);
+    measure.instrumentEdited();
   },
   /** Returns true iff the pitch changed (caller plays it / checks focus). */
   stepString(string: StringNumber, delta: 1 | -1): boolean {
     const next = stepString(panel, string, delta);
     if (next === panel) return false;
     panel = next;
+    measure.instrumentEdited();
     return true;
   },
   /** Sound the pending open string (US2); no-op while closed. Call from a gesture handler. */
@@ -276,15 +281,19 @@ export const instrument = {
   },
   stepFrets(delta: 1 | -1): void {
     panel = stepFrets(panel, delta);
+    measure.instrumentEdited();
   },
   setFrets(n: number): void {
     panel = setFrets(panel, n);
+    measure.instrumentEdited();
   },
   setHandedness(h: Handedness): void {
     panel = setHandedness(panel, h);
+    measure.instrumentEdited();
   },
   setOrientation(o: Orientation): void {
     panel = setOrientation(panel, o);
+    measure.instrumentEdited();
   },
   restoreDefault(): void {
     panel = restoreDefault(panel);
@@ -305,6 +314,8 @@ export const instrument = {
     const inst = instrumentOf(result.next);
     const tuning = result.next.tuning;
     persist(result.next);
+    // 028: the panel actions above only edit the pending value; the traits change here.
+    measure.instrumentEdited();
     if (!result.musicalChanged) {
       // Presentation only (FR-017): views and sound untouched, no notice.
       notes.applyInstrument(inst);

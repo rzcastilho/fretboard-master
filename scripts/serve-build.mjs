@@ -29,6 +29,11 @@ function resolveFile(pathname) {
 
 createServer((req, res) => {
   const { pathname } = new URL(req.url ?? '/', 'http://localhost');
+  // 028 R-05: mirror the `/m` Pages Function so Lighthouse and unstubbed e2e runs see no 404 noise.
+  if (pathname === '/m' && req.method === 'POST') {
+    res.writeHead(204, { 'cache-control': 'no-store' }).end();
+    return;
+  }
   if (pathname.length > 1 && pathname.endsWith('/')) {
     res.writeHead(308, { location: pathname.slice(0, -1) }).end();
     return;

@@ -18,6 +18,8 @@ const ALLOWED = new Set([
   'lib/state/instrument.svelte.ts',
   'lib/state/preferences.svelte.ts',
   'lib/prefs/schema.ts',
+  // 028: reads handedness only to label the anonymous `hand` trait; no behaviour depends on it.
+  'lib/measure/traits.ts',
   'lib/shell/InstrumentPanel.svelte',
   'lib/shell/InstrumentSummary.svelte'
 ]);

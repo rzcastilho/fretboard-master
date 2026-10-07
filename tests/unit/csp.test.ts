@@ -22,6 +22,11 @@ describe('content security policy (FR-019)', () => {
     expect(directives['connect-src']).toEqual(['self']);
   });
 
+  it('measurement adds no origin: connect-src stays exactly self (FR-014)', () => {
+    expect(directives['connect-src']).toEqual(['self']);
+    expect(JSON.stringify(directives)).not.toMatch(/https?:|\/\/|\*/);
+  });
+
   it('keeps the policy this slice shipped with (no widening)', () => {
     expect(directives).toEqual({
       'default-src': ['self'],

@@ -11,7 +11,10 @@ const KEYS = [
   'about_privacy_no_data',
   'about_privacy_stored',
   'about_privacy_erase',
-  'about_privacy_not_measured',
+  'about_privacy_measured',
+  'about_privacy_errors',
+  'about_privacy_never',
+  'about_privacy_dnt',
   'about_privacy_no_ads',
   'about_privacy_no_permissions',
   'about_privacy_hosting',
@@ -30,19 +33,19 @@ describe('PrivacyPolicy', () => {
     ['pt-BR', ptBR],
     ['es', es]
   ] as const) {
-    it(`renders nine statements in order in ${tag}`, () => {
+    it(`renders twelve statements in order in ${tag}`, () => {
       language.start(null);
       language.restore(tag);
       const { container } = render(PrivacyPolicy);
       const items = [...container.querySelectorAll('ul > li')];
-      expect(items).toHaveLength(9);
+      expect(items).toHaveLength(12);
       expect(items.map((li) => li.textContent?.trim())).toEqual(KEYS.map((k) => cat[k]));
     });
   }
 
-  it('covers "nothing is measured"', () => {
+  it('no longer claims "nothing is measured"', () => {
     const { container } = render(PrivacyPolicy);
-    expect(container.textContent).toContain('Nothing is measured');
+    expect(container.textContent).not.toContain('Nothing is measured');
   });
 
   it('renders text, never HTML', () => {

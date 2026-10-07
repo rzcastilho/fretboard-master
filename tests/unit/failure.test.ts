@@ -1,8 +1,43 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { recordFailure } from '../../src/lib/shell/failure';
+import { measure } from '../../src/lib/measure/measure.svelte';
+import { markCalculation, recordFailure } from '../../src/lib/shell/failure';
 
 afterEach(() => vi.restoreAllMocks());
+
+describe('recordFailure reporting', () => {
+  it('reports drawing by default, calculation when marked, audio when passed', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const report = vi.spyOn(measure, 'report').mockImplementation(() => {});
+    const plain = new Error('p');
+    recordFailure('triads', plain);
+    const calc = new Error('c');
+    expect(() =>
+      markCalculation(() => {
+        throw calc;
+      })
+    ).toThrow(calc);
+    recordFailure('notes', calc);
+    const aud = new Error('a');
+    recordFailure('caged', aud, 'audio');
+    expect(report.mock.calls.map(([r]) => [r.kind, r.tool, r.error])).toEqual([
+      ['drawing', 'triads', plain],
+      ['calculation', 'notes', calc],
+      ['audio', 'caged', aud]
+    ]);
+  });
+
+  it('passes a null tool through (the facade maps it to shell) and any non-Error value', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const report = vi.spyOn(measure, 'report').mockImplementation(() => {});
+    recordFailure(null, 'boom');
+    expect(report).toHaveBeenCalledWith({ kind: 'drawing', tool: null, error: 'boom' });
+  });
+
+  it('markCalculation returns the value when nothing throws', () => {
+    expect(markCalculation(() => 7)).toBe(7);
+  });
+});
 
 describe('recordFailure', () => {
   it('builds a record from an Error and logs once to the console', () => {

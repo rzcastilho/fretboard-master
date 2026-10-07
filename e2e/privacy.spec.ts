@@ -52,10 +52,15 @@ test.describe('privacy: first-load walk (FR-019)', () => {
   }) => {
     const origin = new URL(baseURL ?? 'http://localhost').origin;
     const origins = new Set<string>();
+    const nonGet: string[] = [];
     context.on('request', (request) => {
       const url = request.url();
       if (url.startsWith('data:') || url.startsWith('blob:')) return;
-      origins.add(new URL(url).origin);
+      const parsed = new URL(url);
+      origins.add(parsed.origin);
+      if (parsed.origin === origin && request.method() !== 'GET') {
+        nonGet.push(`${request.method()} ${parsed.pathname}`);
+      }
     });
     page.on('dialog', (dialog) => {
       void dialog.dismiss();
@@ -109,6 +114,8 @@ test.describe('privacy: first-load walk (FR-019)', () => {
     await countIdentityInputs('/about');
 
     expect([...origins].filter((o) => o !== origin)).toEqual([]);
+    // 028 FR-015: the only same-origin write is the measurement beacon, POST /m.
+    expect(nonGet.filter((r) => r !== 'POST /m')).toEqual([]);
 
     const calls = await page.evaluate(
       () => (window as unknown as PermissionGlobals).__permissionCalls
@@ -120,6 +127,11 @@ test.describe('privacy: first-load walk (FR-019)', () => {
     const keys = await page.evaluate(() => Object.keys(localStorage));
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) expect(key.startsWith('fretboard-master:')).toBe(true);
+    // 028 R-17: measurement keeps no identifier anywhere in the browser.
+    // SvelteKit's own router snapshot/scroll keys are not measurement state.
+    const session = await page.evaluate(() => Object.keys(sessionStorage));
+    expect(session.filter((k) => !k.startsWith('sveltekit:'))).toEqual([]);
+    expect(await page.evaluate(async () => (await indexedDB.databases?.()) ?? [])).toEqual([]);
 
     expect(identityInputs).toEqual({ '/': 0, '/notes': 0, '/triads': 0, '/caged': 0, '/about': 0 });
   });

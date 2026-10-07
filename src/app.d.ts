@@ -1,10 +1,24 @@
 declare global {
   const __APP_VERSION__: string;
   const __FM_FAULT_INJECTION__: boolean;
+  /** Build-time: measurement endpoint (`/m` by default; empty string disables sending). */
+  const __FM_MEASURE_ENDPOINT__: string;
   /** Build-time: per-locale message keys whose text is still missing (falls back to English). */
   const __FM_MISSING_TEXT__: Readonly<Record<'en' | 'pt-BR' | 'es', readonly string[]>>;
 
-  var __fmFault: Partial<Record<'notes' | 'triads' | 'caged', number>> | undefined;
+  var __fmFault:
+    | Partial<
+        Record<
+          | 'notes'
+          | 'triads'
+          | 'caged'
+          | 'notes:calculation'
+          | 'triads:calculation'
+          | 'caged:calculation',
+          number
+        >
+      >
+    | undefined;
 
   /** Test-only (`__FM_FAULT_INJECTION__`): name of the fixture the fretboard zone should render. */
   var __fmFretboardFixture:
