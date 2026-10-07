@@ -12,7 +12,7 @@
   };
 </script>
 
-<div class="toggle" role="group" aria-label={m.notation_label()}>
+<div class="toggle" data-print="omit" role="group" aria-label={m.notation_label()}>
   {#each NOTATIONS as value (value)}
     <button
       type="button"

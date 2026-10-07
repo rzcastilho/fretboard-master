@@ -41,7 +41,7 @@
 
 <svelte:window {onkeydown} />
 
-<section class="erase">
+<section class="erase" data-print="omit">
   {#if confirming}
     <p>{m.about_erase_question()}</p>
     <div class="actions">

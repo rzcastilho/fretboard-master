@@ -4,6 +4,7 @@ import type { ScaleDegree } from '../theory/caged-layers';
 import type { IntervalId } from '../theory/triad';
 import type { LegendGroup } from './legend';
 import type { FitMode } from './geometry';
+import type { MotionKind } from './transition';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
 export type Emphasis = 'highlighted' | 'normal' | 'dimmed' | 'hidden';
@@ -60,6 +61,8 @@ export type FretboardArrow =
 export interface DisplayModel {
   /** At most one per position; first wins. */
   readonly markers: readonly Marker[];
+  /** 026: how this model differs from the previous one, for motion. Absent ≡ 'none'. */
+  readonly motion?: MotionKind;
   readonly labelMode: LabelMode;
   /** Optional localized leading sentence of the text description. */
   readonly summary?: string;
@@ -143,6 +146,8 @@ export interface FretboardProps {
   ontag?: (id: string) => void;
   /** Whole-neck or comfortable sizing; default comfortable. */
   fit?: FitMode;
+  /** Print layout (026): whole neck at the print width, legend and description visible. */
+  printing?: boolean;
   onfit?: (event: FitEvent) => void;
   /** One-shot: a position to centre after the next fit switch (consumed once). */
   takeAnchor?: () => Position | null;

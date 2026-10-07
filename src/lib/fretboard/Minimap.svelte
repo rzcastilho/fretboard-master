@@ -112,6 +112,7 @@
 
 <div
   class="minimap"
+  data-print="omit"
   role="slider"
   tabindex="0"
   aria-label={m.minimap_label()}

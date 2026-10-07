@@ -23,7 +23,7 @@
 </script>
 
 {#if visible}
-  <div class="notice" role="status" aria-live="polite">
+  <div class="notice" data-print="omit" role="status" aria-live="polite">
     <p>{message}</p>
     {#each actions ?? [] as action (action.label)}
       <button type="button" onclick={action.onclick}>{action.label}</button>

@@ -117,6 +117,35 @@ test.describe('200% text size (US5)', () => {
   });
 });
 
+test.describe('theme selector at 200% (US1)', () => {
+  test('rows wrap inside 320 px on home, labels never truncated', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto('/');
+    await zoom200(page);
+    const selector = page.locator('fieldset.theme');
+    await expect(selector).toBeVisible();
+    const m = await selector.locator('label').evaluateAll((labels) =>
+      labels.map((el) => {
+        const r = el.getBoundingClientRect();
+        const text = el.querySelector('span') as HTMLElement;
+        return {
+          right: r.right,
+          clipped: text.scrollWidth > text.clientWidth + 1,
+          ellipsis: getComputedStyle(text).textOverflow === 'ellipsis'
+        };
+      })
+    );
+    expect(m).toHaveLength(3);
+    for (const row of m) {
+      expect(row.clipped).toBe(false);
+      expect(row.ellipsis).toBe(false);
+      expect(row.right).toBeLessThanOrEqual(320);
+    }
+    await expectNoTruncationOrOverlap(page);
+    await expectNoHorizontalScroll(page);
+  });
+});
+
 test.describe('live re-evaluation (US5)', () => {
   const size = { width: 1400, height: 900 };
   const fit = (page: Page) => page.getByRole('button', { name: 'Fit to screen' });

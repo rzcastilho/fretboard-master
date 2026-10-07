@@ -50,6 +50,11 @@ export default defineConfig(({ mode }) => {
         strategy: ['baseLocale']
       })
     ],
+    build: {
+      // 026 R-01: keep `light-dark()` native. Below these versions the CSS minifier rewrites it
+      // into its `--lightningcss-light/dark` toggle, which this stylesheet does not rely on.
+      cssTarget: ['chrome123', 'firefox120', 'safari17.5']
+    },
     define: {
       __APP_VERSION__: JSON.stringify(version),
       __FM_FAULT_INJECTION__: JSON.stringify(mode === 'test' || mode === 'development'),

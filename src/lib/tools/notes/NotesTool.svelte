@@ -20,6 +20,7 @@
   import { notes } from '$lib/state/notes.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { fit } from '$lib/state/fit.svelte';
+  import { print } from '$lib/state/print.svelte';
   import FitNotice from '$lib/tools/FitNotice.svelte';
   import FitToggle from '$lib/tools/FitToggle.svelte';
   import ContextZone from '$lib/tools/ContextZone.svelte';
@@ -86,7 +87,7 @@
   }
 </script>
 
-<section class="b" aria-labelledby="notes-zone-b">
+<section class="b" data-print="omit" aria-labelledby="notes-zone-b">
   <h2 id="notes-zone-b">{m.notes_zone_selector()}</h2>
   <NoteSelector selected={notes.state.selection} ontoggle={notes.toggleNote} />
   <DetectedTriad detected={notes.display.detected} onview={viewAsTriad} />
@@ -115,13 +116,14 @@
     {onactivate}
     pulses={playback.pulses}
     fit={fit.effective}
+    printing={print.active}
     onfit={fit.handle}
     takeAnchor={fit.takeAnchor}
   />
 </section>
 <SidePanels>
   {#snippet actions()}
-    <section class="e" aria-labelledby="notes-zone-e">
+    <section class="e" data-print="omit" aria-labelledby="notes-zone-e">
       <h2 id="notes-zone-e">{m.notes_zone_actions()}</h2>
       <FitToggle />
       <NotesActions

@@ -485,8 +485,9 @@ test.describe('caged triad polish: accessibility and persistence', () => {
   test('T052: reload of the synced address keeps Triad on (ADR 0021)', async ({ page }) => {
     await aShapeTriad(page);
     const before = await triadKeys(page);
-    // The address bar follows the view after a 150 ms debounce; reload once it carries the link.
-    await expect(page).toHaveURL(/\/caged\?v=1&/);
+    // The address bar follows the view after a 150 ms debounce; reload once it carries the
+    // triad set (`ts`), not just any link: the address already has `v=1&` from the start.
+    await expect(page).toHaveURL(/\/caged\?v=1&.*[?&]ts=[^-&]/);
     await page.reload();
     await expect(layerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'true');
     await expect(setOption(page, '3-2-1')).toBeChecked();

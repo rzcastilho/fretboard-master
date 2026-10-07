@@ -89,13 +89,18 @@ test.describe('home screen', () => {
     for (const insets of cases) {
       await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets });
       const vp = { width: 360, height: 740 };
+      await page.evaluate(() => window.scrollTo(0, 0));
       for (const target of targets()) {
         const r = await box(target);
         expect(r.y).toBeGreaterThanOrEqual(insets.top);
-        expect(r.y + r.height).toBeLessThanOrEqual(vp.height - insets.bottom);
         expect(r.x).toBeGreaterThanOrEqual(insets.left);
         expect(r.x + r.width).toBeLessThanOrEqual(vp.width - insets.right);
       }
+      // The header grew with the theme choice (026), so the cards may scroll: the bottom inset
+      // is checked at the end of the page, where the last card must clear it.
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      const last = await box(page.getByRole('list').getByRole('link').last());
+      expect(last.y + last.height).toBeLessThanOrEqual(vp.height - insets.bottom);
     }
   });
 

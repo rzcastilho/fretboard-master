@@ -10,9 +10,11 @@
     description: string;
     /** Legend groups for the view as drawn (`legendGroups(model)`). */
     legend: readonly LegendGroup[];
+    /** Print layout: description and legend are shown even when collapsed on screen. */
+    printing?: boolean;
   }
 
-  let { description, legend }: Props = $props();
+  let { description, legend, printing = false }: Props = $props();
 
   const uid = $props.id();
   /** Component-local: closed on every mount, never persisted or shared. */
@@ -66,17 +68,25 @@
       {m.fretboard_legend()}
     </button>
   </div>
-  <p class="description" id="{uid}-description" hidden={!showDescription}>{description}</p>
+  <p
+    class="description"
+    id="{uid}-description"
+    data-print="show"
+    hidden={!showDescription && !printing}
+  >
+    {description}
+  </p>
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <section
     class="legend"
     id="{uid}-legend"
     aria-labelledby="{uid}-legend-heading"
-    hidden={!legendOpen}
+    data-print="show"
+    hidden={!legendOpen && !printing}
     onkeydown={onLegendKeydown}
   >
     <h2 id="{uid}-legend-heading">{m.fretboard_legend()}</h2>
-    {#if legendOpen}
+    {#if legendOpen || printing}
       <LegendPanel groups={legend} />
     {/if}
   </section>

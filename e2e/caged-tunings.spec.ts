@@ -272,6 +272,10 @@ test.describe('caged 015 US3: altered lowest string', () => {
     await key(page, 2).click();
     await expect(page.getByText('D major', { exact: true })).toBeVisible();
     await expect(page.getByText('altered', { exact: true })).toBeVisible();
+    // A key change slides (026): markers of the previous key fade out over --duration-short.
+    await expect
+      .poll(async () => (await sixFrets(page)).every((f) => [7, 12, 19].includes(f)))
+      .toBe(true);
     const frets = await sixFrets(page);
     expect(frets).toEqual(expect.arrayContaining([7, 12]));
     // Only chord tones of D (A at 7 and 19, D at 12) in G and E regions.

@@ -11,6 +11,7 @@
   import { instrument } from '$lib/state/instrument.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { fit } from '$lib/state/fit.svelte';
+  import { print } from '$lib/state/print.svelte';
   import FitNotice from '$lib/tools/FitNotice.svelte';
   import FitToggle from '$lib/tools/FitToggle.svelte';
   import ContextZone from '$lib/tools/ContextZone.svelte';
@@ -85,7 +86,7 @@
 
 <svelte:window bind:innerWidth={vw} bind:innerHeight={vh} />
 
-<section class="b" aria-labelledby="caged-zone-b">
+<section class="b" data-print="omit" aria-labelledby="caged-zone-b">
   <h2 id="caged-zone-b">{m.zone_main_controls()}</h2>
   <CagedControls
     state={caged.state}
@@ -124,6 +125,7 @@
       ontag={(id) => caged.toggleTag(id)}
       pulses={playback.pulses}
       fit={fit.effective}
+      printing={print.active}
       onfit={fit.handle}
       takeAnchor={fit.takeAnchor}
     />
@@ -144,7 +146,7 @@
 
 <SidePanels>
   {#snippet actions()}
-    <section class="e" aria-labelledby="caged-zone-e">
+    <section class="e" data-print="omit" aria-labelledby="caged-zone-e">
       <h2 id="caged-zone-e">{m.zone_actions()}</h2>
       <FitToggle />
       <ChoiceGroup

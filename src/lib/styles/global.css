@@ -234,3 +234,51 @@ header[data-landscape] :is(a, button):is(:hover, :focus-visible) > .bar-label {
   border-radius: var(--radius-md);
   pointer-events: none;
 }
+
+/*
+ * Print (026 US5, contracts/ui.md §5). The print palette lives in tokens.css; the layout of the
+ * board is Fretboard.svelte's print branch. Here: white page, chrome omitted, text shown.
+ * No `@page { size }`: the user's paper and orientation stand.
+ */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* The board's print width (--print-board-inline) is the whole printable width. */
+  main,
+  header {
+    padding-inline: 0 !important;
+  }
+
+  /* Zone frames are screen chrome and would shave the board's printable width. */
+  main .grid > section {
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  [data-print='omit'] {
+    display: none !important;
+  }
+
+  /* Visible text that is hidden or visually clipped on screen. */
+  [data-print='show'][hidden] {
+    display: block !important;
+  }
+
+  [data-print='show'].sr-only {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+}

@@ -76,6 +76,7 @@
   bind:this={opener}
   type="button"
   class="panels-opener"
+  data-print="omit"
   aria-expanded={landscape && open ? 'true' : 'false'}
   aria-controls="tool-panels"
   hidden={!landscape}
@@ -86,14 +87,19 @@
   id="tool-panels"
   class="panels"
   class:landscape
+  data-print={landscape ? 'omit' : undefined}
   role={landscape ? 'region' : undefined}
   aria-label={landscape ? m.panels_region() : undefined}
   hidden={landscape && !open}
   {onkeydown}
 >
   {#if landscape}
-    <button bind:this={closeButton} type="button" class="panels-close" onclick={() => void close()}
-      >{m.panels_close()}</button
+    <button
+      bind:this={closeButton}
+      type="button"
+      class="panels-close"
+      data-print="omit"
+      onclick={() => void close()}>{m.panels_close()}</button
     >
   {/if}
   {@render actions()}

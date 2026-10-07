@@ -10,7 +10,7 @@
   }
 </script>
 
-<button type="button" class="instrument-button" onclick={open}
+<button type="button" class="instrument-button" data-print="omit" onclick={open}
   ><BarIcon name="instrument" /><span class="bar-label">{m.instrument_button()}</span></button
 >
 

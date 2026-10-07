@@ -169,7 +169,11 @@ export function centerScrollTarget(
   const b = layout.columns[end];
   const maxScroll = Math.max(0, layout.width - viewport.width);
   if (!a || !b || maxScroll === 0) return null;
-  const mid = (Math.min(a.start, b.start) + Math.max(a.end, b.end)) / 2;
+  const left = Math.min(a.start, b.start);
+  const right = Math.max(a.end, b.end);
+  // A region already fully in view stays where it is (026: no scroll).
+  if (left >= viewport.scrollLeft && right <= viewport.scrollLeft + viewport.width) return null;
+  const mid = (left + right) / 2;
   const target = Math.min(Math.max(mid - viewport.width / 2, 0), maxScroll);
   return Math.abs(target - viewport.scrollLeft) < 0.5 ? null : target;
 }

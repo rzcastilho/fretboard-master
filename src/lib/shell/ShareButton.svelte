@@ -24,6 +24,7 @@
   bind:this={button}
   type="button"
   class="share-button"
+  data-print="omit"
   aria-busy={share.busy ? 'true' : undefined}
   onclick={activate}
   ><BarIcon name="share" /><span class="bar-label">{m.share_button()}</span></button

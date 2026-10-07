@@ -566,3 +566,72 @@ test.describe('caged focus polish: targets, focus ring, axe', () => {
     await runAxe(page);
   });
 });
+
+test.describe('caged focus: dim and scroll timing (026 US4)', () => {
+  const scrollLeft = (page: Page) =>
+    page.evaluate(() => document.querySelector<HTMLElement>('.scroller')?.scrollLeft ?? 0);
+  const C_TAG = /^C shape/;
+  const bandInView = (page: Page) =>
+    page.evaluate(() => {
+      const s = document.querySelector<HTMLElement>('.scroller')?.getBoundingClientRect();
+      const b = document.querySelector('.region-band')?.getBoundingClientRect();
+      return !!s && !!b && b.left >= s.left - 1 && b.right <= s.right + 1;
+    });
+
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 480, height: 900 });
+  });
+
+  test('focus scrolls to the region within 500 ms and dims the others', async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/caged');
+    await expandDetails(page);
+    const start = await scrollLeft(page);
+    // dispatchEvent: Playwright's own click would scroll the tag into view first.
+    await tag(page, E_TAG).dispatchEvent('click');
+    await page.clock.runFor(100);
+    const early = await scrollLeft(page);
+    await page.clock.runFor(500);
+    const end = await scrollLeft(page);
+    expect(end).toBeGreaterThan(start);
+    expect(early).toBeGreaterThanOrEqual(start);
+    expect(early).toBeLessThan(end);
+    expect(await bandInView(page)).toBe(true);
+    await expect(markers(page, 'dimmed').first()).toBeAttached();
+  });
+
+  test('no scroll when the region is already fully in view', async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/caged');
+    await expandDetails(page);
+    const start = await scrollLeft(page);
+    await tag(page, C_TAG).first().click();
+    await page.clock.runFor(700);
+    expect(await scrollLeft(page)).toBe(start);
+  });
+
+  test('clearing focus restores emphasis without scrolling', async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/caged');
+    await expandDetails(page);
+    // dispatchEvent: Playwright's own click would scroll the tag into view first.
+    await tag(page, E_TAG).dispatchEvent('click');
+    await page.clock.runFor(700);
+    const focused = await scrollLeft(page);
+    await radio(page, 'See all').click();
+    await page.clock.runFor(700);
+    expect(await scrollLeft(page)).toBe(focused);
+    await expect(markers(page, 'dimmed')).toHaveCount(0);
+  });
+
+  test('reduced motion jumps instantly and still reveals the region', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/caged');
+    await expandDetails(page);
+    const start = await scrollLeft(page);
+    // dispatchEvent: Playwright's own click would scroll the tag into view first.
+    await tag(page, E_TAG).dispatchEvent('click');
+    await expect.poll(() => scrollLeft(page)).toBeGreaterThan(start);
+    expect(await bandInView(page)).toBe(true);
+  });
+});

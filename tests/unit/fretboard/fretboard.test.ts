@@ -663,7 +663,7 @@ describe('Fretboard notes-tool model fields (US1)', () => {
     expect(marker).toBeTruthy();
     const css = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
     expect(css).toMatch(
-      /\.marker\.neutral\.highlighted[^{]*\.glyph[^{]*\{[^}]*--color-note-highlight\)/
+      /\.marker\.neutral\.highlighted[^{]*\.glyph[^{]*\{[^}]*--fb-color-note-highlight\)/
     );
   });
 
@@ -676,7 +676,7 @@ describe('Fretboard notes-tool model fields (US1)', () => {
     expect(container.querySelectorAll('.marker.tone-3')).toHaveLength(1);
     expect(container.querySelector('.marker.tone-3')?.classList.contains('highlighted')).toBe(true);
     const css = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
-    for (let n = 1; n <= 7; n++) expect(css).toContain(`var(--octave-tone-${n})`);
+    for (let n = 1; n <= 7; n++) expect(css).toContain(`var(--fb-octave-tone-${n})`);
   });
 
   it('draws an octave badge only for labelMode note', () => {
@@ -820,7 +820,7 @@ describe('Fretboard region band (US3)', () => {
     if (!firstString) throw new Error('no strings');
     expect(all.indexOf(band)).toBeLessThan(all.indexOf(firstString));
     const css = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
-    expect(css).toMatch(/\.region-band[^{]*\{[^}]*var\(--region-band\)/);
+    expect(css).toMatch(/\.region-band[^{]*\{[^}]*var\(--fb-region-band\)/);
   });
 
   it('clamps an out-of-range region to 0..fretCount', () => {
@@ -974,7 +974,7 @@ describe('Fretboard connection ring (016 US2)', () => {
   it('is styled from the ring tokens and never animates', () => {
     const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
     const rule = /\.connection-ring\s*\{([^}]*)\}/.exec(src)?.[1] ?? '';
-    expect(rule).toMatch(/var\(--connection-ring\)/);
+    expect(rule).toMatch(/var\(--fb-color-outline\)/);
     expect(rule).toMatch(/var\(--connection-ring-width\)/);
     expect(src).toMatch(/var\(--connection-ring-gap\)/);
     expect(rule).not.toMatch(/animation|transition/);
@@ -1615,10 +1615,13 @@ describe('Fretboard marker motion (007 US5)', () => {
           animate.mockClear();
           await rerender({
             instrument: STANDARD_GUITAR,
-            model: model([
-              ...base(),
-              id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.5 })
-            ])
+            model: {
+              ...model([
+                ...base(),
+                id({ string: 2, fret: 5, id: '2:5', function: 'degree', appear: 0.5 })
+              ]),
+              motion: 'reveal'
+            }
           });
           // Svelte holds the node for the delay (one 90 ms animation) before the 120 ms fade.
           expect(opts().filter((o) => o.duration === 90)).toHaveLength(1);
@@ -2602,5 +2605,144 @@ describe('Fretboard fit to screen (025 US2)', () => {
   it('the scroller allows panning both ways (touch-action: pan-x pan-y)', () => {
     const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
     expect(src).toMatch(/\.scroller\s*\{[^}]*touch-action:\s*pan-x pan-y/);
+  });
+});
+
+describe('Fretboard model-change motion (026)', () => {
+  const mk = (string: number, fret: number, extra: Partial<Marker> = {}): Marker => ({
+    string,
+    fret,
+    function: 'root',
+    emphasis: 'highlighted',
+    ...extra
+  });
+  const withMotion = (markers: Marker[], motion?: DisplayModel['motion']): DisplayModel => ({
+    markers,
+    labelMode: 'none',
+    ...(motion ? { motion } : {})
+  });
+  const grid = (c: HTMLElement) => c.querySelector('svg[role="grid"]');
+  const marker = (c: HTMLElement, pos: string) => c.querySelector(`.marker[data-key="${pos}"]`);
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('data-motion equals model.motion, none when absent', async () => {
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withMotion([mk(1, 1)])
+    });
+    expect(grid(container)?.getAttribute('data-motion')).toBe('none');
+    for (const kind of ['slide', 'by-role', 'cross-fade', 'focus', 'reveal'] as const) {
+      await rerender({ instrument: STANDARD_GUITAR, model: withMotion([mk(1, 1)], kind) });
+      expect(grid(container)?.getAttribute('data-motion')).toBe(kind);
+    }
+  });
+
+  it('slide keeps one element per string and moves it', async () => {
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withMotion([mk(1, 1), mk(2, 3)])
+    });
+    const before = marker(container, '1:1');
+    await rerender({
+      instrument: STANDARD_GUITAR,
+      model: withMotion([mk(1, 5), mk(2, 7)], 'slide')
+    });
+    expect(marker(container, '1:5')).toBe(before);
+    expect(container.querySelectorAll('.marker')).toHaveLength(2);
+  });
+
+  it('none replaces an unrelated marker without keeping the old element', async () => {
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withMotion([mk(1, 1)])
+    });
+    const before = marker(container, '1:1');
+    await rerender({ instrument: STANDARD_GUITAR, model: withMotion([mk(2, 4)]) });
+    expect(marker(container, '2:4')).not.toBe(before);
+  });
+
+  it('a pulse update keeps the data-motion of the model and the other markers', async () => {
+    const model = withMotion([mk(1, 1), mk(2, 3)], 'slide');
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withMotion([mk(1, 1), mk(2, 3)])
+    });
+    await rerender({ instrument: STANDARD_GUITAR, model });
+    const other = marker(container, '2:3');
+    await rerender({
+      instrument: STANDARD_GUITAR,
+      model,
+      pulses: [{ id: 1, position: { string: 1, fret: 1 }, durationMs: 300 }]
+    });
+    expect(grid(container)?.getAttribute('data-motion')).toBe('slide');
+    expect(marker(container, '2:3')).toBe(other);
+  });
+
+  it('declares transition: none for none and never changes data-motion with the theme', async () => {
+    const source = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(source).toMatch(/\[data-motion='none'\] \.marker[\s\S]*?transition: none/);
+    const { container, rerender } = render(Fretboard, {
+      instrument: STANDARD_GUITAR,
+      model: withMotion([mk(1, 1)])
+    });
+    expect(grid(container)?.getAttribute('data-motion')).toBe('none'); // the mount model
+    await rerender({ instrument: STANDARD_GUITAR, model: withMotion([mk(1, 3)], 'slide') });
+    document.documentElement.dataset.theme = 'dark';
+    await tick();
+    expect(grid(container)?.getAttribute('data-motion')).toBe('slide');
+    delete document.documentElement.dataset.theme;
+  });
+});
+
+describe('Fretboard print layout (026 US5)', () => {
+  const long = presetInstrument('AF-1', 7, 24);
+  const model: DisplayModel = {
+    labelMode: 'note',
+    description: 'Printed description of the view',
+    markers: [{ string: 1, fret: 3, function: 'root', emphasis: 'highlighted' }]
+  };
+
+  function stubWidth(px: number) {
+    const proto = HTMLElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => px });
+    return () => {
+      if (desc) Object.defineProperty(proto, 'clientWidth', desc);
+      else delete (proto as unknown as Record<string, unknown>).clientWidth;
+    };
+  }
+
+  it('while printing, lays out whole at the print width, no minimap, visible description and legend', async () => {
+    const restore = stubWidth(320);
+    try {
+      const { container, rerender } = render(Fretboard, {
+        instrument: long,
+        model,
+        fit: 'comfortable'
+      });
+      await tick();
+      const svg = () => container.querySelector('svg[role="grid"]') as SVGSVGElement;
+      // Screen: comfortable at 320 px scrolls, so the minimap is there.
+      expect(screen.queryByRole('slider', { name: 'Fretboard overview' })).not.toBeNull();
+      expect(Number(svg().getAttribute('width'))).toBeGreaterThan(900);
+
+      await rerender({ instrument: long, model, fit: 'comfortable', printing: true });
+      // Whole neck at `--print-board-inline` (190mm ≈ 718 px), whatever the screen width.
+      expect(Number(svg().getAttribute('width'))).toBeCloseTo((190 * 96) / 25.4, 0);
+      expect(screen.queryByRole('slider')).toBeNull();
+      const description = container.querySelector('[data-print="show"].description');
+      expect(description?.textContent).toBe('Printed description of the view');
+      expect(description?.closest('.sr-only')).toBeNull();
+      const legend = container.querySelector('section.legend[data-print="show"]') as HTMLElement;
+      expect(legend.hidden).toBe(false);
+      expect(legend.querySelector('ul, dl, p, li')).not.toBeNull();
+
+      await rerender({ instrument: long, model, fit: 'comfortable', printing: false });
+      expect(Number(svg().getAttribute('width'))).toBeGreaterThan(900);
+      expect(legend.hidden).toBe(true);
+    } finally {
+      restore();
+    }
   });
 });

@@ -46,6 +46,22 @@ describe('static/_headers', () => {
     expect(rules.get('/fonts/*')?.get('cache-control')).toBe('public, max-age=31536000, immutable');
   });
 
+  it('revalidates the theme boot script (026)', () => {
+    expect(rules.get('/theme-boot.js')?.get('cache-control')).toBe('no-cache');
+  });
+
+  it('keeps the CSP script-src at self only (026)', () => {
+    const config = readFileSync(join(process.cwd(), 'svelte.config.js'), 'utf8');
+    expect(config).toMatch(/'script-src':\s*\['self'\]/);
+  });
+
+  it('app.html loads exactly one external boot script in head and no inline script (026)', () => {
+    const html = readFileSync(join(process.cwd(), 'src/app.html'), 'utf8');
+    const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'));
+    expect(head.match(/<script src="\/theme-boot\.js"><\/script>/g)).toHaveLength(1);
+    expect(html.match(/<script\b/g)).toHaveLength(1);
+  });
+
   it.each(['/', '/*.html', '/notes', '/triads', '/about', '/404.html'])(
     'revalidates HTML at %s',
     (path) => {

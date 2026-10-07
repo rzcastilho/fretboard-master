@@ -391,9 +391,9 @@
   "triads_view_in_caged": "View in CAGED",
   "triads_view_in_caged_unavailable": "CAGED covers major and minor chords",
   "language_label": "Language",
-  "language_open": "Language",
+  "language_open": "Language and appearance",
   "language_close": "Close language and notation settings",
-  "language_panel_label": "Language and notation",
+  "language_panel_label": "Language and appearance",
   "note_name_solfege_c": "Do",
   "note_name_solfege_d": "Re",
   "note_name_solfege_e": "Mi",
@@ -444,5 +444,9 @@
   "summary_shape": "shape {shape}",
   "summary_positions_one": "{count} position",
   "summary_positions_other": "{count} positions",
-  "summary_no_notes": "No notes selected"
+  "summary_no_notes": "No notes selected",
+  "theme_label": "Theme",
+  "theme_device": "Follow device",
+  "theme_light": "Light",
+  "theme_dark": "Dark"
 }

@@ -46,7 +46,13 @@
 
 <svelte:window onpointerdown={onWindowPointerdown} onkeydown={onKeydown} />
 
-<div class="sound" role="group" aria-label={m.sound_group_label()} bind:this={root}>
+<div
+  class="sound"
+  data-print="omit"
+  role="group"
+  aria-label={m.sound_group_label()}
+  bind:this={root}
+>
   <button
     type="button"
     class="mute"

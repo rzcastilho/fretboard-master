@@ -1,47 +1,50 @@
 // @vitest-environment node
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { contrastRatio, deltaEUnderCvd, type CvdType } from './color';
+import { parseTokenSheet, resolveLightDark, type TokenMap } from './tokens';
 
-/** US5: root/third/fifth stay distinguishable under colour-vision deficiency. */
+/**
+ * US5 and 026: root/third/fifth stay distinguishable under colour-vision deficiency, in the
+ * standard, contrast-more and print palettes.
+ */
 
-const tokens = readFileSync('src/lib/styles/tokens.css', 'utf8');
-const blocks = {
-  light: /^:root\s*\{([\s\S]*?)\n\}/m.exec(tokens)?.[1] ?? '',
-  dark:
-    /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([\s\S]*?)\n\s*\}/.exec(tokens)?.[1] ??
-    ''
+const sheet = parseTokenSheet();
+
+const SETS: Record<'standard' | 'contrast-more' | 'print', TokenMap> = {
+  standard: sheet.root,
+  'contrast-more': { ...sheet.root, ...sheet.contrastMore },
+  print: { ...sheet.root, ...sheet.print }
 };
 
-const value = (block: string, name: string): string => {
-  const v = new RegExp(`${name}:\\s*([^;]+);`).exec(block)?.[1].trim();
+const value = (set: TokenMap, name: string): string => {
+  const v = set[name];
   if (v === undefined) throw new Error(`${name} missing`);
-  return v;
+  return resolveLightDark(v)[0];
 };
 
 const CVD: CvdType[] = ['deuteranopia', 'protanopia', 'tritanopia'];
-const DEGREES = ['--color-root', '--color-third', '--color-fifth'] as const;
+const DEGREES = ['--fb-color-root', '--fb-color-third', '--fb-color-fifth'] as const;
 const PAIRS: [(typeof DEGREES)[number], (typeof DEGREES)[number]][] = [
-  ['--color-root', '--color-third'],
-  ['--color-root', '--color-fifth'],
-  ['--color-third', '--color-fifth']
+  ['--fb-color-root', '--fb-color-third'],
+  ['--fb-color-root', '--fb-color-fifth'],
+  ['--fb-color-third', '--fb-color-fifth']
 ];
 
-describe.each(['light', 'dark'] as const)('%s palette', (theme) => {
-  const block = blocks[theme];
+describe.each(Object.keys(SETS) as (keyof typeof SETS)[])('%s palette', (name) => {
+  const set = SETS[name];
 
   for (const type of CVD) {
     for (const [a, b] of PAIRS) {
       it(`${a} vs ${b} ΔE ≥ 10 under ${type}`, () => {
-        expect(deltaEUnderCvd(value(block, a), value(block, b), type)).toBeGreaterThanOrEqual(10);
+        expect(deltaEUnderCvd(value(set, a), value(set, b), type)).toBeGreaterThanOrEqual(10);
       });
     }
   }
 
-  for (const name of DEGREES) {
-    it(`label on ${name} has contrast ≥ 4.5`, () => {
+  for (const role of DEGREES) {
+    it(`label on ${role} has contrast ≥ 4.5`, () => {
       expect(
-        contrastRatio(value(block, '--color-marker-label'), value(block, name))
+        contrastRatio(value(set, '--fb-color-label'), value(set, role))
       ).toBeGreaterThanOrEqual(4.5);
     });
   }

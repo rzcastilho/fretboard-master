@@ -220,7 +220,7 @@ test.describe('share US1-5: es and pt-BR', () => {
       const englishLink = await clipboardText(page);
       expect(englishLink).toMatch(CAGED_LINK);
 
-      await page.getByRole('button', { name: 'Language', exact: true }).click();
+      await page.getByRole('button', { name: 'Language and appearance', exact: true }).click();
       await page
         .locator('div[role="region"][id^="language-panel-"]')
         .getByRole('radio', { name: c.label })
@@ -235,7 +235,7 @@ test.describe('share US1-5: es and pt-BR', () => {
     test(`${c.label}: the sheet title is translated`, async ({ page }) => {
       await stubPlatform(page, { coarse: true, share: 'ok' });
       await setUpCagedAMinorE(page);
-      await page.getByRole('button', { name: 'Language', exact: true }).click();
+      await page.getByRole('button', { name: 'Language and appearance', exact: true }).click();
       await page
         .locator('div[role="region"][id^="language-panel-"]')
         .getByRole('radio', { name: c.label })
@@ -374,7 +374,7 @@ test.describe('share US2: manual-copy fallback', () => {
       await breakClipboard(page, 'none');
       await page.goto('/caged');
       await expandDetails(page);
-      await page.getByRole('button', { name: 'Language', exact: true }).click();
+      await page.getByRole('button', { name: 'Language and appearance', exact: true }).click();
       await page
         .locator('div[role="region"][id^="language-panel-"]')
         .getByRole('radio', { name: l.label })
@@ -388,7 +388,7 @@ test.describe('share US2: manual-copy fallback', () => {
 });
 
 async function chooseLanguage(page: Page, label: string): Promise<void> {
-  await page.getByRole('button', { name: 'Language', exact: true }).click();
+  await page.getByRole('button', { name: 'Language and appearance', exact: true }).click();
   await page
     .locator('div[role="region"][id^="language-panel-"]')
     .getByRole('radio', { name: label })

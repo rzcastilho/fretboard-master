@@ -1,37 +1,31 @@
 // @vitest-environment node
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { contrastRatio } from './color';
+import { parseTokenSheet, resolveLightDark } from './tokens';
 
-/** US4: the two-tone focus ring stays visible on the wood and on every marker fill. */
+/**
+ * US4 and 026: the two-tone focus ring stays visible on the wood and on every marker fill. The
+ * ring tones are surface tokens, `light-dark(light, dark)`; the board palette is shared, so
+ * both ring arms are checked against the same wood and fills.
+ */
 
-const tokens = readFileSync('src/lib/styles/tokens.css', 'utf8');
-const blocks = {
-  light: /^:root\s*\{([\s\S]*?)\n\}/m.exec(tokens)?.[1] ?? '',
-  dark:
-    /@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([\s\S]*?)\n\s*\}/.exec(tokens)?.[1] ??
-    ''
-};
-
-const value = (block: string, name: string): string => {
-  const v = new RegExp(`${name}:\\s*([^;]+);`).exec(block)?.[1].trim();
-  if (v === undefined) throw new Error(`${name} missing`);
-  return v;
-};
+const { root } = parseTokenSheet();
 
 const FILLS = [
-  '--color-root',
-  '--color-third',
-  '--color-fifth',
-  '--color-neutral-note',
-  '--color-note-highlight',
-  ...[1, 2, 3, 4, 5, 6, 7].map((n) => `--octave-tone-${n}`)
+  '--fb-color-root',
+  '--fb-color-third',
+  '--fb-color-fifth',
+  '--fb-color-neutral',
+  '--fb-color-note-highlight',
+  ...[1, 2, 3, 4, 5, 6, 7].map((n) => `--fb-octave-tone-${n}`)
 ];
 
-describe.each(['light', 'dark'] as const)('focus ring (%s)', (mode) => {
-  const block = blocks[mode];
-  const outer = (): string => value(block, '--color-focus-ring-outer');
-  const inner = (): string => value(block, '--color-focus-ring-inner');
+describe.each([
+  ['light', 0],
+  ['dark', 1]
+] as const)('focus ring (%s)', (_mode, arm) => {
+  const outer = (): string => resolveLightDark(root['--color-focus-ring-outer'])[arm];
+  const inner = (): string => resolveLightDark(root['--color-focus-ring-inner'])[arm];
 
   it('defines both ring tones', () => {
     expect(outer()).toMatch(/^#[0-9a-f]{6}$/i);
@@ -40,14 +34,14 @@ describe.each(['light', 'dark'] as const)('focus ring (%s)', (mode) => {
   });
 
   it('has contrast >= 3:1 against the wood', () => {
-    const wood = value(block, '--color-fretboard-wood');
+    const wood = root['--fb-color-wood'];
     expect(
       Math.max(contrastRatio(outer(), wood), contrastRatio(inner(), wood))
     ).toBeGreaterThanOrEqual(3);
   });
 
   it.each(FILLS)('has contrast >= 3:1 against %s', (fill) => {
-    const f = value(block, fill);
+    const f = root[fill];
     expect(Math.max(contrastRatio(outer(), f), contrastRatio(inner(), f))).toBeGreaterThanOrEqual(
       3
     );
@@ -55,7 +49,7 @@ describe.each(['light', 'dark'] as const)('focus ring (%s)', (mode) => {
 
   /** The inner tone is a halo separating the ring from the marker; the outer stroke is the ring colour. */
   it('has an outer stroke that is not equal to any marker fill', () => {
-    const fills = FILLS.map((n) => value(block, n).toLowerCase());
+    const fills = FILLS.map((n) => root[n].toLowerCase());
     expect(fills).not.toContain(outer().toLowerCase());
   });
 });

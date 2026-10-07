@@ -7,7 +7,12 @@ const PREFS_KEY = 'fretboard-master:prefs';
 const selector = (page: Page) =>
   page.getByRole('group', { name: /^(Choose notes|Elige las notas|Escolha as notas)$/ });
 const languageButton = (page: Page) =>
-  page.getByRole('button', { name: /^(Language|Idioma)$/, exact: false }).first();
+  page
+    .getByRole('button', {
+      name: /^(Language and appearance|Idioma y apariencia|Idioma e aparência)$/,
+      exact: false
+    })
+    .first();
 const panel = (page: Page) => page.locator('div[role="region"][id^="language-panel-"]');
 
 async function openPanel(page: Page): Promise<void> {

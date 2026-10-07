@@ -19,7 +19,8 @@ import {
 
 /**
  * Any preference field, including `customTuning` (011); `null` clears it. 021 adds `{ notation }`,
- * `{ accidentals }` and `{ cagedNoteShown: true }`, which are covered by the partial.
+ * `{ accidentals }` and `{ cagedNoteShown: true }`, which are covered by the partial. 026 adds
+ * `{ theme }` (`Theme | null`; `null` clears the pin), covered the same way.
  */
 export type PreferencesPatch = Partial<Omit<Preferences, 'labels'>> & {
   labels?: Partial<Preferences['labels']>;

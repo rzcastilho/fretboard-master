@@ -39,7 +39,8 @@ describe('constants and defaults (FR-018)', () => {
       language: null,
       notation: null,
       accidentals: 'sharps',
-      cagedNoteShown: false
+      cagedNoteShown: false,
+      theme: null
     });
   });
 
@@ -339,7 +340,8 @@ describe('serializePreferences', () => {
       language: null,
       notation: null,
       accidentals: 'sharps',
-      cagedNoteShown: false
+      cagedNoteShown: false,
+      theme: null
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -393,7 +395,8 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       language: null,
       notation: null,
       accidentals: 'sharps',
-      cagedNoteShown: false
+      cagedNoteShown: false,
+      theme: null
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -670,7 +673,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   language: fc.constantFrom(null, 'en', 'pt-BR', 'es'),
   notation: fc.constantFrom(null, 'letters', 'solfege'),
   accidentals: fc.constantFrom('sharps', 'flats', 'both'),
-  cagedNoteShown: fc.boolean()
+  cagedNoteShown: fc.boolean(),
+  theme: fc.constantFrom(null, 'light', 'dark')
 });
 
 function isValid(p: Preferences): boolean {
@@ -753,5 +757,41 @@ describe('tempo picklist parity (019)', () => {
   it('accepts exactly the TEMPOS of the Listen module', () => {
     for (const t of TEMPOS) expect(parsePreferences(rec({ tempo: t })).tempo).toBe(t);
     expect(DEFAULT_PREFERENCES.tempo).toBe(DEFAULT_TEMPO);
+  });
+});
+
+describe('theme (026)', () => {
+  const p = (o: Record<string, unknown>) => parsePreferences(rec({ version: 1, ...o }));
+
+  it('absent → null', () => expect(p({}).theme).toBeNull());
+  it.each(['dark', 'light'] as const)('%s is kept', (t) => expect(p({ theme: t }).theme).toBe(t));
+  it.each(['system', 'Dark', 1, {}, null])('invalid theme %j → null, others unchanged', (bad) => {
+    const r = p({ theme: bad, frets: 18, muted: true });
+    expect(r.theme).toBeNull();
+    expect([r.fretCount, r.muted]).toEqual([18, true]);
+  });
+  it('defaults serialize without a theme key, byte-identical to slice 025', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+  });
+  it('serializes theme last, after cagedNote', () => {
+    const raw = serializePreferences({
+      ...DEFAULT_PREFERENCES,
+      cagedNoteShown: true,
+      theme: 'dark'
+    });
+    expect(raw.endsWith(',"cagedNote":true,"theme":"dark"}')).toBe(true);
+    expect(serializePreferences({ ...DEFAULT_PREFERENCES, theme: 'dark' })).toMatch(
+      /,"theme":"dark"\}$/
+    );
+  });
+  it('version stays 1 and round-trips every field including theme', () => {
+    expect(PREFS_VERSION).toBe(1);
+    fc.assert(
+      fc.property(arbPrefs, (x) => {
+        expect(parsePreferences(serializePreferences(x))).toEqual(x);
+      })
+    );
   });
 });

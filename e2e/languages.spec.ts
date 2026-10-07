@@ -83,7 +83,8 @@ const title = (tag: string, toolKey: string): string =>
 
 const TOOLS = ['/notes', '/triads', '/caged', '/about'] as const;
 
-const languageButton = (page: Page) => page.getByRole('button', { name: 'Language', exact: true });
+const languageButton = (page: Page) =>
+  page.getByRole('button', { name: 'Language and appearance', exact: true });
 /** Stable across language switches (the accessible name is translated). */
 const panel = (page: Page) => page.locator('div[role="region"][id^="language-panel-"]');
 // The region's accessible name is translated; the single grid is language-independent.
@@ -195,7 +196,9 @@ test.describe('switch language anywhere (US2)', () => {
     await expect(group.locator('label[lang="en"]')).toHaveText('English');
     await expect(group.locator('label[lang="pt-BR"]')).toHaveText('Português');
     await expect(group.locator('label[lang="es"]')).toHaveText('Español');
-    await expect(page.getByRole('button', { name: 'Language', exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Language and appearance', exact: true })
+    ).toHaveCount(0);
     await group.getByRole('radio', { name: 'Español' }).check();
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
     await expect(page.getByRole('group', { name: text('es', 'language_label') })).toBeVisible();

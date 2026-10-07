@@ -8,6 +8,7 @@ import type { ToolId } from '$lib/shell/tools';
 import type { Tempo } from '$lib/state/listen';
 import type { LanguageTag } from '$lib/i18n/languages';
 import type { AccidentalPolicy, Notation } from '$lib/notation/policy';
+import type { Theme } from '$lib/prefs/schema';
 
 /**
  * Seed fixtures from specs/010-remembered-preferences/contracts/storage-format.md.
@@ -47,6 +48,7 @@ export interface ExpectedPreferences {
   readonly accidentals: AccidentalPolicy;
   /** 021: stored as `cagedNote`; absent or invalid in a record → false. */
   readonly cagedNoteShown: boolean;
+  readonly theme: Theme | null;
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -79,7 +81,8 @@ const defaults: ExpectedPreferences = {
   language: null,
   notation: null,
   accidentals: 'sharps',
-  cagedNoteShown: false
+  cagedNoteShown: false,
+  theme: null
 };
 
 function load(name: string): string {
@@ -116,7 +119,8 @@ export const FIXTURES: readonly PrefsFixture[] = [
     language: null,
     notation: null,
     accidentals: 'sharps',
-    cagedNoteShown: false
+    cagedNoteShown: false,
+    theme: null
   }),
   fixture('bad-volume', { ...defaults, tuningId: 'AF-2' }),
   fixture('garbage', defaults),

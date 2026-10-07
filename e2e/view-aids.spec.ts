@@ -192,7 +192,7 @@ test.describe('Announcements (US2)', () => {
   test('US2-5: one announcement in Portuguese after a language change', async ({ page }) => {
     await gotoFrozen(page, '/triads');
     await expect(liveRegion(page)).toHaveText('');
-    await page.getByRole('button', { name: 'Language', exact: true }).click();
+    await page.getByRole('button', { name: 'Language and appearance', exact: true }).click();
     await page
       .locator('div[role="region"][id^="language-panel-"]')
       .getByRole('radio', { name: 'Português' })

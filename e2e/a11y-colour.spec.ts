@@ -128,3 +128,53 @@ for (const colorScheme of ['light', 'dark'] as const) {
     }
   });
 }
+
+/** 026 US2: the reserved role colours are one value in both themes (shared --fb-* palette). */
+test('US2: role fills resolve to the same colour in light and dark', async ({ page }) => {
+  const read = async () =>
+    page.evaluate(() => {
+      const cs = getComputedStyle(document.documentElement);
+      return ['root', 'third', 'fifth', 'label'].map((n) =>
+        cs.getPropertyValue(`--fb-color-${n}`).trim()
+      );
+    });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/triads');
+  const light = await read();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await read()).toEqual(light);
+  expect(light.every((v) => /^#[0-9a-f]{6}$/i.test(v))).toBe(true);
+});
+
+/** 026 US3-6: forced colours win, yet marker shapes and labels stay visible on system colours. */
+test.describe('forced colours (026)', () => {
+  test.use({ colorScheme: 'light' });
+
+  for (const tool of TOOLS) {
+    test(`${tool.name}: shapes and labels remain, board uses system colours`, async ({ page }) => {
+      await page.emulateMedia({ forcedColors: 'active' });
+      await tool.open(page);
+      await expectDegreeShapes(page);
+      const paint = await board(page).evaluate((root) => {
+        const wood = root.querySelector('.wood');
+        const line = root.querySelector('.nut');
+        const probe = (color: string) => {
+          const el = document.createElement('span');
+          el.style.color = color;
+          document.body.append(el);
+          const resolved = getComputedStyle(el).color;
+          el.remove();
+          return resolved;
+        };
+        return {
+          woodFill: wood ? getComputedStyle(wood).fill : '',
+          lineFill: line ? getComputedStyle(line).fill : '',
+          canvas: probe('Canvas'),
+          canvasText: probe('CanvasText')
+        };
+      });
+      expect(paint.woodFill).toBe(paint.canvas);
+      expect([paint.canvasText, paint.canvas]).toContain(paint.lineFill);
+    });
+  }
+});

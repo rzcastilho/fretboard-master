@@ -624,3 +624,32 @@ test.describe('remembered preferences: Listen tempo (019 US2)', () => {
     expect(await storedTempo(page)).toBeUndefined();
   });
 });
+
+test.describe('theme preference: US1 (026)', () => {
+  const themeAttr = (page: Page) =>
+    page.evaluate(() => document.documentElement.dataset.theme ?? null);
+
+  test('Erase my preferences returns the tab to Follow device at once', async ({ page }) => {
+    await seed(page, '{"version":1,"theme":"dark"}');
+    await page.goto('/about');
+    expect(await themeAttr(page)).toBe('dark');
+    await page.getByRole('button', { name: 'Erase my preferences' }).click();
+    await page.getByRole('button', { name: 'Erase', exact: true }).click();
+    await expect.poll(() => themeAttr(page)).toBeNull();
+  });
+
+  test('records without theme open as Follow device', async ({ page }) => {
+    await seed(page, '{"version":1,"muted":true}');
+    await page.goto('/');
+    expect(await themeAttr(page)).toBeNull();
+    await expect(page.getByRole('radio', { name: 'Follow device' })).toBeChecked();
+  });
+
+  test('corrupted theme follows the device and keeps other fields', async ({ page }) => {
+    await seed(page, '{"version":1,"theme":"purple","muted":true}');
+    await page.goto('/');
+    expect(await themeAttr(page)).toBeNull();
+    await page.getByRole('button', { name: 'Sound settings' }).click();
+    await expect(muteButton(page)).toHaveAttribute('aria-pressed', 'true');
+  });
+});

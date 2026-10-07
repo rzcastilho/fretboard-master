@@ -391,9 +391,9 @@
   "triads_view_in_caged": "Ver en CAGED",
   "triads_view_in_caged_unavailable": "CAGED cubre acordes mayores y menores",
   "language_label": "Idioma",
-  "language_open": "Idioma",
+  "language_open": "Idioma y apariencia",
   "language_close": "Cerrar idioma y notación",
-  "language_panel_label": "Idioma y notación",
+  "language_panel_label": "Idioma y apariencia",
   "note_name_solfege_c": "Do",
   "note_name_solfege_d": "Re",
   "note_name_solfege_e": "Mi",
@@ -444,5 +444,9 @@
   "summary_shape": "forma {shape}",
   "summary_positions_one": "{count} posición",
   "summary_positions_other": "{count} posiciones",
-  "summary_no_notes": "Ninguna nota seleccionada"
+  "summary_no_notes": "Ninguna nota seleccionada",
+  "theme_label": "Tema",
+  "theme_device": "Seguir el dispositivo",
+  "theme_light": "Claro",
+  "theme_dark": "Oscuro"
 }

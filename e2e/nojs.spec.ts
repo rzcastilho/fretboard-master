@@ -40,3 +40,17 @@ test.describe('unknown address without JavaScript', () => {
     await expect(page.getByRole('list').getByRole('link')).toHaveCount(3);
   });
 });
+
+test.describe('theme without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('device setting applies through CSS, no attribute, no flash', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto('/');
+    const light = await page.screenshot();
+    await page.emulateMedia({ colorScheme: 'dark' });
+    const dark = await page.screenshot();
+    expect(await page.locator('html').getAttribute('data-theme')).toBeNull();
+    expect(dark.equals(light)).toBe(false);
+  });
+});

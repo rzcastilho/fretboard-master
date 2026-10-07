@@ -5,6 +5,7 @@
   import type { DisplayModel } from '$lib/fretboard/types';
   import { STANDARD_GUITAR, type Instrument, type Position } from '$lib/instrument/instrument';
   import { playback } from '$lib/state/playback.svelte';
+  import { print } from '$lib/state/print.svelte';
   import { onMount } from 'svelte';
   import { maybeFault } from './fault';
   import type { ToolId } from './tools';
@@ -44,7 +45,7 @@
 </section>
 <section class="c" aria-labelledby="zone-c">
   <h2 id="zone-c">{m.zone_fretboard()}</h2>
-  <Fretboard {instrument} {model} {onactivate} pulses={playback.pulses} />
+  <Fretboard {instrument} {model} {onactivate} pulses={playback.pulses} printing={print.active} />
 </section>
 <section class="d" aria-labelledby="zone-d">
   <h2 id="zone-d">{m.zone_context_panel()}</h2>

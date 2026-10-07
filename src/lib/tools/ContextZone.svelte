@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
   import { contextPanel } from '$lib/state/context-panel.svelte';
+  import { print } from '$lib/state/print.svelte';
   import { viewport } from '$lib/state/viewport.svelte';
 
   interface Props {
@@ -22,7 +23,7 @@
 </script>
 
 {#if narrow}
-  <div class="summary-row">
+  <div class="summary-row" data-print="omit">
     <p class="summary">{summary}</p>
     <button
       type="button"
@@ -34,7 +35,7 @@
     </button>
   </div>
 {/if}
-<div id={contentId} class="content" hidden={narrow && !expanded}>
+<div id={contentId} class="content" data-print="show" hidden={narrow && !expanded && !print.active}>
   {@render children()}
 </div>
 

@@ -104,6 +104,43 @@ test.describe('pulse feedback (US2)', () => {
     expect(animations).toBe(0);
   });
 
+  test('one pulse runs for the note duration, then the marker returns (026)', async ({ page }) => {
+    await openString6(page).click();
+    const shape = page.locator('.marker.pulse[data-key="6:0"] .shape');
+    await expect(shape).toHaveCount(1);
+    const timing = await shape.evaluate((el) =>
+      el.getAnimations().map((a) => ({
+        name: (a as CSSAnimation).animationName,
+        duration: Number(a.effect?.getComputedTiming().duration),
+        iterations: a.effect?.getComputedTiming().iterations
+      }))
+    );
+    const pulses = timing.filter((t) => t.name.endsWith('marker-pulse'));
+    expect(pulses).toHaveLength(1);
+    expect(pulses[0].iterations).toBe(1);
+    expect(pulses[0].duration).toBeGreaterThan(0);
+  });
+
+  test('reduced motion and muted: highlighted while sounding, normal afterwards (026)', async ({
+    page
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: 'Mute sound' }).click();
+    await openString6(page).click();
+    const marker = page.locator('.marker.pulse[data-key="6:0"]');
+    await expect(marker).toHaveClass(/highlighted/);
+    expect(
+      await marker.evaluate(
+        (el) =>
+          el.getAnimations({ subtree: true }).filter((a) => (a as CSSAnimation).animationName)
+            .length
+      )
+    ).toBe(0);
+    await page.clock.runFor(1500);
+    await expect(page.locator('.marker.pulse')).toHaveCount(0);
+    await expect(page.locator('.marker[data-key="6:0"]')).toHaveCount(0);
+  });
+
   test('an empty position shows a transient neutral marker (US2-4)', async ({ page }) => {
     expect(await page.locator('.marker[data-key="6:0"]').count()).toBe(0);
     await openString6(page).click();

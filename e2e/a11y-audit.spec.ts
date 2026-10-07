@@ -108,6 +108,45 @@ test.describe('axe matrix (US6-1)', () => {
   }
 });
 
+/** 026 US2: an explicit pin (not just the device setting) also yields zero violations. */
+test.describe('axe with a pinned theme (026)', () => {
+  test.describe.configure({ mode: 'parallel' });
+
+  const PINNED = ['home', 'notes', 'triads', 'caged', 'about'];
+  for (const pin of THEMES) {
+    for (const target of TARGETS.filter((t) => PINNED.includes(t.name))) {
+      test(`pinned ${pin} on the opposite device — ${target.name}`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme: pin === 'dark' ? 'light' : 'dark' });
+        await page.addInitScript(
+          ([key, value]) => localStorage.setItem(key as string, value as string),
+          [PREFS_KEY, JSON.stringify({ version: 1, theme: pin })]
+        );
+        await page.goto(target.path);
+        await target.ready(page);
+        expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(pin);
+        await runAxe(page);
+      });
+    }
+  }
+});
+
+/** 026 US3: the higher-contrast variant also yields zero violations, on every tool and About. */
+test.describe('axe with prefers-contrast: more (026)', () => {
+  test.describe.configure({ mode: 'parallel' });
+
+  const SCREENS = ['home', 'notes', 'triads', 'caged', 'about'];
+  for (const colorScheme of THEMES) {
+    for (const target of TARGETS.filter((t) => SCREENS.includes(t.name))) {
+      test(`contrast more · ${colorScheme} — ${target.name}`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme, contrast: 'more' });
+        await page.goto(target.path);
+        await target.ready(page);
+        await runAxe(page);
+      });
+    }
+  }
+});
+
 test.describe('name, role and state (US6-2)', () => {
   test('view-aid toggles expose expanded state and controls', async ({ page }) => {
     await page.goto('/triads');

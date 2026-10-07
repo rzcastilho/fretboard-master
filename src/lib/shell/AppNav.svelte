@@ -38,7 +38,7 @@
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- static internal paths; app is not deployed under a base path -->
-<nav aria-label={m.nav_label()}>
+<nav aria-label={m.nav_label()} data-print="omit">
   <ul>
     {#each items as item (item.id)}
       {@const isCurrent = item.id === current}

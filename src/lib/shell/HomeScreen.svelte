@@ -5,6 +5,7 @@
   import StopButton from './StopButton.svelte';
   import InstrumentSummary from './InstrumentSummary.svelte';
   import LanguageSelector from './LanguageSelector.svelte';
+  import ThemeSelector from './ThemeSelector.svelte';
   import { screenTitle } from './screens';
   import { TOOLS } from './tools';
   import ToolCard from './ToolCard.svelte';
@@ -20,8 +21,9 @@
 <header class="top">
   <h1 tabindex="-1">{m.app_name()}</h1>
   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- /about route (typed by resolve) lands in US3 -->
-  <a class="about" href="/about">{m.nav_about()}</a>
+  <a class="about" data-print="omit" href="/about">{m.nav_about()}</a>
   <LanguageSelector />
+  <ThemeSelector />
   <StopButton />
   <SoundControl />
 </header>

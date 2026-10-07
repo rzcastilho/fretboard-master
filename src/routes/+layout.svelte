@@ -10,6 +10,8 @@
   import { instrument } from '$lib/state/instrument.svelte';
   import { opening } from '$lib/state/opening.svelte';
   import { playback } from '$lib/state/playback.svelte';
+  import { print } from '$lib/state/print.svelte';
+  import { onMount } from 'svelte';
   import { preferences } from '$lib/state/preferences.svelte';
   import { TOOLS } from '$lib/shell/tools';
   import ShellFailure from '$lib/shell/ShellFailure.svelte';
@@ -18,6 +20,8 @@
   import '$lib/styles/global.css';
 
   let { children } = $props();
+
+  onMount(() => print.start());
 
   const screen = $derived(SCREENS.find((s) => s.path === page.url.pathname)?.id ?? 'home');
 

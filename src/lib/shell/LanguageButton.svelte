@@ -18,6 +18,7 @@
 <button
   type="button"
   class="language-button"
+  data-print="omit"
   aria-expanded={open}
   aria-controls={controls}
   bind:this={element}

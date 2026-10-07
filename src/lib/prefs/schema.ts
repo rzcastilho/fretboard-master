@@ -32,6 +32,10 @@ import {
   type Notation
 } from '$lib/notation/policy';
 
+/** 026: the pinned theme; `null` follows the device. Mirrored by `static/theme-boot.js`. */
+export const THEMES = ['light', 'dark'] as const;
+export type Theme = (typeof THEMES)[number];
+
 export interface Preferences {
   /** 6 or 7 (012); absent or invalid in a stored record → 6. */
   readonly stringCount: StringCount;
@@ -66,6 +70,8 @@ export interface Preferences {
   readonly accidentals: AccidentalPolicy;
   /** 021; absent or invalid in a stored record → false. Stored as `cagedNote`, only when true. */
   readonly cagedNoteShown: boolean;
+  /** 026; absent or invalid in a stored record → null (follow the device). Stored only when non-null. */
+  readonly theme: Theme | null;
 }
 
 export const PREFS_VERSION = 1 as const;
@@ -90,7 +96,8 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   language: null,
   notation: null,
   accidentals: 'sharps',
-  cagedNoteShown: false
+  cagedNoteShown: false,
+  theme: null
 });
 
 const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
@@ -139,7 +146,8 @@ const recordSchema = v.object({
   language: v.fallback(v.nullable(v.picklist(LANGUAGE_TAGS)), null),
   notation: v.fallback(v.nullable(v.picklist(NOTATIONS)), null),
   accidentals: v.fallback(v.picklist(ACCIDENTAL_POLICIES), d.accidentals),
-  cagedNote: v.fallback(v.boolean(), d.cagedNoteShown)
+  cagedNote: v.fallback(v.boolean(), d.cagedNoteShown),
+  theme: v.fallback(v.nullable(v.picklist(THEMES)), null)
 });
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -171,7 +179,8 @@ export function parsePreferences(raw: string | null): Preferences {
       language: r.language,
       notation: r.notation,
       accidentals: r.accidentals,
-      cagedNoteShown: r.cagedNote
+      cagedNoteShown: r.cagedNote,
+      theme: r.theme
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -194,7 +203,7 @@ export function tuningOfPreferences(p: Preferences): Tuning {
  * `rotateHint` only when true (016), `labels.caged` only when `'name'` (017),
  * `tempo` (after `rotateHint`) only when not `'medium'` (019), `language` (after `tempo`) only
  * when non-null (020), then `notation` (non-null), `accidentals` (not `'sharps'`) and
- * `cagedNote` (true only) (021).
+ * `cagedNote` (true only) (021), then `theme` (non-null) last (026).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -218,6 +227,7 @@ export function serializePreferences(p: Preferences): string {
     ...(p.language === null ? {} : { language: p.language }),
     ...(p.notation === null ? {} : { notation: p.notation }),
     ...(p.accidentals === 'sharps' ? {} : { accidentals: p.accidentals }),
-    ...(p.cagedNoteShown ? { cagedNote: true } : {})
+    ...(p.cagedNoteShown ? { cagedNote: true } : {}),
+    ...(p.theme === null ? {} : { theme: p.theme })
   });
 }

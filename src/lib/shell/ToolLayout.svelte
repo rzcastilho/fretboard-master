@@ -78,7 +78,7 @@
 </header>
 
 {#if instrumentNotice !== null}
-  <div class="share-notice">
+  <div class="share-notice" data-print="omit">
     <Notice
       message={linkNoticeMessage(instrumentNotice.link, instrument.active.stringCount)}
       actions={[
@@ -91,27 +91,27 @@
 {/if}
 
 {#if opening.incomplete?.screen === tool}
-  <div class="share-notice">
+  <div class="share-notice" data-print="omit">
     <Notice message={m.link_incomplete()} ondismiss={() => opening.dismissIncomplete()} />
   </div>
 {/if}
 
 {#if share.notice !== null}
   {#key share.notice.id}
-    <div class="share-notice">
+    <div class="share-notice" data-print="omit">
       <Notice message={m.share_copied()} ondismiss={() => share.dismissNotice()} />
     </div>
   {/key}
 {/if}
 
 {#if share.fallback !== null}
-  <div class="share-notice">
+  <div class="share-notice" data-print="omit">
     <ShareFallback href={share.fallback.href} />
   </div>
 {/if}
 
 <main>
-  <h1 tabindex="-1" class:sr-only={landscape}>{name}</h1>
+  <h1 tabindex="-1" class:sr-only={landscape} data-print="show">{name}</h1>
   <div class="grid" data-arrangement={viewport.arrangement}>
     <svelte:boundary onerror={(e) => recordFailure(tool, e)}>
       {#if tool === 'notes'}

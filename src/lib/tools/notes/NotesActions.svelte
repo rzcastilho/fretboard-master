@@ -122,7 +122,7 @@
   }
 
   button[aria-pressed='true'] {
-    background: var(--color-note-highlight);
-    color: var(--color-note-highlight-label);
+    background: var(--color-accent);
+    color: var(--color-accent-text);
   }
 </style>

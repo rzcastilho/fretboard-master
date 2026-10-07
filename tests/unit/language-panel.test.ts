@@ -21,20 +21,20 @@ afterEach(() => {
   resetLanguageForTests();
 });
 
-const button = () => screen.getByRole('button', { name: 'Language' });
+const button = () => screen.getByRole('button', { name: 'Language and appearance' });
 
 describe('LanguageButton + LanguagePanel', () => {
   it('button exposes aria-expanded and aria-controls; panel is closed at first', () => {
     render(LanguagePanel);
     expect(button().getAttribute('aria-expanded')).toBe('false');
     expect(button().getAttribute('aria-controls')).toBeTruthy();
-    expect(screen.queryByRole('region', { name: 'Language and notation' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Language and appearance' })).toBeNull();
   });
 
   it('opens a non-modal region (not a dialog) controlled by the button', async () => {
     const { container } = render(LanguagePanel);
     await fireEvent.click(button());
-    const panel = screen.getByRole('region', { name: 'Language and notation' });
+    const panel = screen.getByRole('region', { name: 'Language and appearance' });
     expect(button().getAttribute('aria-expanded')).toBe('true');
     expect(button().getAttribute('aria-controls')).toBe(panel.id);
     expect(container.querySelector('dialog')).toBeNull();
@@ -44,10 +44,20 @@ describe('LanguageButton + LanguagePanel', () => {
     expect(within(panel).getByRole('group', { name: 'Note names' })).toBeTruthy();
   });
 
+  it('renders ThemeSelector after the notation selector', async () => {
+    render(LanguagePanel);
+    await fireEvent.click(button());
+    const panel = screen.getByRole('region', { name: 'Language and appearance' });
+    const groups = within(panel).getAllByRole('group');
+    const names = groups.map((g) => g.querySelector('legend')?.textContent);
+    expect(names.indexOf('Theme')).toBeGreaterThan(names.indexOf('Note names'));
+    expect(within(panel).getByRole('radio', { name: 'Follow device' })).toBeTruthy();
+  });
+
   it('close button closes and returns focus to the language button', async () => {
     render(LanguagePanel);
     await fireEvent.click(button());
-    const panel = screen.getByRole('region', { name: 'Language and notation' });
+    const panel = screen.getByRole('region', { name: 'Language and appearance' });
     await fireEvent.click(
       within(panel).getByRole('button', { name: 'Close language and notation settings' })
     );
@@ -60,7 +70,7 @@ describe('LanguageButton + LanguagePanel', () => {
   it('Escape inside the panel closes it and returns focus to the button', async () => {
     render(LanguagePanel);
     await fireEvent.click(button());
-    const panel = screen.getByRole('region', { name: 'Language and notation' });
+    const panel = screen.getByRole('region', { name: 'Language and appearance' });
     const radio = within(panel).getAllByRole('radio')[0] as HTMLElement;
     radio.focus();
     await fireEvent.keyDown(radio, { key: 'Escape' });
@@ -75,16 +85,16 @@ describe('LanguageButton + LanguagePanel', () => {
     await fireEvent.click(screen.getByRole('radio', { name: 'Español' }));
     flushSync();
     expect(language.current).toBe('es');
-    expect(screen.getByRole('region', { name: 'Idioma y notación' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Idioma' }).getAttribute('aria-expanded')).toBe(
-      'true'
-    );
+    expect(screen.getByRole('region', { name: 'Idioma y apariencia' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Idioma y apariencia' }).getAttribute('aria-expanded')
+    ).toBe('true');
   });
 
   it('renders NotationSelector under the language selector', async () => {
     render(LanguagePanel);
     await fireEvent.click(button());
-    const panel = screen.getByRole('region', { name: 'Language and notation' });
+    const panel = screen.getByRole('region', { name: 'Language and appearance' });
     const groups = within(panel).getAllByRole('group');
     expect(groups[0]).toBe(within(panel).getByRole('group', { name: 'Language' }));
     expect(groups[1]).toBe(within(panel).getByRole('group', { name: 'Note names' }));

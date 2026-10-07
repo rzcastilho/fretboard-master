@@ -8,6 +8,7 @@
   import { maybeFault } from '$lib/shell/fault';
   import { playback } from '$lib/state/playback.svelte';
   import { fit } from '$lib/state/fit.svelte';
+  import { print } from '$lib/state/print.svelte';
   import FitNotice from '$lib/tools/FitNotice.svelte';
   import FitToggle from '$lib/tools/FitToggle.svelte';
   import ContextZone from '$lib/tools/ContextZone.svelte';
@@ -60,7 +61,7 @@
   });
 </script>
 
-<section class="b" aria-labelledby="triads-zone-b">
+<section class="b" data-print="omit" aria-labelledby="triads-zone-b">
   <h2 id="triads-zone-b">{m.zone_main_controls()}</h2>
   <TriadsControls
     state={triads.state}
@@ -83,6 +84,7 @@
     ontag={(id) => triads.selectTag(id)}
     pulses={playback.pulses}
     fit={fit.effective}
+    printing={print.active}
     onfit={fit.handle}
     takeAnchor={fit.takeAnchor}
   />
@@ -99,7 +101,7 @@
 </section>
 <SidePanels>
   {#snippet actions()}
-    <section class="e" aria-labelledby="triads-zone-e">
+    <section class="e" data-print="omit" aria-labelledby="triads-zone-e">
       <h2 id="triads-zone-e">{m.zone_actions()}</h2>
       <FitToggle />
       {#if instrument.adjustedIn === 'triads' && triads.notice === null}

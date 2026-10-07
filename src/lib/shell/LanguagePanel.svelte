@@ -4,6 +4,7 @@
   import LanguageButton from './LanguageButton.svelte';
   import LanguageSelector from './LanguageSelector.svelte';
   import NotationSelector from './NotationSelector.svelte';
+  import ThemeSelector from './ThemeSelector.svelte';
 
   const uid = $props.id();
   const panelId = `language-panel-${uid}`;
@@ -25,7 +26,7 @@
 </script>
 
 <!-- Non-modal disclosure: button plus a region in header flow; no trap, backdrop or history entry. -->
-<div class="language">
+<div class="language" data-print="omit">
   <LanguageButton
     {open}
     controls={panelId}
@@ -38,6 +39,7 @@
     <div id={panelId} class="panel" role="region" aria-label={m.language_panel_label()} {onkeydown}>
       <LanguageSelector />
       <NotationSelector />
+      <ThemeSelector />
       <button type="button" class="close" onclick={close}>{m.language_close()}</button>
     </div>
   {/if}

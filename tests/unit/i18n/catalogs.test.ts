@@ -119,10 +119,10 @@ describe('notation catalog keys (021 contracts/notation-api.md §9)', () => {
   }
 
   it('has the contract wording for the panel labels', () => {
-    expect(en.language_panel_label).toBe('Language and notation');
+    expect(en.language_panel_label).toBe('Language and appearance');
     expect(en.language_close).toBe('Close language and notation settings');
-    expect(load('pt-BR').language_panel_label).toBe('Idioma e notação');
-    expect(load('es').language_panel_label).toBe('Idioma y notación');
+    expect(load('pt-BR').language_panel_label).toBe('Idioma e aparência');
+    expect(load('es').language_panel_label).toBe('Idioma y apariencia');
   });
 
   it('has the per-locale solfège syllables', () => {
