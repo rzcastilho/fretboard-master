@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  expandDetails,
   expectNoHorizontalScroll,
   injectAudioFault,
   readAudioLog,
@@ -17,6 +18,7 @@ async function stepEntries(page: Page) {
 test.describe('note playback (US1)', () => {
   test('no audio is unlocked by navigation or scrolling (US1-4, FR-002)', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     const grid = page.getByRole('grid', { name: 'Fretboard' });
     await grid.waitFor();
     await grid.evaluate((el) => {
@@ -38,6 +40,7 @@ test.describe('note playback (US1)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     expect(await readAudioLog(page)).toEqual([]);
     await cellAt(page, 6, 0).click();
@@ -53,6 +56,7 @@ test.describe('note playback (US1)', () => {
 
   test('keyboard: Enter on string 5 fret 3 sounds pitch 48', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await cellAt(page, 5, 3).focus();
     await page.keyboard.press('Enter');
@@ -71,6 +75,7 @@ test.describe('pulse feedback (US2)', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -114,6 +119,7 @@ test.describe('sound control (US3)', () => {
   test('mute then click logs a silent step and still pulses', async ({ page }) => {
     await page.clock.install();
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await page.getByRole('button', { name: 'Mute sound' }).click();
     await cellAt(page, 6, 0).click();
@@ -126,6 +132,7 @@ test.describe('sound control (US3)', () => {
 
   test('settings are remembered across a reload (010 US1)', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Sound settings' }).click();
     await page.getByRole('slider', { name: 'Volume' }).fill('40');
     await page.getByRole('button', { name: 'Mute sound' }).click();
@@ -160,6 +167,7 @@ test.describe('sound control (US3)', () => {
 
   test('axe: zero violations with the panel open (SC-009)', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Sound settings' }).click();
     await expect(page.getByRole('slider', { name: 'Volume' })).toBeVisible();
     await runAxe(page);
@@ -197,6 +205,7 @@ test.describe('interruption, stop, and hidden app (US4)', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -266,6 +275,7 @@ test.describe('graceful failure when sound is unavailable (US5)', () => {
       await injectAudioFault(page, cause);
       await page.clock.install();
       await page.goto('/notes');
+      await expandDetails(page);
       await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
 
       await cellAt(page, 6, 0).click();
@@ -292,6 +302,7 @@ test.describe('graceful failure when sound is unavailable (US5)', () => {
   }) => {
     await injectAudioFault(page, 'context');
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await cellAt(page, 6, 0).click();
     await expect(page.getByText(NOTICE)).toBeVisible();
@@ -306,6 +317,7 @@ test.describe('graceful failure when sound is unavailable (US5)', () => {
     await injectAudioFault(page, 'context');
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await cellAt(page, 6, 0).click();
     const text = page.getByText(NOTICE);
@@ -321,6 +333,7 @@ test.describe('graceful failure when sound is unavailable (US5)', () => {
   test('axe: zero violations with the notice visible (SC-009)', async ({ page }) => {
     await injectAudioFault(page, 'context');
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await cellAt(page, 6, 0).click();
     await expect(page.getByText(NOTICE)).toBeVisible();
@@ -329,6 +342,7 @@ test.describe('graceful failure when sound is unavailable (US5)', () => {
 
   test('offline after load: a tap still sounds (FR-016, SC-008)', async ({ page, context }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await context.setOffline(true);
     await cellAt(page, 6, 0).click();
@@ -342,6 +356,7 @@ test.describe('Listen follows the view (feature 006, US4)', () => {
 
   async function openAMajor(page: Page, view: 'Full neck' | 'All notes') {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await page
       .getByRole('group', { name: 'Root' })
@@ -403,6 +418,7 @@ test.describe('Listen to comparison (007 US6)', () => {
       }, fixture);
     }
     await page.goto('/triads');
+    await expandDetails(page);
     await board(page).waitFor();
   }
 

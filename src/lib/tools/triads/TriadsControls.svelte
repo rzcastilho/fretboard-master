@@ -16,6 +16,7 @@
   import type { TriadsViewState } from '$lib/state/triads-view';
   import ChoiceGroup from '../ChoiceGroup.svelte';
   import NoteSelector from '../NoteSelector.svelte';
+  import { overflow } from '../overflow';
 
   interface Props {
     state: TriadsViewState;
@@ -60,30 +61,42 @@
 </script>
 
 <div class="controls">
-  <ChoiceGroup name={m.triads_view_label()} options={views} current={view.view} onchoose={onview} />
-  <NoteSelector selected={[view.rootPc]} ontoggle={onroot} label={m.triads_group_root()} />
-  <ChoiceGroup
-    name={m.triads_group_quality()}
-    options={qualities}
-    current={view.quality}
-    onchoose={onquality}
+  <NoteSelector
+    selected={[view.rootPc]}
+    ontoggle={onroot}
+    label={m.triads_group_root()}
+    layout="single"
   />
-  <ChoiceGroup
-    name={m.triads_group_inversion()}
-    options={inversions}
-    current={view.inversion}
-    onchoose={oninversion}
-    disabled={!controls.inversion}
-    describedby={HINT_ID}
-  />
-  <ChoiceGroup
-    name={m.triads_group_string_set()}
-    options={sets}
-    current={String(view.stringSet)}
-    onchoose={(v) => onstringset(Number(v))}
-    disabled={!controls.stringSet}
-    describedby={HINT_ID}
-  />
+  <div class="controls-row" use:overflow>
+    <ChoiceGroup
+      name={m.triads_view_label()}
+      options={views}
+      current={view.view}
+      onchoose={onview}
+    />
+    <ChoiceGroup
+      name={m.triads_group_quality()}
+      options={qualities}
+      current={view.quality}
+      onchoose={onquality}
+    />
+    <ChoiceGroup
+      name={m.triads_group_inversion()}
+      options={inversions}
+      current={view.inversion}
+      onchoose={oninversion}
+      disabled={!controls.inversion}
+      describedby={HINT_ID}
+    />
+    <ChoiceGroup
+      name={m.triads_group_string_set()}
+      options={sets}
+      current={String(view.stringSet)}
+      onchoose={(v) => onstringset(Number(v))}
+      disabled={!controls.stringSet}
+      describedby={HINT_ID}
+    />
+  </div>
   {#if anyDisabled}
     <p id={HINT_ID} class="hint">{m.triads_hint_all_notes()}</p>
   {/if}

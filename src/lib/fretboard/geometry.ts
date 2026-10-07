@@ -53,6 +53,9 @@ export interface Row {
   center: number;
 }
 
+/** Comfortable keeps natural column widths (scrolls when wider); whole shrinks to the container. */
+export type FitMode = 'comfortable' | 'whole';
+
 export interface FretboardLayout {
   width: number;
   height: number;
@@ -77,6 +80,10 @@ export interface FretboardLayout {
   /** y of the two double-inlay dots (frets 12/24), mirrored with the strings. */
   doubleInlayY: readonly number[];
   scrolls: boolean;
+  /** Comfortable-size width for the instrument's fret count; independent of container and fit. */
+  naturalWidth: number;
+  /** Marker glyph scale: min(1, narrowest column / markerRoot). 1 in comfortable mode. */
+  markerScale: number;
 }
 
 export type FretboardVariant = 'interactive' | 'thumbnail' | 'preview';
@@ -116,7 +123,8 @@ export function layoutFretboard(
   metrics: FretboardMetrics,
   containerWidth: number,
   variant: FretboardVariant,
-  marked = false
+  marked = false,
+  fit: FitMode = 'comfortable'
 ): FretboardLayout {
   const thumb = variant === 'thumbnail';
   // Preview: compact like the thumbnail, but every pending fret and a label column.
@@ -137,6 +145,11 @@ export function layoutFretboard(
   if (!compact && containerWidth > naturalWidth) {
     scale = (containerWidth - labelCol) / columnsNatural;
   }
+  // Whole neck: shrink below natural size so every fret fits; `fit` never affects compact variants.
+  const whole =
+    !compact && fit === 'whole' && containerWidth > labelCol && naturalWidth > containerWidth;
+  if (whole) scale = (containerWidth - labelCol) / columnsNatural;
+  const markerScale = whole ? Math.min(1, (Math.min(...widths) * scale) / metrics.markerRoot) : 1;
 
   let x = labelCol;
   const natural: Column[] = widths.map((w, fret) => {
@@ -188,7 +201,9 @@ export function layoutFretboard(
     boardTop,
     boardBottom,
     doubleInlayY,
-    scrolls: !compact && naturalWidth > containerWidth
+    scrolls: !compact && !whole && naturalWidth > containerWidth,
+    naturalWidth,
+    markerScale
   };
 }
 

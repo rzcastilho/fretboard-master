@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { expandDetails, runAxe } from './support/helpers';
 
 /** US6: zero axe violations on every screen/state, names/roles/states on controls, every sound has a visible counterpart. */
 
@@ -111,6 +111,7 @@ test.describe('axe matrix (US6-1)', () => {
 test.describe('name, role and state (US6-2)', () => {
   test('view-aid toggles expose expanded state and controls', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     for (const name of ['Describe this view', 'Legend']) {
       const button = page.getByRole('button', { name, exact: true });
       await expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -122,6 +123,7 @@ test.describe('name, role and state (US6-2)', () => {
 
   test('Triads selectors are named groups with checked radios', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByRole('group', { name: 'Root' })).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: 'Inversion' })).toBeVisible();
     await expect(
@@ -131,6 +133,7 @@ test.describe('name, role and state (US6-2)', () => {
 
   test('Notes toggles report pressed state', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     const note = page
       .getByRole('group', { name: 'Choose notes' })
       .getByRole('button', { name: 'C', exact: true });
@@ -144,6 +147,7 @@ test.describe('name, role and state (US6-2)', () => {
 
   test('CAGED layer switches report checked state', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const layers = page.getByRole('group', { name: 'Layers' }).getByRole('switch');
     expect(await layers.count()).toBeGreaterThan(0);
     for (const sw of await layers.all()) {
@@ -153,6 +157,7 @@ test.describe('name, role and state (US6-2)', () => {
 
   test('instrument panel is a named dialog with named fret steppers', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Instrument', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Instrument' });
     await expect(dialog).toBeVisible();
@@ -168,6 +173,7 @@ test.describe('name, role and state (US6-2)', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByRole('region', { name: 'Fretboard' })).toBeVisible();
     await expect(page.locator('[aria-current="page"]').first()).toBeVisible();
   });
@@ -176,6 +182,7 @@ test.describe('name, role and state (US6-2)', () => {
 test.describe('polite status messages (US6-2)', () => {
   test('notice on a received link is a polite status and takes no focus', async ({ page }) => {
     await page.goto('/caged?v=1&rt=2');
+    await expandDetails(page);
     const notice = page.locator('.notice[role="status"][aria-live="polite"]');
     await expect(notice.first()).toBeVisible();
     const focused = await page.evaluate(() => document.activeElement?.closest('.notice') ?? null);
@@ -191,6 +198,7 @@ test.describe('polite status messages (US6-2)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.locator('.view-aids [aria-live="polite"][aria-atomic="true"]')).toHaveCount(
       1
     );
@@ -205,6 +213,7 @@ test.describe('polite status messages (US6-2)', () => {
       Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
     });
     await page.goto('/triads');
+    await expandDetails(page);
     const share = page.getByRole('banner').getByRole('button', { name: 'Share', exact: true });
     await share.click();
     const status = page.getByRole('status').filter({ hasText: /copied/i });
@@ -216,12 +225,14 @@ test.describe('polite status messages (US6-2)', () => {
 test.describe('sound → visible inventory (US6-3)', () => {
   test('tapping a position pulses its marker', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.locator('.cell[data-string="6"][data-fret="0"]').click();
     await expect(page.locator('.marker.pulse')).toHaveCount(1);
   });
 
   test('Triads Listen shows pulsing markers during playback', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Listen', exact: true }).click();
     await expect(page.locator('.marker.pulse').first()).toBeVisible();
   });
@@ -230,8 +241,103 @@ test.describe('sound → visible inventory (US6-3)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Listen', exact: true }).click();
     await expect(page.locator('.marker.pulse').first()).toBeAttached();
     await expect(page.locator('[data-listen-status]')).toHaveText(/Playing/);
+  });
+});
+
+/** 025 (contracts/ui.md §11): axe on every arrangement, panel state, whole mode and the minimap. */
+const ARRANGEMENT_TOOLS = ['notes', 'triads', 'caged'] as const;
+
+interface Arrangement {
+  name: string;
+  size: { width: number; height: number };
+  frets: number;
+  expect: string;
+}
+
+const ARRANGEMENTS: Arrangement[] = [
+  { name: 'narrow', size: { width: 390, height: 844 }, frets: 24, expect: 'narrow' },
+  { name: 'medium', size: { width: 800, height: 1000 }, frets: 24, expect: 'medium' },
+  { name: 'wide-side', size: { width: 1440, height: 900 }, frets: 12, expect: 'wide-side' },
+  { name: 'wide-stacked', size: { width: 1440, height: 900 }, frets: 24, expect: 'wide-stacked' },
+  { name: 'landscape', size: { width: 844, height: 390 }, frets: 24, expect: 'landscape' }
+];
+
+async function openArranged(page: Page, tool: string, a: Arrangement) {
+  await page.setViewportSize(a.size);
+  await page.addInitScript((frets) => {
+    if (localStorage.getItem('__seeded') === null) {
+      localStorage.setItem(
+        'fretboard-master:prefs',
+        JSON.stringify({ version: 1, tuning: 'AF-1', frets })
+      );
+      localStorage.setItem('__seeded', '1');
+    }
+  }, a.frets);
+  await page.goto(`/${tool}`);
+  await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+  await expect(page.locator('main .grid')).toHaveAttribute('data-arrangement', a.expect);
+}
+
+test.describe('axe: arrangements, panel, whole mode, minimap (025)', () => {
+  test.describe.configure({ mode: 'parallel' });
+
+  for (const tool of ARRANGEMENT_TOOLS) {
+    for (const a of ARRANGEMENTS) {
+      if (a.name === 'narrow') {
+        test(`${tool} — narrow collapsed`, async ({ page }) => {
+          await openArranged(page, tool, a);
+          await expect(page.getByRole('button', { name: 'Show details' })).toHaveAttribute(
+            'aria-expanded',
+            'false'
+          );
+          await runAxe(page);
+        });
+        test(`${tool} — narrow expanded`, async ({ page }) => {
+          await openArranged(page, tool, a);
+          await page.getByRole('button', { name: 'Show details' }).click();
+          await expect(page.getByRole('button', { name: 'Hide details' })).toHaveAttribute(
+            'aria-expanded',
+            'true'
+          );
+          await runAxe(page);
+        });
+      } else if (a.name === 'landscape') {
+        test(`${tool} — landscape panel closed`, async ({ page }) => {
+          await openArranged(page, tool, a);
+          await runAxe(page);
+        });
+        test(`${tool} — landscape panel open`, async ({ page }) => {
+          await openArranged(page, tool, a);
+          await page.getByRole('button', { name: 'Panels', exact: true }).click();
+          await expect(page.getByRole('region', { name: 'Actions and details' })).toBeVisible();
+          await runAxe(page);
+        });
+      } else {
+        test(`${tool} — ${a.name}`, async ({ page }) => {
+          await openArranged(page, tool, a);
+          await runAxe(page);
+        });
+      }
+    }
+  }
+
+  test('minimap focused', async ({ page }) => {
+    await openArranged(page, 'notes', ARRANGEMENTS[0]);
+    const minimap = page.getByRole('slider', { name: 'Fretboard overview' });
+    await minimap.focus();
+    await expect(minimap).toBeFocused();
+    await runAxe(page);
+  });
+
+  test('whole mode with notice', async ({ page }) => {
+    await openArranged(page, 'notes', ARRANGEMENTS[0]);
+    await page.getByRole('button', { name: 'Fit to screen' }).click();
+    await page.locator('.cell[data-string="2"][data-fret="18"]').click();
+    await expect(page.locator('.notice[role="status"]').first()).toBeVisible();
+    await runAxe(page);
   });
 });

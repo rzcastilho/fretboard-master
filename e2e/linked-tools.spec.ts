@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { expandDetails, runAxe } from './support/helpers';
 
 const selector = (page: Page) => page.getByRole('group', { name: 'Choose notes' });
 const note = (page: Page, name: string) =>
@@ -16,6 +16,7 @@ async function pick(page: Page, ...names: string[]) {
 test.describe('linked tools: find a triad from selected notes (US1)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
   });
 
   test('C–E–G names C major and View as triad opens Triads on C major', async ({ page }) => {
@@ -76,6 +77,7 @@ const radio = (page: Page, name: string) => page.getByRole('radio', { name, exac
 test.describe('linked tools: nav carries notes and triads (US2)', () => {
   test('A + 1st inversion + 4-3-2 → Notes A → Triads keeps all but the root', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await radio(page, '1st inversion').click();
     await radio(page, '4-3-2').click();
     await nav(page).getByRole('link', { name: 'Fretboard Notes' }).click();
@@ -91,6 +93,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
 
   test('Triads C major → Notes shows C, E, G and "C major"', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await nav(page).getByRole('link', { name: 'Fretboard Notes' }).click();
     await expect(note(page, 'C')).toHaveAttribute('aria-pressed', 'true');
     await expect(note(page, 'E')).toHaveAttribute('aria-pressed', 'true');
@@ -100,6 +103,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
 
   test('nothing selected → Triads opens in its last state', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await rootButton(page, 'D').click();
     await nav(page).getByRole('link', { name: 'Fretboard Notes' }).click();
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
@@ -109,6 +113,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
 
   test('home card opens the tool without a carry', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await note(page, 'A').click();
     await nav(page).getByRole('link', { name: 'Home' }).click();
     await page.getByRole('link', { name: /^Triads/ }).click();
@@ -119,6 +124,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await note(page, 'A').click();
     await nav(page).getByRole('link', { name: 'Triads' }).click();
     await expect(page.getByText('A major — Root position', { exact: true })).toBeVisible();
@@ -128,11 +134,13 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     await page.goForward();
     await expect(page.getByText('D major — Root position', { exact: true })).toBeVisible();
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
   });
 
   test('G♯ only with augmented → A♭ augmented', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await radio(page, 'augmented').click();
     await nav(page).getByRole('link', { name: 'Fretboard Notes' }).click();
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
@@ -143,6 +151,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
 
   test('a user-switched D♭ is kept when C♯/D♭ is carried', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await rootButton(page, 'C sharp or D flat').click();
     await page.getByRole('button', { name: /switch to/i }).click();
     const heading = page.getByText(/(C♯|D♭) major — Root position/);
@@ -158,6 +167,7 @@ test.describe('linked tools: nav carries notes and triads (US2)', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await rootButton(page, 'F').click();
     // Carry F–A–C to Notes, then keep only the low E string on frets 0–4: A and C are not there.
     await nav(page).getByRole('link', { name: 'Fretboard Notes' }).click();
@@ -182,6 +192,7 @@ const triadsFromNote = (page: Page) =>
 test.describe('linked tools: Triads from this note (US3)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -220,6 +231,7 @@ test.describe('linked tools: Triads from this note (US3)', () => {
 test.describe('linked tools: session memory and Reset tool (US4)', () => {
   test('a changed Triads tool is as left after visiting Notes', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await rootButton(page, 'A').click();
     await radio(page, 'minor').click();
     await radio(page, '1st inversion').click();
@@ -236,6 +248,7 @@ test.describe('linked tools: session memory and Reset tool (US4)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await pick(page, 'C', 'D');
     await nav(page).getByRole('link', { name: 'Triads' }).click();
     await radio(page, 'minor').click();
@@ -255,6 +268,7 @@ test.describe('linked tools: session memory and Reset tool (US4)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await pick(page, 'E');
     await nav(page).getByRole('link', { name: 'Triads' }).click();
     await radio(page, 'minor').click();
@@ -336,6 +350,7 @@ test.describe('linked tools: history only follows screens (US5)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await pick(page, 'C', 'E', 'G');
     const before = await historyLength(page);
     await viewAsTriadButton(page).click();
@@ -350,6 +365,7 @@ test.describe('linked tools: history only follows screens (US5)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await cell(page, 1, 2).click();
     await expect(card(page)).toBeVisible();
@@ -368,6 +384,7 @@ test.describe('linked tools: CAGED triad round trip (018 US3)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await page
       .getByRole('radiogroup', { name: 'Shape' })
       .getByRole('radio', { name: 'A', exact: true })
@@ -409,6 +426,7 @@ const tool = (page: Page, name: string) => nav(page).getByRole('link', { name, e
 test.describe('linked tools: CAGED carry (019 US3)', () => {
   test('Notes (B♭ only) → CAGED B♭ with the previous quality', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await cagedQuality(page, 'Minor').click();
     await tool(page, 'Fretboard Notes').click();
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
@@ -420,6 +438,7 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
 
   test('CAGED A minor → Notes with A, C and E selected', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await cagedKey(page, 'A').click();
     await cagedQuality(page, 'Minor').click();
     await tool(page, 'Fretboard Notes').click();
@@ -431,6 +450,7 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
 
   test('Triads B diminished → CAGED B major', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await rootButton(page, 'B').click();
     await radio(page, 'diminished').click();
     await tool(page, 'CAGED').click();
@@ -440,6 +460,7 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
 
   test('CAGED D major → Triads D major with inversion and set unchanged', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await radio(page, '1st inversion').click();
     await tool(page, 'CAGED').click();
     await cagedKey(page, 'D').click();
@@ -449,6 +470,7 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
 
   test('Notes with two notes → CAGED as left', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await cagedKey(page, 'G').click();
     await tool(page, 'Fretboard Notes').click();
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
@@ -459,6 +481,7 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
 
   test('reload, Back/Forward and deep links never carry', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await note(page, 'F').click();
     await tool(page, 'CAGED').click();
     await expect(cagedKey(page, 'F')).toHaveAttribute('aria-pressed', 'true');
@@ -467,13 +490,16 @@ test.describe('linked tools: CAGED carry (019 US3)', () => {
     await page.goForward();
     await expect(cagedKey(page, 'E')).toHaveAttribute('aria-pressed', 'true');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(cagedKey(page, 'C')).toHaveAttribute('aria-pressed', 'true');
     await page.goto('/notes');
+    await expandDetails(page);
     await expect(note(page, 'F')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('A♯ major shows the Switch to B♭ guidance and 𝄪 where needed', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await rootButton(page, 'A sharp or B flat').click();
     const sw = page.getByRole('button', { name: /switch to/i });
     if (!/B♭/.test((await sw.textContent()) ?? '')) await sw.click();
@@ -499,6 +525,7 @@ test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await cell(page, 1, 3).click(); // string 1, fret 3 = G
     await expect(card(page)).toBeVisible();
@@ -513,6 +540,7 @@ test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await rootButton(page, 'A sharp or B flat').click();
     await radio(page, 'minor').click();
     await viewInCaged(page).click();
@@ -535,6 +563,7 @@ test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
       page
     }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await rootButton(page, root).click();
       await radio(page, quality).click();
       const btn = viewInCaged(page);
@@ -553,11 +582,13 @@ test.describe('linked tools: CAGED shortcuts (019 US4)', () => {
     }) => {
       await page.emulateMedia({ colorScheme });
       await page.goto('/notes');
+      await expandDetails(page);
       await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
       await cell(page, 1, 3).click();
       await expect(cagedInThisKey(page)).toBeVisible();
       await runAxe(page);
       await page.goto('/triads');
+      await expandDetails(page);
       await expect(viewInCaged(page)).toHaveAttribute('aria-disabled', 'false');
       await runAxe(page);
       await radio(page, 'augmented').click();

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { expandDetails, runAxe } from './support/helpers';
 
 /** Slice 015 (CAGED across tunings): quickstart scenarios E1–E14, axe A1–A4. */
 
@@ -49,6 +49,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
   }) => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(notice(page, 'Open G')).toBeVisible();
     await expect(board(page).getByRole('button')).toHaveText([
       'View in standard tuning',
@@ -64,6 +65,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
   }) => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
+    await expandDetails(page);
     const before = await storedPrefs(page);
     await viewInStandard(page);
     await expect(page.getByText('C major', { exact: true })).toBeVisible();
@@ -88,6 +90,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
   test('E3: leaving CAGED and coming back shows the notice again', async ({ page }) => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
+    await expandDetails(page);
     await viewInStandard(page);
     await expect(tags(page).first()).toBeVisible();
     const nav = page.getByRole('navigation', { name: 'Tools' });
@@ -101,6 +104,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
   test('E4: Go to Triads opens /triads under the Open G badge', async ({ page }) => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Go to Triads' }).click();
     await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
     await expect(
@@ -113,6 +117,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 7).click();
     await quality(page, 'Minor').click();
     const dialog = await openPanel(page);
@@ -129,6 +134,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
   }) => {
     await seed(page, { strings: 7, tuning: 'AF-21', customTuning: [0, 0, 0, 0, 0, 0, 3] });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(notice(page, 'Custom')).toBeVisible();
     await viewInStandard(page);
     await expect(
@@ -147,12 +153,14 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
   }) => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
+    await expandDetails(page);
     await viewInStandard(page);
     await key(page, 2).click();
     await quality(page, 'Minor').click();
     await expect(page.getByText('D minor', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Temporary tuning: Standard/ })).toBeVisible();
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(notice(page, 'Open G')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Temporary tuning/ })).toHaveCount(0);
   });
@@ -162,6 +170,7 @@ test.describe('caged 015 US1: honest CAGED in a non-compatible tuning', () => {
   }) => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
+    await expandDetails(page);
     await viewInStandard(page);
     const dialog = await openPanel(page);
     await expect(dialog.getByRole('radio', { name: /^Open G/ })).toBeChecked();
@@ -179,6 +188,7 @@ test.describe('caged 015 US1: accessibility (A1, A2)', () => {
   test('A1: axe on the Open G notice', async ({ page }) => {
     await seed(page, { tuning: 'AF-8' });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(notice(page, 'Open G')).toBeVisible();
     await runAxe(page);
   });
@@ -188,6 +198,7 @@ test.describe('caged 015 US1: accessibility (A1, A2)', () => {
       if (width) await page.setViewportSize({ width, height: 800 });
       await seed(page, { tuning: 'AF-8' });
       await page.goto('/caged');
+      await expandDetails(page);
       await viewInStandard(page);
       await expect(tags(page).first()).toBeVisible();
       await expect(page.getByRole('button', { name: /^Temporary tuning/ })).toBeVisible();
@@ -200,6 +211,7 @@ test.describe('caged 015 US2: transposed compatible tunings', () => {
   test('E9: Half step down, E♭ and G♭ major draw the Standard shapes', async ({ page }) => {
     await seed(page, { tuning: 'AF-2' });
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 3).click();
     await expect(page.getByText('E♭ major', { exact: true })).toBeVisible();
     await expect(
@@ -224,6 +236,7 @@ test.describe('caged 015 US2: transposed compatible tunings', () => {
     test(`E10: ${id} draws shapes with no altered mark or temporary badge`, async ({ page }) => {
       await seed(page, { strings, tuning: id });
       await page.goto('/caged');
+      await expandDetails(page);
       await expect(tags(page).first()).toBeVisible();
       await expect(board(page).locator('.marker').first()).toBeVisible();
       await expect(page.getByText('altered', { exact: true })).toHaveCount(0);
@@ -255,6 +268,7 @@ test.describe('caged 015 US3: altered lowest string', () => {
   }) => {
     await seed(page, { tuning: 'AF-4' });
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 2).click();
     await expect(page.getByText('D major', { exact: true })).toBeVisible();
     await expect(page.getByText('altered', { exact: true })).toBeVisible();
@@ -276,15 +290,19 @@ test.describe('caged 015 US3: altered lowest string', () => {
   }) => {
     await seed(page, { tuning: 'AF-4' });
     await page.goto('/caged');
+    await expandDetails(page);
     for (const pc of [0, 4, 6, 9, 11]) {
       await key(page, pc).click();
       await expect(mark(page)).toHaveText('altered');
       const open = 38; // D2
-      const frets = await sixFrets(page);
-      for (const f of frets) {
-        const rel = (((open + f - pc) % 12) + 12) % 12;
-        expect([0, 4, 7]).toContain(rel);
-      }
+      // The mark already reads "altered" from the previous key; poll until the board redraws.
+      await expect
+        .poll(async () =>
+          (await sixFrets(page)).every((f) =>
+            [0, 4, 7].includes((((open + f - pc) % 12) + 12) % 12)
+          )
+        )
+        .toBe(true);
     }
   });
 
@@ -294,6 +312,7 @@ test.describe('caged 015 US3: altered lowest string', () => {
   }) => {
     await seed(page, { tuning: 'AF-3' });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tags(page).first()).toBeVisible();
     const wsd = await starts(page);
     expect(wsd.length).toBeGreaterThan(0);
@@ -301,6 +320,7 @@ test.describe('caged 015 US3: altered lowest string', () => {
     const other = await context.newPage();
     await seed(other, { tuning: 'AF-5' });
     await other.goto('/caged');
+    await expandDetails(other);
     await expect(tags(other).first()).toBeVisible();
     await expect(mark(other)).toHaveText('altered');
     expect(await starts(other)).toEqual(wsd);
@@ -311,6 +331,7 @@ test.describe('caged 015 US3: accessibility (A3, A4)', () => {
   test('A3: axe on Drop D', async ({ page }) => {
     await seed(page, { tuning: 'AF-4' });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(board(page).locator('text.string-mark')).toHaveText('altered');
     await runAxe(page);
   });
@@ -322,6 +343,7 @@ test.describe('caged 015 US3: accessibility (A3, A4)', () => {
       if (width) await page.setViewportSize({ width, height: 800 });
       await seed(page, { tuning: 'AF-4', handedness: 'left', orientation: 'lowest-top' });
       await page.goto('/caged');
+      await expandDetails(page);
       const mark = board(page).locator('text.string-mark');
       await expect(mark).toHaveText('altered');
       // Mirrored: the label column sits at the right edge of the board.
@@ -356,6 +378,7 @@ test.describe('caged 015 polish: every preset tuning (E14, SC-001)', () => {
     test(`E14: ${id} is compatible: shapes, no altered mark, no badge`, async ({ page }) => {
       await seed(page, { strings, tuning: id });
       await page.goto('/caged');
+      await expandDetails(page);
       await expect(tags(page).first()).toBeVisible();
       await expect(board(page).locator('.marker').first()).toBeVisible();
       await expect(page.getByText('altered', { exact: true })).toHaveCount(0);
@@ -368,6 +391,7 @@ test.describe('caged 015 polish: every preset tuning (E14, SC-001)', () => {
     test(`E14: ${id} is altered: shapes plus the altered mark`, async ({ page }) => {
       await seed(page, { strings, tuning: id });
       await page.goto('/caged');
+      await expandDetails(page);
       await expect(tags(page).first()).toBeVisible();
       await expect(board(page).locator('.marker').first()).toBeVisible();
       await expect(board(page).locator('text.string-mark')).toHaveText('altered');
@@ -381,6 +405,7 @@ test.describe('caged 015 polish: every preset tuning (E14, SC-001)', () => {
     }) => {
       await seed(page, { tuning: id });
       await page.goto('/caged');
+      await expandDetails(page);
       await expect(anyNotice(page)).toBeVisible();
       await expect(board(page).getByRole('button')).toHaveText([
         'View in standard tuning',

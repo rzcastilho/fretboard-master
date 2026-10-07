@@ -3,6 +3,7 @@
   import { currentSnapshot, share } from '$lib/state/share.svelte';
   import { shareTitle } from './share-title';
   import type { ToolId } from './tools';
+  import BarIcon from './BarIcon.svelte';
 
   let { tool }: { tool: ToolId } = $props();
 
@@ -24,7 +25,8 @@
   type="button"
   class="share-button"
   aria-busy={share.busy ? 'true' : undefined}
-  onclick={activate}>{m.share_button()}</button
+  onclick={activate}
+  ><BarIcon name="share" /><span class="bar-label">{m.share_button()}</span></button
 >
 
 <style>

@@ -566,3 +566,72 @@ describe('layoutFretboard label column with string marks (slice 015)', () => {
     expect(l.board).toEqual({ start: 0, end: l.width - DEFAULT_METRICS.labelColMarked });
   });
 });
+
+describe('layoutFretboard fit mode (025)', () => {
+  const guitar = (fretCount: number) => ({ ...STANDARD_GUITAR, fretCount });
+
+  it('24 frets / 320 comfortable: natural 1220, scale 1, scrolls', () => {
+    const l = layoutFretboard(guitar(24), DEFAULT_METRICS, 320, 'interactive');
+    expect(l.naturalWidth).toBe(1220);
+    expect(l.scale).toBe(1);
+    expect(l.markerScale).toBe(1);
+    expect(l.scrolls).toBe(true);
+  });
+
+  it('24 frets / 320 whole: shrinks to fit, no scroll', () => {
+    const l = layoutFretboard(guitar(24), DEFAULT_METRICS, 320, 'interactive', false, 'whole');
+    expect(l.naturalWidth).toBe(1220);
+    expect(l.scale).toBeCloseTo((320 - 24) / 1196, 4);
+    expect(l.scrolls).toBe(false);
+    expect(l.width).toBeCloseTo(320, 6);
+    expect(l.markerScale).toBeLessThan(1);
+    expect(l.markerScale).toBeCloseTo(
+      (DEFAULT_METRICS.fretLast * l.scale) / DEFAULT_METRICS.markerRoot,
+      6
+    );
+  });
+
+  it('24 frets / 1400 whole: stretches as comfortable does', () => {
+    const w = layoutFretboard(guitar(24), DEFAULT_METRICS, 1400, 'interactive', false, 'whole');
+    const c = layoutFretboard(guitar(24), DEFAULT_METRICS, 1400, 'interactive');
+    expect(w.scale).toBeGreaterThan(1);
+    expect(w.scale).toBeCloseTo(c.scale, 9);
+    expect(w.scrolls).toBe(false);
+    expect(w.markerScale).toBe(1);
+  });
+
+  it('12 frets / 1008 comfortable: natural ≈ 644, stretches, no scroll', () => {
+    const l = layoutFretboard(guitar(12), DEFAULT_METRICS, 1008, 'interactive');
+    expect(Math.abs(l.naturalWidth - 644)).toBeLessThanOrEqual(1);
+    expect(l.scale).toBeGreaterThan(1);
+    expect(l.scrolls).toBe(false);
+  });
+
+  it('naturalWidth ignores container and fit', () => {
+    const a = layoutFretboard(guitar(24), DEFAULT_METRICS, 0, 'interactive');
+    const b = layoutFretboard(guitar(24), DEFAULT_METRICS, 320, 'interactive', false, 'whole');
+    expect(a.naturalWidth).toBe(b.naturalWidth);
+  });
+
+  it('fit is ignored for thumbnail and preview', () => {
+    for (const v of ['thumbnail', 'preview'] as const) {
+      const a = layoutFretboard(guitar(24), DEFAULT_METRICS, 100, v);
+      const b = layoutFretboard(guitar(24), DEFAULT_METRICS, 100, v, false, 'whole');
+      expect(b).toEqual(a);
+      expect(b.markerScale).toBe(1);
+    }
+  });
+
+  it('whole mirrored keeps width = container', () => {
+    const l = layoutFretboard(
+      withPresentation(guitar(24), 'left', 'highest-top'),
+      DEFAULT_METRICS,
+      320,
+      'interactive',
+      false,
+      'whole'
+    );
+    expect(l.width).toBeCloseTo(320, 6);
+    expect(l.scrolls).toBe(false);
+  });
+});

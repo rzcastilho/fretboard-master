@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
-import { trackRequests } from './support/helpers';
+import { expandDetails, trackRequests } from './support/helpers';
 
 const PREFS_KEY = 'fretboard-master:prefs';
 
@@ -104,6 +104,7 @@ test.describe('switch language anywhere (US2)', () => {
 
   test('US2-1: Triads comparison survives English → Español', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(board(page).locator('.marker')).toHaveCount(3);
     await page.getByRole('button', { name: 'Compare', exact: true }).click();
     await page
@@ -113,6 +114,8 @@ test.describe('switch language anywhere (US2)', () => {
     const comparison = board(page).locator('.marker.comparison');
     const before = await comparison.count();
     expect(before).toBeGreaterThan(0);
+    // The address follows after a 150 ms debounce; capture it once it carries the comparison.
+    await expect.poll(() => page.url()).toMatch(/cmp=1&cq=minor/);
     const url = page.url();
 
     await openPanel(page);
@@ -161,6 +164,7 @@ test.describe('switch language anywhere (US2)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await openPanel(page);
     await panel(page).getByRole('radio').first().focus();
     await page.keyboard.press('Escape');
@@ -172,6 +176,7 @@ test.describe('switch language anywhere (US2)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await openPanel(page);
     await panel(page).getByRole('radio', { name: 'Português' }).check();
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
@@ -199,6 +204,7 @@ test.describe('switch language anywhere (US2)', () => {
 
   test('US2-5: <html lang> and document.title follow the choice', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page).toHaveTitle(title('en', 'tool_triads_name'));
     await openPanel(page);
     for (const [label, tag] of [
@@ -278,6 +284,7 @@ for (const tag of ['en', 'pt-BR', 'es'] as const) {
       page
     }) => {
       await page.goto('/notes');
+      await expandDetails(page);
       await page.getByRole('button', { name: text(tag, 'instrument_button'), exact: true }).click();
       const dialog = page.getByRole('dialog', { name: text(tag, 'instrument_panel_title') });
       await expect(
@@ -293,6 +300,7 @@ for (const tag of ['en', 'pt-BR', 'es'] as const) {
       page
     }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       const root = tag === 'en' ? 'R' : 'T';
       expect(text(tag, 'interval_root')).toBe(root);
       await expect(board(page).getByText(root, { exact: true }).first()).toBeAttached();
@@ -304,6 +312,7 @@ for (const tag of ['en', 'pt-BR', 'es'] as const) {
 
     test('accidental symbols are unchanged in every language', async ({ page }) => {
       await page.goto('/notes');
+      await expandDetails(page);
       for (const key of ['accidental_sharp', 'accidental_flat']) {
         if (key in EN) expect(text(tag, key)).toBe(EN[key]);
       }

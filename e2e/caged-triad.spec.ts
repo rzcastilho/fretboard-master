@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe } from './support/helpers';
 
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
 const layers = (page: Page) => page.getByRole('group', { name: 'Layers' });
@@ -25,6 +25,7 @@ const triadKeys = async (page: Page): Promise<string[]> =>
 /** C major, standard tuning, A shape in focus, Triad on (default set 3-2-1). */
 async function aShapeTriad(page: Page): Promise<void> {
   await page.goto('/caged');
+  await expandDetails(page);
   await shape(page, 'A').click();
   await layerSwitch(page, 'Triad').click();
 }
@@ -103,6 +104,7 @@ test.describe('caged triad US1: find the triad inside the shape I am holding', (
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'A').click();
     // Read the intro delays in the same task as the click, before the window ends.
     const delays = await page.evaluate(async () => {
@@ -130,6 +132,7 @@ test.describe('caged triad US1: find the triad inside the shape I am holding', (
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(layers(page).getByRole('switch').last()).toHaveText(/Triad\s*Off/);
     await expect(sets(page)).toHaveCount(0);
     await shape(page, 'A').click();
@@ -148,6 +151,7 @@ test.describe('caged triad US2: know which string sets have no triad', () => {
 
   async function gShapeTriad(page: Page): Promise<void> {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'G').click();
     await layerSwitch(page, 'Triad').click();
   }
@@ -213,6 +217,7 @@ test.describe('caged triad US3: jump to the Triads tool', () => {
 
   test('US3-2: minor carries the quality', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await quality(page, 'Minor').click();
     await shape(page, 'A').click();
     await layerSwitch(page, 'Triad').click();
@@ -224,6 +229,7 @@ test.describe('caged triad US3: jump to the Triads tool', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'D').click();
     await layerSwitch(page, 'Triad').click();
     await setOption(page, '3-2-1').click();
@@ -235,6 +241,7 @@ test.describe('caged triad US3: jump to the Triads tool', () => {
 
   test('US3-4: no shortcut without a drawn triad', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'A').click();
     await expect(openButton(page)).toHaveCount(0);
   });
@@ -247,6 +254,7 @@ test.describe('caged triad US4: turn on Triad without a shape in focus', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(seeAll(page)).toBeChecked();
     await layerSwitch(page, 'Triad').click();
     await expect(seeAll(page)).not.toBeChecked();
@@ -311,6 +319,7 @@ test.describe('caged triad US5: right notes in any tuning', () => {
   test('US5-1: Half step down E major A shape names follow the real pitch', async ({ page }) => {
     await seedPrefs(page, { tuning: 'AF-2' });
     await page.goto('/caged');
+    await expandDetails(page);
     await keyButton(page, 4).click();
     await shape(page, 'A').click();
     await layerSwitch(page, 'Triad').click();
@@ -330,6 +339,7 @@ test.describe('caged triad US5: right notes in any tuning', () => {
   test('US5-2: Drop D, D major E shape, set 6-5-4 is offered and consistent', async ({ page }) => {
     await seedPrefs(page, { tuning: 'AF-4' });
     await page.goto('/caged');
+    await expandDetails(page);
     await keyButton(page, 2).click();
     await shape(page, 'E').click();
     await layerSwitch(page, 'Triad').click();
@@ -353,6 +363,7 @@ test.describe('caged triad US5: right notes in any tuning', () => {
   test('US5-3: 7-string selector lists 7-6-5 first', async ({ page }) => {
     await seedPrefs(page, { strings: 7, tuning: 'AF-21' });
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'A').click();
     await layerSwitch(page, 'Triad').click();
     const options = await sets(page)
@@ -381,6 +392,7 @@ test.describe('caged triad US5: right notes in any tuning', () => {
       await expect(page.getByRole('dialog', { name: 'Instrument' })).toBeHidden();
     };
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'A').click();
     await layerSwitch(page, 'Triad').click();
     await expect(layerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'true');
@@ -404,6 +416,7 @@ test.describe('caged triad polish: accessibility and persistence', () => {
   /** G shape: 3-2-1 is a disabled set, 6-5-4 drawn, shortcut shown. */
   async function gShapeTriad(page: Page): Promise<void> {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'G').click();
     await layerSwitch(page, 'Triad').click();
     await expect(triadMarkers(page)).toHaveCount(3);
@@ -422,6 +435,7 @@ test.describe('caged triad polish: accessibility and persistence', () => {
 
   test('T051: keyboard-only pass over switch, set entries and shortcut', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'A').click();
     await layerSwitch(page, 'Triad').focus();
     await page.keyboard.press('Space');
@@ -482,6 +496,7 @@ test.describe('caged triad polish: accessibility and persistence', () => {
   test('T052: opening /caged without a link turns Triad off (Chord only)', async ({ page }) => {
     await aShapeTriad(page);
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(layerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'false');
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-checked', 'true');
     await expect(sets(page)).toHaveCount(0);
@@ -497,6 +512,7 @@ test.describe('caged triad polish: accessibility and persistence', () => {
 
   test('T052: prefs record in localStorage is byte-identical after Triad use', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'A').click();
     const before = await rawPrefs(page);
     const keysBefore = await page.evaluate(() => Object.keys(localStorage).sort());

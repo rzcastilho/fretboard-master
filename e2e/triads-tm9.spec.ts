@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { readAudioLog, runAxe } from './support/helpers';
+import { expandDetails, readAudioLog, runAxe } from './support/helpers';
 
 /**
  * TM-9 screenshot views 7, 8, 11, 12 (specs/005-triads-isolated-view/contracts/test-hooks.md)
@@ -21,6 +21,7 @@ async function open(page: Page, instrument?: 'AF-4' | 'AF-8' | 'AF-21') {
     }, instrument);
   }
   await page.goto('/triads');
+  await expandDetails(page);
   await board(page).waitFor();
 }
 

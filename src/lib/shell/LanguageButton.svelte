@@ -1,5 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
+  import BarIcon from './BarIcon.svelte';
 
   let {
     open,
@@ -20,7 +21,7 @@
   aria-expanded={open}
   aria-controls={controls}
   bind:this={element}
-  {onclick}>{m.language_open()}</button
+  {onclick}><BarIcon name="language" /><span class="bar-label">{m.language_open()}</span></button
 >
 
 <style>

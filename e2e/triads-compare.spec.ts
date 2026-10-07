@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe } from './support/helpers';
 
 const sizes = [
   { name: 'phone', width: 360, height: 740 },
@@ -15,6 +15,7 @@ const arrows = (page: Page) => board(page).locator('g.arrows .arrow');
 
 async function openTriads(page: Page) {
   await page.goto('/triads');
+  await expandDetails(page);
   await expect(board(page).locator('.marker')).toHaveCount(3);
 }
 
@@ -165,6 +166,7 @@ const tags = (page: Page) => page.getByRole('group', { name: 'Shapes' }).getByRo
 /** A major, strings 3-2-1, Full neck (six shapes). */
 async function openFullNeck(page: Page) {
   await page.goto('/triads');
+  await expandDetails(page);
   await page
     .getByRole('group', { name: 'Root' })
     .getByRole('button', { name: 'A', exact: true })
@@ -234,6 +236,7 @@ async function openFixture(page: Page, fixture?: 'SHORT-7' | 'AF-1-12' | 'NC-UNI
     }, fixture);
   }
   await page.goto('/triads');
+  await expandDetails(page);
   await board(page).waitFor();
 }
 

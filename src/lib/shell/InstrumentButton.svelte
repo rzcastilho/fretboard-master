@@ -2,6 +2,7 @@
   import { m } from '$lib/paraglide/messages.js';
   import { instrument } from '$lib/state/instrument.svelte';
   import { rememberOpener } from './instrument-opener';
+  import BarIcon from './BarIcon.svelte';
 
   function open(event: MouseEvent): void {
     rememberOpener(event.currentTarget as HTMLElement);
@@ -9,7 +10,9 @@
   }
 </script>
 
-<button type="button" class="instrument-button" onclick={open}>{m.instrument_button()}</button>
+<button type="button" class="instrument-button" onclick={open}
+  ><BarIcon name="instrument" /><span class="bar-label">{m.instrument_button()}</span></button
+>
 
 <style>
   .instrument-button {

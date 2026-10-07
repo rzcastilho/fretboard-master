@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { expandDetails, runAxe } from './support/helpers';
 
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
 const tags = (page: Page) => board(page).locator('.tag:visible');
@@ -26,12 +26,14 @@ test.describe('caged US1: five linked shapes', () => {
 
   test('Q2: opens on C major with the title and heading', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page).toHaveTitle('CAGED — Fretboard Master');
     await expect(page.getByText('C major', { exact: true })).toBeVisible();
   });
 
   test('Q3: tags in order, no overlap, start frets 0, 3, 5, 8, 10', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     // 22 frets also fit the start of a second cycle; the first five are the first cycle.
     await expect(tags(page)).toHaveCount(9);
     const texts = await tags(page).allInnerTexts();
@@ -67,6 +69,7 @@ test.describe('caged US1: five linked shapes', () => {
 
   test('Q4: root markers are squares; radios are Quality, Shape and Labels', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const roots = board(page).locator('.marker.root');
     await expect(roots.first()).toBeAttached();
     expect(await roots.count()).toBeGreaterThan(0);
@@ -88,6 +91,7 @@ test.describe('caged US1: five linked shapes', () => {
       globalThis.__fmInstrument = 'AF-1-24';
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tags(page)).toHaveCount(9);
     const texts = (await tags(page).allInnerTexts()).map((t) => t.trim());
     expect(texts[0]).toBe(texts[5]);
@@ -95,6 +99,7 @@ test.describe('caged US1: five linked shapes', () => {
 
   test('no axe violations', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByText('C major', { exact: true })).toBeVisible();
     await runAxe(page);
   });
@@ -108,6 +113,7 @@ const order = async (page: Page) =>
 test.describe('caged US2: choose the key', () => {
   test('Q6: G major order G E D C A, no C tag below fret 7', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 7).click();
     await expect(page.getByText('G major', { exact: true })).toBeVisible();
     expect(await order(page)).toEqual(['G', 'E', 'D', 'C', 'A']);
@@ -118,6 +124,7 @@ test.describe('caged US2: choose the key', () => {
 
   test('Q7: D♭ major order C A G E D', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 1).click();
     await expect(page.getByText('D♭ major', { exact: true })).toBeVisible();
     expect(await order(page)).toEqual(['C', 'A', 'G', 'E', 'D']);
@@ -125,6 +132,7 @@ test.describe('caged US2: choose the key', () => {
 
   test('Q8: F♯ major order E D C A G', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 6).click();
     expect(await order(page)).toEqual(['E', 'D', 'C', 'A', 'G']);
   });
@@ -133,6 +141,7 @@ test.describe('caged US2: choose the key', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByRole('button', { name: /^Switch to/ })).toHaveCount(0);
     await key(page, 1).click();
     await expect(page.getByText('D♭ major', { exact: true })).toBeVisible();
@@ -151,6 +160,7 @@ const qualityRadio = (page: Page, name: 'Major' | 'Minor') =>
 test.describe('caged US3: major and minor', () => {
   test('Q10: G major then Minor gives Gm 0, Em 3, Dm 5, Cm 7, Am 10', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 7).click();
     await qualityRadio(page, 'Minor').click();
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
@@ -162,6 +172,7 @@ test.describe('caged US3: major and minor', () => {
 
   test('Q11: C minor muted strings stay empty', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await qualityRadio(page, 'Minor').click();
     await expect(page.getByText('C minor', { exact: true })).toBeVisible();
     // Cm shape: string 6 (frets 0-3) and string 1 (frets 0-2) carry no marker.
@@ -173,6 +184,7 @@ test.describe('caged US3: major and minor', () => {
 
   test('Q12: minor thirds are labelled ♭3', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await qualityRadio(page, 'Minor').click();
     await expect(board(page).getByText('♭3').first()).toBeAttached();
     await expect(board(page).locator('.marker').getByText(/^3$/)).toHaveCount(0);
@@ -180,6 +192,7 @@ test.describe('caged US3: major and minor', () => {
 
   test('Q9 (full): spelling survives quality changes', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 1).click();
     await qualityRadio(page, 'Minor').click();
     await expect(page.getByText('C♯ minor', { exact: true })).toBeVisible();
@@ -216,6 +229,7 @@ test.describe('caged US4: fewer frets, fewer shapes', () => {
   test('Q13: 12 frets, C major shows four shapes, no D, and the note', async ({ page }) => {
     await withFixture(page, 'AF-1-12');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByRole('status').filter({ hasText: FIT })).toBeVisible();
     await expect(tags(page).filter({ hasText: /^D shape/ })).toHaveCount(0);
     expect((await tags(page).allInnerTexts()).map((t) => t.trim()[0]).slice(0, 4)).toEqual([
@@ -229,6 +243,7 @@ test.describe('caged US4: fewer frets, fewer shapes', () => {
   test('Q14: G major at 12 frets shows no note', async ({ page }) => {
     await withFixture(page, 'AF-1-12');
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 7).click();
     await expect(page.getByText('G major', { exact: true })).toBeVisible();
     await expect(page.getByText(/shapes fit on the fretboard/)).toHaveCount(0);
@@ -236,17 +251,20 @@ test.describe('caged US4: fewer frets, fewer shapes', () => {
 
   test('Q15: 22 and 24 frets show no note, any key', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByText(/shapes fit on the fretboard/)).toHaveCount(0);
     await key(page, 1).click();
     await expect(page.getByText(/shapes fit on the fretboard/)).toHaveCount(0);
     await withFixture(page, 'AF-1-24');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByText(/shapes fit on the fretboard/)).toHaveCount(0);
   });
 
   test('Q16: 7 strings draws nothing on string 7', async ({ page }) => {
     await withFixture(page, 'AF-21');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tags(page)).toHaveCount(9);
     await expect(board(page).locator('.cell[data-string="7"]')).not.toHaveCount(0);
     await expect(board(page).locator('.marker[data-string="7"]')).toHaveCount(0);
@@ -260,6 +278,7 @@ test.describe('caged US4: fewer frets, fewer shapes', () => {
           .evaluateAll((els) => els.map((e) => e.getAttribute('data-key') ?? ''))
       ).sort();
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(board(page).locator('.marker').first()).toBeAttached();
     const six = await keys();
     expect(six.length).toBeGreaterThan(0);
@@ -301,6 +320,7 @@ const browserSeven = async (page: Page) => {
     globalThis.__fmInstrument = 'AF-21';
   });
   await page.goto('/caged');
+  await expandDetails(page);
   await expect(board(page).locator('.cell[data-string="7"]')).not.toHaveCount(0);
   return (
     await board(page)
@@ -317,6 +337,7 @@ test.describe('caged US5: other tunings', () => {
   test('Q17: Half step down draws C1 A4 G6 E9 D11', async ({ page }) => {
     await withFixture(page, 'AF-2');
     await page.goto('/caged');
+    await expandDetails(page);
     expect((await tags(page).allInnerTexts()).slice(0, 5).map((t) => t.trim()[0])).toEqual([
       'C',
       'A',
@@ -331,6 +352,7 @@ test.describe('caged US5: other tunings', () => {
   test('Q18: AF-4 draws shapes with the altered mark', async ({ page }) => {
     await withFixture(page, 'AF-4');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(board(page).locator('.marker').first()).toBeVisible();
     await expect(tags(page).first()).toBeVisible();
     await expect(board(page).locator('text.string-mark')).toHaveText('altered');
@@ -347,6 +369,7 @@ test.describe('caged US5: other tunings', () => {
       );
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByRole('status').filter({ hasText: unsupported('Open G') })).toBeVisible();
     await expect(board(page).locator('.marker')).toHaveCount(0);
     await expect(board(page).locator('.tag')).toHaveCount(0);
@@ -363,6 +386,7 @@ test.describe('caged US5: other tunings', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 7).click();
     await qualityRadio(page, 'Minor').click();
     let dialog = await openPanel(page);
@@ -387,6 +411,7 @@ test.describe('caged US6: behaves like the other tools', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 7).click();
     await qualityRadio(page, 'Minor').click();
     await expect(page.getByText('G minor', { exact: true })).toBeVisible();
@@ -400,6 +425,7 @@ test.describe('caged US6: behaves like the other tools', () => {
 
   test('Q21: the home card shows Continue, also after a reload', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('fretboard-master:prefs')))
       .toContain('"lastTool":"caged"');
@@ -425,6 +451,7 @@ test.describe('caged US6: behaves like the other tools', () => {
 
   test('Q23: Reset tool returns C major and keeps the instrument', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await key(page, 1).click();
     await qualityRadio(page, 'Minor').click();
     await page.getByRole('button', { name: 'Reset tool' }).click();
@@ -444,6 +471,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
 
   test('axe: C major (AF-1)', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByText('C major', { exact: true })).toBeVisible();
     await settle(page);
   });
@@ -453,6 +481,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
   test('axe: C minor on 12 frets with the fit note', async ({ page }) => {
     await withFixture(page, 'AF-1-12');
     await page.goto('/caged');
+    await expandDetails(page);
     await qualityRadio(page, 'Minor').click();
     await expect(page.getByText('C minor', { exact: true })).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: /shapes fit/ })).toBeVisible();
@@ -462,6 +491,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
   test('axe: Drop D draws shapes with the altered mark', async ({ page }) => {
     await withFixture(page, 'AF-4');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(board(page).locator('text.string-mark')).toHaveText('altered');
     await runAxe(page);
   });
@@ -470,6 +500,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tags(page)).toHaveCount(9);
     const texts = (await tags(page).allInnerTexts()).map((t) => t.trim());
     const markers = await board(page).locator('.marker').count();
@@ -490,6 +521,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
     test(`axe at ${width} px, no horizontal page scroll`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/caged');
+      await expandDetails(page);
       await expect(tags(page)).toHaveCount(9);
       await settle(page);
       const overflow = await page.evaluate(
@@ -503,6 +535,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     // D♭ major shows the Switch button; start from the first key button.
     await key(page, 1).click();
     await expect(page.getByRole('button', { name: /^Switch to/ })).toBeVisible();
@@ -566,6 +599,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
 
   test('200 % text zoom: tags and controls wrap, nothing is truncated', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tags(page)).toHaveCount(9);
     // CSP forbids injected <style>; the CSSOM route is allowed.
     await page.evaluate(() => document.documentElement.style.setProperty('font-size', '200%'));
@@ -607,6 +641,7 @@ test.describe('caged US5 (021): solfège note', () => {
   }) => {
     await seed(page, { notation: 'solfege' });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(note(page)).toBeVisible();
     await expect(
       board(page)
@@ -622,6 +657,7 @@ test.describe('caged US5 (021): solfège note', () => {
 
   test('US5-3: shows on a letters → solfège switch while CAGED is open', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(board(page)).toBeVisible();
     await expect(note(page)).toHaveCount(0);
     await page
@@ -638,6 +674,7 @@ test.describe('caged US5 (021): solfège note', () => {
 
   test('US5-4: absent in letters', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(board(page)).toBeVisible();
     await expect(note(page)).toHaveCount(0);
   });
@@ -645,6 +682,7 @@ test.describe('caged US5 (021): solfège note', () => {
   test('US5-5: after Erase my preferences it may show again', async ({ page }) => {
     await seed(page, { notation: 'solfege' });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(note(page)).toBeVisible();
     await page.goto('/about');
     await page.getByRole('button', { name: 'Erase my preferences' }).click();
@@ -652,6 +690,7 @@ test.describe('caged US5 (021): solfège note', () => {
     await expect(page).toHaveURL('/');
     expect(await stored(page)).not.toContain('cagedNote');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(note(page)).toBeVisible();
   });
 });

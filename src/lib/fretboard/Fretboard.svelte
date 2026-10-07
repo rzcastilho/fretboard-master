@@ -20,6 +20,7 @@
     type Position
   } from '../instrument/instrument';
   import { describeView, positionName } from './description';
+  import Minimap, { type MinimapDot } from './Minimap.svelte';
   import ViewAids from './ViewAids.svelte';
   import { legendGroups } from './legend';
   import {
@@ -46,6 +47,7 @@
   import { layoutTags } from './tags';
   import { applyPulses } from './pulse';
   import { readMetrics } from './metrics';
+  import { reducePinch, type PinchState } from './pinch';
   import { animateScroll, browserClock } from './scroll-animation';
   import { tokenDuration } from './motion';
   import type {
@@ -59,6 +61,10 @@
   /** Vertical gap (px) between a marked string's label and its text mark. */
   const STRING_MARK_OFFSET = 9;
   const NO_MARKERS = { markers: [], labelMode: 'none' } as const;
+  /** Whole mode: marker labels are omitted below this glyph scale (shape still carries function). */
+  const LABEL_MIN_SCALE = 0.75;
+  /** `--target-min`: a column narrower than this is too small to tap reliably in whole mode. */
+  const TARGET_MIN_PX = 44;
 
   let {
     instrument,
@@ -66,7 +72,10 @@
     variant = 'interactive',
     onactivate,
     pulses = [],
-    ontag
+    ontag,
+    fit = 'comfortable',
+    onfit,
+    takeAnchor
   }: FretboardProps = $props();
 
   const thumb = $derived(variant === 'thumbnail');
@@ -156,10 +165,41 @@
         )
   );
   const markByString = $derived(new Map(stringMarks.map((mk) => [mk.string, mk.label])));
+  /** A boolean, so a marker-only model change does not re-derive the layout. */
+  const hasStringMarks = $derived(stringMarks.length > 0);
   const layout = $derived(
-    layoutFretboard(instrument, metrics, containerWidth, variant, stringMarks.length > 0)
+    layoutFretboard(instrument, metrics, containerWidth, variant, hasStringMarks, fit)
   );
   const lastFret = $derived(layout.columns.length - 1);
+
+  /**
+   * Fit availability (025): the interactive neck overflows its container at comfortable size.
+   * Reported once measured and on every change; never by thumbnail/preview.
+   */
+  const overflows = $derived(containerWidth > 0 && layout.naturalWidth > containerWidth);
+  let lastOverflow: boolean | undefined;
+  $effect(() => {
+    const value = overflows;
+    if (!mounted || compact || containerWidth === 0) return;
+    if (value === lastOverflow) return;
+    lastOverflow = value;
+    untrack(() => onfit?.({ kind: 'overflow', value }));
+  });
+
+  /** Highlighted valid positions in layout space for the minimap. */
+  const minimapDots = $derived.by((): MinimapDot[] => {
+    if (compact || !layout.scrolls) return [];
+    const rowIndex = new Map(layout.rows.map((r, i) => [r.string, i]));
+    const dots: MinimapDot[] = [];
+    for (const mk of model.markers) {
+      if (mk.emphasis !== 'highlighted' || !isValidPosition(instrument, mk)) continue;
+      const row = rowIndex.get(mk.string);
+      const col = layout.columns[mk.fret];
+      if (row === undefined || !col) continue;
+      dots.push({ x: col.center, row });
+    }
+    return dots;
+  });
 
   const singleInlays = $derived(
     INLAY_FRETS.filter((f) => f <= lastFret).map((f) => layout.columns[f].center)
@@ -254,17 +294,57 @@
     untrack(() => {
       const prev = anchored;
       anchored = current;
-      const viewport = el.clientWidth;
+      // Pure checks first: reading `clientWidth` forces a synchronous reflow.
       if (prev === null) {
-        if (current.mirrored) el.scrollLeft = scrollForNutOffset(current, 0, viewport);
+        if (current.mirrored) el.scrollLeft = scrollForNutOffset(current, 0, el.clientWidth);
         return;
       }
       if (prev.width === current.width && prev.mirrored === current.mirrored) return;
       if (!prev.mirrored && !current.mirrored) return; // right-handed keeps the browser's own scroll
       if (holdWidth !== null) return;
+      const viewport = el.clientWidth;
       const offset = nutOffset(prev, scrollBefore, viewport);
       stopAutoScroll();
       el.scrollLeft = scrollForNutOffset(current, offset, viewport);
+    });
+  });
+
+  /**
+   * Scroll anchor on a fit switch (FR-013): after whole ↔ comfortable keep the highlighted (or
+   * CAGED-focus) groups visible, else the nut offset the layout already preserved. An accepted
+   * small-fret notice centres the tapped position instead (clamped). Instant, no animation.
+   */
+  let lastFit = untrack(() => fit);
+  $effect(() => {
+    const mode = fit;
+    const current = layout;
+    const el = scroller;
+    if (!el || compact || containerWidth === 0 || mode === lastFit) return;
+    lastFit = mode;
+    untrack(() => {
+      const width = el.clientWidth;
+      const maxScroll = Math.max(0, current.width - width);
+      const accepted = mode === 'comfortable' ? (takeAnchor?.() ?? null) : null;
+      let target: number | null;
+      if (accepted && isValidPosition(instrument, accepted)) {
+        target = Math.min(
+          Math.max(current.columns[accepted.fret].center - width / 2, 0),
+          maxScroll
+        );
+      } else if (model.autoScroll) {
+        const groups = model.autoScroll.groups.map((g) =>
+          g.filter((p) => isValidPosition(instrument, p))
+        );
+        target = groupScrollTarget(current, groups, { scrollLeft: el.scrollLeft, width });
+      } else {
+        const positions = model.markers.filter(
+          (mk) => mk.emphasis === 'highlighted' && isValidPosition(instrument, mk)
+        );
+        target = autoScrollTarget(current, positions, { scrollLeft: el.scrollLeft, width });
+      }
+      if (target === null) return;
+      stopAutoScroll();
+      el.scrollLeft = target;
     });
   });
 
@@ -285,26 +365,38 @@
     if (!scroller || thumb) return;
     if (key === lastHighlightKey) return;
     lastHighlightKey = key;
+    let frame = 0;
     untrack(() => {
-      if (!scroller || key === '') return;
-      const viewport = { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth };
-      let target: number | null;
-      if (model.autoScroll) {
-        const groups = model.autoScroll.groups.map((g) =>
-          g.filter((p) => isValidPosition(instrument, p))
-        );
-        target = groupScrollTarget(layout, groups, viewport);
-      } else {
-        const positions = key.split(',').map((k) => {
-          const [string, fret] = k.split(':').map(Number);
-          return { string, fret };
-        });
-        target = autoScrollTarget(layout, positions, viewport);
-      }
-      if (target === null) return;
-      stopAutoScroll();
-      cancelScroll = animateScroll(scroller, target, scrollDuration(), browserClock);
+      // A board that fits has nothing to scroll.
+      const el = scroller;
+      if (!el || key === '' || !layout.scrolls) return;
+      const run = () => {
+        const viewport = { scrollLeft: el.scrollLeft, width: el.clientWidth };
+        let target: number | null;
+        if (model.autoScroll) {
+          const groups = model.autoScroll.groups.map((g) =>
+            g.filter((p) => isValidPosition(instrument, p))
+          );
+          target = groupScrollTarget(layout, groups, viewport);
+        } else {
+          const positions = key.split(',').map((k) => {
+            const [string, fret] = k.split(':').map(Number);
+            return { string, fret };
+          });
+          target = autoScrollTarget(layout, positions, viewport);
+        }
+        if (target === null) return;
+        stopAutoScroll();
+        cancelScroll = animateScroll(el, target, duration, browserClock);
+      };
+      const duration = scrollDuration();
+      if (duration <= 0) return run();
+      // Animated: measure in the next frame, still before it paints. Reading the scroll
+      // geometry here would force a synchronous reflow of the board just patched, inside the
+      // control → board budget (≤ 100 ms).
+      frame = requestAnimationFrame(run);
     });
+    return () => cancelAnimationFrame(frame);
   });
 
   // Shape tags (Full neck): measured widths feed the pure layout; absent tags reserve nothing.
@@ -496,7 +588,7 @@
         mk,
         x: layout.columns[mk.fret].center,
         y: rowOf(layout, mk.string).center,
-        label: labelFit(mk),
+        label: layout.markerScale < LABEL_MIN_SCALE ? null : labelFit(mk),
         tone: mk.emphasis === 'highlighted' ? mk.tone : undefined,
         badge:
           mk.octaveBadge === true && model.labelMode === 'note'
@@ -504,6 +596,34 @@
             : null
       }))
   );
+
+  const narrowestColumn = $derived(
+    layout.columns.reduce((min, c) => Math.min(min, c.end - c.start), Infinity)
+  );
+
+  /**
+   * Two-finger pinch (025 R-06): passive touch listeners feed the pure reducer; a completed pinch
+   * requests a mode (in → whole, out → comfortable). One finger never emits; scrolling is native.
+   */
+  $effect(() => {
+    const el = scroller;
+    if (!el || compact) return;
+    let state: PinchState = { kind: 'idle' };
+    const onTouches = (e: TouchEvent) => {
+      const points = Array.from(e.touches, (t) => ({ x: t.clientX, y: t.clientY }));
+      const r = reducePinch(state, { type: 'touches', points });
+      state = r.state;
+      if (r.effect.kind === 'pinch') {
+        onfit?.({ kind: 'request', mode: r.effect.direction === 'in' ? 'whole' : 'comfortable' });
+      }
+    };
+    const opts = { passive: true } as const;
+    const types = ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const;
+    for (const t of types) el.addEventListener(t, onTouches, opts);
+    return () => {
+      for (const t of types) el.removeEventListener(t, onTouches);
+    };
+  });
 
   let gesture: GestureState = { kind: 'idle' };
   let activePointers = 0;
@@ -526,7 +646,11 @@
       svgEl
         ?.querySelector<SVGElement>(`.cell[data-string="${p.string}"][data-fret="${p.fret}"]`)
         ?.focus();
-      onactivate?.({ string: p.string, fret: p.fret });
+      const position = { string: p.string, fret: p.fret };
+      onactivate?.(position);
+      if (fit === 'whole' && narrowestColumn < TARGET_MIN_PX) {
+        onfit?.({ kind: 'small-tap', position });
+      }
     }
   }
 
@@ -850,7 +974,7 @@
             >
           {/each}
         </g>
-        <g aria-hidden="true" class="markers">
+        <g aria-hidden="true" class="markers" data-marker-scale={layout.markerScale}>
           {#each drawn as d (d.mk.pulse?.id ?? d.mk.id ?? d.key)}
             <g
               class="marker {d.mk.function} {d.mk.emphasis}{d.tone ? ` tone-${d.tone}` : ''}"
@@ -867,49 +991,58 @@
               out:markerOut={d.mk.variant === 'comparison'}
             >
               <g class="shape">
-                {#if d.mk.function === 'root'}
-                  <rect
-                    class="glyph"
-                    x={-metrics.markerRoot / 2}
-                    y={-metrics.markerRoot / 2}
-                    width={metrics.markerRoot}
-                    height={metrics.markerRoot}
-                    rx={metrics.markerRoot / 5}
-                  />
-                {:else if d.mk.function === 'fifth'}
-                  <polygon class="glyph" points={diamond(metrics.markerMedium / 2 + 2)} />
-                {:else if d.mk.function === 'degree'}
-                  <circle class="glyph outline" r={metrics.markerSmall / 2} />
-                {:else if d.mk.function === 'neutral'}
-                  <circle class="glyph ring" r={metrics.markerMedium / 2} />
-                {:else}
-                  <circle class="glyph" r={metrics.markerMedium / 2} />
-                {/if}
-                {#if d.mk.extra && d.mk.function === 'degree'}
-                  <circle class="extra-dot" aria-hidden="true" cy={metrics.markerSmall / 2 + 3} />
-                {/if}
-                {#if d.mk.ring}
-                  <circle class="connection-ring" aria-hidden="true" style:--ring-base={ringBase} />
-                {/if}
-                {#if d.label}
-                  <text
-                    class="marker-label"
-                    class:normal={d.label.size === 'normal'}
-                    class:min={d.label.size === 'min'}
-                    aria-hidden="true"
-                    >{#if d.label.lines.length === 2}<tspan x="0" dy="-0.55em"
-                        >{d.label.lines[0]}</tspan
-                      ><tspan x="0" dy="1.1em">{d.label.lines[1]}</tspan>{:else}{d.label
-                        .lines[0]}{/if}</text
-                  >
-                {/if}
-                {#if d.badge}
-                  <text
-                    class="octave-badge"
-                    x={metrics.markerMedium / 2}
-                    y={-metrics.markerMedium / 2}>{d.badge}</text
-                  >
-                {/if}
+                <g
+                  class="glyph-scale"
+                  transform={layout.markerScale < 1 ? `scale(${layout.markerScale})` : undefined}
+                >
+                  {#if d.mk.function === 'root'}
+                    <rect
+                      class="glyph"
+                      x={-metrics.markerRoot / 2}
+                      y={-metrics.markerRoot / 2}
+                      width={metrics.markerRoot}
+                      height={metrics.markerRoot}
+                      rx={metrics.markerRoot / 5}
+                    />
+                  {:else if d.mk.function === 'fifth'}
+                    <polygon class="glyph" points={diamond(metrics.markerMedium / 2 + 2)} />
+                  {:else if d.mk.function === 'degree'}
+                    <circle class="glyph outline" r={metrics.markerSmall / 2} />
+                  {:else if d.mk.function === 'neutral'}
+                    <circle class="glyph ring" r={metrics.markerMedium / 2} />
+                  {:else}
+                    <circle class="glyph" r={metrics.markerMedium / 2} />
+                  {/if}
+                  {#if d.mk.extra && d.mk.function === 'degree'}
+                    <circle class="extra-dot" aria-hidden="true" cy={metrics.markerSmall / 2 + 3} />
+                  {/if}
+                  {#if d.mk.ring}
+                    <circle
+                      class="connection-ring"
+                      aria-hidden="true"
+                      style:--ring-base={ringBase}
+                    />
+                  {/if}
+                  {#if d.label}
+                    <text
+                      class="marker-label"
+                      class:normal={d.label.size === 'normal'}
+                      class:min={d.label.size === 'min'}
+                      aria-hidden="true"
+                      >{#if d.label.lines.length === 2}<tspan x="0" dy="-0.55em"
+                          >{d.label.lines[0]}</tspan
+                        ><tspan x="0" dy="1.1em">{d.label.lines[1]}</tspan>{:else}{d.label
+                          .lines[0]}{/if}</text
+                    >
+                  {/if}
+                  {#if d.badge}
+                    <text
+                      class="octave-badge"
+                      x={metrics.markerMedium / 2}
+                      y={-metrics.markerMedium / 2}>{d.badge}</text
+                    >
+                  {/if}
+                </g>
               </g>
             </g>
           {/each}
@@ -988,6 +1121,9 @@
         <div class="hold" aria-hidden="true" style:inline-size={`${holdWidth}px`}></div>
       {/if}
     </div>
+    {#if layout.scrolls}
+      <Minimap {layout} {scroller} dots={minimapDots} />
+    {/if}
     <ViewAids {description} legend={legendGroups(model)} />
   </div>
 {/if}
@@ -1001,7 +1137,7 @@
   .scroller {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    touch-action: auto;
+    touch-action: pan-x pan-y;
   }
 
   .tags {

@@ -4,6 +4,7 @@
  * Other `ShapeView` kinds and the composition extras are filled by later stories.
  */
 import { m } from '$lib/paraglide/messages.js';
+import { joinNotes, joinSummary } from './context-summary';
 import { describeEntries, spokenList } from '../fretboard/description';
 import type { DisplayModel, FretboardArrow, FretboardTag, Marker } from '../fretboard/types';
 import {
@@ -156,6 +157,8 @@ export type ShapeView =
   | { readonly kind: 'does-not-close' };
 
 export interface TriadsDisplay extends DisplayBody {
+  /** One-line context summary: chord · inversion · notes (FR-016). */
+  readonly summary: string;
   readonly compare: CompareDisplay;
   /** Guidance shown outside All notes: offer the See all notes recovery action (C8). */
   readonly seeAllNotes: boolean;
@@ -617,6 +620,17 @@ function allNotes(
   };
 }
 
+/** `{chord} · {inversion} · {n1} – {n2} – {n3}`; no inversion part in All notes. */
+function triadsSummary(c: Composition): string {
+  const { root, quality, inversion } = c.name;
+  const ordered = c.lowToHigh ?? c.notes;
+  return joinSummary([
+    m.caged_key_name({ root: noteLabel(root), quality: qualityName(quality) }),
+    inversion === null ? '' : inversionName(inversion),
+    joinNotes(ordered.map((n) => noteLabel(n.spelling)))
+  ]);
+}
+
 export function buildTriadsModel(s: TriadsViewState, instrument: Instrument): TriadsDisplay {
   const d = buildDisplay(s, instrument);
   const guidance = d.shape.kind === 'beyond' || d.shape.kind === 'does-not-close';
@@ -628,6 +642,7 @@ export function buildTriadsModel(s: TriadsViewState, instrument: Instrument): Tr
   };
   return {
     ...d,
+    summary: triadsSummary(d.composition),
     compare,
     seeAllNotes: guidance && s.view !== 'all-notes',
     listenComparison: buildListenComparison(s, d, instrument),

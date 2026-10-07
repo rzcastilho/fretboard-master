@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { expectNoHorizontalScroll, runAxe, setTextScale } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe, setTextScale } from './support/helpers';
 
 type ShareCall = { url: string; title: string };
 type ShareGlobals = { __shareCalls: ShareCall[]; __copied: string[] };
@@ -77,6 +77,7 @@ const E_TAG = /^Em shape · roots on strings 6, 4, 1$/;
 /** CAGED, A minor, E shape focused, Chord + Pentatonic. */
 async function setUpCagedAMinorE(page: Page): Promise<void> {
   await page.goto('/caged');
+  await expandDetails(page);
   await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(9).click();
   await page.getByRole('radio', { name: 'Minor', exact: true }).click();
   await page
@@ -126,6 +127,7 @@ test.describe('share US1-2: desktop copies the link', () => {
   test('the notice can be dismissed', async ({ page }) => {
     await stubPlatform(page, { coarse: false, share: 'none' });
     await page.goto('/caged');
+    await expandDetails(page);
     await shareButton(page).click();
     await expect(statusRegion(page, 'Link copied')).toBeVisible();
     await page.getByRole('button', { name: 'Dismiss' }).click();
@@ -251,6 +253,7 @@ test.describe('share edge: double tap', () => {
   test('two rapid clicks reach a slow share sheet once', async ({ page }) => {
     await stubPlatform(page, { coarse: true, share: 'slow' });
     await page.goto('/triads');
+    await expandDetails(page);
     const button = shareButton(page);
     await button.click();
     await expect(button).toHaveAttribute('aria-busy', 'true');
@@ -305,6 +308,7 @@ test.describe('share US2: manual-copy fallback', () => {
     await stubPlatform(page, { coarse: false, share: 'none' });
     await breakClipboard(page, 'none');
     await page.goto('/triads');
+    await expandDetails(page);
     await shareButton(page).click();
     await expect(fallbackField(page)).toBeFocused();
     await page.keyboard.press('Escape');
@@ -316,6 +320,7 @@ test.describe('share US2: manual-copy fallback', () => {
     await stubPlatform(page, { coarse: false, share: 'none' });
     await breakClipboard(page, 'reject');
     await page.goto('/triads');
+    await expandDetails(page);
     await shareButton(page).click();
     await expect(fallbackField(page)).toBeVisible();
     await page.keyboard.press('Tab');
@@ -329,6 +334,7 @@ test.describe('share US2: manual-copy fallback', () => {
     await stubPlatform(page, { coarse: false, share: 'none' });
     await breakClipboard(page, 'none');
     await page.goto('/caged');
+    await expandDetails(page);
     await shareButton(page).click();
     await expect(fallbackField(page)).toBeVisible();
     await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(2).click();
@@ -339,6 +345,7 @@ test.describe('share US2: manual-copy fallback', () => {
     await stubPlatform(page, { coarse: false, share: 'none' });
     await breakClipboard(page, 'none');
     await page.goto('/caged');
+    await expandDetails(page);
     await shareButton(page).click();
     await expect(fallbackField(page)).toBeVisible();
     await page.getByRole('navigation').getByRole('link', { name: 'Triads' }).first().click();
@@ -355,6 +362,7 @@ test.describe('share US2: manual-copy fallback', () => {
     await stubPlatform(page, { coarse: false, share: 'none' });
     await breakClipboard(page, 'none');
     await page.goto('/caged');
+    await expandDetails(page);
     await shareButton(page).click();
     await expect(fallbackField(page)).toBeVisible();
     await runAxe(page);
@@ -365,6 +373,7 @@ test.describe('share US2: manual-copy fallback', () => {
       await stubPlatform(page, { coarse: false, share: 'none' });
       await breakClipboard(page, 'none');
       await page.goto('/caged');
+      await expandDetails(page);
       await page.getByRole('button', { name: 'Language', exact: true }).click();
       await page
         .locator('div[role="region"][id^="language-panel-"]')
@@ -416,6 +425,7 @@ test.describe('share polish: fallback reflow (Principle VII)', () => {
     await stubPlatform(page, { coarse: false, share: 'none' });
     await breakClipboard(page, 'none');
     await page.goto('/caged');
+    await expandDetails(page);
     await shareButton(page).click();
     await expect(fallbackField(page)).toBeVisible();
   }

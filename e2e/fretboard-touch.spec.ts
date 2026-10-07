@@ -119,3 +119,45 @@ test('scrolling under 4× CPU throttle has no long animation frame over 50 ms (S
   expect(Math.max(0, ...loafs)).toBeLessThanOrEqual(50);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 });
+
+/** Two-finger pinch from the scroller's centre: fingers start `from` px apart and end `to` apart. */
+async function pinch(page: Page, from: number, to: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const box = await page.locator('.fretboard .scroller').boundingBox();
+  if (!box) throw new Error('no scroller box');
+  const cx = Math.round(box.x + box.width / 2);
+  const y = Math.round(box.y + box.height / 2);
+  const at = (gap: number) => [
+    { x: cx - gap / 2, y, id: 1 },
+    { x: cx + gap / 2, y, id: 2 }
+  ];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(from) });
+  const steps = 8;
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: at(from + ((to - from) * i) / steps)
+    });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+
+test('pinch toggles fit (US2)', async ({ page }) => {
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'fretboard-master:prefs',
+      JSON.stringify({ version: 1, tuning: 'AF-21', strings: 7, frets: 24 })
+    );
+  });
+  await page.reload();
+  await expect(page.getByRole('grid', { name: 'Fretboard' })).toBeVisible();
+  const toggle = page.getByRole('button', { name: 'Fit to screen' });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await pinch(page, 200, 80);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await pinch(page, 80, 200);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  // One-finger scroll never toggles.
+  await swipe(page, -120, 0);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+});

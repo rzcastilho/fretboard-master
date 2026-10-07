@@ -4,7 +4,9 @@
   import { CAGED_QUALITIES, type CagedViewState } from '$lib/state/caged-view';
   import type { CagedDisplay } from '$lib/state/caged-model';
   import ChoiceGroup from '../ChoiceGroup.svelte';
+  import type { Snippet } from 'svelte';
   import NoteSelector from '../NoteSelector.svelte';
+  import { overflow } from '../overflow';
 
   interface Props {
     state: CagedViewState;
@@ -13,9 +15,11 @@
     onroot: (pc: CagedViewState['rootPc']) => void;
     onquality: (q: CagedViewState['quality']) => void;
     onswitch: () => void;
+    /** Further controls for the second row (the shape choice). */
+    more?: Snippet;
   }
 
-  let { state: view, switchTo, onroot, onquality, onswitch }: Props = $props();
+  let { state: view, switchTo, onroot, onquality, onswitch, more }: Props = $props();
 
   const qualities = CAGED_QUALITIES.map((value) => ({
     value,
@@ -24,18 +28,26 @@
 </script>
 
 <div class="controls">
-  <NoteSelector selected={[view.rootPc]} ontoggle={onroot} label={m.caged_group_key()} />
-  <ChoiceGroup
-    name={m.caged_group_quality()}
-    options={qualities}
-    current={view.quality}
-    onchoose={onquality}
+  <NoteSelector
+    selected={[view.rootPc]}
+    ontoggle={onroot}
+    label={m.caged_group_key()}
+    layout="single"
   />
-  {#if switchTo}
-    <button type="button" class="switch" onclick={onswitch}>
-      {m.caged_switch_spelling({ root: noteLabel(switchTo) })}
-    </button>
-  {/if}
+  <div class="controls-row" use:overflow>
+    <ChoiceGroup
+      name={m.caged_group_quality()}
+      options={qualities}
+      current={view.quality}
+      onchoose={onquality}
+    />
+    {#if switchTo}
+      <button type="button" class="switch" onclick={onswitch}>
+        {m.caged_switch_spelling({ root: noteLabel(switchTo) })}
+      </button>
+    {/if}
+    {@render more?.()}
+  </div>
 </div>
 
 <style>
@@ -46,7 +58,6 @@
   }
 
   .switch {
-    align-self: start;
     min-block-size: var(--target-min);
     padding: var(--space-1) var(--space-3);
     font: inherit;

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { expandDetails, runAxe } from './support/helpers';
 
 const PREFS_KEY = 'fretboard-master:prefs';
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
@@ -43,6 +43,7 @@ test.describe('caged focus US1: focus on one shape', () => {
   }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(markers(page, 'normal').first()).toBeVisible();
     await expect(board(page).locator('.region-band')).toHaveCount(0);
 
@@ -64,6 +65,7 @@ test.describe('caged focus US1: focus on one shape', () => {
 
   test('leave focus via a second tap and via See all', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await tag(page, E_TAG).click();
     await expect(markers(page, 'dimmed').first()).toBeAttached();
     await tag(page, E_TAG).click();
@@ -81,6 +83,7 @@ test.describe('caged focus US1: focus on one shape', () => {
 
   test('selector G equals tapping the G tag', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await radio(page, 'G').click();
     await expect(radio(page, 'G')).toHaveAttribute('aria-checked', 'true');
     const viaSelector = await markers(page, 'highlighted').count();
@@ -100,6 +103,7 @@ test.describe('caged focus US1: focus on one shape', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const cTags = board(page).getByRole('button', { name: /^C shape/ });
     await expect(cTags).toHaveCount(2);
     await cTags.nth(1).click();
@@ -117,6 +121,7 @@ test.describe('caged focus US1: focus on one shape', () => {
   test('a 12-fret instrument disables D', async ({ page }) => {
     await withFixture(page, 'AF-1-12');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(radio(page, 'D')).toHaveAttribute('aria-disabled', 'true');
     await radio(page, 'D').click({ force: true });
     await expect(radio(page, 'See all')).toHaveAttribute('aria-checked', 'true');
@@ -127,6 +132,7 @@ test.describe('caged focus US1: focus on one shape', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await tag(page, E_TAG).click();
     await page.clock.runFor(32);
     expect(await bandIsCentred(page)).toBe(true);
@@ -136,6 +142,7 @@ test.describe('caged focus US1: focus on one shape', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect
       .poll(() => page.evaluate((k) => localStorage.getItem(k), PREFS_KEY))
       .not.toBeNull();
@@ -152,12 +159,14 @@ test.describe('caged focus US1: focus on one shape', () => {
     expect(await page.evaluate((k) => localStorage.getItem(k), PREFS_KEY)).toBe(before);
 
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'false');
     await expect(radio(page, 'See all')).toHaveAttribute('aria-checked', 'true');
   });
 
   test('axe: zero violations with focus on', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await runAxe(page);
     await radio(page, 'E').click();
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'true');
@@ -166,6 +175,7 @@ test.describe('caged focus US1: focus on one shape', () => {
 
   test('keyboard-only: tags and selector', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await radio(page, 'See all').focus();
     await page.keyboard.press('ArrowLeft'); // wraps to D, the last letter
     await expect(radio(page, 'D')).toHaveAttribute('aria-checked', 'true');
@@ -198,6 +208,7 @@ test.describe('caged focus US2: step to the neighbor shape', () => {
   }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await tag(page, E_TAG).click();
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'true');
 
@@ -218,6 +229,7 @@ test.describe('caged focus US2: step to the neighbor shape', () => {
   }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await tag(page, E_TAG).click();
     await freeze(page);
     await stepBtn(page, 'Previous shape').click();
@@ -230,6 +242,7 @@ test.describe('caged focus US2: step to the neighbor shape', () => {
 
   test('ends are disabled: none → both, first → Previous, last → Next', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const disabled = (n: 'Previous shape' | 'Next shape') =>
       stepBtn(page, n).getAttribute('aria-disabled');
     expect(await disabled('Previous shape')).toBe('true');
@@ -248,6 +261,7 @@ test.describe('caged focus US2: step to the neighbor shape', () => {
   test('two presses within 500 ms ring only the second pair', async ({ page }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await tag(page, E_TAG).click();
     await freeze(page);
     await stepBtn(page, 'Next shape').click(); // E → D: s4f10
@@ -266,6 +280,7 @@ test.describe('caged focus US2: step to the neighbor shape', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await tag(page, E_TAG).click();
     await freeze(page);
     await stepBtn(page, 'Next shape').click();
@@ -279,6 +294,7 @@ test.describe('caged focus US2: step to the neighbor shape', () => {
   test('axe: zero violations with the ring showing', async ({ page }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await tag(page, E_TAG).click();
     await freeze(page);
     await stepBtn(page, 'Next shape').click();
@@ -289,6 +305,7 @@ test.describe('caged focus US2: step to the neighbor shape', () => {
 
   test('keyboard-only: both buttons operate with Enter and Space', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await radio(page, 'E').click();
     await stepBtn(page, 'Next shape').focus();
     await page.keyboard.press('Enter');
@@ -321,6 +338,7 @@ const TM_7_2 = [
 test.describe('caged focus US3: show connections', () => {
   test('C major: rings exactly the TM-6.3 anchors', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(connSwitch(page)).toHaveAttribute('aria-checked', 'false');
     await expect(rings(page)).toHaveCount(0);
     await connSwitch(page).click();
@@ -330,6 +348,7 @@ test.describe('caged focus US3: show connections', () => {
 
   test('C minor: rings exactly TM-7.2 (Gm→Em includes s2f8)', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'Minor', exact: true }).click();
     await connSwitch(page).click();
     const keys = await ringKeys(page);
@@ -339,6 +358,7 @@ test.describe('caged focus US3: show connections', () => {
 
   test('off and no step shows no ring', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(rings(page)).toHaveCount(0);
     await connSwitch(page).click();
     await connSwitch(page).click();
@@ -347,6 +367,7 @@ test.describe('caged focus US3: show connections', () => {
 
   test('connections on plus focus keeps every ring', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await connSwitch(page).click();
     await tag(page, E_TAG).click();
     expect(await ringKeys(page)).toEqual(sorted(TM_6_3));
@@ -356,6 +377,7 @@ test.describe('caged focus US3: show connections', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect
       .poll(() => page.evaluate((k) => localStorage.getItem(k), PREFS_KEY))
       .not.toBeNull();
@@ -370,12 +392,14 @@ test.describe('caged focus US3: show connections', () => {
     await expect(tag(page, E_TAG)).toHaveAttribute('aria-pressed', 'true');
     expect(await page.evaluate((k) => localStorage.getItem(k), PREFS_KEY)).toBe(before);
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(connSwitch(page)).toHaveAttribute('aria-checked', 'false');
     await expect(rings(page)).toHaveCount(0);
   });
 
   test('Reset tool turns the switch off', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await connSwitch(page).click();
     await page.getByRole('button', { name: 'Reset tool' }).click();
     await expect(connSwitch(page)).toHaveAttribute('aria-checked', 'false');
@@ -384,6 +408,7 @@ test.describe('caged focus US3: show connections', () => {
 
   test('axe: zero violations with connections on', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await connSwitch(page).click();
     await expect(rings(page).first()).toBeAttached();
     await runAxe(page);
@@ -391,6 +416,7 @@ test.describe('caged focus US3: show connections', () => {
 
   test('keyboard-only: switch operates with Enter and Space', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await connSwitch(page).focus();
     await page.keyboard.press('Enter');
     await expect(connSwitch(page)).toHaveAttribute('aria-checked', 'true');
@@ -400,6 +426,7 @@ test.describe('caged focus US3: show connections', () => {
 
   test('F♯ minor: rings are the C-minor pattern shifted by 6 frets mod 12', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'Minor', exact: true }).click();
     await keyBtn(page, 6).click();
     await connSwitch(page).click();
@@ -430,6 +457,7 @@ test.describe('caged rotate hint US4', () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(hint(page)).toBeVisible();
     await runAxe(page);
     await expect.poll(() => stored(page)).toContain('"rotateHint":true');
@@ -442,6 +470,7 @@ test.describe('caged rotate hint US4', () => {
   test('hides on rotation to landscape', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(hint(page)).toBeVisible();
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(hint(page)).toHaveCount(0);
@@ -450,6 +479,7 @@ test.describe('caged rotate hint US4', () => {
   test('desktop: none shown and nothing recorded', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(board(page)).toBeVisible();
     await expect(hint(page)).toHaveCount(0);
     expect(((await stored(page)) ?? '').includes('rotateHint')).toBe(false);
@@ -465,6 +495,7 @@ test.describe('caged rotate hint US4', () => {
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(hint(page)).toHaveCount(1);
     await page.getByRole('link', { name: 'Home' }).first().click();
     await expect(page).toHaveURL('/');
@@ -477,17 +508,20 @@ test.describe('caged rotate hint US4', () => {
   test('Erase my preferences clears the record so it may show again', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(hint(page)).toBeVisible();
     await expect.poll(() => stored(page)).toContain('rotateHint');
     await erase(page);
     expect(((await stored(page)) ?? '').includes('rotateHint')).toBe(false);
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(hint(page)).toBeVisible();
   });
 
   test('Reset tool keeps the record', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(hint(page)).toBeVisible();
     await page.getByRole('button', { name: 'Reset tool' }).click();
     expect(await stored(page)).toContain('"rotateHint":true');
@@ -497,6 +531,7 @@ test.describe('caged rotate hint US4', () => {
 test.describe('caged focus polish: targets, focus ring, axe', () => {
   test('controls are at least 44×44 px with a visible focus ring', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await radio(page, 'E').click();
     const controls = [
       tag(page, E_TAG),
@@ -523,6 +558,7 @@ test.describe('caged focus polish: targets, focus ring, axe', () => {
 
   test('axe: zero violations with focus and connections both on', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await radio(page, 'E').click();
     await connSwitch(page).click();
     await stepBtn(page, 'Next shape').click();

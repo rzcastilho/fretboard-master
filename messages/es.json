@@ -427,5 +427,22 @@
   "triads_desc_inversion_root": "posición fundamental",
   "triads_desc_inversion_first": "primera inversión",
   "triads_desc_inversion_second": "segunda inversión",
-  "notes_desc_empty": "No hay notas seleccionadas. Elige una nota en el selector de notas."
+  "notes_desc_empty": "No hay notas seleccionadas. Elige una nota en el selector de notas.",
+  "fit_to_screen": "Ajustar a la pantalla",
+  "minimap_label": "Vista general del diapasón",
+  "minimap_value": "Trastes {first} a {last} de {count}",
+  "fit_small_notice": "Estos trastes son pequeños. ¿Cambiar al tamaño cómodo?",
+  "fit_use_comfortable": "Usar tamaño cómodo",
+  "panels_open": "Paneles",
+  "panels_close": "Cerrar paneles",
+  "panels_region": "Acciones y detalles",
+  "context_show": "Mostrar detalles",
+  "context_hide": "Ocultar detalles",
+  "summary_separator": " · ",
+  "summary_note_separator": " – ",
+  "summary_all_shapes": "todas las formas",
+  "summary_shape": "forma {shape}",
+  "summary_positions_one": "{count} posición",
+  "summary_positions_other": "{count} posiciones",
+  "summary_no_notes": "Ninguna nota seleccionada"
 }

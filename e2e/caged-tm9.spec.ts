@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { expandDetails } from './support/helpers';
 /**
  * TM-9 screenshot view 15 (CAGED, C major, standard tuning) and the CAGED part of view 22
  * (left-handed). Specs: specs/014-caged-shapes/quickstart.md Q26.
@@ -9,6 +10,7 @@ const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
 
 async function open(page: Page) {
   await page.goto('/caged');
+  await expandDetails(page);
   await board(page).waitFor();
   await expect(page.getByText('C major', { exact: true })).toBeVisible();
   await expect(board(page).locator('.marker').first()).toBeVisible();
@@ -44,6 +46,7 @@ test.describe('TM-9 CAGED views', () => {
       );
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     await expect(
       page.getByRole('status').filter({ hasText: "shapes don't exist in Open G" })
@@ -59,6 +62,7 @@ test.describe('TM-9 CAGED views', () => {
       );
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(2).click();
     await expect(page.getByText('D major', { exact: true })).toBeVisible();
@@ -90,6 +94,7 @@ test.describe('TM-9 CAGED layers (017)', () => {
       );
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(2).click();
     await expect(page.getByText('D major', { exact: true })).toBeVisible();
@@ -111,6 +116,7 @@ test.describe('TM-9 CAGED layers (017)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(9).click();
     await page
@@ -135,6 +141,7 @@ test.describe('TM-9 CAGED layers (017)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(7).click();
     await expect(page.getByText('G major', { exact: true })).toBeVisible();
@@ -162,6 +169,7 @@ test.describe('TM-9 CAGED triad layer (018)', () => {
       );
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     await page.getByRole('group', { name: 'Key' }).getByRole('button').nth(4).click();
     await expect(page.getByText('E major', { exact: true })).toBeVisible();

@@ -19,6 +19,7 @@
   import { currentLink, share } from '$lib/state/share.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { opening } from '$lib/state/opening.svelte';
+  import { startViewport, viewport } from '$lib/state/viewport.svelte';
   import { linkNoticeMessage } from './link-notice';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
@@ -27,6 +28,8 @@
   import { TOOLS, type ToolId } from './tools';
 
   let { tool }: { tool: ToolId } = $props();
+
+  const landscape = $derived(viewport.arrangement === 'landscape');
 
   const name = $derived(TOOLS.find((t) => t.id === tool)?.name() ?? '');
 
@@ -47,6 +50,10 @@
   // FR-014: the address bar follows the view. Opening the screen replaces it with the canonical
   // link; later changes are debounced. Only the store is read here, never `url.searchParams`.
   onMount(() => openToolAddress(tool));
+
+  // 025: track the window so `data-arrangement` follows it. Absent at prerender (media-query
+  // fallback in tokens.css), written once mounted.
+  onMount(() => startViewport());
   $effect(() => {
     scheduleAddress(currentLink(tool));
   });
@@ -59,7 +66,7 @@
   <title>{screenTitle(tool)}</title>
 </svelte:head>
 
-<header aria-label={m.zone_app_bar()}>
+<header aria-label={m.zone_app_bar()} data-landscape={landscape ? '' : undefined}>
   <AppNav current={tool} />
   <ShareButton {tool} />
   <InstrumentButton />
@@ -104,8 +111,8 @@
 {/if}
 
 <main>
-  <h1 tabindex="-1">{name}</h1>
-  <div class="grid">
+  <h1 tabindex="-1" class:sr-only={landscape}>{name}</h1>
+  <div class="grid" data-arrangement={viewport.arrangement}>
     <svelte:boundary onerror={(e) => recordFailure(tool, e)}>
       {#if tool === 'notes'}
         <NotesTool />

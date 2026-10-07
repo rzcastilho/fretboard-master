@@ -427,5 +427,22 @@
   "triads_desc_inversion_root": "root position",
   "triads_desc_inversion_first": "first inversion",
   "triads_desc_inversion_second": "second inversion",
-  "notes_desc_empty": "No notes selected. Pick a note in the note selector."
+  "notes_desc_empty": "No notes selected. Pick a note in the note selector.",
+  "fit_to_screen": "Fit to screen",
+  "minimap_label": "Fretboard overview",
+  "minimap_value": "Frets {first} to {last} of {count}",
+  "fit_small_notice": "These frets are small. Switch to comfortable size?",
+  "fit_use_comfortable": "Use comfortable size",
+  "panels_open": "Panels",
+  "panels_close": "Close panels",
+  "panels_region": "Actions and details",
+  "context_show": "Show details",
+  "context_hide": "Hide details",
+  "summary_separator": " · ",
+  "summary_note_separator": " – ",
+  "summary_all_shapes": "all shapes",
+  "summary_shape": "shape {shape}",
+  "summary_positions_one": "{count} position",
+  "summary_positions_other": "{count} positions",
+  "summary_no_notes": "No notes selected"
 }

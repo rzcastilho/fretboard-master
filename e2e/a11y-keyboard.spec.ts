@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { expandDetails } from './support/helpers';
 /** US4: every function is reachable and operable by keyboard alone, with a visible two-tone focus ring. */
 
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
@@ -35,6 +36,7 @@ test.describe('keyboard only (US4)', () => {
       globalThis.__fmFretboardEvents = [];
     });
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
 
     const noteC = page
@@ -63,6 +65,7 @@ test.describe('keyboard only (US4)', () => {
 
   test('US4-3: Triads — change inversion by keyboard', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await board(page).waitFor();
     // A radio group is one Tab stop (the checked radio); arrows change the choice.
     const group = page.getByRole('radiogroup', { name: 'Inversion' });
@@ -73,6 +76,7 @@ test.describe('keyboard only (US4)', () => {
 
   test('US4-3: CAGED — change shape by keyboard', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     const group = page.getByRole('radiogroup', { name: 'Shape' });
     await tabTo(page, group.getByRole('radio', { checked: true }));
@@ -99,6 +103,7 @@ test.describe('keyboard only (US4)', () => {
 
   test('US4-3/4: shared-view notice is operable and focus is never lost', async ({ page }) => {
     await page.goto('/caged?v=1&rt=2&q=banana&fr=99');
+    await expandDetails(page);
     await board(page).waitFor();
     await expect(
       page.getByRole('status').filter({ hasText: 'This link was incomplete' })
@@ -110,6 +115,7 @@ test.describe('keyboard only (US4)', () => {
   test('US4-3: share notice — Link copied appears from the keyboard', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/notes');
+    await expandDetails(page);
     const share = page.getByRole('banner').getByRole('button', { name: 'Share', exact: true });
     await tabTo(page, share);
     await page.keyboard.press('Enter');
@@ -119,6 +125,7 @@ test.describe('keyboard only (US4)', () => {
 
   test('US4-4: description panel opens and closes with focus on its button', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await board(page).waitFor();
     await tabTo(page, describeButton(page));
     await page.keyboard.press('Enter');
@@ -131,6 +138,7 @@ test.describe('keyboard only (US4)', () => {
 
   test('US4-3: focus order follows reading order, no trap', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
     const tops: number[] = [];
     const lefts: number[] = [];
@@ -164,6 +172,7 @@ test.describe('keyboard only (US4)', () => {
 
   test('US4-2: two ring rects on a focused position, including a hidden one', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
     // Nothing selected: every position is unmarked/hidden.
     await cell(page, 4, 2).focus();
@@ -182,6 +191,7 @@ test.describe('keyboard only (US4)', () => {
   test('US4-5: focusing an off-screen position scrolls it into view', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
     const target = cell(page, 3, 20);
     await target.focus();

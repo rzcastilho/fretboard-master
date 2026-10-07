@@ -10,6 +10,11 @@
   import { openTriadsFromCaged, openTriadsFromCagedTriad } from '$lib/state/links.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { playback } from '$lib/state/playback.svelte';
+  import { fit } from '$lib/state/fit.svelte';
+  import FitNotice from '$lib/tools/FitNotice.svelte';
+  import FitToggle from '$lib/tools/FitToggle.svelte';
+  import ContextZone from '$lib/tools/ContextZone.svelte';
+  import SidePanels from '$lib/tools/SidePanels.svelte';
   import { notation } from '$lib/state/notation.svelte';
   import { solfegeName } from '$lib/notation/notation';
   import { preferences } from '$lib/state/preferences.svelte';
@@ -88,13 +93,16 @@
     onroot={(pc) => caged.selectRoot(pc)}
     onquality={(q) => caged.setQuality(q)}
     onswitch={() => caged.switchSpelling()}
-  />
-  <CagedFocusControls
-    letter={caged.state.focus?.letter ?? null}
-    drawn={caged.display.drawnLetters}
-    disabled={caged.display.tuningClass === 'non-compatible'}
-    onchoose={(c) => caged.chooseShape(c)}
-  />
+  >
+    {#snippet more()}
+      <CagedFocusControls
+        letter={caged.state.focus?.letter ?? null}
+        drawn={caged.display.drawnLetters}
+        disabled={caged.display.tuningClass === 'non-compatible'}
+        onchoose={(c) => caged.chooseShape(c)}
+      />
+    {/snippet}
+  </CagedControls>
   <CagedListen
     enabled={caged.display.listen.enabled}
     reason={caged.display.listen.reason}
@@ -107,6 +115,7 @@
 </section>
 <section class="c" aria-labelledby="caged-zone-c">
   <h2 id="caged-zone-c" tabindex="-1">{m.zone_fretboard()}</h2>
+  <FitNotice />
   {#if caged.display.model || fixture}
     <Fretboard
       instrument={caged.instrument}
@@ -114,6 +123,9 @@
       {onactivate}
       ontag={(id) => caged.toggleTag(id)}
       pulses={playback.pulses}
+      fit={fit.effective}
+      onfit={fit.handle}
+      takeAnchor={fit.takeAnchor}
     />
     {#if caged.display.fitNote}
       <p class="fit" role="status">{caged.display.fitNote}</p>
@@ -130,80 +142,88 @@
   {/if}
 </section>
 
-<section class="e" aria-labelledby="caged-zone-e">
-  <h2 id="caged-zone-e">{m.zone_actions()}</h2>
-  <ChoiceGroup
-    name={m.caged_group_labels()}
-    options={labels}
-    current={caged.state.labelType}
-    onchoose={caged.setLabelType}
-  />
-  <div class="steps">
-    <button
-      type="button"
-      class="step"
-      aria-disabled={caged.display.steps.previous ? undefined : 'true'}
-      onclick={() => caged.step(-1)}>{m.caged_previous_shape()}</button
-    >
-    <button
-      type="button"
-      class="step"
-      aria-disabled={caged.display.steps.next ? undefined : 'true'}
-      onclick={() => caged.step(1)}>{m.caged_next_shape()}</button
-    >
-  </div>
-  {#if instrument.adjustedIn === 'caged'}
-    <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
-  {/if}
-  {#if noteOpen}
-    <Notice
-      message={m.caged_solfege_note({
-        c: solfegeName('C'),
-        a: solfegeName('A'),
-        g: solfegeName('G'),
-        e: solfegeName('E'),
-        d: solfegeName('D')
-      })}
-      ondismiss={() => (noteOpen = false)}
-    />
-  {/if}
-  {#if hintOpen}
-    <Notice message={m.caged_rotate_hint()} ondismiss={() => (hintOpen = false)} />
-  {/if}
-</section>
-
-<div class="d">
-  <CagedLayerList
-    switches={caged.switches}
-    extraSampleShown={caged.display.extraSampleShown}
-    ontoggle={(layer) => caged.toggleLayer(layer)}
-  />
-  {#if caged.display.triad}
-    <CagedTriadSets
-      triad={caged.display.triad}
-      onselect={(set) => caged.selectTriadSet(set)}
-      onopen={() => openTriadsFromCagedTriad()}
-    />
-  {/if}
-  <button
-    type="button"
-    class="conn-switch"
-    role="switch"
-    aria-checked={caged.state.connections}
-    aria-disabled={caged.display.tuningClass === 'non-compatible' ? 'true' : undefined}
-    onclick={() => {
-      if (caged.display.tuningClass !== 'non-compatible')
-        caged.setConnections(!caged.state.connections);
-    }}
-  >
-    <span class="track" aria-hidden="true"><span class="thumb"></span></span>
-    {m.caged_show_connections()}
-    <span class="state" aria-hidden="true"
-      >{caged.state.connections ? m.caged_switch_on() : m.caged_switch_off()}</span
-    >
-  </button>
-  <button type="button" onclick={() => caged.reset()}>{m.caged_reset()}</button>
-</div>
+<SidePanels>
+  {#snippet actions()}
+    <section class="e" aria-labelledby="caged-zone-e">
+      <h2 id="caged-zone-e">{m.zone_actions()}</h2>
+      <FitToggle />
+      <ChoiceGroup
+        name={m.caged_group_labels()}
+        options={labels}
+        current={caged.state.labelType}
+        onchoose={caged.setLabelType}
+      />
+      <div class="steps">
+        <button
+          type="button"
+          class="step"
+          aria-disabled={caged.display.steps.previous ? undefined : 'true'}
+          onclick={() => caged.step(-1)}>{m.caged_previous_shape()}</button
+        >
+        <button
+          type="button"
+          class="step"
+          aria-disabled={caged.display.steps.next ? undefined : 'true'}
+          onclick={() => caged.step(1)}>{m.caged_next_shape()}</button
+        >
+      </div>
+      {#if instrument.adjustedIn === 'caged'}
+        <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
+      {/if}
+      {#if noteOpen}
+        <Notice
+          message={m.caged_solfege_note({
+            c: solfegeName('C'),
+            a: solfegeName('A'),
+            g: solfegeName('G'),
+            e: solfegeName('E'),
+            d: solfegeName('D')
+          })}
+          ondismiss={() => (noteOpen = false)}
+        />
+      {/if}
+      {#if hintOpen}
+        <Notice message={m.caged_rotate_hint()} ondismiss={() => (hintOpen = false)} />
+      {/if}
+    </section>
+  {/snippet}
+  {#snippet details()}
+    <div class="d">
+      <ContextZone summary={caged.display.summary}>
+        <CagedLayerList
+          switches={caged.switches}
+          extraSampleShown={caged.display.extraSampleShown}
+          ontoggle={(layer) => caged.toggleLayer(layer)}
+        />
+        {#if caged.display.triad}
+          <CagedTriadSets
+            triad={caged.display.triad}
+            onselect={(set) => caged.selectTriadSet(set)}
+            onopen={() => openTriadsFromCagedTriad()}
+          />
+        {/if}
+        <button
+          type="button"
+          class="conn-switch"
+          role="switch"
+          aria-checked={caged.state.connections}
+          aria-disabled={caged.display.tuningClass === 'non-compatible' ? 'true' : undefined}
+          onclick={() => {
+            if (caged.display.tuningClass !== 'non-compatible')
+              caged.setConnections(!caged.state.connections);
+          }}
+        >
+          <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+          {m.caged_show_connections()}
+          <span class="state" aria-hidden="true"
+            >{caged.state.connections ? m.caged_switch_on() : m.caged_switch_off()}</span
+          >
+        </button>
+        <button type="button" onclick={() => caged.reset()}>{m.caged_reset()}</button>
+      </ContextZone>
+    </div>
+  {/snippet}
+</SidePanels>
 
 <style>
   section {

@@ -427,5 +427,22 @@
   "triads_desc_inversion_root": "posição fundamental",
   "triads_desc_inversion_first": "primeira inversão",
   "triads_desc_inversion_second": "segunda inversão",
-  "notes_desc_empty": "Nenhuma nota selecionada. Escolha uma nota no seletor de notas."
+  "notes_desc_empty": "Nenhuma nota selecionada. Escolha uma nota no seletor de notas.",
+  "fit_to_screen": "Ajustar à tela",
+  "minimap_label": "Visão geral do braço",
+  "minimap_value": "Casas {first} a {last} de {count}",
+  "fit_small_notice": "Estas casas estão pequenas. Mudar para o tamanho confortável?",
+  "fit_use_comfortable": "Usar tamanho confortável",
+  "panels_open": "Painéis",
+  "panels_close": "Fechar painéis",
+  "panels_region": "Ações e detalhes",
+  "context_show": "Mostrar detalhes",
+  "context_hide": "Ocultar detalhes",
+  "summary_separator": " · ",
+  "summary_note_separator": " – ",
+  "summary_all_shapes": "todas as formas",
+  "summary_shape": "forma {shape}",
+  "summary_positions_one": "{count} posição",
+  "summary_positions_other": "{count} posições",
+  "summary_no_notes": "Nenhuma nota selecionada"
 }

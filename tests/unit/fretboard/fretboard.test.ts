@@ -2398,3 +2398,209 @@ describe('Fretboard accidental policy (021 F-1, F-2, F-4)', () => {
     }
   });
 });
+
+describe('Fretboard fit overflow and minimap (025 US1)', () => {
+  function stubWidth(px: number) {
+    const proto = HTMLElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => px });
+    return () => {
+      if (desc) Object.defineProperty(proto, 'clientWidth', desc);
+      else delete (proto as unknown as Record<string, unknown>).clientWidth;
+    };
+  }
+  const long = presetInstrument('AF-1', 6, 24);
+
+  it('emits overflow true on mount when the neck is wider than the container', async () => {
+    const restore = stubWidth(320);
+    try {
+      const onfit = vi.fn();
+      render(Fretboard, { instrument: long, onfit });
+      await tick();
+      expect(onfit).toHaveBeenCalledWith({ kind: 'overflow', value: true });
+      expect(onfit).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it('emits overflow false when the neck fits', async () => {
+    const restore = stubWidth(2000);
+    try {
+      const onfit = vi.fn();
+      render(Fretboard, { instrument: STANDARD_GUITAR, onfit });
+      await tick();
+      expect(onfit).toHaveBeenCalledWith({ kind: 'overflow', value: false });
+    } finally {
+      restore();
+    }
+  });
+
+  it('never emits for thumbnail or preview', async () => {
+    const restore = stubWidth(320);
+    try {
+      const onfit = vi.fn();
+      render(Fretboard, { instrument: long, variant: 'thumbnail', onfit });
+      render(Fretboard, { instrument: long, variant: 'preview', onfit });
+      await tick();
+      expect(onfit).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it('renders the minimap iff interactive and scrolling', async () => {
+    let restore = stubWidth(320);
+    try {
+      const a = render(Fretboard, { instrument: long });
+      await tick();
+      expect(screen.queryByRole('slider', { name: 'Fretboard overview' })).not.toBeNull();
+      a.unmount();
+      render(Fretboard, { instrument: long, variant: 'preview' });
+      await tick();
+      expect(screen.queryAllByRole('slider')).toHaveLength(0);
+    } finally {
+      restore();
+    }
+    restore = stubWidth(4000);
+    try {
+      render(Fretboard, { instrument: STANDARD_GUITAR });
+      await tick();
+      expect(screen.queryByRole('slider')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('Fretboard fit to screen (025 US2)', () => {
+  function stubWidth(px: number) {
+    const proto = HTMLElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, 'clientWidth');
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => px });
+    return () => {
+      if (desc) Object.defineProperty(proto, 'clientWidth', desc);
+      else delete (proto as unknown as Record<string, unknown>).clientWidth;
+    };
+  }
+  const long = presetInstrument('AF-1', 6, 24);
+  const touches = (gap: number) => [
+    { identifier: 1, clientX: 100, clientY: 100 },
+    { identifier: 2, clientX: 100 + gap, clientY: 100 }
+  ];
+  const noteMarkers = (n: number): DisplayModel => ({
+    labelMode: 'note',
+    markers: Array.from({ length: n }, (_, i) => ({
+      string: 1,
+      fret: i,
+      function: 'neutral' as const,
+      emphasis: 'highlighted' as const
+    }))
+  });
+
+  it('whole mode fits every fret, keeps rows at 44 px and scales the markers', async () => {
+    const restore = stubWidth(320);
+    try {
+      const { container } = render(Fretboard, {
+        instrument: long,
+        fit: 'whole',
+        model: noteMarkers(3)
+      });
+      await tick();
+      const svg = container.querySelector('svg[role="grid"]') as SVGSVGElement;
+      expect(Number(svg.getAttribute('width'))).toBeCloseTo(320, 0);
+      expect(Number(svg.getAttribute('height'))).toBe(6 * 44 + 24);
+      expect(screen.queryByRole('slider')).toBeNull();
+      const shape = container.querySelector('.marker .glyph') as SVGElement;
+      expect(shape).toBeTruthy();
+      // Marker glyph scaled below 1 in whole mode (scale ≈ 0.25 at 24 frets / 320 px).
+      const scaled = container.querySelector('.markers') as SVGGElement;
+      expect(scaled.getAttribute('data-marker-scale')).not.toBe('1');
+      // Labels omitted below 75 % scale; the shapes stay.
+      expect(container.querySelectorAll('.marker-label')).toHaveLength(0);
+    } finally {
+      restore();
+    }
+  });
+
+  it('comfortable mode keeps labels and scale 1', async () => {
+    const restore = stubWidth(320);
+    try {
+      const { container } = render(Fretboard, { instrument: long, model: noteMarkers(3) });
+      await tick();
+      expect(container.querySelectorAll('.marker-label').length).toBe(3);
+      expect(container.querySelector('.markers')?.getAttribute('data-marker-scale')).toBe('1');
+    } finally {
+      restore();
+    }
+  });
+
+  it('emits request(whole) on a completed pinch in and request(comfortable) on pinch out', async () => {
+    const restore = stubWidth(320);
+    try {
+      const onfit = vi.fn();
+      const { container } = render(Fretboard, { instrument: long, onfit });
+      await tick();
+      const scroller = container.querySelector('.scroller') as HTMLElement;
+      await fireEvent.touchStart(scroller, { touches: touches(200) });
+      await fireEvent.touchMove(scroller, { touches: touches(100) });
+      await fireEvent.touchEnd(scroller, { touches: [] });
+      expect(onfit).toHaveBeenCalledWith({ kind: 'request', mode: 'whole' });
+      await fireEvent.touchStart(scroller, { touches: touches(100) });
+      await fireEvent.touchMove(scroller, { touches: touches(200) });
+      await fireEvent.touchEnd(scroller, { touches: [] });
+      expect(onfit).toHaveBeenCalledWith({ kind: 'request', mode: 'comfortable' });
+    } finally {
+      restore();
+    }
+  });
+
+  it('one finger never emits a request', async () => {
+    const restore = stubWidth(320);
+    try {
+      const onfit = vi.fn();
+      const { container } = render(Fretboard, { instrument: long, onfit });
+      await tick();
+      const scroller = container.querySelector('.scroller') as HTMLElement;
+      await fireEvent.touchStart(scroller, { touches: [touches(0)[0]] });
+      await fireEvent.touchMove(scroller, {
+        touches: [{ identifier: 1, clientX: 300, clientY: 100 }]
+      });
+      await fireEvent.touchEnd(scroller, { touches: [] });
+      expect(onfit.mock.calls.filter(([e]) => e.kind === 'request')).toHaveLength(0);
+    } finally {
+      restore();
+    }
+  });
+
+  it('emits small-tap after onactivate only in whole mode with a column under 44 px', async () => {
+    const restore = stubWidth(320);
+    try {
+      const onfit = vi.fn();
+      const onactivate = vi.fn();
+      const whole = render(Fretboard, { instrument: long, fit: 'whole', onfit, onactivate });
+      await tick();
+      const svg = whole.container.querySelector('svg[role="grid"]') as SVGSVGElement;
+      tap(svg, 100, 100);
+      expect(onactivate).toHaveBeenCalledTimes(1);
+      const small = onfit.mock.calls.map(([e]) => e).filter((e) => e.kind === 'small-tap');
+      expect(small).toHaveLength(1);
+      expect(small[0].position).toEqual(onactivate.mock.calls[0][0]);
+      whole.unmount();
+
+      const onfit2 = vi.fn();
+      const comfy = render(Fretboard, { instrument: long, onfit: onfit2, onactivate });
+      await tick();
+      const svg2 = comfy.container.querySelector('svg[role="grid"]') as SVGSVGElement;
+      tap(svg2, 100, 100);
+      expect(onfit2.mock.calls.filter(([e]) => e.kind === 'small-tap')).toHaveLength(0);
+    } finally {
+      restore();
+    }
+  });
+
+  it('the scroller allows panning both ways (touch-action: pan-x pan-y)', () => {
+    const src = readFileSync('src/lib/fretboard/Fretboard.svelte', 'utf8');
+    expect(src).toMatch(/\.scroller\s*\{[^}]*touch-action:\s*pan-x pan-y/);
+  });
+});

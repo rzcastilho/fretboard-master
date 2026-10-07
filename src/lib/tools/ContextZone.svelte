@@ -1,0 +1,80 @@
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+  import { m } from '$lib/paraglide/messages.js';
+  import { contextPanel } from '$lib/state/context-panel.svelte';
+  import { viewport } from '$lib/state/viewport.svelte';
+
+  interface Props {
+    /** One-line summary of the tool's current view (`display.summary`). */
+    summary: string;
+    children: Snippet;
+  }
+
+  let { summary, children }: Props = $props();
+
+  const uid = $props.id();
+  const contentId = $derived(`${uid}-content`);
+
+  // Only the narrow arrangement collapses. Before mount there is no arrangement, so the
+  // content stays visible (the no-JS and prerender fallback).
+  const narrow = $derived(viewport.arrangement === 'narrow');
+  const expanded = $derived(contextPanel.expanded);
+</script>
+
+{#if narrow}
+  <div class="summary-row">
+    <p class="summary">{summary}</p>
+    <button
+      type="button"
+      aria-expanded={expanded}
+      aria-controls={contentId}
+      onclick={() => contextPanel.toggle()}
+    >
+      {expanded ? m.context_hide() : m.context_show()}
+    </button>
+  </div>
+{/if}
+<div id={contentId} class="content" hidden={narrow && !expanded}>
+  {@render children()}
+</div>
+
+<style>
+  .summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    margin-block-end: var(--space-3);
+  }
+
+  /* Wraps instead of truncating, so it stays whole at 200% text. */
+  .summary {
+    flex: 1 1 12rem;
+    margin: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding: var(--space-1) var(--space-3);
+    font: inherit;
+    font-weight: 600;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-text);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  /* The wrapper adds no box: the children keep the zone's own flex or block layout. */
+  .content {
+    display: contents;
+  }
+
+  .content[hidden] {
+    display: none;
+  }
+</style>

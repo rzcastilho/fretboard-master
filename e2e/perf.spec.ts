@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { readAudioLog } from './support/helpers';
+import { expandDetails, readAudioLog } from './support/helpers';
 
 // Measured in the page (pointerdown → <h1> focused), so Playwright round-trips under
 // throttling (actionability checks, polling) are not counted.
@@ -67,6 +67,7 @@ test.describe('tap-to-sound latency (constitution VI)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await page.evaluate(() => {
       const w = globalThis as unknown as { __tapTimes: number[] };
@@ -118,6 +119,7 @@ test.describe('control-change latency (SC-001, quickstart #30)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/notes');
+    await expandDetails(page);
     const board = page.getByRole('grid', { name: 'Fretboard' });
     await board.waitFor();
     const selector = page.getByRole('group', { name: 'Choose notes' });
@@ -162,6 +164,7 @@ test.describe('triads control-change latency (FR-031, SC-003)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     // Measured in the page (pointerdown → heading text changed), so Playwright round-trips
     // under throttling are not counted.
@@ -217,6 +220,7 @@ test.describe('triads view-switch and tag-tap latency (FR-021, SC-006)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/triads');
+    await expandDetails(page);
     await page
       .getByRole('group', { name: 'Root' })
       .getByRole('button', { name: 'A', exact: true })
@@ -311,6 +315,7 @@ test.describe('triads Compare latency (FR-021, SC-007)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/triads');
+    await expandDetails(page);
     const board = page.getByRole('region', { name: 'Fretboard' });
     await expect(board.locator('.marker')).toHaveCount(3);
     const toggle = page.getByRole('button', { name: 'Compare', exact: true });
@@ -411,6 +416,7 @@ test.describe('linked-tools carry latency (SC-005, FR-017)', () => {
       ['B', 'B major — Root position']
     ] as const) {
       await page.goto('/notes');
+      await expandDetails(page);
       await page
         .getByRole('group', { name: 'Choose notes' })
         .getByRole('button', { name: pitch, exact: true })
@@ -457,6 +463,7 @@ test.describe('instrument change latency (SC-001)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
 
     // Measured in the page (pointerdown on Confirm → string 6 label changed), so Playwright
@@ -557,6 +564,7 @@ test.describe('remembered preferences (SC-006, SC-008)', () => {
 
     // Control change (instrument Confirm) with a remembered record, measured in the page.
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await page.evaluate(() => {
       const w = globalThis as unknown as { __prefMs: number[]; __prefDown: number | null };
@@ -598,6 +606,7 @@ test.describe('custom tuning latency (011 SC-007)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await page
       .getByRole('button', { name: /^6 strings|^Instrument/ })
@@ -673,7 +682,10 @@ test.describe('seven strings × 24 frets (US5, quickstart §4)', () => {
     });
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    // At 1280 the wide-stacked board fits 24 frets without overflow; medium width still scrolls.
+    await page.setViewportSize({ width: 800, height: 800 });
     await page.goto('/notes');
+    await expandDetails(page);
     const board = page.getByRole('grid', { name: 'Fretboard' });
     await board.waitFor();
     await expect(board.getByRole('row')).toHaveCount(6);
@@ -814,6 +826,7 @@ test.describe('handedness and orientation (013 SC-006)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
 
     let dialog = await openPanel(page);
@@ -828,6 +841,8 @@ test.describe('handedness and orientation (013 SC-006)', () => {
   });
 
   test('left-handed 7 strings × 24 frets scrolls smoothly inside .scroller', async ({ page }) => {
+    // At 1280 the wide-stacked board fits 24 frets without overflow; medium width still scrolls.
+    await page.setViewportSize({ width: 800, height: 800 });
     await page.addInitScript(() => {
       localStorage.setItem(
         'fretboard-master:prefs',
@@ -837,6 +852,7 @@ test.describe('handedness and orientation (013 SC-006)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/notes');
+    await expandDetails(page);
     const board = page.getByRole('grid', { name: 'Fretboard' });
     await board.waitFor();
     await expect(board.getByRole('row')).toHaveCount(7);
@@ -910,6 +926,7 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(page.getByText('C major', { exact: true })).toBeVisible();
     const keys = page.getByRole('group', { name: 'Key' }).getByRole('button');
     const times: number[] = [];
@@ -937,6 +954,7 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
       );
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await page
       .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
       .first()
@@ -960,6 +978,7 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/caged');
+    await expandDetails(page);
     const board = page.getByRole('region', { name: 'Fretboard' });
     await expect(board.locator('.cell')).toHaveCount(7 * 25);
     await page
@@ -990,6 +1009,8 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
   test('7 strings × 24 frets with nine tags: scrolling stays inside .scroller', async ({
     page
   }) => {
+    // At 1280 the wide-stacked board fits 24 frets without overflow; medium width still scrolls.
+    await page.setViewportSize({ width: 800, height: 800 });
     await page.addInitScript(() => {
       localStorage.setItem(
         'fretboard-master:prefs',
@@ -999,6 +1020,7 @@ test.describe('CAGED latency (014 Q27, SC-004)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/caged');
+    await expandDetails(page);
     await page
       .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
       .first()
@@ -1038,6 +1060,7 @@ test.describe('notation switch latency (021 US2)', () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     const toggle = page.getByRole('banner').getByRole('group', { name: 'Note names' });
     // Measured in the page (pointerdown → first marker label in the new notation).
@@ -1093,6 +1116,7 @@ test.describe('address sync under rapid change (SC-007)', () => {
     );
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/triads');
+    await expandDetails(page);
     const inversions = ['root position', '1st inversion', '2nd inversion'];
     const worst = await page.evaluate(async (names) => {
       let max = 0;

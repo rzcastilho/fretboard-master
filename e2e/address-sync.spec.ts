@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { expandDetails } from './support/helpers';
 const radio = (page: Page, name: string) => page.getByRole('radio', { name, exact: true });
 const shareButton = (page: Page) =>
   page.getByRole('banner').getByRole('button', { name: 'Share', exact: true });
@@ -30,6 +31,7 @@ test.describe('address sync US4', () => {
   test('US4-3: the settled address equals the Share link', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/triads');
+    await expandDetails(page);
     await radio(page, 'minor').click();
     await radio(page, '1st inversion').click();
     await expect.poll(() => page.url()).toContain('inv=first');
@@ -42,6 +44,7 @@ test.describe('address sync US4', () => {
 
   test('US4-4: Triads → CAGED gives a CAGED link with no Triads keys', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await radio(page, '2nd inversion').click();
     await expect.poll(() => page.url()).toContain('inv=second');
     await nav(page, 'CAGED').click();
@@ -52,6 +55,7 @@ test.describe('address sync US4', () => {
 
   test('panel: changing frets in the instrument panel is reflected in fr=', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await expect.poll(() => page.url()).toContain('fr=22');
     await page
       .getByRole('button', { name: /instrument/i })
@@ -70,6 +74,7 @@ test.describe('address sync US4', () => {
     page
   }) => {
     await page.goto('/triads?v=1&inv=second');
+    await expandDetails(page);
     await expect(page.getByText('C major — 2nd inversion', { exact: true }).first()).toBeVisible();
     await expect.poll(() => page.url()).toMatch(/\/triads\?v=1&rt=0&sp=none&q=major&inv=second&/);
     expect(await page.evaluate(() => history.length)).toBeLessThanOrEqual(2);

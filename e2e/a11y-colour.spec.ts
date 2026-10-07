@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { CVD_MATRICES, type CvdType } from '../tests/unit/a11y/color';
 
+import { expandDetails } from './support/helpers';
 /** US5: root, third and fifth never depend on colour alone — shape, label, emphasis and outline carry the meaning. */
 
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
@@ -27,6 +28,7 @@ const TOOLS: { name: string; open: (page: Page) => Promise<void> }[] = [
     name: 'Triads',
     open: async (page) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await expect(board(page).locator('.marker')).toHaveCount(3);
     }
   },
@@ -34,6 +36,7 @@ const TOOLS: { name: string; open: (page: Page) => Promise<void> }[] = [
     name: 'CAGED',
     open: async (page) => {
       await page.goto('/caged');
+      await expandDetails(page);
       await expect(board(page).locator('.marker.root').first()).toBeVisible();
     }
   }
@@ -54,6 +57,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     test('US5-2: emphasis levels differ by opacity and size, not hue', async ({ page }) => {
       await page.goto('/caged');
+      await expandDetails(page);
       await layerSwitch(page, 'Pentatonic').click();
       const root = board(page).locator('.marker.root.highlighted').first();
       const degree = board(page).locator('.marker.degree').first();

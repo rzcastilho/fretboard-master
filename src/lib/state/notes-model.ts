@@ -23,6 +23,7 @@ import {
 import { octaveOf, pitchClass, type PitchClass, type Spelling } from '../theory/pitch';
 import type { Quality } from '../theory/triad';
 import { detectTriad } from '../theory/triad-detect';
+import { joinNotes, joinSummary } from './context-summary';
 import { qualityName } from './triads-model';
 import { LISTEN_BPM, type ListenStep } from './listen';
 import { missingNotes, type Background, type NotesViewState } from './notes-view';
@@ -78,6 +79,8 @@ export function detectedTriad(selection: readonly PitchClass[]): DetectedTriad |
 }
 
 export interface NotesDisplay {
+  /** One-line context summary: notes · count or selected position (FR-016). */
+  readonly summary: string;
   readonly model: DisplayModel;
   /** Number of `highlighted` markers. */
   readonly highlightedCount: number;
@@ -224,6 +227,17 @@ function describe(
     : `${listed} ${m.notes_desc_triad({ name: detected.spokenName })}`;
 }
 
+function positionsText(count: number): string {
+  return count === 1 ? m.summary_positions_one({ count }) : m.summary_positions_other({ count });
+}
+
+function notesSummary(s: NotesViewState, info: CardInfo | null, count: number): string {
+  if (s.selection.length === 0) return m.summary_no_notes();
+  const names = joinNotes(s.selection.map((pc) => noteLabel(singleSpelling(pc))));
+  const position = info === null ? positionsText(count) : pitchLabel(info.spelling, info.octave);
+  return joinSummary([names, position]);
+}
+
 export function buildNotesModel(s: NotesViewState, instrument: Instrument): NotesDisplay {
   const bg = backgroundSet(s.background);
   const tonesOn =
@@ -279,6 +293,7 @@ export function buildNotesModel(s: NotesViewState, instrument: Instrument): Note
   const base = describe(s, instrument, highlighted, detected);
   const wholeNeck = s.region.start === 0 && s.region.end === instrument.fretCount;
   return {
+    summary: notesSummary(s, info, highlighted.length + cardHighlighted),
     model: {
       ...(wholeNeck ? {} : { region: { start: s.region.start, end: s.region.end } }),
       markers,

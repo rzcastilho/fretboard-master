@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { expandDetails, runAxe } from './support/helpers';
 
 /** TM-9 screenshot views 1–5 (contracts/test-hooks.md). Semantic facts are asserted too. */
 
@@ -18,6 +18,7 @@ async function open(page: Page, instrument?: 'AF-7' | 'AF-21') {
     }, instrument);
   }
   await page.goto('/notes');
+  await expandDetails(page);
   await board(page).waitFor();
 }
 

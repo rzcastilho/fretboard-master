@@ -315,6 +315,8 @@ test.describe('instrument panel US3 (cancel and restore)', () => {
     await pick(page, 'Drop D').check();
     await dialog.getByRole('button', { name: 'Confirm' }).click();
     await expect(page.getByRole('button', { name: /^Tuning: Drop D/ })).toBeVisible();
+    // The address follows after a 150 ms debounce; reloading sooner opens the old link.
+    await expect.poll(() => page.url()).toMatch(/tu=AF-4/);
     await page.reload();
     await expect(page.getByRole('button', { name: /^Tuning: Drop D/ })).toBeVisible();
     const reopened = await openPanel(page);

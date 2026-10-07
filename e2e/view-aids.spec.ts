@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoTruncationOrOverlap, setTextScale } from './support/helpers';
+import { expandDetails, expectNoTruncationOrOverlap, setTextScale } from './support/helpers';
 
 const PREFS_KEY = 'fretboard-master:prefs';
 
@@ -51,6 +51,7 @@ const A_MAJOR_FIRST =
 test.describe('Describe this view (US1)', () => {
   test('US1-1: Triads reads the exact sentence', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await pickA1stInversion432(page);
     await open(page);
     await expect(panel(page)).toHaveText(A_MAJOR_FIRST);
@@ -60,6 +61,7 @@ test.describe('Describe this view (US1)', () => {
   test('US1-2: Portuguese with solfège', async ({ page }) => {
     await storePrefs(page, { language: 'pt-BR', notation: 'solfege' });
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: '1ª inversão' }).click();
     await page.getByRole('radio', { name: '4-3-2' }).click();
     await page.getByRole('button', { name: 'Descrever esta vista' }).click();
@@ -83,6 +85,7 @@ test.describe('Describe this view (US1)', () => {
 
   test('US1-4: Notes states the selection and the string filter', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page
       .getByRole('group', { name: 'Choose notes' })
       .getByRole('button', { name: 'C', exact: true })
@@ -99,6 +102,7 @@ test.describe('Describe this view (US1)', () => {
 
   test('US1-5: CAGED with pentatonic lists entries with notes', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await page
       .getByRole('group', { name: 'Layers' })
       .getByRole('switch', { name: 'Pentatonic', exact: true })
@@ -110,6 +114,7 @@ test.describe('Describe this view (US1)', () => {
 
   test('US1-6: the open panel updates when the view changes', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await open(page);
     const before = await panel(page).textContent();
     await page.getByRole('radio', { name: '1st inversion' }).click();
@@ -119,6 +124,7 @@ test.describe('Describe this view (US1)', () => {
 
   test('US1-7: an empty Notes view says what to do', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'None' }).first().click();
     await open(page);
     await expect(panel(page)).toHaveText('No notes selected. Pick a note in the note selector.');
@@ -218,6 +224,7 @@ const layerSwitch = (page: Page, name: string) =>
 test.describe('Legend (US3)', () => {
   test('US3-1: CAGED with Pentatonic lists Chord and Pentatonic groups', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Pentatonic').click();
     await openLegend(page);
     await expect(legendPanel(page).locator('h3')).toHaveText(['Chord', 'Pentatonic']);
@@ -226,6 +233,7 @@ test.describe('Legend (US3)', () => {
 
   test('US3-2: connection ring appears with Show connections', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await openLegend(page);
     await expect(legendNames(page).filter({ hasText: 'Connection' })).toHaveCount(0);
     await page.getByRole('switch', { name: 'Show connections' }).click();
@@ -235,6 +243,7 @@ test.describe('Legend (US3)', () => {
   test('US3-3: altered sixth string adds Altered string', async ({ page }) => {
     await storePrefs(page, { tuning: 'AF-4' });
     await page.goto('/caged');
+    await expandDetails(page);
     await openLegend(page);
     await expect(legendNames(page).filter({ hasText: 'Altered string' })).toHaveCount(1);
   });
@@ -244,6 +253,7 @@ test.describe('Legend (US3)', () => {
       globalThis.__fmInstrument = 'AF-4';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: '6-5-4' }).click();
     await openLegend(page);
     await expect(legendNames(page).filter({ hasText: 'Wide stretch' })).toHaveCount(1);
@@ -251,6 +261,7 @@ test.describe('Legend (US3)', () => {
 
   test('US3-4: Triads comparison adds a Comparison entry', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await openLegend(page);
     await expect(legendNames(page)).toHaveText(['Root', 'Third', 'Fifth']);
     await page.getByRole('button', { name: 'Compare', exact: true }).click();
@@ -261,6 +272,7 @@ test.describe('Legend (US3)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await openLegend(page);
     await expect(legendNames(page).filter({ hasText: 'Selected note' })).toHaveCount(0);
     await expect(legendNames(page).filter({ hasText: 'Octave colour' })).toHaveCount(0);
@@ -273,6 +285,7 @@ test.describe('Legend (US3)', () => {
 
   test('US3-5: the open Legend updates when the view changes', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await openLegend(page);
     await expect(legendNames(page)).toHaveText(['Root', 'Third', 'Fifth']);
     await layerSwitch(page, 'Arpeggio').click();
@@ -283,6 +296,7 @@ test.describe('Legend (US3)', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await openLegend(page);
     await legendButton(page).press('Tab');
     await expect(legendPanel(page)).toBeVisible();
@@ -304,6 +318,7 @@ test.describe('Legend (US3)', () => {
 
   test('both panels open independently', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await openLegend(page);
     await expect(describeButton(page)).toHaveAttribute('aria-expanded', 'false');
     await open(page);
@@ -315,6 +330,7 @@ test.describe('Legend (US3)', () => {
   }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Pentatonic').click();
     await open(page);
     await openLegend(page);

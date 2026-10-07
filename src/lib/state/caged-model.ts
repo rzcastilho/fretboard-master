@@ -25,6 +25,7 @@ import {
 } from '../theory/caged';
 import { pitchClass, pitchOfSpelling, type Pitch, type Spelling } from '../theory/pitch';
 import { otherRootSpelling, spellTriad, type TriadFunction } from '../theory/triad';
+import { joinNotes, joinSummary } from './context-summary';
 import { drawnLetters, occurrenceIndex, stepAvailability } from './caged-focus';
 import { selectedTriad, triadAvailability, triadHandoff, type TriadsHandoff } from './caged-triad';
 import {
@@ -93,6 +94,8 @@ export interface CagedListenDisplay {
 }
 
 export interface CagedDisplay {
+  /** One-line context summary: chord · shape · notes (FR-016). */
+  readonly summary: string;
   readonly keyName: string;
   readonly tuningName: string;
   /** Name of the temporary tuning being shown, else null. */
@@ -250,6 +253,7 @@ export function buildCagedModel(
   const root = cagedRootSpelling(view);
   const triad = spellTriad(root, view.quality);
   const keyName = m.caged_key_name({ root: noteLabel(root), quality: qualityName(view.quality) });
+  const chordNotes = [triad.root, triad.third, triad.fifth].map(noteLabel);
   const spokenKey = m.caged_key_name({
     root: spokenNote(root),
     quality: qualityName(view.quality)
@@ -258,6 +262,7 @@ export function buildCagedModel(
   const tuningClass = cagedTuningClass(sixHighestOpen(instrument));
   if (tuningClass === 'non-compatible') {
     return {
+      summary: joinSummary([keyName, joinNotes(chordNotes)]),
       keyName,
       tuningName,
       temporaryName,
@@ -481,6 +486,11 @@ export function buildCagedModel(
   const fitNote = fit < 5 ? m.caged_fit_note({ frets: instrument.fretCount, count: fit }) : null;
 
   return {
+    summary: joinSummary([
+      keyName,
+      focused ? m.summary_shape({ shape: focused.shape.id }) : m.summary_all_shapes(),
+      joinNotes(chordNotes)
+    ]),
     keyName,
     tuningName,
     temporaryName,

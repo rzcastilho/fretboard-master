@@ -3,6 +3,7 @@ import type { Spelling } from '../theory/pitch';
 import type { ScaleDegree } from '../theory/caged-layers';
 import type { IntervalId } from '../theory/triad';
 import type { LegendGroup } from './legend';
+import type { FitMode } from './geometry';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
 export type Emphasis = 'highlighted' | 'normal' | 'dimmed' | 'hidden';
@@ -125,6 +126,13 @@ export interface DrawnMarker extends Marker {
   readonly pulse?: { readonly id: number; readonly durationMs: number };
 }
 
+/** Renderer → store events for fit to screen. No screen coordinates (Principle III). */
+export type FitEvent =
+  | { readonly kind: 'overflow'; readonly value: boolean }
+  /** Pinch in → 'whole', pinch out → 'comfortable'. */
+  | { readonly kind: 'request'; readonly mode: FitMode }
+  | { readonly kind: 'small-tap'; readonly position: Position };
+
 export interface FretboardProps {
   instrument: Instrument;
   model?: DisplayModel;
@@ -133,6 +141,11 @@ export interface FretboardProps {
   /** Positions sounding now; drawn as a pulse, never announced. */
   pulses?: readonly Pulse[];
   ontag?: (id: string) => void;
+  /** Whole-neck or comfortable sizing; default comfortable. */
+  fit?: FitMode;
+  onfit?: (event: FitEvent) => void;
+  /** One-shot: a position to centre after the next fit switch (consumed once). */
+  takeAnchor?: () => Position | null;
 }
 
 /** Gesture state machine (data-model §6). */

@@ -13,6 +13,7 @@ import {
 } from '../../src/lib/state/share.svelte';
 import { opening, resetOpeningForTests } from '../../src/lib/state/opening.svelte';
 import ToolLayout from '../../src/lib/shell/ToolLayout.svelte';
+import { setViewportForTests } from '../../src/lib/state/viewport.svelte';
 
 describe('ToolLayout', () => {
   beforeEach(() => {
@@ -329,4 +330,60 @@ describe('ToolLayout instrument notice (023 US2)', () => {
     expect(screen.queryByRole('button', { name: 'Adopt this one' })).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
   });
+});
+
+describe('ToolLayout arrangement (025 US3)', () => {
+  beforeEach(() => {
+    resetInstrumentForTests();
+    resetCagedForTests();
+  });
+  afterEach(() => setViewportForTests());
+
+  // ToolLayout starts the viewport store on mount, which measures the window: size the window.
+  const sizeWindow = (width: number, height: number): void => {
+    Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: height, configurable: true });
+  };
+
+  const grid = (): HTMLElement => {
+    const el = document.querySelector<HTMLElement>('main .grid');
+    if (el === null) throw new Error('no grid');
+    return el;
+  };
+
+  it('has no data-arrangement before the viewport is measured (prerender)', () => {
+    sizeWindow(0, 0);
+    render(ToolLayout, { tool: 'notes' });
+    expect(grid().hasAttribute('data-arrangement')).toBe(false);
+  });
+
+  it.each([
+    ['narrow', 390, 844],
+    ['medium', 800, 1280],
+    ['wide-side', 2560, 1440]
+  ])('writes %s from the viewport store', (name, width, height) => {
+    sizeWindow(width, height);
+    render(ToolLayout, { tool: 'notes' });
+    expect(grid().getAttribute('data-arrangement')).toBe(name);
+  });
+
+  it.each(['notes', 'triads', 'caged'] as const)(
+    'renders zones B, C, E, D in that DOM order for %s',
+    (tool) => {
+      sizeWindow(390, 844);
+      render(ToolLayout, { tool });
+      const g = grid();
+      const order = ['b', 'c', 'e', 'd'].map((zone) => {
+        const el = g.querySelector<HTMLElement>(`.${zone}`);
+        if (el === null) throw new Error(`no zone ${zone}`);
+        return el;
+      });
+      for (let i = 1; i < order.length; i++) {
+        expect(
+          order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+      }
+      expect(g.querySelector('.panels-opener')?.hasAttribute('hidden')).toBe(true);
+    }
+  );
 });
