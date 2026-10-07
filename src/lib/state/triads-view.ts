@@ -3,6 +3,7 @@
  * Pure: no Svelte, DOM or paraglide. Every function is total; a no-op returns the same object.
  */
 import type { Instrument } from '../instrument/instrument';
+import type { MotionKind } from '../fretboard/transition';
 import { setOpenPitches, type StringSetId } from '../instrument/string-sets';
 import type { PitchClass, Spelling } from '../theory/pitch';
 import {
@@ -225,4 +226,34 @@ export function setCompareQuality(s: TriadsViewState, q: Quality, i: Instrument)
 /** The root as the view spells it: the override when it applies, else the default (FR-003). */
 export function triadsRootSpelling(s: TriadsViewState): Spelling {
   return effectiveRootSpelling(s.rootPc, s.spellingOverride, s.quality);
+}
+
+/** What else changed in the same update, supplied by the store (026, data-model §7). */
+export interface MotionContext {
+  readonly instrumentChanged: boolean;
+  /** Label type or other presentation difference (labels, notation, language, fit). */
+  readonly presentationChanged: boolean;
+}
+
+/**
+ * How the drawn markers should move between two views (026 data-model §7). Pure. The earliest
+ * row wins; a root and a quality changing together (a link or Reset) is not a user step, so it
+ * is instant like every instrument or presentation change and the very first view.
+ */
+export function motionKind(
+  prev: TriadsViewState | null,
+  next: TriadsViewState,
+  ctx: MotionContext
+): MotionKind {
+  if (prev === null || ctx.instrumentChanged || ctx.presentationChanged) return 'none';
+  if (prev.view !== next.view) return 'none';
+  const root = prev.rootPc !== next.rootPc;
+  const quality = prev.quality !== next.quality;
+  if (root) return quality ? 'none' : 'slide';
+  if (quality) return 'by-role';
+  if (prev.compare.on !== next.compare.on || prev.compare.quality !== next.compare.quality) {
+    return 'by-role';
+  }
+  if (prev.inversion !== next.inversion || prev.stringSet !== next.stringSet) return 'cross-fade';
+  return 'none';
 }

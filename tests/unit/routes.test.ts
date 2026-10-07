@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createRawSnippet } from 'svelte';
 import { render, screen, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

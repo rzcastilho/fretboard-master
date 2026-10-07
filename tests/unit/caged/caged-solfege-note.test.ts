@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { must } from '../must';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';

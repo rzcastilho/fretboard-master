@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { readAudioLog, runAxe } from './support/helpers';
+import { expandDetails, readAudioLog, runAxe } from './support/helpers';
 
 const sizes = [
   { name: 'phone', width: 360, height: 740 },
@@ -13,6 +13,7 @@ for (const size of sizes) {
 
     test('US1-1: opens on C major, root position, 3-2-1, frets 5-5-3', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
       const board = page.getByRole('region', { name: 'Fretboard' });
       await expect(board.locator('.marker-label').filter({ hasText: /^R$/ })).toHaveCount(1);
@@ -22,6 +23,7 @@ for (const size of sizes) {
 
     test('US1-2/3: panel shows notes, intervals, stacking, low to high', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await expect(page.getByText('R – 3 – 5')).toBeVisible();
       await expect(page.getByText('major third + minor third')).toBeVisible();
       await expect(page.getByText('C (root), E (third), G (fifth)')).toBeVisible();
@@ -29,6 +31,7 @@ for (const size of sizes) {
 
     test('US1-4: label switch to note names and back', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await page.getByRole('radio', { name: 'Note names' }).click();
       const board = page.getByRole('region', { name: 'Fretboard' });
       await expect(board.locator('.marker-label').filter({ hasText: /^E$/ })).toHaveCount(1);
@@ -38,6 +41,7 @@ for (const size of sizes) {
 
     test('no axe violations', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
       await runAxe(page);
     });
@@ -55,6 +59,7 @@ for (const size of sizes) {
       page
     }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       for (const name of ['Root', 'Quality', 'Inversion', 'String set']) {
         await expect(
           page.getByRole(name === 'Root' ? 'group' : 'radiogroup', { name })
@@ -85,6 +90,7 @@ for (const size of sizes) {
 
     test('playback stops on every control change', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       const changes = [
         () =>
           page
@@ -130,6 +136,7 @@ for (const size of sizes) {
       page
     }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await pickRoot(page, /D sharp/);
       await expect(page.getByText('E♭ major — Root position', { exact: true })).toBeVisible();
       const board = page.getByRole('region', { name: 'Fretboard' });
@@ -153,6 +160,7 @@ for (const size of sizes) {
 
     test('US3-3: default spelling follows the quality (C♯ minor, D♭ major)', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await pickRoot(page, /C sharp/);
       await expect(page.getByText('D♭ major — Root position', { exact: true })).toBeVisible();
       await page.getByRole('radio', { name: 'minor' }).click();
@@ -161,6 +169,7 @@ for (const size of sizes) {
 
     test('US3-4/5: C augmented is C–E–G♯; naturals have no switch command', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await page.getByRole('radio', { name: 'augmented' }).click();
       const notes = panel(page).getByRole('list', { name: 'Notes' });
       await expect(notes.getByRole('listitem')).toHaveText(['C', 'E', 'G♯']);
@@ -169,6 +178,7 @@ for (const size of sizes) {
 
     test('US3-6: D♯ augmented shows two sounds-as lines and suggests E♭', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await pickRoot(page, /D sharp/);
       await page.getByRole('radio', { name: 'augmented' }).click();
       await page.getByRole('button', { name: 'Switch to D♯' }).click();
@@ -179,6 +189,7 @@ for (const size of sizes) {
 
     test('US3-7: B augmented has F𝄪 line, no suggestion, no switch', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await pickRoot(page, 'B');
       await page.getByRole('radio', { name: 'augmented' }).click();
       await expect(panel(page).getByText('F\u{1D12A} sounds as G')).toBeVisible();
@@ -187,6 +198,7 @@ for (const size of sizes) {
 
     test('US3-8: A augmented has no sounds-as line', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await pickRoot(page, 'A');
       await page.getByRole('radio', { name: 'augmented' }).click();
       await expect(panel(page).getByText(/sounds as/)).toHaveCount(0);
@@ -194,6 +206,7 @@ for (const size of sizes) {
 
     test('US3-9: note-name labels show F𝄪 for D♯ major', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await pickRoot(page, /D sharp/);
       await page.getByRole('button', { name: 'Switch to D♯' }).click();
       await page.getByRole('radio', { name: 'Note names' }).click();
@@ -203,6 +216,7 @@ for (const size of sizes) {
 
     test('US3: panel has no axe violations with sounds-as lines', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await pickRoot(page, /D sharp/);
       await page.getByRole('button', { name: 'Switch to D♯' }).click();
       await runAxe(page);
@@ -221,6 +235,7 @@ for (const size of sizes) {
       page
     }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       const before = await board(page).getByRole('gridcell').allTextContents();
       await page.getByRole('button', { name: 'Octave up' }).click();
       await expect(page.getByRole('button', { name: 'Octave down' })).toHaveAttribute(
@@ -234,6 +249,7 @@ for (const size of sizes) {
 
     test('US4-2: lowest occurrence has Octave down disabled, not hidden', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       const down = page.getByRole('button', { name: 'Octave down' });
       await expect(down).toBeVisible();
       await expect(down).toHaveAttribute('aria-disabled', 'true');
@@ -241,6 +257,7 @@ for (const size of sizes) {
 
     test('US4-3: highest occurrence has Octave up disabled', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await page.getByRole('button', { name: 'Octave up' }).click();
       await expect(page.getByRole('button', { name: 'Octave up' })).toHaveAttribute(
         'aria-disabled',
@@ -250,6 +267,7 @@ for (const size of sizes) {
 
     test('US4-4: 1st inversion on 6-5-4 has both commands disabled', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await page.getByRole('radio', { name: '1st inversion' }).click();
       await page.getByRole('radio', { name: '6-5-4' }).click();
       await expect(page.getByRole('button', { name: 'Octave up' })).toHaveAttribute(
@@ -264,6 +282,7 @@ for (const size of sizes) {
 
     test('US4: no axe violations with disabled octave command', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await runAxe(page);
     });
   });
@@ -275,6 +294,7 @@ test.describe('triads US5 wide stretch', () => {
       globalThis.__fmInstrument = 'AF-4';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: '6-5-4' }).click();
     await expect(page.getByText('Wide stretch', { exact: true })).toBeVisible();
     await runAxe(page);
@@ -282,6 +302,7 @@ test.describe('triads US5 wide stretch', () => {
 
   test('US5-2: standard tuning shows no mark', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     for (const set of ['6-5-4', '5-4-3', '4-3-2', '3-2-1']) {
       await page.getByRole('radio', { name: set }).click();
       await expect(page.getByText('Wide stretch', { exact: true })).toHaveCount(0);
@@ -290,6 +311,7 @@ test.describe('triads US5 wide stretch', () => {
 
   test('US5-3: 0-1-0 shape shows no mark', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: '2nd inversion' }).click();
     await expect(page.getByText('Wide stretch', { exact: true })).toHaveCount(0);
   });
@@ -298,6 +320,7 @@ test.describe('triads US5 wide stretch', () => {
 test.describe('triads US6 special qualities', () => {
   test('US6-1: augmented states symmetry', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'augmented' }).click();
     await expect(page.getByText(/Augmented triads are symmetric/)).toBeVisible();
     await runAxe(page);
@@ -305,6 +328,7 @@ test.describe('triads US6 special qualities', () => {
 
   test('US6-2: diminished marks the ♭5 as characteristic', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'diminished' }).click();
     await expect(page.getByText(/The ♭5 is the characteristic note/)).toBeVisible();
     await expect(page.getByText(/Augmented triads are symmetric/)).toHaveCount(0);
@@ -312,6 +336,7 @@ test.describe('triads US6 special qualities', () => {
 
   test('US6-3: major and minor show neither statement', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     for (const q of ['major', 'minor']) {
       await page.getByRole('radio', { name: q }).click();
       await expect(page.getByText(/symmetric|characteristic note/)).toHaveCount(0);
@@ -326,6 +351,7 @@ test.describe('triads US7 hear the shape', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await listen(page).click();
     await expect
       .poll(async () => (await readAudioLog(page)).filter((e) => e.type === 'step').length)
@@ -343,6 +369,7 @@ test.describe('triads US7 hear the shape', () => {
 
   test('US7-2: any change stops Listen', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await listen(page).click();
     await expect(page.locator('.marker.pulse').first()).toBeVisible();
     await page.getByRole('radio', { name: 'minor' }).click();
@@ -351,6 +378,7 @@ test.describe('triads US7 hear the shape', () => {
 
   test('US7-3: muted, markers still pulse', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Mute sound' }).click();
     await listen(page).click();
     await expect(page.locator('.marker.pulse').first()).toBeVisible();
@@ -363,6 +391,7 @@ test.describe('triads US8 honest messages', () => {
       globalThis.__fmInstrument = 'AF-1-12';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'diminished' }).click();
     await page.getByRole('radio', { name: '5-4-3' }).click();
     await expect(page.getByText('This shape lies beyond fret 12', { exact: true })).toBeVisible();
@@ -379,6 +408,7 @@ test.describe('triads US8 honest messages', () => {
       globalThis.__fmInstrument = 'NC-UNISON';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByText(/^This triad does not close on this string set/)).toBeVisible();
     await runAxe(page);
     await page.getByRole('button', { name: 'Another set' }).click();
@@ -395,6 +425,7 @@ test.describe('triads US8 honest messages', () => {
       globalThis.__fmInstrument = 'NC-UNISON';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     const guidance = await page
       .getByText(/^This triad does not close on this string set/)
       .boundingBox();
@@ -431,6 +462,7 @@ test.describe('triads cross-cutting (T067)', () => {
 
   test('keyboard only: every control is reachable and operable', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     const stops = new Set<string>();
     await page.locator('body').click({ position: { x: 1, y: 1 } });
@@ -465,6 +497,7 @@ test.describe('triads cross-cutting (T067)', () => {
     test(`${width} px: only the fretboard scrolls horizontally; axe clean`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/triads');
+      await expandDetails(page);
       await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
       await expect(board(page)).toBeVisible();
       await expectOnlyBoardScrolls(page);
@@ -475,6 +508,7 @@ test.describe('triads cross-cutting (T067)', () => {
   test('200 % text zoom at 320 px: no page scroll, controls reachable', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     await page.evaluate(() => {
       document.documentElement.style.fontSize = '200%';
@@ -489,6 +523,7 @@ test.describe('triads cross-cutting (T067)', () => {
 
   test('axe: default, guidance, and wide-stretch states', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     await runAxe(page);
 
@@ -497,6 +532,7 @@ test.describe('triads cross-cutting (T067)', () => {
       globalThis.__fmInstrument = 'NC-UNISON';
     });
     await guidance.goto('/triads');
+    await expandDetails(guidance);
     await expect(guidance.getByText(/^This triad does not close on this string set/)).toBeVisible();
     await runAxe(guidance);
 
@@ -505,6 +541,7 @@ test.describe('triads cross-cutting (T067)', () => {
       globalThis.__fmInstrument = 'AF-4';
     });
     await wide.goto('/triads');
+    await expandDetails(wide);
     await wide.getByRole('radio', { name: '6-5-4' }).click();
     await expect(wide.getByText('Wide stretch', { exact: true })).toBeVisible();
     await runAxe(wide);
@@ -524,11 +561,14 @@ test.describe('triads on seven strings (012 US3)', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     const sets = page.getByRole('radiogroup', { name: /string set/i });
     await expect(sets.getByRole('radio')).toHaveText(['7-6-5', '6-5-4', '5-4-3', '4-3-2', '3-2-1']);
     await sets.getByRole('radio', { name: '7-6-5' }).click();
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
-    await expect(page.locator('.description')).toContainText(/frets 13,? ?12,? ?10/);
+    await expect(page.locator('.description')).toContainText(
+      /string 7, fret 13,.*string 6, fret 12,.*string 5, fret 10/
+    );
     await expect(board(page).locator('.marker.normal, .marker').first()).toBeVisible();
 
     await page
@@ -537,12 +577,15 @@ test.describe('triads on seven strings (012 US3)', () => {
       .click();
     await page.getByRole('radio', { name: 'minor' }).click();
     await expect(page.getByText('E minor — Root position', { exact: true })).toBeVisible();
-    await expect(page.locator('.description')).toContainText(/frets 5,? ?3,? ?2/);
+    await expect(page.locator('.description')).toContainText(
+      /string 7, fret 5,.*string 6, fret 3,.*string 5, fret 2/
+    );
     await runAxe(page);
   });
 
   test('Q11: the notes sound at their calculated pitches (C3 E3 G3 on 7-6-5)', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page
       .getByRole('radiogroup', { name: /string set/i })
       .getByRole('radio', { name: '7-6-5' })
@@ -568,6 +611,7 @@ test.describe('triads on seven strings (012 US3)', () => {
       globalThis.__fmInstrument = undefined;
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page
       .getByRole('button', { name: /strings · |^Tuning:|^Instrument/ })
       .first()
@@ -608,6 +652,7 @@ test.describe('triads: string-count change (012 US4)', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await chooseStrings(page, 7);
     await sets(page).getByRole('radio', { name: '7-6-5' }).click();
     await expect(sets(page).getByRole('radio', { name: '7-6-5' })).toBeChecked();
@@ -627,6 +672,7 @@ test.describe('triads: string-count change (012 US4)', () => {
 
   test('Q13: 7 → 6 strings on another set shows no notice and keeps the set', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await chooseStrings(page, 7);
     await sets(page).getByRole('radio', { name: '5-4-3' }).click();
     await chooseStrings(page, 6);
@@ -636,6 +682,7 @@ test.describe('triads: string-count change (012 US4)', () => {
 
   test('6 → 7 strings keeps the view with no notice', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await sets(page).getByRole('radio', { name: '6-5-4' }).click();
     await chooseStrings(page, 7);
     await expect(sets(page).getByRole('radio', { name: '6-5-4' })).toBeChecked();

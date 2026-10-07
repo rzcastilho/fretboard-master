@@ -6,7 +6,8 @@ import type { PitchClass, Spelling } from '../theory/pitch';
 import type { CagedQuality, CagedShapeId } from '../theory/caged';
 import { CHORD_ONLY } from './caged-layers';
 import { choiceOf, effectiveRootSpelling, isAlteredRoot } from '../theory/triad';
-import type { SpellingOverride } from './triads-view';
+import type { SpellingOverride, MotionContext } from './triads-view';
+import type { MotionKind } from '../fretboard/transition';
 import type { StringSetId } from '../instrument/string-sets';
 
 export type { SpellingOverride } from './triads-view';
@@ -137,4 +138,24 @@ export function equalsCagedView(a: CagedViewState, b: CagedViewState): boolean {
 
 export function cagedRootSpelling(s: CagedViewState): Spelling {
   return effectiveRootSpelling(s.rootPc, s.spellingOverride, s.quality);
+}
+
+/**
+ * How the drawn markers should move between two views (026 data-model §7). Pure. Key → slide,
+ * focus → focus, layer on/off → reveal; a key and quality changing together (a link or Reset),
+ * an instrument or presentation change and the first view are instant.
+ */
+export function motionKind(
+  prev: CagedViewState | null,
+  next: CagedViewState,
+  ctx: MotionContext
+): MotionKind {
+  if (prev === null || ctx.instrumentChanged || ctx.presentationChanged) return 'none';
+  if (prev.rootPc !== next.rootPc) return prev.quality !== next.quality ? 'none' : 'slide';
+  if (prev.quality !== next.quality) return 'none';
+  // A layer switch can bring its own focus along (Pentatonic and Scale focus the first shape),
+  // and the notes that appear are what to show, so layers are checked before the focus.
+  if (!equalsLayers(prev.layers, next.layers)) return 'reveal';
+  if (!equalsFocus(prev.focus, next.focus)) return 'focus';
+  return 'none';
 }

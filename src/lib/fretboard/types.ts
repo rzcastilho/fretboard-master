@@ -2,6 +2,9 @@ import type { Instrument, Position } from '../instrument/instrument';
 import type { Spelling } from '../theory/pitch';
 import type { ScaleDegree } from '../theory/caged-layers';
 import type { IntervalId } from '../theory/triad';
+import type { LegendGroup } from './legend';
+import type { FitMode } from './geometry';
+import type { MotionKind } from './transition';
 
 export type NoteFunction = 'root' | 'third' | 'fifth' | 'degree' | 'neutral';
 export type Emphasis = 'highlighted' | 'normal' | 'dimmed' | 'hidden';
@@ -58,6 +61,8 @@ export type FretboardArrow =
 export interface DisplayModel {
   /** At most one per position; first wins. */
   readonly markers: readonly Marker[];
+  /** 026: how this model differs from the previous one, for motion. Absent ≡ 'none'. */
+  readonly motion?: MotionKind;
   readonly labelMode: LabelMode;
   /** Optional localized leading sentence of the text description. */
   readonly summary?: string;
@@ -85,6 +90,10 @@ export interface DisplayModel {
   readonly arrows?: readonly FretboardArrow[];
   /** Visible text marks beside a string's label (CAGED "altered"). Aria-hidden; the description carries the meaning. */
   readonly stringMarks?: readonly { readonly string: number; readonly label: string }[];
+  /** Triads: a shown shape needs a wide stretch. Feeds the Legend. */
+  readonly wideStretch?: boolean;
+  /** CAGED: Legend groups by drawn layer; absent → one flat group. */
+  readonly legendGroups?: readonly LegendGroup[];
   /** Keyed auto-scroll: re-runs only when `key` changes (replaces the highlighted-set trigger). */
   readonly autoScroll?: {
     readonly key: string;
@@ -120,6 +129,13 @@ export interface DrawnMarker extends Marker {
   readonly pulse?: { readonly id: number; readonly durationMs: number };
 }
 
+/** Renderer → store events for fit to screen. No screen coordinates (Principle III). */
+export type FitEvent =
+  | { readonly kind: 'overflow'; readonly value: boolean }
+  /** Pinch in → 'whole', pinch out → 'comfortable'. */
+  | { readonly kind: 'request'; readonly mode: FitMode }
+  | { readonly kind: 'small-tap'; readonly position: Position };
+
 export interface FretboardProps {
   instrument: Instrument;
   model?: DisplayModel;
@@ -128,6 +144,13 @@ export interface FretboardProps {
   /** Positions sounding now; drawn as a pulse, never announced. */
   pulses?: readonly Pulse[];
   ontag?: (id: string) => void;
+  /** Whole-neck or comfortable sizing; default comfortable. */
+  fit?: FitMode;
+  /** Print layout (026): whole neck at the print width, legend and description visible. */
+  printing?: boolean;
+  onfit?: (event: FitEvent) => void;
+  /** One-shot: a position to centre after the next fit switch (consumed once). */
+  takeAnchor?: () => Position | null;
 }
 
 /** Gesture state machine (data-model §6). */

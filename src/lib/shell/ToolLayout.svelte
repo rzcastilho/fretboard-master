@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { measure } from '$lib/measure/measure.svelte';
   import { onMount } from 'svelte';
   import { m } from '$lib/paraglide/messages.js';
   import AppNav from './AppNav.svelte';
@@ -19,6 +20,7 @@
   import { currentLink, share } from '$lib/state/share.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { opening } from '$lib/state/opening.svelte';
+  import { startViewport, viewport } from '$lib/state/viewport.svelte';
   import { linkNoticeMessage } from './link-notice';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
@@ -27,6 +29,8 @@
   import { TOOLS, type ToolId } from './tools';
 
   let { tool }: { tool: ToolId } = $props();
+
+  const landscape = $derived(viewport.arrangement === 'landscape');
 
   const name = $derived(TOOLS.find((t) => t.id === tool)?.name() ?? '');
 
@@ -39,6 +43,11 @@
     document.querySelector<HTMLElement>('h1')?.focus();
   }
 
+  // 028: one tool-opened event per tool per load (the facade de-duplicates).
+  $effect(() => {
+    measure.toolOpened(tool);
+  });
+
   // The manual-copy panel shows one link: close it as soon as the view no longer matches.
   $effect(() => {
     share.viewChanged(currentLink(tool));
@@ -47,6 +56,10 @@
   // FR-014: the address bar follows the view. Opening the screen replaces it with the canonical
   // link; later changes are debounced. Only the store is read here, never `url.searchParams`.
   onMount(() => openToolAddress(tool));
+
+  // 025: track the window so `data-arrangement` follows it. Absent at prerender (media-query
+  // fallback in tokens.css), written once mounted.
+  onMount(() => startViewport());
   $effect(() => {
     scheduleAddress(currentLink(tool));
   });
@@ -59,7 +72,7 @@
   <title>{screenTitle(tool)}</title>
 </svelte:head>
 
-<header aria-label={m.zone_app_bar()}>
+<header aria-label={m.zone_app_bar()} data-landscape={landscape ? '' : undefined}>
   <AppNav current={tool} />
   <ShareButton {tool} />
   <InstrumentButton />
@@ -71,7 +84,7 @@
 </header>
 
 {#if instrumentNotice !== null}
-  <div class="share-notice">
+  <div class="share-notice" data-print="omit">
     <Notice
       message={linkNoticeMessage(instrumentNotice.link, instrument.active.stringCount)}
       actions={[
@@ -84,28 +97,28 @@
 {/if}
 
 {#if opening.incomplete?.screen === tool}
-  <div class="share-notice">
+  <div class="share-notice" data-print="omit">
     <Notice message={m.link_incomplete()} ondismiss={() => opening.dismissIncomplete()} />
   </div>
 {/if}
 
 {#if share.notice !== null}
   {#key share.notice.id}
-    <div class="share-notice">
+    <div class="share-notice" data-print="omit">
       <Notice message={m.share_copied()} ondismiss={() => share.dismissNotice()} />
     </div>
   {/key}
 {/if}
 
 {#if share.fallback !== null}
-  <div class="share-notice">
+  <div class="share-notice" data-print="omit">
     <ShareFallback href={share.fallback.href} />
   </div>
 {/if}
 
 <main>
-  <h1 tabindex="-1">{name}</h1>
-  <div class="grid">
+  <h1 tabindex="-1" class:sr-only={landscape} data-print="show">{name}</h1>
+  <div class="grid" data-arrangement={viewport.arrangement}>
     <svelte:boundary onerror={(e) => recordFailure(tool, e)}>
       {#if tool === 'notes'}
         <NotesTool />

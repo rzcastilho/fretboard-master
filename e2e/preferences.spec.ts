@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe, trackRequests } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe, trackRequests } from './support/helpers';
 
 const card = (page: Page, name: RegExp) => page.getByRole('list').getByRole('link', { name });
 const muteButton = (page: Page) => page.getByRole('button', { name: 'Mute sound' });
@@ -35,11 +35,13 @@ test.describe('remembered preferences: US1', () => {
     await setDropDAndFrets(page);
     await setSound(page);
     await page.goto('/notes');
+    await expandDetails(page);
     await page
       .getByRole('radiogroup', { name: 'Label' })
       .getByRole('radio', { name: 'Octave' })
       .click();
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'Note names' }).click();
 
     await page.goto('/');
@@ -62,10 +64,12 @@ test.describe('remembered preferences: US1', () => {
     await expect(page.getByRole('slider', { name: 'Volume' })).toHaveValue('40');
 
     await page.goto('/notes');
+    await expandDetails(page);
     await expect(
       page.getByRole('radiogroup', { name: 'Label' }).getByRole('radio', { name: 'Octave' })
     ).toBeChecked();
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByRole('radio', { name: 'Note names' })).toBeChecked();
   });
 
@@ -95,8 +99,10 @@ test.describe('remembered preferences: US1', () => {
 
   test('US1-3: musical selection is not restored (SC-005)', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'Hide names', exact: true }).click();
     await page.goto('/triads');
+    await expandDetails(page);
     await page
       .getByRole('radiogroup', { name: 'Quality' })
       .getByRole('radio', { name: 'minor' })
@@ -105,6 +111,7 @@ test.describe('remembered preferences: US1', () => {
     await page.reload();
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     await page.goto('/notes');
+    await expandDetails(page);
     await expect(page.getByRole('button', { name: 'Hide names', exact: true })).toBeVisible();
     await expect(page.locator('.marker.selected')).toHaveCount(0);
   });
@@ -268,10 +275,12 @@ test.describe('remembered preferences: US2', () => {
     await page.getByRole('button', { name: 'Sound settings' }).click();
     await expect(page.getByRole('slider', { name: 'Volume' })).toHaveValue('80');
     await page.goto('/notes');
+    await expandDetails(page);
     await expect(
       page.getByRole('radiogroup', { name: 'Label' }).getByRole('radio', { name: 'Octave' })
     ).toBeChecked();
     await page.goto('/triads');
+    await expandDetails(page);
     await expect(page.getByRole('radio', { name: 'Intervals' })).toBeChecked();
   });
 
@@ -311,12 +320,14 @@ test.describe('remembered preferences: US2', () => {
 });
 
 test.describe('remembered preferences: US3', () => {
-  const erase = (page: Page) => page.getByRole('button', { name: 'Erase my preferences' });
+  const erase = (page: Page) =>
+    page.locator('#privacy').getByRole('button', { name: 'Erase my preferences' });
   const storedKeys = (page: Page) =>
     page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('fretboard-master:')));
 
   async function setNonDefault(page: Page): Promise<void> {
     await page.goto('/triads');
+    await expandDetails(page);
     await setDropDAndFrets(page);
     await setSound(page);
     await page.goto('/about');
@@ -586,6 +597,7 @@ test.describe('remembered preferences: Listen tempo (019 US2)', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tempo(page, 'Medium')).toBeChecked();
     await tempo(page, 'Fast').click();
     expect(await storedTempo(page)).toBe('fast');
@@ -601,13 +613,44 @@ test.describe('remembered preferences: Listen tempo (019 US2)', () => {
 
   test('Erase preferences returns Tempo to Medium', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await tempo(page, 'Fast').click();
     await page.goto('/about');
     await page.getByRole('button', { name: 'Erase my preferences' }).click();
     await page.getByRole('button', { name: 'Erase', exact: true }).click();
     await expect(page).toHaveURL('/');
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(tempo(page, 'Medium')).toBeChecked();
     expect(await storedTempo(page)).toBeUndefined();
+  });
+});
+
+test.describe('theme preference: US1 (026)', () => {
+  const themeAttr = (page: Page) =>
+    page.evaluate(() => document.documentElement.dataset.theme ?? null);
+
+  test('Erase my preferences returns the tab to Follow device at once', async ({ page }) => {
+    await seed(page, '{"version":1,"theme":"dark"}');
+    await page.goto('/about');
+    expect(await themeAttr(page)).toBe('dark');
+    await page.getByRole('button', { name: 'Erase my preferences' }).click();
+    await page.getByRole('button', { name: 'Erase', exact: true }).click();
+    await expect.poll(() => themeAttr(page)).toBeNull();
+  });
+
+  test('records without theme open as Follow device', async ({ page }) => {
+    await seed(page, '{"version":1,"muted":true}');
+    await page.goto('/');
+    expect(await themeAttr(page)).toBeNull();
+    await expect(page.getByRole('radio', { name: 'Follow device' })).toBeChecked();
+  });
+
+  test('corrupted theme follows the device and keeps other fields', async ({ page }) => {
+    await seed(page, '{"version":1,"theme":"purple","muted":true}');
+    await page.goto('/');
+    expect(await themeAttr(page)).toBeNull();
+    await page.getByRole('button', { name: 'Sound settings' }).click();
+    await expect(muteButton(page)).toHaveAttribute('aria-pressed', 'true');
   });
 });

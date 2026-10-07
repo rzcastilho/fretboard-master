@@ -5,22 +5,24 @@
 :root {
   color-scheme: light dark;
 
-  /* Color roles (light) */
-  --color-surface: #ffffff;
-  --color-surface-raised: #f3f4f6;
-  --color-text: #1a1d21;
-  --color-text-muted: #4b5563;
-  --color-accent: #0b5cad;
-  --color-accent-text: #ffffff;
-  --color-border: #9ca3af;
+  /* Surface roles: one declaration each, light-dark(light, dark) (026). */
+  --color-surface: light-dark(#ffffff, #101317);
+  --color-surface-raised: light-dark(#f3f4f6, #1b2027);
+  --color-text: light-dark(#1a1d21, #eef0f3);
+  --color-text-muted: light-dark(#4b5563, #b3bac4);
+  --color-accent: light-dark(#13466a, #c2e0f8);
+  --color-accent-text: light-dark(#ffffff, #101317);
+  --color-border: light-dark(#9ca3af, #6b7480);
   /* Disabled controls: greyed, never error red (feature 006) */
-  --color-disabled-text: #6b7280;
-  --color-disabled-border: #d1d5db;
+  --color-disabled-text: light-dark(#6b7280, #8a929e);
+  --color-disabled-border: light-dark(#d1d5db, #3a414b);
   --disabled-opacity: 0.6;
-  --color-focus-ring: #0b5cad;
-  --color-notice-surface: #e8eef6;
-  --color-notice-text: #1a1d21;
-  --color-notice-border: #6b7f99;
+  --color-focus-ring: light-dark(#1a1d21, #ffffff);
+  --color-focus-ring-outer: light-dark(#1a1d21, #ffffff);
+  --color-focus-ring-inner: light-dark(#ffffff, #101317);
+  --color-notice-surface: light-dark(#e8eef6, #1f2a38);
+  --color-notice-text: light-dark(#1a1d21, #eef0f3);
+  --color-notice-border: light-dark(#6b7f99, #7f93ad);
 
   /* Spacing scale */
   --space-1: 0.25rem;
@@ -92,34 +94,43 @@
   /* Emphasis */
   --emph-highlight-scale: 1.15;
   --emph-dim-scale: 0.85;
-  --emph-dim-opacity: 0.4;
 
-  /* Fretboard colors (light) */
-  --color-fretboard-wood: #e7d3b0;
-  --color-fretboard-line: #6b5a3e;
-  --color-nut: #f5f0e6;
-  --color-inlay: #b8a888;
-  --color-root: #b3261e;
-  --color-third: #0b5cad;
-  --color-fifth: #1b6e3a;
-  --color-neutral-note: #ffffff;
-  --color-neutral-note-stroke: #1a1d21;
-  --color-degree-stroke: #1a1d21;
-  --color-marker-label: #ffffff;
-  --color-hint-surface: #e8eef6;
-  --color-hint-text: #1a1d21;
+  /*
+   * Fretboard palette — identical in light and dark (026, R-05). Literal values only: no
+   * light-dark(), no surface-token reference, no [data-theme] override. Three sets: this one
+   * (standard), the contrast-more set and the print set below.
+   */
+  --fb-color-wood: #3b2a1b;
+  --fb-color-edge: #b09a74;
+  --fb-color-line: #9c8760;
+  --fb-color-nut: #a8946c;
+  --fb-color-inlay: #6b5640;
+  --fb-color-number: #d8ccb4;
+  --fb-color-number-strong: #f6efe0;
+  --fb-color-root: #ff8a80;
+  --fb-color-third: #7ab4f0;
+  --fb-color-fifth: #94ecbc;
+  --fb-color-label: #101317;
+  --fb-color-neutral: #1b2027;
+  --fb-color-neutral-stroke: #eef0f3;
+  --fb-color-degree-stroke: #eef0f3;
+  --fb-color-label-on-neutral: #eef0f3;
+  --fb-color-outline: #f4efe4;
+  --fb-color-arrow-halo: #1d140c;
+  --fb-color-note-highlight: #86c0ea;
+  --fb-color-note-highlight-label: #101317;
+  --fb-octave-tone-1: #a8d2f0;
+  --fb-octave-tone-2: #97c9ed;
+  --fb-octave-tone-3: #86c0ea;
+  --fb-octave-tone-4: #74b7e7;
+  --fb-octave-tone-5: #63aee3;
+  --fb-octave-tone-6: #52a5e0;
+  --fb-octave-tone-7: #409cdd;
+  --fb-region-band: #86c0ea2e;
+  --fb-color-elevation: #f4efe4;
+  --fb-edge-width: 1;
+  --emph-dim-opacity: 0.6;
 
-  /* Notes tool: highlight, octave-tone ramp (accent hue), region band */
-  --color-note-highlight: #1b6498;
-  --color-note-highlight-label: #ffffff;
-  --octave-tone-1: #2078b6;
-  --octave-tone-2: #1d6ea7;
-  --octave-tone-3: #1b6498;
-  --octave-tone-4: #185a89;
-  --octave-tone-5: #155079;
-  --octave-tone-6: #13466a;
-  --octave-tone-7: #103c5b;
-  --region-band: hsl(205 70% 40% / 0.14);
   --marker-badge-size: 0.75rem;
 
   /* Quality comparison (feature 007) */
@@ -127,6 +138,13 @@
   --marker-dash-gap: 3px;
   --arrow-head-size: 0.5rem;
   --panel-column-min: 8rem;
+
+  /* Minimap, landscape side panel, strip edge fade (feature 025) */
+  --minimap-row: 0.375rem;
+  --minimap-dot: 0.375rem;
+  --side-panel-max: 24rem;
+  --edge-fade-width: 1.5rem;
+  --landscape-bar-height: calc(var(--target-min) + 2 * var(--space-2));
 
   --font-family-notes: 'FM Accidentals', var(--font-family-ui);
 
@@ -140,8 +158,12 @@
   /* Sizing */
   --target-min: 44px;
 
-  /* CAGED shape connections (feature 016): ring follows text color in every theme */
-  --connection-ring: var(--color-text);
+  /* Print layout (026): nominal board width, one-page height cap, text floor */
+  --print-board-inline: 190mm;
+  --print-board-max-block: 55vh;
+  --print-text-min: 7pt;
+
+  /* CAGED shape connections (feature 016): ring colour is --fb-color-outline */
   --connection-ring-width: 2px;
   --connection-ring-gap: 2px;
 
@@ -163,87 +185,145 @@
   --tool-grid-rows: auto auto minmax(20rem, 1fr) auto auto;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-surface: #101317;
-    --color-surface-raised: #1b2027;
-    --color-text: #eef0f3;
-    --color-text-muted: #b3bac4;
-    --color-accent: #7ab4f0;
-    --color-accent-text: #101317;
-    --color-border: #6b7480;
-    --color-disabled-text: #8a929e;
-    --color-disabled-border: #3a414b;
-    --color-focus-ring: #9cc8f7;
-    --color-notice-surface: #1f2a38;
-    --color-notice-text: #eef0f3;
-    --color-notice-border: #7f93ad;
-    --color-fretboard-wood: #4a3a26;
-    --color-fretboard-line: #c9b896;
-    --color-nut: #d9d2c3;
-    --color-inlay: #8a7a5c;
-    --color-root: #ff8a80;
-    --color-third: #7ab4f0;
-    --color-fifth: #7fd49a;
-    --color-neutral-note: #1b2027;
-    --color-neutral-note-stroke: #eef0f3;
-    --color-degree-stroke: #eef0f3;
-    --color-marker-label: #101317;
-    --color-hint-surface: #1f2a38;
-    --color-hint-text: #eef0f3;
+/* Theme pin (026): the boot script and the theme store set data-theme on <html>. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
 
-    /* Notes tool: highlight, octave-tone ramp (accent hue), region band */
-    --color-note-highlight: #86c0ea;
-    --color-note-highlight-label: #101317;
-    --octave-tone-1: #a8d2f0;
-    --octave-tone-2: #97c9ed;
-    --octave-tone-3: #86c0ea;
-    --octave-tone-4: #74b7e7;
-    --octave-tone-5: #63aee3;
-    --octave-tone-6: #52a5e0;
-    --octave-tone-7: #409cdd;
-    --region-band: hsl(205 80% 70% / 0.18);
-  }
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 @media (prefers-contrast: more) {
   :root {
+    /* Surfaces deepen so all non-board text reaches 7:1 in light and dark (026 US3). */
+    --color-surface: light-dark(#ffffff, #000000);
+    --color-surface-raised: light-dark(#f0f1f3, #0d1014);
+    --color-text: light-dark(#000000, #ffffff);
+    --color-accent: light-dark(#0b3350, #d6ebfb);
+    --color-accent-text: light-dark(#ffffff, #000000);
+    --color-notice-surface: light-dark(#e1e9f3, #121a24);
+    --color-notice-text: light-dark(#000000, #ffffff);
     --color-text-muted: var(--color-text);
     --color-border: var(--color-text);
     --color-disabled-text: GrayText;
     --color-disabled-border: GrayText;
     --color-notice-border: var(--color-text);
     --color-sound-panel-border: var(--color-text);
-    --connection-ring: CanvasText;
     --border-width: 2px;
     --focus-ring-width: 4px;
-    --color-fretboard-wood: Canvas;
-    --color-fretboard-line: CanvasText;
-    --color-nut: CanvasText;
-    --color-inlay: CanvasText;
-    --color-neutral-note-stroke: CanvasText;
-    --color-degree-stroke: CanvasText;
+    --color-focus-ring-outer: CanvasText;
+    --color-focus-ring-inner: Canvas;
     --marker-neutral-stroke-width: 3px;
     --marker-stroke: 3px;
     --marker-layer-opacity: 1;
     --marker-triad-stroke: 4px;
 
-    --color-note-highlight: CanvasText;
-    --color-note-highlight-label: Canvas;
-    --octave-tone-1: CanvasText;
-    --octave-tone-2: CanvasText;
-    --octave-tone-3: CanvasText;
-    --octave-tone-4: CanvasText;
-    --octave-tone-5: CanvasText;
-    --octave-tone-6: CanvasText;
-    --octave-tone-7: CanvasText;
-    --region-band: color-mix(in srgb, CanvasText 18%, transparent);
+    /* Contrast-more fretboard set: warm, darker board; 7:1 text; 4.5:1 markers and lines. */
+    --fb-color-wood: #2b1d11;
+    --fb-color-edge: #d4bf96;
+    --fb-color-line: #b8a37a;
+    --fb-color-nut: #bfa97f;
+    --fb-color-inlay: #7a6347;
+    --fb-color-number: #f0e6d2;
+    --fb-color-number-strong: #ffffff;
+    --fb-color-root: #ff9c93;
+    --fb-color-third: #8fc2f5;
+    --fb-color-fifth: #a6f2c8;
+    --fb-color-label: #000000;
+    --fb-color-neutral: #14181d;
+    --fb-color-neutral-stroke: #ffffff;
+    --fb-color-degree-stroke: #ffffff;
+    --fb-color-label-on-neutral: #ffffff;
+    --fb-color-outline: #ffffff;
+    --fb-color-arrow-halo: #140d07;
+    --fb-color-note-highlight: #a8d2f0;
+    --fb-color-note-highlight-label: #000000;
+    --fb-octave-tone-1: #c4e2f7;
+    --fb-octave-tone-2: #b8dbf5;
+    --fb-octave-tone-3: #acd5f3;
+    --fb-octave-tone-4: #9fcef1;
+    --fb-octave-tone-5: #92c7ef;
+    --fb-octave-tone-6: #85c0ed;
+    --fb-octave-tone-7: #78b9eb;
+    --fb-region-band: #a8d2f040;
+    --fb-color-elevation: #ffffff;
+    --fb-edge-width: 2;
+    --emph-dim-opacity: 0.7;
   }
 }
 
+/*
+ * Forced colours win over every set above: the board, lines, outlines and strokes take system
+ * colours (Canvas/CanvasText). Role markers become outlined Canvas shapes with CanvasText labels,
+ * so shape and label (not hue) carry root, third and fifth.
+ */
 @media (forced-colors: active) {
   :root {
-    --connection-ring: CanvasText;
+    --fb-color-wood: Canvas;
+    --fb-color-edge: CanvasText;
+    --fb-color-line: CanvasText;
+    --fb-color-nut: CanvasText;
+    --fb-color-inlay: CanvasText;
+    --fb-color-number: CanvasText;
+    --fb-color-number-strong: CanvasText;
+    --fb-color-root: Canvas;
+    --fb-color-third: Canvas;
+    --fb-color-fifth: Canvas;
+    --fb-color-label: CanvasText;
+    --fb-color-elevation: Canvas;
+    --fb-color-neutral: Canvas;
+    --fb-color-neutral-stroke: CanvasText;
+    --fb-color-degree-stroke: CanvasText;
+    --fb-color-label-on-neutral: CanvasText;
+    --fb-color-outline: CanvasText;
+    --fb-color-arrow-halo: Canvas;
+    --fb-color-note-highlight: CanvasText;
+    --fb-color-note-highlight-label: Canvas;
+    --fb-octave-tone-1: CanvasText;
+    --fb-octave-tone-2: CanvasText;
+    --fb-octave-tone-3: CanvasText;
+    --fb-octave-tone-4: CanvasText;
+    --fb-octave-tone-5: CanvasText;
+    --fb-octave-tone-6: CanvasText;
+    --fb-octave-tone-7: CanvasText;
+    --fb-region-band: color-mix(in srgb, CanvasText 18%, transparent);
+  }
+}
+
+/* Print set (026): a light board with dark lines and darker role fills, on any theme. */
+@media print {
+  :root {
+    --fb-color-wood: #fffaf0;
+    --fb-color-edge: #3b2a1b;
+    --fb-color-line: #8a7650;
+    --fb-color-nut: #8c7852;
+    --fb-color-inlay: #d9cdb4;
+    --fb-color-number: #4b3b27;
+    --fb-color-number-strong: #1a1209;
+    --fb-color-root: #b3261e;
+    --fb-color-third: #0b5cad;
+    --fb-color-fifth: #188450;
+    --fb-color-label: #ffffff;
+    --fb-color-neutral: #ffffff;
+    --fb-color-neutral-stroke: #1a1d21;
+    --fb-color-degree-stroke: #1a1d21;
+    --fb-color-label-on-neutral: #1a1d21;
+    --fb-color-outline: #1a1d21;
+    --fb-color-arrow-halo: #ffffff;
+    --fb-color-note-highlight: #1b6498;
+    --fb-color-note-highlight-label: #ffffff;
+    --fb-octave-tone-1: #2078b6;
+    --fb-octave-tone-2: #1d6ea7;
+    --fb-octave-tone-3: #1b6498;
+    --fb-octave-tone-4: #185a89;
+    --fb-octave-tone-5: #155079;
+    --fb-octave-tone-6: #13466a;
+    --fb-octave-tone-7: #103c5b;
+    --fb-region-band: #1b64982e;
+    --fb-color-elevation: #1a1d21;
+    --fb-edge-width: 1.5;
+    --emph-dim-opacity: 0.8;
   }
 }
 
@@ -274,4 +354,43 @@
     --tool-grid-columns: minmax(0, 3fr) minmax(0, 1fr);
     --tool-grid-rows: auto auto minmax(24rem, 1fr) auto;
   }
+}
+
+/*
+ * Arrangements (025 contracts/ui.md §5). `data-arrangement` is written by the tool layout after
+ * mount from the viewport store, so it can weigh the fretboard's width, which media queries
+ * cannot. The media-query rules above stay as the prerender and no-JS fallback. Zone order in
+ * the DOM is B, C, E, D for every tool; only the placement differs.
+ */
+[data-arrangement='narrow'] {
+  --tool-grid-areas: 'b' 'c' 'e' 'd';
+  --tool-grid-columns: minmax(0, 1fr);
+  --tool-grid-rows: auto minmax(20rem, 1fr) auto auto;
+}
+
+[data-arrangement='medium'],
+[data-arrangement='wide-stacked'] {
+  --tool-grid-areas: 'b b' 'c c' 'e d';
+  --tool-grid-columns: minmax(0, 1fr) minmax(0, 1fr);
+  --tool-grid-rows: auto minmax(20rem, 1fr) auto;
+}
+
+[data-arrangement='wide-side'] {
+  --tool-grid-areas: 'b d' 'c d' 'e d';
+  --tool-grid-columns: minmax(0, 3fr) minmax(0, 1fr);
+  --tool-grid-rows: auto minmax(24rem, 1fr) auto;
+}
+
+/*
+ * Landscape phone (025 contracts/ui.md §5, §7). The bar is one icon-only row, zone B a one-row
+ * strip with the Panels button at its end, zone C takes the rest of the height. Zones E and D
+ * live in the sliding panel (SidePanels), so they take no grid area. JS-only: landscape is
+ * decided by `isPhoneLandscape`, never by an orientation media query.
+ */
+[data-arrangement='landscape'] {
+  --tool-grid-areas: 'b p' 'c c';
+  --tool-grid-columns: minmax(0, 1fr) auto;
+  --tool-grid-rows: auto minmax(0, 1fr);
+  block-size: calc(100dvh - var(--landscape-bar-height) - 2 * var(--space-4));
+  gap: var(--space-2);
 }

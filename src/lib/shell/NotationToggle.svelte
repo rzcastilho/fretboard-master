@@ -3,6 +3,8 @@
   import { solfegeName } from '$lib/notation/notation';
   import { NOTATIONS, type Notation } from '$lib/notation/policy';
   import { notation } from '$lib/state/notation.svelte';
+  import { shortcuts } from '$lib/state/shortcuts.svelte';
+  import BarIcon from './BarIcon.svelte';
 
   /** Each option previews its own notation, whichever one is active. */
   const SAMPLE: Readonly<Record<Notation, () => string>> = {
@@ -11,12 +13,19 @@
   };
 </script>
 
-<div class="toggle" role="group" aria-label={m.notation_label()}>
+<div
+  class="toggle"
+  data-print="omit"
+  role="group"
+  aria-label={m.notation_label()}
+  aria-keyshortcuts={shortcuts.enabled ? 'N' : undefined}
+>
   {#each NOTATIONS as value (value)}
     <button
       type="button"
       aria-pressed={notation.effective === value}
-      onclick={() => notation.choose(value)}>{SAMPLE[value]()}</button
+      onclick={() => notation.choose(value)}
+      ><BarIcon name={value} /><span class="bar-label">{SAMPLE[value]()}</span></button
     >
   {/each}
 </div>

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { must } from '../must';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
@@ -49,12 +50,15 @@ describe('CagedTool', () => {
       expect(screen.queryByRole('radio', { name })).toBeNull();
       expect(screen.queryByRole('checkbox', { name })).toBeNull();
     }
-    // Board buttons: the nine toggle tags, then the description toggle.
+    // Board buttons: the nine toggle tags, then the description and Legend toggles.
     const buttons = within(screen.getByRole('region', { name: 'Fretboard' })).queryAllByRole(
       'button'
     );
     expect(buttons.filter((b) => b.hasAttribute('aria-pressed'))).toHaveLength(9);
-    expect(buttons.map((b) => b.textContent?.trim()).at(-1)).toBe('Show text description');
+    expect(buttons.map((b) => b.textContent?.trim()).slice(-2)).toEqual([
+      'Describe this view',
+      'Legend'
+    ]);
   });
 
   describe('key selection (US2)', () => {

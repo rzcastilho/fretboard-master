@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { measure } from '$lib/measure/measure.svelte';
   import { m } from '$lib/paraglide/messages.js';
   import Fretboard from '$lib/fretboard/Fretboard.svelte';
   import { fixtureModel } from '$lib/fretboard/fixtures';
@@ -16,14 +17,28 @@
   import StringFilter from '$lib/tools/notes/StringFilter.svelte';
   import PositionCard from '$lib/tools/notes/PositionCard.svelte';
   import { maybeFault } from '$lib/shell/fault';
+  import { markCalculation } from '$lib/shell/failure';
   import { openCagedFromNote, openTriadsFromNote, viewAsTriad } from '$lib/state/links.svelte';
   import { notes } from '$lib/state/notes.svelte';
   import { playback } from '$lib/state/playback.svelte';
+  import { fit } from '$lib/state/fit.svelte';
+  import { print } from '$lib/state/print.svelte';
+  import FitNotice from '$lib/tools/FitNotice.svelte';
+  import FitToggle from '$lib/tools/FitToggle.svelte';
+  import ContextZone from '$lib/tools/ContextZone.svelte';
+  import SidePanels from '$lib/tools/SidePanels.svelte';
   import { onMount } from 'svelte';
 
   // Test-only hook: throws during render so the boundary can be exercised (dead code in production).
-  const guard = () => maybeFault('notes');
+  const guard = () => maybeFault('notes', 'drawing');
   guard();
+
+  // Display-model derivation: an error here is a calculation failure (028 R-09); the test-only
+  // fault hook fires inside it (dead code in production).
+  markCalculation(() => {
+    maybeFault('notes', 'calculation');
+    return notes.display;
+  });
 
   // Test-only hook: render a named fixture model once on mount (dead code in production).
   let fixture: DisplayModel | undefined = $state();
@@ -63,6 +78,7 @@
   // Activation plays the note and opens the card; focus stays on the tapped cell.
   function onactivate(p: Position) {
     notes.activate(p);
+    measure.firstInteraction();
     if (__FM_FAULT_INJECTION__) (globalThis.__fmFretboardEvents ??= []).push({ ...p });
   }
 
@@ -81,7 +97,7 @@
   }
 </script>
 
-<section class="b" aria-labelledby="notes-zone-b">
+<section class="b" data-print="omit" aria-labelledby="notes-zone-b">
   <h2 id="notes-zone-b">{m.notes_zone_selector()}</h2>
   <NoteSelector selected={notes.state.selection} ontoggle={notes.toggleNote} />
   <DetectedTriad detected={notes.display.detected} onview={viewAsTriad} />
@@ -102,54 +118,68 @@
   {#if notes.display.emptyGuidance}
     <Notice message={m.notes_notice_empty()} />
   {/if}
+  <FitNotice />
   <Fretboard
     bind:this={board}
     instrument={notes.instrument}
     {model}
     {onactivate}
     pulses={playback.pulses}
+    fit={fit.effective}
+    printing={print.active}
+    onfit={fit.handle}
+    takeAnchor={fit.takeAnchor}
   />
 </section>
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions (Escape closes the card) -->
-<section class="d" aria-labelledby="notes-zone-d" {onkeydown}>
-  <h2 id="notes-zone-d">{m.notes_zone_details()}</h2>
-  {#if notes.display.cardInfo}
-    <PositionCard
-      info={notes.display.cardInfo}
-      onaddnote={notes.addNote}
-      ontriads={openTriadsFromNote}
-      oncaged={openCagedFromNote}
-      onclose={closeCard}
-    />
-  {/if}
-  <StringFilter
-    instrument={notes.instrument}
-    active={notes.state.activeStrings}
-    ontoggle={notes.toggleString}
-  />
-  <RegionFilter
-    fretCount={notes.instrument.fretCount}
-    region={notes.state.region}
-    onstart={notes.setRegionStart}
-    onend={notes.setRegionEnd}
-    onshortcut={notes.setRegionShortcut}
-  />
-</section>
-<section class="e" aria-labelledby="notes-zone-e">
-  <h2 id="notes-zone-e">{m.notes_zone_actions()}</h2>
-  <NotesActions
-    background={notes.state.background}
-    labelType={notes.state.labelType}
-    onbackground={notes.setBackground}
-    onlabeltype={notes.setLabelType}
-    hideNames={notes.state.hideNames}
-    listen={notes.display.listen}
-    onhidenames={notes.setHideNames}
-    onlisten={notes.listen}
-    onclear={notes.clear}
-    onreset={notes.reset}
-  />
-</section>
+<SidePanels>
+  {#snippet actions()}
+    <section class="e" data-print="omit" aria-labelledby="notes-zone-e">
+      <h2 id="notes-zone-e">{m.notes_zone_actions()}</h2>
+      <FitToggle />
+      <NotesActions
+        background={notes.state.background}
+        labelType={notes.state.labelType}
+        onbackground={notes.setBackground}
+        onlabeltype={notes.setLabelType}
+        hideNames={notes.state.hideNames}
+        listen={notes.display.listen}
+        onhidenames={notes.setHideNames}
+        onlisten={notes.listen}
+        onclear={notes.clear}
+        onreset={notes.reset}
+      />
+    </section>
+  {/snippet}
+  {#snippet details()}
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions (Escape closes the card) -->
+    <section class="d" aria-labelledby="notes-zone-d" {onkeydown}>
+      <h2 id="notes-zone-d">{m.notes_zone_details()}</h2>
+      <ContextZone summary={notes.display.summary}>
+        {#if notes.display.cardInfo}
+          <PositionCard
+            info={notes.display.cardInfo}
+            onaddnote={notes.addNote}
+            ontriads={openTriadsFromNote}
+            oncaged={openCagedFromNote}
+            onclose={closeCard}
+          />
+        {/if}
+        <StringFilter
+          instrument={notes.instrument}
+          active={notes.state.activeStrings}
+          ontoggle={notes.toggleString}
+        />
+        <RegionFilter
+          fretCount={notes.instrument.fretCount}
+          region={notes.state.region}
+          onstart={notes.setRegionStart}
+          onend={notes.setRegionEnd}
+          onshortcut={notes.setRegionShortcut}
+        />
+      </ContextZone>
+    </section>
+  {/snippet}
+</SidePanels>
 
 <style>
   section {

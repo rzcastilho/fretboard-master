@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { NoteFunction } from './types';
+  import type { NoteFunction, OctaveTone } from './types';
 
   /**
    * Legend sample of a board marker (aria-hidden). Same glyph geometry as `Fretboard.svelte`,
@@ -10,18 +10,28 @@
     layer?: 'arpeggio' | 'triad';
     /** Extra dot on a Pentatonic/Scale note outside the pentatonic. */
     extra?: boolean;
+    /** Selected note (Notes): the highlighted neutral glyph. */
+    emphasis?: 'highlighted';
+    /** Same-octave colour sample (with `emphasis: 'highlighted'`). */
+    tone?: OctaveTone;
+    /** Comparison triad note: dashed outline. */
+    variant?: 'comparison';
+    /** Connection ring around the glyph. */
+    ring?: boolean;
   }
-  let { fn, layer, extra = false }: Props = $props();
+  let { fn, layer, extra = false, emphasis, tone, variant, ring = false }: Props = $props();
 
   const SIZE = 44;
   const ROOT = 28;
   const MEDIUM = 26;
   const SMALL = 20;
+  const RING = Math.max(ROOT, MEDIUM + 4) / 2;
   const diamond = (half: number) => `0,${-half} ${half},0 0,${half} ${-half},0`;
 </script>
 
 <svg
-  class="marker-sample marker {fn}"
+  class="marker-sample marker {fn}{emphasis ? ` ${emphasis}` : ''}{tone ? ` tone-${tone}` : ''}"
+  class:comparison={variant === 'comparison'}
   class:layer-arpeggio={layer === 'arpeggio'}
   class:layer-triad={layer === 'triad'}
   aria-hidden="true"
@@ -30,6 +40,7 @@
   height={SIZE}
   viewBox="{-SIZE / 2} {-SIZE / 2} {SIZE} {SIZE}"
 >
+  <rect class="backdrop" x={-SIZE / 2} y={-SIZE / 2} width={SIZE} height={SIZE} rx="6" />
   <g
     class="shape"
     style:transform={layer === 'arpeggio'
@@ -53,6 +64,9 @@
     {#if extra}
       <circle class="extra-dot" cy={SMALL / 2 + 3} />
     {/if}
+    {#if ring}
+      <circle class="connection-ring" style:--ring-base={RING} />
+    {/if}
   </g>
 </svg>
 
@@ -61,35 +75,75 @@
     flex: none;
     overflow: visible;
   }
+  .backdrop {
+    fill: var(--fb-color-wood);
+    stroke: var(--fb-color-edge);
+    stroke-width: var(--fb-edge-width);
+  }
   .shape {
     transform-box: fill-box;
     transform-origin: center;
   }
   .root .glyph {
-    fill: var(--color-root);
+    fill: var(--fb-color-root);
   }
   .third .glyph {
-    fill: var(--color-third);
+    fill: var(--fb-color-third);
   }
   .fifth .glyph {
-    fill: var(--color-fifth);
+    fill: var(--fb-color-fifth);
   }
   .glyph.ring {
-    fill: var(--color-neutral-note);
-    stroke: var(--color-neutral-note-stroke);
+    fill: var(--fb-color-neutral);
+    stroke: var(--fb-color-neutral-stroke);
     stroke-width: var(--marker-neutral-stroke-width);
   }
   .glyph.outline {
     fill: none;
-    stroke: var(--color-degree-stroke);
+    stroke: var(--fb-color-degree-stroke);
     stroke-width: var(--marker-stroke);
   }
+  .neutral.highlighted .glyph {
+    fill: var(--fb-color-note-highlight);
+  }
+  .tone-1 .glyph {
+    fill: var(--fb-octave-tone-1);
+  }
+  .tone-2 .glyph {
+    fill: var(--fb-octave-tone-2);
+  }
+  .tone-3 .glyph {
+    fill: var(--fb-octave-tone-3);
+  }
+  .tone-4 .glyph {
+    fill: var(--fb-octave-tone-4);
+  }
+  .tone-5 .glyph {
+    fill: var(--fb-octave-tone-5);
+  }
+  .tone-6 .glyph {
+    fill: var(--fb-octave-tone-6);
+  }
+  .tone-7 .glyph {
+    fill: var(--fb-octave-tone-7);
+  }
+  .comparison .glyph {
+    stroke: var(--fb-color-outline);
+    stroke-width: var(--marker-stroke);
+    stroke-dasharray: var(--marker-dash) var(--marker-dash-gap);
+  }
+  .connection-ring {
+    fill: none;
+    stroke: var(--fb-color-outline);
+    stroke-width: var(--connection-ring-width);
+    r: calc(var(--ring-base) * 1px + var(--connection-ring-gap));
+  }
   .layer-triad .glyph {
-    stroke: var(--color-text);
+    stroke: var(--fb-color-outline);
     stroke-width: var(--marker-triad-stroke);
   }
   .extra-dot {
-    fill: var(--color-text);
+    fill: var(--fb-color-outline);
     r: var(--marker-extra-dot);
   }
 </style>

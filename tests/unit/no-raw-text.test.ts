@@ -99,6 +99,25 @@ describe('no raw user-facing text in Svelte components', () => {
   }
 });
 
+describe('view aids strings (024)', () => {
+  const components = ['src/lib/fretboard/ViewAids.svelte', 'src/lib/fretboard/LegendPanel.svelte'];
+
+  it('scans ViewAids and LegendPanel and finds no raw text', () => {
+    for (const file of components) {
+      expect(svelteFiles('src'), file).toContain(file);
+      expect(findRawText(readFileSync(file, 'utf8')), file).toEqual([]);
+    }
+  });
+
+  it('every legend_* catalog message is used by LegendPanel', () => {
+    const catalog = JSON.parse(readFileSync('messages/en.json', 'utf8')) as Record<string, string>;
+    const panel = readFileSync('src/lib/fretboard/LegendPanel.svelte', 'utf8');
+    const keys = Object.keys(catalog).filter((k) => k.startsWith('legend_'));
+    expect(keys.length).toBe(29);
+    for (const key of keys) expect(panel, key).toContain(`m.${key}`);
+  });
+});
+
 describe('triad layer strings (018)', () => {
   const triadComponent = 'src/lib/tools/caged/CagedTriadSets.svelte';
   const catalog = JSON.parse(readFileSync('messages/en.json', 'utf8')) as Record<string, string>;

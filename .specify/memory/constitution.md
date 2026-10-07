@@ -1,18 +1,22 @@
 <!--
 Sync Impact Report
-- Version change: 1.8.0 → 1.9.0 (MINOR: Principle VI initial JS budget raised from 120 KB to
-  128 KB gzip)
-- Modified principles: VI (Performance Budgets) — initial JavaScript, gzip: ≤ 120 KB → ≤ 128 KB.
-  Slice 023 (open a shared view) ships the link decoder, the receive-side validation and the
-  session instrument override in the initial bundle, because ADR 0002 keeps a single bundle and
-  the link is applied before hydration (research R-08). The slice's required behavior was not
-  trimmed.
-- Modified sections: none
+- Version change: 1.10.0 → 1.11.0 (MINOR: Principle VI initial JS budget raised from 136 KB to
+  150 KB gzip)
+- Modified principles: VI (Performance Budgets) — initial JavaScript, gzip: ≤ 136 KB → ≤ 150 KB.
+  Slice 026 (themes, motion and print) measured 136.9 KB after trimming (`theme-boot.js`
+  comments, shared marker grouping in `transition.ts`, unit-table-free `printInlinePx`): the
+  theme store and selector, boot script, marker reconciliation, per-tool motion kinds and print
+  layout ship in the initial bundle because ADR 0002 keeps a single bundle. The cap is raised
+  to 150 KB by owner decision, leaving headroom for later slices instead of another
+  one-slice-at-a-time raise. The slice's required behavior was not cut.
+- Modified sections: Performance budgets table
 - Added sections: none
 - Removed sections: none
 - Dependent guidance updated: `scripts/check-bundle-size.mjs` (limit and messages),
   `docs/adr/0002-single-bundle-for-version-continuity.md` (cap history)
-- Prior amendments: 1.7.0 → 1.8.0 raised the initial JS budget from 94 KB to 120 KB (slice 017);
+- Prior amendments: 1.9.0 → 1.10.0 raised the initial JS budget from 128 KB to 136 KB (slice 025);
+  1.8.0 → 1.9.0 raised the initial JS budget from 120 KB to 128 KB (slice 023);
+  1.7.0 → 1.8.0 raised the initial JS budget from 94 KB to 120 KB (slice 017);
   1.6.0 → 1.7.0 raised it from 92 KB to 94 KB (slice 016);
   1.5.0 → 1.6.0 raised it from 90 KB to 92 KB (slice 015);
   1.4.0 → 1.5.0 added the "Verification tiers" rule (local runs target touched
@@ -131,7 +135,7 @@ enforce these budgets:
 | Control change to fretboard update | ≤ 100 ms |
 | Instrument change | ≤ 300 ms |
 | Tap to sound, after audio unlock | ≤ 100 ms |
-| Initial JavaScript, gzip | ≤ 128 KB |
+| Initial JavaScript, gzip | ≤ 150 KB |
 | Lighthouse mobile performance score | ≥ 90 |
 
 - Sound material MUST NOT block the fretboard from becoming interactive.
@@ -317,4 +321,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.9.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-06
+**Version**: 1.11.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-07

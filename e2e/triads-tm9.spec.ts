@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { readAudioLog, runAxe } from './support/helpers';
+import { expandDetails, readAudioLog, runAxe } from './support/helpers';
 
 /**
  * TM-9 screenshot views 7, 8, 11, 12 (specs/005-triads-isolated-view/contracts/test-hooks.md)
@@ -21,6 +21,7 @@ async function open(page: Page, instrument?: 'AF-4' | 'AF-8' | 'AF-21') {
     }, instrument);
   }
   await page.goto('/triads');
+  await expandDetails(page);
   await board(page).waitFor();
 }
 
@@ -150,7 +151,9 @@ test.describe('TM-9 triads on seven strings (feature 012)', () => {
     await expect(panel(page).getByRole('list', { name: 'Notes' }).getByRole('listitem')).toHaveText(
       ['E', 'G', 'B']
     );
-    await expect(page.locator('.description')).toContainText(/frets 5,? ?3,? ?2/);
+    await expect(page.locator('.description')).toContainText(
+      /string 7, fret 5,.*string 6, fret 3,.*string 5, fret 2/
+    );
     await page.getByRole('button', { name: 'Listen', exact: true }).click();
     await expect
       .poll(async () => (await readAudioLog(page)).filter((e) => e.type === 'step').length)

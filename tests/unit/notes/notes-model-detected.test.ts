@@ -60,3 +60,22 @@ describe('NotesDisplay.detected', () => {
     expect(build(select(0, 4)).model.description).not.toContain('The selected notes form');
   });
 });
+
+describe('Notes description (US1, FR-007)', () => {
+  it('empty selection with no background says to pick a note', async () => {
+    const { describeView } = await import('../../../src/lib/fretboard/description');
+    const s = { ...INIT, background: 'none' as const, selection: [] };
+    const d = build(s);
+    expect(d.model.description).toBe('No notes selected. Pick a note in the note selector.');
+    expect(describeView(STANDARD_GUITAR, { ...d.model, description: undefined })).not.toBe('');
+  });
+
+  it('selection with a string filter states both and lists positions without function', () => {
+    const s = { ...select(0), activeStrings: [1, 2] };
+    const text = build(s).model.description as string;
+    expect(text).toContain('C selected');
+    expect(text).toContain('strings 1 to 2');
+    expect(text).toMatch(/string 2, fret 1, C/);
+    expect(text).not.toMatch(/root|third|fifth/);
+  });
+});

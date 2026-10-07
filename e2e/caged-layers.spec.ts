@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe } from './support/helpers';
 
 const board = (page: Page) => page.getByRole('region', { name: 'Fretboard' });
 const layers = (page: Page) => page.getByRole('group', { name: 'Layers' });
@@ -13,6 +13,7 @@ const live = (page: Page) => board(page).locator('[aria-live="polite"]');
 test.describe('caged layers US2: layer switches double as the legend', () => {
   test('US2-1: five rows, Chord on and disabled, the rest off and enabled', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(layers(page).getByRole('switch')).toHaveText([
       /Chord\s*On/,
       /Arpeggio\s*Off/,
@@ -31,6 +32,7 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
 
   test('US2-2: toggling follows the base-layer rule', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Arpeggio').click();
     await expect(layerSwitch(page, 'Arpeggio')).toHaveAttribute('aria-checked', 'true');
     await expect(layerSwitch(page, 'Chord')).not.toHaveAttribute('aria-disabled', 'true');
@@ -44,6 +46,7 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
 
   test('US2-3: every row carries an aria-hidden 44x44 sample marker', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const rows = layers(page).getByRole('switch');
     await expect(rows).toHaveCount(5);
     for (let i = 0; i < 5; i++) {
@@ -64,6 +67,7 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
 
   test('US2-4: navigating away and back keeps the layers', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Arpeggio').click();
     const nav = page.getByRole('navigation', { name: 'Tools' });
     await nav.getByRole('link', { name: 'Triads' }).click();
@@ -74,11 +78,13 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
 
   test('US2-5: a fresh open resets to Chord only and stores no layer data', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Arpeggio').click();
     await layerSwitch(page, 'Scale').click();
     const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }));
     expect(stored.toLowerCase()).not.toMatch(/arpeggio|pentatonic|scale|layers/);
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-checked', 'true');
     for (const name of ['Arpeggio', 'Pentatonic', 'Scale'])
       await expect(layerSwitch(page, name)).toHaveAttribute('aria-checked', 'false');
@@ -86,6 +92,7 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
 
   test('US2-6: Reset tool returns the layers to Chord only', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Arpeggio').click();
     await layerSwitch(page, 'Pentatonic').click();
     await page.getByRole('button', { name: 'Reset tool' }).click();
@@ -98,6 +105,7 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     await layerSwitch(page, 'Scale').click();
     await layerSwitch(page, 'Chord').click();
@@ -110,12 +118,14 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
 
   test('switches announce their change politely', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Arpeggio').click();
     await expect(live(page)).toContainText('Arpeggio layer on.');
   });
 
   test('has no axe violations', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await runAxe(page);
   });
 });
@@ -169,6 +179,7 @@ const tm64 = (): string[] => {
 test.describe('caged layers US1: see the scale inside the shape', () => {
   test('US1-1: C major, E in focus, Scale on, Interval labels match TM-6.4', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     await layerSwitch(page, 'Scale').click();
     const shown = live_(await marks(page));
@@ -188,6 +199,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
 
   test('US1-2: Name labels show the note names and persist across reload', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(labelRadio(page, 'Intervals')).toBeChecked();
     await shape(page, 'E').click();
     await layerSwitch(page, 'Scale').click();
@@ -216,6 +228,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
       globalThis.__fmInstrument = 'AF-21';
     });
     await page.goto('/caged');
+    await expandDetails(page);
     await keyButton(page, 2).click();
     await shape(page, 'C').click();
     await layerSwitch(page, 'Scale').click();
@@ -234,6 +247,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
       globalThis.__fmInstrument = 'AF-1-12';
     });
     await page.goto('/caged');
+    await expandDetails(page);
     const notices = page.locator('.notice');
     const before = await notices.count();
     await shape(page, 'G').click();
@@ -244,6 +258,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
 
   test('US1-5: the open-position C shape draws nothing below the nut', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'C').click();
     await layerSwitch(page, 'Scale').click();
     const all = await marks(page);
@@ -255,6 +270,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
   test('US1-6: under reduced motion every note is present in the first frame', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     const before = live_(await marks(page)).length;
     await layerSwitch(page, 'Scale').click();
@@ -270,6 +286,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
 
   test('the Labels group sits before Previous and Next shape', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const labels = page.getByRole('radiogroup', { name: 'Labels' });
     const prev = page.getByRole('button', { name: 'Previous shape' });
     const a = await labels.boundingBox();
@@ -291,6 +308,7 @@ test.describe('caged layers US3: arpeggio around the chord', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const before = await marks(page);
     await layerSwitch(page, 'Arpeggio').click();
     const after = await marks(page);
@@ -310,6 +328,7 @@ test.describe('caged layers US3: arpeggio around the chord', () => {
 
   test('US3-1: arpeggio markers are smaller and lighter than chord markers', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Arpeggio').click();
     const arp = board(page).locator('.marker.layer-arpeggio .shape').first();
     const chord = board(page).locator('.marker:not(.layer-arpeggio) .shape').first();
@@ -322,6 +341,7 @@ test.describe('caged layers US3: arpeggio around the chord', () => {
 
   test('US3-2: A minor arpeggio shows R, b3 and 5 only', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await keyButton(page, 9).click();
     await page
       .getByRole('radiogroup', { name: 'Quality' })
@@ -334,6 +354,7 @@ test.describe('caged layers US3: arpeggio around the chord', () => {
 
   test('US3-3: with a shape in focus arpeggio notes stay in its region', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     await layerSwitch(page, 'Arpeggio').click();
     const frets = (await marks(page))
@@ -348,6 +369,7 @@ test.describe('caged layers US3: arpeggio around the chord', () => {
 
   test('US3-4 and quickstart 3: Chord off draws chord positions as arpeggio', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     const chordKeys = (await marks(page)).map((x) => x.key);
     await layerSwitch(page, 'Arpeggio').click();
     await layerSwitch(page, 'Chord').click();
@@ -368,6 +390,7 @@ test.describe('caged layers US3: arpeggio around the chord', () => {
 test.describe('caged layers US4: pentatonic box around the chord', () => {
   const minorA = async (page: Page) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await keyButton(page, 9).click();
     await page
       .getByRole('radiogroup', { name: 'Quality' })
@@ -440,6 +463,7 @@ test.describe('caged layers US4: pentatonic box around the chord', () => {
 
   test('US4-4: major shape shows R 2 3 5 6; minor shape R b3 4 5 b7', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     await layerSwitch(page, 'Pentatonic').click();
     await layerSwitch(page, 'Chord').click();
@@ -456,6 +480,7 @@ test.describe('caged layers US4: pentatonic box around the chord', () => {
 test.describe('caged layers US5: the notes that are only scale', () => {
   const bothOn = async (page: Page) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     await layerSwitch(page, 'Pentatonic').click();
     await layerSwitch(page, 'Scale').click();
@@ -479,6 +504,7 @@ test.describe('caged layers US5: the notes that are only scale', () => {
 
   test('US5-2: minor marks the 2nd and flat 6th', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await keyButton(page, 9).click();
     await page
       .getByRole('radiogroup', { name: 'Quality' })
@@ -497,6 +523,7 @@ test.describe('caged layers US5: the notes that are only scale', () => {
 
   test('US5-3: only Scale on shows no extra mark and no extra sample', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     await layerSwitch(page, 'Scale').click();
     await expect(board(page).locator('.marker.degree').first()).toBeVisible();
@@ -524,6 +551,7 @@ test.describe('caged layers US5: the notes that are only scale', () => {
 test.describe('caged layers US6: readable with everything on', () => {
   const allOn = async (page: Page) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     for (const name of ['Arpeggio', 'Pentatonic', 'Scale']) await layerSwitch(page, name).click();
     await expect(layerSwitch(page, 'Scale')).toHaveAttribute('aria-checked', 'true');
@@ -578,6 +606,8 @@ test.describe('caged layers US6: readable with everything on', () => {
 
   test('US6-3: the description lists the layers and the region counts', async ({ page }) => {
     await allOn(page);
+    // The live region announces the settled description 500 ms after the last change.
+    await expect(live(page)).toContainText('Layers on: Chord, Arpeggio, Pentatonic, and Scale.');
     const text = (await live(page).textContent()) ?? '';
     expect(text).toContain('Layers on: Chord, Arpeggio, Pentatonic, and Scale.');
     const m = text.match(
@@ -596,6 +626,7 @@ test.describe('caged layers polish: accessibility and reflow', () => {
 
   test('axe: zero violations with every layer on and Name labels', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     for (const name of ['Arpeggio', 'Pentatonic', 'Scale']) await layerSwitch(page, name).click();
     await labelRadio(page, 'Note names').click();
@@ -607,6 +638,7 @@ test.describe('caged layers polish: accessibility and reflow', () => {
     page
   }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await shape(page, 'E').click();
     for (const name of allSwitches) {
       await layerSwitch(page, name).focus();
@@ -630,6 +662,7 @@ test.describe('caged layers polish: accessibility and reflow', () => {
 
   test('all four switches are at least 44×44 px', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     for (const name of allSwitches) {
       const box = await layerSwitch(page, name).boundingBox();
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
@@ -640,6 +673,7 @@ test.describe('caged layers polish: accessibility and reflow', () => {
   test('layer switches wrap without horizontal scroll at 320 px', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Scale').scrollIntoViewIfNeeded();
     await expectNoHorizontalScroll(page);
     for (const name of allSwitches) {
@@ -656,6 +690,7 @@ test.describe('caged layers polish: accessibility and reflow', () => {
     // 200% zoom on a 640 px window is a 320 CSS px viewport; the page must still reflow.
     await page.setViewportSize({ width: 320, height: 320 });
     await page.goto('/caged');
+    await expandDetails(page);
     await expectNoHorizontalScroll(page);
     for (const name of allSwitches) {
       await layerSwitch(page, name).scrollIntoViewIfNeeded();
@@ -676,6 +711,7 @@ test.describe('caged layers quickstart: tunings', () => {
   test('row 15: Drop D, D major, E shape, Scale: string 6 shows 9, 11 and 12', async ({ page }) => {
     await seedTuning(page, 'AF-4');
     await page.goto('/caged');
+    await expandDetails(page);
     await keyButton(page, 2).click();
     await shape(page, 'E').click();
     await layerSwitch(page, 'Scale').click();
@@ -690,9 +726,11 @@ test.describe('caged layers quickstart: tunings', () => {
 
   test('row 19: Open G disables all four switches with the explanation', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await layerSwitch(page, 'Scale').click();
     await seedTuning(page, 'AF-8');
     await page.goto('/caged');
+    await expandDetails(page);
     for (const name of ['Chord', 'Arpeggio', 'Pentatonic', 'Scale'])
       await expect(layerSwitch(page, name)).toHaveAttribute('aria-disabled', 'true');
     await expect(layerSwitch(page, 'Chord')).toHaveAccessibleDescription(

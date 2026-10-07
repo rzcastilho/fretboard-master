@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';

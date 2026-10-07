@@ -24,7 +24,9 @@ for (const size of sizes) {
     }) => {
       await page.goto('/triads');
       await page.getByRole('radio', { name: '6-5-4' }).click();
-      await expect(page.locator('.description')).toContainText(/frets 8,? ?7,? ?5/);
+      await expect(page.locator('.description')).toContainText(
+        /string 6, fret 8,.*string 5, fret 7,.*string 4, fret 5/
+      );
 
       const dialog = await openPanel(page);
       await expect(dialog).toBeVisible();
@@ -39,7 +41,9 @@ for (const size of sizes) {
         page.getByRole('button', { name: 'Tuning: Drop D. Open instrument panel' })
       ).toBeVisible();
       await expect(page.getByText('Wide stretch', { exact: true })).toBeVisible();
-      await expect(page.locator('.description')).toContainText(/frets 10,? ?7,? ?5/);
+      await expect(page.locator('.description')).toContainText(
+        /string 6, fret 10,.*string 5, fret 7,.*string 4, fret 5/
+      );
 
       await page.locator('.cell[data-string="6"][data-fret="0"]').click();
       await expect
@@ -311,6 +315,8 @@ test.describe('instrument panel US3 (cancel and restore)', () => {
     await pick(page, 'Drop D').check();
     await dialog.getByRole('button', { name: 'Confirm' }).click();
     await expect(page.getByRole('button', { name: /^Tuning: Drop D/ })).toBeVisible();
+    // The address follows after a 150 ms debounce; reloading sooner opens the old link.
+    await expect.poll(() => page.url()).toMatch(/tu=AF-4/);
     await page.reload();
     await expect(page.getByRole('button', { name: /^Tuning: Drop D/ })).toBeVisible();
     const reopened = await openPanel(page);

@@ -13,6 +13,8 @@ import { language } from './language.svelte';
 import { notation } from './notation.svelte';
 import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
+import { shortcuts } from './shortcuts.svelte';
+import { theme } from './theme.svelte';
 import { triads } from './triads.svelte';
 
 let session: PrefsSession | null = null;
@@ -58,6 +60,8 @@ export const preferences = {
     caged.restoreTempo(p.tempo);
     language.start(p.language);
     notation.start({ notation: p.notation, accidentals: p.accidentals });
+    theme.start(p.theme);
+    shortcuts.start(p.shortcuts);
     lastTool = p.lastTool;
     rotateHintShown = p.rotateHintShown;
     cagedNoteShown = p.cagedNoteShown;
@@ -117,6 +121,8 @@ export const preferences = {
     }
     language.restore(null);
     notation.restore(null, 'sharps');
+    theme.restore(null);
+    shortcuts.restore(true);
     lastTool = null;
     rotateHintShown = false;
     cagedNoteShown = false;

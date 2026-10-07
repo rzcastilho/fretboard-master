@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe } from './support/helpers';
 
 const sizes = [
   { name: 'phone', width: 360, height: 740 },
@@ -40,6 +40,7 @@ for (const size of sizes) {
       page
     }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await page.getByRole('radio', { name: '2nd inversion' }).click();
       await page.getByRole('radio', { name: '4-3-2' }).click();
       await openAllNotes(page, { navigate: false });
@@ -61,6 +62,7 @@ for (const size of sizes) {
 
     test('US2-2: controls re-enable with their previous values', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await page.getByRole('radio', { name: '1st inversion' }).click();
       await page.getByRole('radio', { name: '4-3-2' }).click();
       await view(page, 'All notes').click();
@@ -80,6 +82,7 @@ for (const size of sizes) {
       page
     }) => {
       await openAllNotes(page);
+      await expandDetails(page);
       const panel = page.getByRole('region', { name: 'Composition' });
       await expect(panel.getByText('A major', { exact: true })).toBeVisible();
       await expect(panel.getByText('Low to high')).toHaveCount(0);
@@ -88,6 +91,7 @@ for (const size of sizes) {
 
     test('US2-4: D♯ major spells the third F𝄪', async ({ page }) => {
       await page.goto('/triads');
+      await expandDetails(page);
       await page
         .getByRole('group', { name: 'Root' })
         .getByRole('button', { name: 'D sharp or E flat' })
@@ -106,6 +110,7 @@ for (const size of sizes) {
       await page.getByRole('button', { name: 'Reset tool', exact: true }).click();
       await expect(view(page, 'Isolated')).toBeChecked();
       await expect(inversionGroup(page)).not.toHaveAttribute('aria-disabled', 'true');
+      await expandDetails(page);
       await expect(page.getByRole('region', { name: 'Composition' })).toContainText('C major');
     });
 
@@ -134,6 +139,7 @@ test.describe('triads guidance recovery to All notes (US3)', () => {
       globalThis.__fmInstrument = 'AF-1-12';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'diminished' }).click();
     await page.getByRole('radio', { name: '5-4-3' }).click();
     await page.getByRole('button', { name: 'See all notes' }).click();
@@ -152,6 +158,7 @@ test.describe('triads guidance recovery to All notes (US3)', () => {
       globalThis.__fmInstrument = 'NC-UNISON';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('button', { name: 'See all notes' }).click();
     await expect(view(page, 'All notes')).toBeChecked();
     await expect(page.getByText(/does not close/)).toHaveCount(0);

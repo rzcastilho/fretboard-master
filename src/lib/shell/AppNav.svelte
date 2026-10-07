@@ -3,13 +3,19 @@
   import type { ScreenId } from './screens';
   import { linkTools, type LinkedTool } from '$lib/state/links.svelte';
   import { TOOLS } from './tools';
+  import BarIcon, { type BarIconName } from './BarIcon.svelte';
 
   let { current }: { current: ScreenId } = $props();
 
   const items = $derived([
-    { id: 'home' as const, path: '/', label: m.nav_home() },
-    ...TOOLS.map((t) => ({ id: t.id, path: t.path as string, label: t.name() })),
-    { id: 'about' as const, path: '/about', label: m.nav_about() }
+    { id: 'home' as const, path: '/', label: m.nav_home(), icon: 'home' as BarIconName },
+    ...TOOLS.map((t) => ({
+      id: t.id,
+      path: t.path as string,
+      label: t.name(),
+      icon: t.id as BarIconName
+    })),
+    { id: 'about' as const, path: '/about', label: m.nav_about(), icon: 'about' as BarIconName }
   ]);
 
   const toolIds: readonly ScreenId[] = TOOLS.map((t) => t.id);
@@ -32,7 +38,7 @@
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- static internal paths; app is not deployed under a base path -->
-<nav aria-label={m.nav_label()}>
+<nav aria-label={m.nav_label()} data-print="omit">
   <ul>
     {#each items as item (item.id)}
       {@const isCurrent = item.id === current}
@@ -42,7 +48,8 @@
           onclick={(e) => carry(e, item.id)}
           class:current={isCurrent}
           aria-current={isCurrent ? 'page' : undefined}
-          data-sveltekit-replacestate={isCurrent ? '' : undefined}>{item.label}</a
+          data-sveltekit-replacestate={isCurrent ? '' : undefined}
+          ><BarIcon name={item.icon} /><span class="bar-label">{item.label}</span></a
         >
       </li>
     {/each}

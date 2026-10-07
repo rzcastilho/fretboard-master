@@ -10,6 +10,8 @@ import {
 } from '$lib/audio/engine';
 import type { PulseEvent, TimeMark, TimedStep } from '$lib/audio/types';
 import type { Instrument, Position } from '$lib/instrument/instrument';
+import { measure } from '$lib/measure/measure.svelte';
+import { recordFailure } from '$lib/shell/failure';
 import { preferences } from './preferences.svelte';
 
 type Availability = 'idle' | 'on' | 'unavailable';
@@ -45,7 +47,8 @@ function createEngine(deps?: Partial<EngineDeps>): PlaybackEngine {
       onSequenceChange: (playing) => {
         state.sequencePlaying = playing;
       },
-      onUnavailable: () => {
+      onUnavailable: (cause) => {
+        recordFailure(measure.activeTool(), new Error(`Audio unavailable: ${cause}`), 'audio');
         state.availability = 'unavailable';
         if (!noticeShown) {
           noticeShown = true;
@@ -58,6 +61,11 @@ function createEngine(deps?: Partial<EngineDeps>): PlaybackEngine {
 }
 
 let engine: PlaybackEngine = createEngine();
+
+/** 028: a sound was really scheduled (at least one mark, not muted). */
+function sounded(marks: readonly TimeMark[]): void {
+  if (marks.length > 0 && !state.muted) measure.soundPlayed();
+}
 
 /** idle → on after a gesture reached the engine; unavailable is terminal. */
 function markUnlocked(): void {
@@ -91,6 +99,7 @@ export const playback = {
   note(position: Position, instrument: Instrument): readonly TimeMark[] {
     const marks = engine.play({ kind: 'note', position }, instrument);
     markUnlocked();
+    sounded(marks);
     return marks;
   },
 
@@ -98,6 +107,7 @@ export const playback = {
   chord(positions: readonly Position[], instrument: Instrument): readonly TimeMark[] {
     const marks = engine.play({ kind: 'chord', positions }, instrument);
     markUnlocked();
+    sounded(marks);
     return marks;
   },
 
@@ -109,6 +119,7 @@ export const playback = {
   ): readonly TimeMark[] {
     const marks = engine.play({ kind: 'sequence', steps, bpm }, instrument);
     markUnlocked();
+    sounded(marks);
     return marks;
   },
 
@@ -116,6 +127,7 @@ export const playback = {
   timeline(events: readonly TimedStep[], instrument: Instrument): readonly TimeMark[] {
     const marks = engine.play({ kind: 'timeline', events }, instrument);
     markUnlocked();
+    sounded(marks);
     return marks;
   },
 

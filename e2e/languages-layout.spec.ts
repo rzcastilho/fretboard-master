@@ -56,6 +56,22 @@ for (const { tag, locale } of LANGUAGES) {
       }
     }
 
+    test('theme selector rows are readable at 200% on home and in the panel', async ({ page }) => {
+      await page.goto('/');
+      await setTextScale(page, 200);
+      const selector = page.locator('fieldset.theme');
+      await expect(selector).toBeVisible();
+      await expect(selector.getByRole('radio')).toHaveCount(3);
+      await expectNoTruncationOrOverlap(page);
+
+      await page.goto('/notes');
+      await languageButton(page).click();
+      await expect(page.locator('div[role="region"][id^="language-panel-"]')).toBeVisible();
+      await setTextScale(page, 200);
+      await expect(page.locator('fieldset.theme')).toBeVisible();
+      await expectNoTruncationOrOverlap(page);
+    });
+
     test('notice text stays within two lines at 100% (SC-004)', async ({ page }) => {
       await page.addInitScript(() => {
         Object.defineProperty(window, 'localStorage', {

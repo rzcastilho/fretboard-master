@@ -5,6 +5,7 @@
  */
 import { GAP_WARNING, takeUnreported } from '$lib/i18n/gaps';
 import { BASE_LANGUAGE, matchDeviceLanguage, type LanguageTag } from '$lib/i18n/languages';
+import { measure } from '$lib/measure/measure.svelte';
 import { overwriteGetLocale, overwriteSetLocale } from '$lib/paraglide/runtime.js';
 import { preferences } from './preferences.svelte';
 
@@ -28,6 +29,7 @@ function apply(tag: LanguageTag): void {
   const missing = typeof __FM_MISSING_TEXT__ === 'undefined' ? [] : __FM_MISSING_TEXT__[tag];
   for (const key of takeUnreported(seen, tag, missing)) {
     console.warn(GAP_WARNING, { key, locale: tag });
+    measure.missingText(key);
   }
 }
 

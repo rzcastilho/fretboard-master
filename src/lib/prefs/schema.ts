@@ -32,6 +32,10 @@ import {
   type Notation
 } from '$lib/notation/policy';
 
+/** 026: the pinned theme; `null` follows the device. Mirrored by `static/theme-boot.js`. */
+export const THEMES = ['light', 'dark'] as const;
+export type Theme = (typeof THEMES)[number];
+
 export interface Preferences {
   /** 6 or 7 (012); absent or invalid in a stored record → 6. */
   readonly stringCount: StringCount;
@@ -66,6 +70,10 @@ export interface Preferences {
   readonly accidentals: AccidentalPolicy;
   /** 021; absent or invalid in a stored record → false. Stored as `cagedNote`, only when true. */
   readonly cagedNoteShown: boolean;
+  /** 026; absent or invalid in a stored record → null (follow the device). Stored only when non-null. */
+  readonly theme: Theme | null;
+  /** 027; absent or invalid in a stored record → true. Stored only when false, last. */
+  readonly shortcuts: boolean;
 }
 
 export const PREFS_VERSION = 1 as const;
@@ -90,13 +98,30 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   language: null,
   notation: null,
   accidentals: 'sharps',
-  cagedNoteShown: false
+  cagedNoteShown: false,
+  theme: null,
+  shortcuts: true
 });
 
-const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
-const TRIADS_LABELS = ['interval', 'name'] as const satisfies readonly TriadsLabelType[];
+/**
+ * 027 (FR-019(f)): which privacy-policy category (`about_privacy_stored`) names each stored
+ * preference. A unit test requires every `Preferences` field here, so a new preference with no
+ * policy category fails the build.
+ */
+export const PRIVACY_CATEGORIES = {
+  language: ['language', 'notation', 'accidentals'],
+  instrument: ['stringCount', 'tuningId', 'customTuning', 'fretCount', 'handedness', 'orientation'],
+  sound: ['muted', 'volume', 'tempo'],
+  theme: ['theme'],
+  labelsAndTool: ['labels', 'lastTool'],
+  hints: ['rotateHintShown', 'cagedNoteShown'],
+  shortcuts: ['shortcuts']
+} as const satisfies Record<string, readonly (keyof Preferences)[]>;
+
+export const NOTES_LABELS = ['name', 'octave', 'none'] as const satisfies readonly LabelType[];
+export const TRIADS_LABELS = ['interval', 'name'] as const satisfies readonly TriadsLabelType[];
 const TEMPO_VALUES = ['slow', 'medium', 'fast'] as const satisfies readonly Tempo[];
-const CAGED_LABELS = ['interval', 'name'] as const satisfies readonly CagedLabelType[];
+export const CAGED_LABELS = ['interval', 'name'] as const satisfies readonly CagedLabelType[];
 
 const d = DEFAULT_PREFERENCES;
 
@@ -139,7 +164,9 @@ const recordSchema = v.object({
   language: v.fallback(v.nullable(v.picklist(LANGUAGE_TAGS)), null),
   notation: v.fallback(v.nullable(v.picklist(NOTATIONS)), null),
   accidentals: v.fallback(v.picklist(ACCIDENTAL_POLICIES), d.accidentals),
-  cagedNote: v.fallback(v.boolean(), d.cagedNoteShown)
+  cagedNote: v.fallback(v.boolean(), d.cagedNoteShown),
+  theme: v.fallback(v.nullable(v.picklist(THEMES)), null),
+  shortcuts: v.fallback(v.boolean(), d.shortcuts)
 });
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
@@ -171,7 +198,9 @@ export function parsePreferences(raw: string | null): Preferences {
       language: r.language,
       notation: r.notation,
       accidentals: r.accidentals,
-      cagedNoteShown: r.cagedNote
+      cagedNoteShown: r.cagedNote,
+      theme: r.theme,
+      shortcuts: r.shortcuts
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -194,7 +223,7 @@ export function tuningOfPreferences(p: Preferences): Tuning {
  * `rotateHint` only when true (016), `labels.caged` only when `'name'` (017),
  * `tempo` (after `rotateHint`) only when not `'medium'` (019), `language` (after `tempo`) only
  * when non-null (020), then `notation` (non-null), `accidentals` (not `'sharps'`) and
- * `cagedNote` (true only) (021).
+ * `cagedNote` (true only) (021), then `theme` (non-null) (026), then `shortcuts` (false only) last (027).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -218,6 +247,8 @@ export function serializePreferences(p: Preferences): string {
     ...(p.language === null ? {} : { language: p.language }),
     ...(p.notation === null ? {} : { notation: p.notation }),
     ...(p.accidentals === 'sharps' ? {} : { accidentals: p.accidentals }),
-    ...(p.cagedNoteShown ? { cagedNote: true } : {})
+    ...(p.cagedNoteShown ? { cagedNote: true } : {}),
+    ...(p.theme === null ? {} : { theme: p.theme }),
+    ...(p.shortcuts ? {} : { shortcuts: false })
   });
 }

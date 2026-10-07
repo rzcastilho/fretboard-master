@@ -5,10 +5,11 @@
  */
 import { getLocale } from '$lib/paraglide/runtime.js';
 import { m } from '$lib/paraglide/messages.js';
+import type { LegendGroup, LegendKind } from '../fretboard/legend';
 import type { DisplayModel, FretboardTag, Marker, NoteFunction } from '../fretboard/types';
-import type { Instrument } from '../instrument/instrument';
+import { positionPitch, type Instrument } from '../instrument/instrument';
 import { setLabel } from '../instrument/string-sets';
-import { noteLabel, spokenNote } from '../notation/notation';
+import { noteLabel, spokenMarker, spokenNote } from '../notation/notation';
 import {
   cagedConnections,
   cagedOccurrences,
@@ -22,8 +23,9 @@ import {
   type CagedTuningClass,
   type ShapeOccurrence
 } from '../theory/caged';
-import { pitchOfSpelling, type Pitch, type Spelling } from '../theory/pitch';
+import { pitchClass, pitchOfSpelling, type Pitch, type Spelling } from '../theory/pitch';
 import { otherRootSpelling, spellTriad, type TriadFunction } from '../theory/triad';
+import { joinNotes, joinSummary } from './context-summary';
 import { drawnLetters, occurrenceIndex, stepAvailability } from './caged-focus';
 import { selectedTriad, triadAvailability, triadHandoff, type TriadsHandoff } from './caged-triad';
 import {
@@ -92,6 +94,8 @@ export interface CagedListenDisplay {
 }
 
 export interface CagedDisplay {
+  /** One-line context summary: chord · shape · notes (FR-016). */
+  readonly summary: string;
   readonly keyName: string;
   readonly tuningName: string;
   /** Name of the temporary tuning being shown, else null. */
@@ -128,6 +132,31 @@ const NO_LETTERS: ReadonlySet<CagedShapeId> = new Set();
 const EXTRA_ORDER: readonly ScaleDegree[] = ['2', '4', 'b6', '7'];
 const LAYER_ORDER: readonly CagedLayer[] = ['chord', 'arpeggio', 'pentatonic', 'scale', 'triad'];
 const NO_EXTRAS: CagedExtras = { reveal: null, layerChange: null, triadChange: null };
+
+/**
+ * Legend groups from the layers actually drawn (R-07). Connections and the altered-string mark
+ * stay ungrouped; `legendGroups()` appends them. Kinds not in use are dropped there.
+ */
+export function cagedLegendGroups(
+  drawn: readonly CagedLayer[],
+  layers: Readonly<Record<CagedLayer, boolean>>
+): readonly LegendGroup[] {
+  const kinds = (layer: CagedLayer): readonly LegendKind[] => {
+    switch (layer) {
+      case 'chord':
+        return ['root', 'third', 'fifth'];
+      case 'arpeggio':
+        return ['arpeggio'];
+      case 'pentatonic':
+        return layers.scale ? ['degree'] : ['degree', 'extra'];
+      case 'scale':
+        return ['degree', 'extra'];
+      case 'triad':
+        return ['triadLayer'];
+    }
+  };
+  return drawn.map((layer) => ({ label: layerName(layer), kinds: kinds(layer) }));
+}
 
 function layerName(layer: CagedLayer): string {
   switch (layer) {
@@ -224,6 +253,7 @@ export function buildCagedModel(
   const root = cagedRootSpelling(view);
   const triad = spellTriad(root, view.quality);
   const keyName = m.caged_key_name({ root: noteLabel(root), quality: qualityName(view.quality) });
+  const chordNotes = [triad.root, triad.third, triad.fifth].map(noteLabel);
   const spokenKey = m.caged_key_name({
     root: spokenNote(root),
     quality: qualityName(view.quality)
@@ -232,6 +262,7 @@ export function buildCagedModel(
   const tuningClass = cagedTuningClass(sixHighestOpen(instrument));
   if (tuningClass === 'non-compatible') {
     return {
+      summary: joinSummary([keyName, joinNotes(chordNotes)]),
       keyName,
       tuningName,
       temporaryName,
@@ -356,19 +387,19 @@ export function buildCagedModel(
       lo: o.start,
       hi: o.end,
       strings: strings(o),
-      notes: o.notes
-        .map((n) =>
-          n.fret === 0
-            ? m.caged_description_note_open({
-                string: n.string,
-                interval: intervalName(n.degree)
-              })
-            : m.caged_description_note({
-                string: n.string,
-                fret: n.fret,
-                interval: intervalName(n.degree)
-              })
-        )
+      notes: [...o.notes]
+        .sort((a, b) => b.string - a.string || a.fret - b.fret)
+        .map((n) => {
+          const spelling = scaleSpelling[n.degree];
+          const note =
+            spelling === undefined
+              ? spokenMarker(pitchClass(positionPitch(instrument, n)))
+              : spokenNote(spelling);
+          const interval = intervalName(n.degree);
+          return n.fret === 0
+            ? m.caged_description_note_open({ string: n.string, note, interval })
+            : m.caged_description_note({ string: n.string, fret: n.fret, note, interval });
+        })
         .join(', ')
     })
   );
@@ -455,6 +486,11 @@ export function buildCagedModel(
   const fitNote = fit < 5 ? m.caged_fit_note({ frets: instrument.fretCount, count: fit }) : null;
 
   return {
+    summary: joinSummary([
+      keyName,
+      focused ? m.summary_shape({ shape: focused.shape.id }) : m.summary_all_shapes(),
+      joinNotes(chordNotes)
+    ]),
     keyName,
     tuningName,
     temporaryName,
@@ -472,6 +508,7 @@ export function buildCagedModel(
         ? { region: { start: focused.start, end: focused.end, align: 'center' as const } }
         : {}),
       description,
+      legendGroups: cagedLegendGroups(drawn, view.layers),
       ...(altered ? { stringMarks: [{ string: 6, label: m.caged_altered_mark() }] } : {})
     },
     switchTo: otherRootSpelling(view.rootPc, root),

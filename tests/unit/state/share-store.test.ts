@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decodeLink, encodeLink } from '../../../src/lib/link';
 import { AF_8 } from '../../../src/lib/instrument/fixtures';

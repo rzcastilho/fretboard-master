@@ -81,3 +81,204 @@ h1[tabindex='-1']:focus-visible {
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
+
+/*
+ * Zone B control rows (025). Rows wrap where there is room; on the narrow arrangement each row
+ * stays on one line and scrolls on its own, with an edge fade where more content lies.
+ */
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+[data-arrangement='narrow'] .controls-row {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+[data-arrangement='narrow'] .controls-row::-webkit-scrollbar {
+  display: none;
+}
+
+[data-arrangement='narrow'] .controls-row > * {
+  flex: none;
+}
+
+.controls-row[data-overflow='end'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--edge-fade-width)), transparent);
+}
+
+.controls-row[data-overflow='start'] {
+  mask-image: linear-gradient(to left, #000 calc(100% - var(--edge-fade-width)), transparent);
+}
+
+.controls-row[data-overflow='both'] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--edge-fade-width),
+    #000 calc(100% - var(--edge-fade-width)),
+    transparent
+  );
+}
+
+/*
+ * Landscape (025 US4). Zone headings stay in the accessibility tree but leave the layout; zone B
+ * becomes one horizontally scrollable strip; the app bar shows icons only, with the text as a
+ * tooltip on hover and keyboard focus.
+ */
+[data-arrangement='landscape'] h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+[data-arrangement='landscape'] .b {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+[data-arrangement='landscape'] .b::-webkit-scrollbar {
+  display: none;
+}
+
+[data-arrangement='landscape'] .b > *,
+[data-arrangement='landscape'] .b .controls-row > * {
+  flex: none;
+}
+
+[data-arrangement='landscape'] .b :is(.controls, .selector, .controls-row) {
+  display: contents;
+}
+
+/* min-block-size, not block-size: at 200% text the icons wrap to a second row, and a fixed height
+   would let that row spill over the strip below. */
+header[data-landscape] {
+  gap: var(--space-2);
+  min-block-size: var(--landscape-bar-height);
+  padding-block: 0;
+}
+
+header[data-landscape] nav ul {
+  flex-wrap: nowrap;
+}
+
+.bar-icon {
+  display: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Icons show in landscape only; elsewhere the text label is the whole control. */
+header[data-landscape] .bar-icon {
+  display: inline-block;
+}
+
+header[data-landscape] :is(a, button) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The label stays in the accessibility tree (clip, not display or visibility). */
+header[data-landscape] .bar-label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Tooltip on hover and keyboard focus. */
+header[data-landscape] :is(a, button):is(:hover, :focus-visible) > .bar-label {
+  inset-block-start: 100%;
+  inset-inline-start: 50%;
+  inline-size: max-content;
+  block-size: auto;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  overflow: visible;
+  clip-path: none;
+  transform: translateX(-50%);
+  z-index: 3;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+
+/*
+ * Print (026 US5, contracts/ui.md §5). The print palette lives in tokens.css; the layout of the
+ * board is Fretboard.svelte's print branch. Here: white page, chrome omitted, text shown.
+ * No `@page { size }`: the user's paper and orientation stand.
+ */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* The board's print width (--print-board-inline) is the whole printable width. */
+  main,
+  header {
+    padding-inline: 0 !important;
+  }
+
+  /* Zone frames are screen chrome and would shave the board's printable width. */
+  main .grid > section {
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  [data-print='omit'] {
+    display: none !important;
+  }
+
+  /* Visible text that is hidden or visually clipped on screen. */
+  [data-print='show'][hidden] {
+    display: block !important;
+  }
+
+  [data-print='show'].sr-only {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+}

@@ -4,6 +4,8 @@
  * Other `ShapeView` kinds and the composition extras are filled by later stories.
  */
 import { m } from '$lib/paraglide/messages.js';
+import { joinNotes, joinSummary } from './context-summary';
+import { describeEntries, spokenList } from '../fretboard/description';
 import type { DisplayModel, FretboardArrow, FretboardTag, Marker } from '../fretboard/types';
 import {
   lowestPositionOfPitch,
@@ -18,7 +20,7 @@ import {
   stringSets,
   type StringSetId
 } from '../instrument/string-sets';
-import { defaultSpelling, noteLabel, spokenNote, spokenNoteList } from '../notation/notation';
+import { defaultSpelling, noteLabel, spokenNote } from '../notation/notation';
 import {
   pitchClassOfSpelling,
   pitchOfSpelling,
@@ -155,6 +157,8 @@ export type ShapeView =
   | { readonly kind: 'does-not-close' };
 
 export interface TriadsDisplay extends DisplayBody {
+  /** One-line context summary: chord · inversion · notes (FR-016). */
+  readonly summary: string;
   readonly compare: CompareDisplay;
   /** Guidance shown outside All notes: offer the See all notes recovery action (C8). */
   readonly seeAllNotes: boolean;
@@ -311,6 +315,12 @@ export function nearestClosingSet(s: TriadsViewState, i: Instrument): StringSetI
   }
   return null;
 }
+
+const INVERSION_SENTENCE: Readonly<Record<Inversion, () => string>> = {
+  root: () => m.triads_desc_inversion_root(),
+  first: () => m.triads_desc_inversion_first(),
+  second: () => m.triads_desc_inversion_second()
+};
 
 const TAG_LABEL: Readonly<Record<Inversion, () => string>> = {
   root: () => m.triads_tag_root(),
@@ -515,6 +525,7 @@ function fullNeck(
         groups: selected.map((x) => x.positions)
       },
       ...(cmps.length === 0 ? {} : { arrows }),
+      ...(shapes.some((x) => x.wideStretch) ? { wideStretch: true } : {}),
       description:
         cmps.length === 0 ? description : [description, ...cmps.map((c) => c.description)].join(' ')
     }
@@ -609,6 +620,17 @@ function allNotes(
   };
 }
 
+/** `{chord} · {inversion} · {n1} – {n2} – {n3}`; no inversion part in All notes. */
+function triadsSummary(c: Composition): string {
+  const { root, quality, inversion } = c.name;
+  const ordered = c.lowToHigh ?? c.notes;
+  return joinSummary([
+    m.caged_key_name({ root: noteLabel(root), quality: qualityName(quality) }),
+    inversion === null ? '' : inversionName(inversion),
+    joinNotes(ordered.map((n) => noteLabel(n.spelling)))
+  ]);
+}
+
 export function buildTriadsModel(s: TriadsViewState, instrument: Instrument): TriadsDisplay {
   const d = buildDisplay(s, instrument);
   const guidance = d.shape.kind === 'beyond' || d.shape.kind === 'does-not-close';
@@ -620,6 +642,7 @@ export function buildTriadsModel(s: TriadsViewState, instrument: Instrument): Tr
   };
   return {
     ...d,
+    summary: triadsSummary(d.composition),
     compare,
     seeAllNotes: guidance && s.view !== 'all-notes',
     listenComparison: buildListenComparison(s, d, instrument),
@@ -786,10 +809,13 @@ function buildDisplay(s: TriadsViewState, instrument: Instrument): DisplayBody {
 
   const wide = isWideStretch(frets);
   const base = m.triads_desc_shape({
-    name,
-    notes: spokenNoteList([spelling.root, spelling.third, spelling.fifth]),
-    strings: setStrings(s.stringSet).slice().reverse().join(', '),
-    frets: frets.join(', ')
+    chord: m.triads_name_no_inversion({
+      root: spokenNote(rootSpelling),
+      quality: qualityName(s.quality)
+    }),
+    inversion: INVERSION_SENTENCE[s.inversion](),
+    strings: spokenList(setStrings(s.stringSet).map(String)),
+    entries: describeEntries(instrument, firstMarkers).join('; ')
   });
   const summary = wide ? `${base} ${m.triads_desc_wide_stretch()}` : base;
   const withComparison =
@@ -818,7 +844,10 @@ function buildDisplay(s: TriadsViewState, instrument: Instrument): DisplayBody {
       markers,
       labelMode,
       summary,
-      ...(cmp === null ? {} : { arrows: cmp.arrows, description: cmp.description })
+      ...(wide ? { wideStretch: true } : {}),
+      // The summary already lists every entry (FR-003); never repeat them.
+      description: cmp === null ? summary : cmp.description,
+      ...(cmp === null ? {} : { arrows: cmp.arrows })
     }
   };
 }

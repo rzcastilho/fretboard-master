@@ -9,6 +9,8 @@ import {
   type Position
 } from '../instrument/instrument';
 import type { PitchClass } from '../theory/pitch';
+import type { MotionKind } from '../fretboard/transition';
+import type { MotionContext } from './triads-view';
 
 export type LabelType = 'name' | 'octave' | 'none';
 export type Background = 'naturals' | 'all' | 'none';
@@ -276,4 +278,25 @@ export function adaptNotesView(
     !whole && (view.region.start !== s.region.start || view.region.end !== s.region.end);
   const adjusted = regionClamped || cardClosed || filterForced;
   return { view: equalsNotesView(view, s) ? s : view, adjusted };
+}
+
+/**
+ * How the drawn markers should move between two views (026 data-model §7). Pure. A changed
+ * selection slides (each string pairs old and new markers in fret order); a change of
+ * filters, an instrument or presentation change, a card open or close and the first view are
+ * instant.
+ */
+export function motionKind(
+  prev: NotesViewState | null,
+  next: NotesViewState,
+  ctx: MotionContext
+): MotionKind {
+  if (prev === null || ctx.instrumentChanged || ctx.presentationChanged) return 'none';
+  if (sameList(prev.selection, next.selection)) return 'none';
+  const sameFilters =
+    prev.background === next.background &&
+    prev.region.start === next.region.start &&
+    prev.region.end === next.region.end &&
+    sameList(prev.activeStrings, next.activeStrings);
+  return sameFilters ? 'slide' : 'none';
 }

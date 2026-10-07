@@ -8,6 +8,7 @@ import { buildTriadsModel, tagTarget, type TriadsDisplay } from './triads-model'
 import {
   equalsTriadsView,
   initialTriadsView,
+  motionKind,
   octaveDown,
   octaveUp,
   resetTriads,
@@ -37,6 +38,7 @@ import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
 import type { SpellingOverride } from './triads-view';
 import { LISTEN_BPM } from './listen';
+import { createMotionTracker, withMotion } from './motion-track';
 
 /** Remembered label type: part of the initial view and of `reset()` (010). */
 let preferredLabel: TriadsLabelType = 'interval';
@@ -58,7 +60,15 @@ export type TriadsNotice =
 
 let notice = $state.raw<TriadsNotice>(null);
 
-const display = $derived<TriadsDisplay>(buildTriadsModel(view, instrument));
+const motionOf = createMotionTracker<TriadsViewState, Instrument>(
+  motionKind,
+  (a, b) => a.labelType !== b.labelType
+);
+
+/** `display.model.motion` says how the markers moved from the previous view (026). */
+const display = $derived<TriadsDisplay>(
+  withMotion(buildTriadsModel(view, instrument), motionOf(view, instrument))
+);
 
 /** Apply a transition; a changed view stops playback (FR-028), a no-op does nothing. */
 function apply(next: TriadsViewState, message: TriadsNotice = null): void {
@@ -76,6 +86,7 @@ export const triads = {
     return instrument;
   },
   get display(): TriadsDisplay {
+    motionOf.consume();
     return display;
   },
   get notice(): TriadsNotice {

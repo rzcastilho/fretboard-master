@@ -24,12 +24,24 @@ function missingText(): Record<'en' | 'pt-BR' | 'es', string[]> {
   };
 }
 
+/** Worker cap from an env value ("4" or "50%"), else the fallback. */
+function workerCap(
+  env: string | undefined,
+  fallback: string | undefined
+): number | string | undefined {
+  if (!env) return fallback;
+  return /^\d+$/.test(env) ? Number(env) : env;
+}
+
 export default defineConfig(({ mode }) => {
   const override = process.env.FM_APP_VERSION;
   if (override && mode !== 'test') {
     throw new Error('FM_APP_VERSION may only be set for `--mode test` builds.');
   }
   const version = mode === 'test' && override ? override : pkg.version;
+  // 028 R-05: Vitest and `vite dev` send nothing; builds default to the same-origin `/m`.
+  const measureEndpoint =
+    process.env.VITEST || mode === 'development' ? '' : (process.env.FM_MEASURE_ENDPOINT ?? '/m');
 
   return {
     plugins: [
@@ -41,13 +53,24 @@ export default defineConfig(({ mode }) => {
         strategy: ['baseLocale']
       })
     ],
+    build: {
+      // 026 R-01: keep `light-dark()` native. Below these versions the CSS minifier rewrites it
+      // into its `--lightningcss-light/dark` toggle, which this stylesheet does not rely on.
+      cssTarget: ['chrome123', 'firefox120', 'safari17.5']
+    },
     define: {
       __APP_VERSION__: JSON.stringify(version),
       __FM_FAULT_INJECTION__: JSON.stringify(mode === 'test' || mode === 'development'),
-      __FM_MISSING_TEXT__: JSON.stringify(missingText())
+      __FM_MISSING_TEXT__: JSON.stringify(missingText()),
+      __FM_MEASURE_ENDPOINT__: JSON.stringify(measureEndpoint)
     },
     test: {
-      environment: 'jsdom',
+      // Pure tests run in node; files that render or touch the DOM opt in with
+      // `// @vitest-environment jsdom` (jsdom setup was ~36% of suite time).
+      environment: 'node',
+      // Several worktrees share one machine locally; cap workers so parallel runs do not
+      // starve each other into timeouts. CI keeps the default. Override: VITEST_MAX_WORKERS.
+      maxWorkers: workerCap(process.env.VITEST_MAX_WORKERS, process.env.CI ? undefined : '50%'),
       include: ['tests/unit/**/*.test.ts'],
       setupFiles: ['tests/unit/setup.ts'],
       coverage: {

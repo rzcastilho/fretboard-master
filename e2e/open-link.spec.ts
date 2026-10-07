@@ -1,6 +1,12 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe, setTextScale, trackRequests } from './support/helpers';
+import {
+  expandDetails,
+  expectNoHorizontalScroll,
+  runAxe,
+  setTextScale,
+  trackRequests
+} from './support/helpers';
 
 const PREFS_KEY = 'fretboard-master:prefs';
 
@@ -215,6 +221,7 @@ test.describe('open link US1: land on exactly the shared view', () => {
 
   test('a bare tool path opens normally with no notice', async ({ page }) => {
     await page.goto('/caged');
+    await expandDetails(page);
     await board(page).waitFor();
     await expect(page.getByRole('radio', { name: 'Major', exact: true })).toBeChecked();
     await expect(noticeCount(page)).toHaveCount(0);
@@ -404,6 +411,7 @@ const incomplete = (page: Page) =>
 test.describe('open link US3: untrusted, incomplete or newer links', () => {
   test('invalid frets and quality default, the valid key stays, one notice', async ({ page }) => {
     await page.goto('/caged?v=1&rt=2&q=banana&fr=99');
+    await expandDetails(page);
     await board(page).waitFor();
     await expect(incomplete(page)).toHaveCount(1);
     await expect(page.getByRole('radio', { name: 'Major', exact: true })).toBeChecked();
@@ -432,6 +440,7 @@ test.describe('open link US3: untrusted, incomplete or newer links', () => {
     page
   }) => {
     await page.goto('/notes?v=9&sel=0.4.7');
+    await expandDetails(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Fretboard Notes' })).toBeVisible();
     await expect(incomplete(page)).toHaveCount(1);
     const choose = page.getByRole('group', { name: 'Choose notes' });
@@ -445,6 +454,7 @@ test.describe('open link US3: untrusted, incomplete or newer links', () => {
 
   test('missing parameters take defaults with one notice', async ({ page }) => {
     await page.goto('/triads?v=1&rt=5');
+    await expandDetails(page);
     await expect(page.getByRole('heading', { level: 1, name: 'Triads' })).toBeVisible();
     await expect(incomplete(page)).toHaveCount(1);
     await expect(
@@ -496,6 +506,7 @@ test.describe('open link US3: untrusted, incomplete or newer links', () => {
 
   test('both notices together leave the fretboard reachable', async ({ page }) => {
     await page.goto(`/caged?v=1&rt=2&q=banana&${DROP_D}`);
+    await expandDetails(page);
     await board(page).waitFor();
     await expect(instrumentNotice(page)).toBeVisible();
     await expect(incomplete(page)).toHaveCount(1);

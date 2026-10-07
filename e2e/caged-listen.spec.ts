@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
 
 /** Feature 019 US1: Listen plays the widest layer on, with pulses (also muted). */
 
@@ -44,6 +44,7 @@ test.describe('caged listen US1: hear the focused shape', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -147,6 +148,7 @@ test.describe('caged listen US1: tunings', () => {
     ] as const);
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     const b = listen(page);
     await expect(b).toHaveAttribute('aria-disabled', 'true');
     const reason = await b.getAttribute('aria-describedby');
@@ -189,6 +191,7 @@ test.describe('caged listen US2: Stop', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -248,6 +251,7 @@ test.describe('caged listen US2: stop matrix (R-09)', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -343,6 +347,7 @@ test.describe('caged listen US2: tempo', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await shape(page, 'E').click();
   });
@@ -394,6 +399,7 @@ test.describe('caged listen polish: keyboard', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.install();
     await page.goto('/caged');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -426,6 +432,7 @@ test.describe('caged listen polish: keyboard', () => {
       { version: 1, tuning: 'AF-8' }
     ] as const);
     await page.goto('/caged');
+    await expandDetails(page);
     await expect(listen(page)).toHaveAttribute('aria-disabled', 'true');
     await tabTo(page, listen(page));
     await page.keyboard.press('Enter');
@@ -438,6 +445,7 @@ test.describe('caged listen polish: link buttons by keyboard', () => {
   test('Notes: CAGED in this key activates with Enter and Space', async ({ page }) => {
     for (const key of ['Enter', 'Space']) {
       await page.goto('/notes');
+      await expandDetails(page);
       const grid = page.getByRole('grid', { name: 'Fretboard' });
       await grid.waitFor();
       await page.locator('.cell[data-string="1"][data-fret="3"]').click();
@@ -451,6 +459,7 @@ test.describe('caged listen polish: link buttons by keyboard', () => {
   test('Triads: View in CAGED activates with Enter and Space', async ({ page }) => {
     for (const key of ['Enter', 'Space']) {
       await page.goto('/triads');
+      await expandDetails(page);
       const link = page.getByRole('button', { name: 'View in CAGED', exact: true });
       await link.focus();
       await expect(link).toBeFocused();
@@ -473,6 +482,7 @@ test.describe('caged listen polish: axe, targets and narrow widths', () => {
         await page.emulateMedia({ colorScheme });
         await page.clock.install();
         await page.goto('/caged');
+        await expandDetails(page);
         await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
         await runAxe(page);
         await listen(page).click();
@@ -484,6 +494,7 @@ test.describe('caged listen polish: axe, targets and narrow widths', () => {
           { version: 1, tuning: 'AF-8' }
         ] as const);
         await page.goto('/caged');
+        await expandDetails(page);
         await expect(listen(page)).toHaveAttribute('aria-disabled', 'true');
         await runAxe(page);
       });
@@ -497,6 +508,7 @@ test.describe('caged listen polish: axe, targets and narrow widths', () => {
       await page.setViewportSize({ width, height: 640 });
       await page.clock.install();
       await page.goto('/caged');
+      await expandDetails(page);
       await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
       const targets = [listen(page), ...(await tempoGroup(page).getByRole('radio').all())];
       await listen(page).click();

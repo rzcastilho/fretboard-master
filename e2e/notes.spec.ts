@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
 
 const selector = (page: Page) => page.getByRole('group', { name: 'Choose notes' });
 const note = (page: Page, name: string) =>
@@ -23,6 +23,7 @@ async function expectInitialView(page: Page) {
 test.describe('notes tool: find every occurrence (US1)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
   });
 
   test('US1-1: initial view shows labeled naturals and nothing selected', async ({ page }) => {
@@ -80,6 +81,7 @@ test.describe('notes tool: find every occurrence (US1)', () => {
   }) => {
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto('/notes');
+    await expandDetails(page);
     const tops = await selector(page)
       .getByRole('button')
       .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
@@ -100,6 +102,7 @@ test.describe('notes tool: find every occurrence (US1)', () => {
   test('US1-5b: at 1280 px the selector is one row', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/notes');
+    await expandDetails(page);
     const tops = await selector(page)
       .getByRole('button')
       .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
@@ -130,6 +133,7 @@ test.describe('notes tool: find every occurrence (US1)', () => {
     test(`axe: no violations at ${width} px (initial and G selected)`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/notes');
+      await expandDetails(page);
       await runAxe(page);
       await note(page, 'G').click();
       await expect(markers(page, 'highlighted')).toHaveCount(12);
@@ -152,6 +156,7 @@ async function steps(page: Page) {
 test.describe('notes tool: tap a position (US2)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
   });
 
@@ -255,6 +260,7 @@ test.describe('notes tool: tap a position (US2)', () => {
     test(`axe: no violations at ${width} px with the card open`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/notes');
+      await expandDetails(page);
       await cell(page, 3, 2).click();
       await expect(card(page)).toBeVisible();
       await runAxe(page);
@@ -274,6 +280,7 @@ const notice = (page: Page) => page.getByRole('status');
 test.describe('notes tool: string and region filters (US3)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
   });
 
   test('US3-1: strings 1–5 off dims and unlabels them; string 6 stays on and is aria-disabled', async ({
@@ -355,9 +362,12 @@ test.describe('notes tool: string and region filters (US3)', () => {
   test('US3-4: notice names up to three notes, else a count, in at most 2 lines', async ({
     page
   }) => {
+    // Two widths, two axe runs and ~30 clicks: over the default budget on a loaded machine.
+    test.slow();
     for (const w of [320, 1280]) {
       await page.setViewportSize({ width: w, height: 900 });
       await page.goto('/notes');
+      await expandDetails(page);
       for (const name of [
         'String 2, B',
         'String 3, G',
@@ -404,6 +414,7 @@ test.describe('notes tool: string and region filters (US3)', () => {
   }) => {
     await page.setViewportSize({ width: 600, height: 900 });
     await page.goto('/notes');
+    await expandDetails(page);
     await frets(page).getByRole('button', { name: '10–14' }).click();
     await expect(board(page).locator('.region-band')).toHaveCount(1);
     await expect(board(page).locator('.region-band')).toHaveAttribute('aria-hidden', 'true');
@@ -454,6 +465,7 @@ test.describe('notes tool: labels and background (US4)', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
   });
 
   test('scenario 18: a selected altered note shows while other altered notes stay hidden', async ({
@@ -539,6 +551,7 @@ test.describe('notes tool: listen, hide names, clear, reset (US5)', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
   });
 
@@ -666,6 +679,7 @@ test.describe('notes tool: listen, hide names, clear, reset (US5)', () => {
     await nav.getByRole('link', { name: 'Fretboard Notes' }).click();
     await expect(note(page, 'G')).toHaveAttribute('aria-pressed', 'true');
     await page.goto('/notes');
+    await expandDetails(page);
     await expectInitialView(page);
   });
 
@@ -690,6 +704,7 @@ test.describe('notes tool: keyboard only (scenario 29, SC-005)', () => {
 
   test('every control is reachable and operable by keyboard alone', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
 
     // Tab through the whole page, recording each stop.
@@ -768,6 +783,7 @@ test.describe('notes tool: keyboard only (scenario 29, SC-005)', () => {
     test(`axe and layout at ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/notes');
+      await expandDetails(page);
       await note(page, 'G').focus();
       await page.keyboard.press('Enter');
       await runAxe(page);
@@ -780,6 +796,7 @@ test.describe('notes tool: keyboard only (scenario 29, SC-005)', () => {
   }) => {
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto('/notes');
+    await expandDetails(page);
     await board(page).waitFor();
     await page.evaluate(() => {
       document.documentElement.style.fontSize = '200%'; // CSSOM: allowed under the style-src CSP
@@ -819,6 +836,7 @@ test.describe('notes tool: seven strings (012 US2)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await chooseStrings(page, 7);
     await page
       .getByRole('radiogroup', { name: 'Show' })
@@ -839,6 +857,7 @@ test.describe('notes tool: seven strings (012 US2)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     const dialog = await openInstrumentPanel(page);
     await dialog.getByRole('radio', { name: '7 strings' }).check();
     await dialog
@@ -858,6 +877,7 @@ test.describe('notes tool: seven strings (012 US2)', () => {
 
   test('Q9: strings 1–3 only → 7 strings → string 7 stays off, no notice', async ({ page }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     for (const n of ['String 4, D', 'String 5, A', 'String 6, E']) {
       await stringBtn(page, n).click();
     }
@@ -875,6 +895,7 @@ test.describe('notes tool: seven strings (012 US2)', () => {
     page
   }) => {
     await page.goto('/notes');
+    await expandDetails(page);
     await chooseStrings(page, 7);
     for (const n of [
       'String 1, E',

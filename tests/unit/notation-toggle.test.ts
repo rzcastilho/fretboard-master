@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { flushSync } from 'svelte';
 import { readFileSync } from 'node:fs';
@@ -7,6 +8,7 @@ import NotationSelector from '../../src/lib/shell/NotationSelector.svelte';
 import { language, resetLanguageForTests } from '../../src/lib/state/language.svelte';
 import { notation, resetNotationForTests } from '../../src/lib/state/notation.svelte';
 import { resetPreferencesForTests } from '../../src/lib/state/preferences.svelte';
+import { resetShortcutsForTests, shortcuts } from '../../src/lib/state/shortcuts.svelte';
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -20,6 +22,7 @@ beforeEach(() => {
 afterEach(() => {
   resetNotationForTests();
   resetLanguageForTests();
+  resetShortcutsForTests();
 });
 
 const buttons = () => screen.getAllByRole('button') as HTMLButtonElement[];
@@ -54,6 +57,15 @@ describe('NotationToggle', () => {
     expect(buttons().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
     await fireEvent.click(screen.getByRole('button', { name: 'C D E' }));
     expect(choose).toHaveBeenLastCalledWith('letters');
+  });
+
+  it('aria-keyshortcuts="N" on the group while shortcuts are on, absent once off', () => {
+    render(NotationToggle);
+    const group = screen.getByRole('group', { name: 'Note names' });
+    expect(group.getAttribute('aria-keyshortcuts')).toBe('N');
+    shortcuts.choose(false);
+    flushSync();
+    expect(group.hasAttribute('aria-keyshortcuts')).toBe(false);
   });
 
   it('each button enforces --target-min (44×44) and a visible focus ring', () => {

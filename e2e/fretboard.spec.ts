@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe } from './support/helpers';
 
 for (const path of ['/notes', '/triads']) {
   test.describe(`fretboard layout on ${path}`, () => {
@@ -67,6 +67,7 @@ async function withFixture(page: Page, name: string): Promise<void> {
     globalThis.__fmFretboardFixture = n as typeof globalThis.__fmFretboardFixture;
   }, name);
   await page.goto('/triads');
+  await expandDetails(page);
 }
 
 test.describe('markers (US2)', () => {
@@ -108,6 +109,7 @@ test.describe('markers (US2)', () => {
     });
     await page.goto('/');
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
     await page.evaluate(() => document.fonts.ready);
     expect(fontRequests).toEqual([]);
@@ -211,6 +213,7 @@ test.describe('US4: scrolling and fill-container', () => {
       globalThis.__fmFretboardFixture = 'highlight-far';
     });
     await page.goto('/notes');
+    await expandDetails(page);
     const scroller = scrollerOf(page);
     await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
     // Settle, then check the highlighted span is fully inside the viewport.
@@ -244,6 +247,7 @@ test.describe('US4: scrolling and fill-container', () => {
       globalThis.__fmFretboardFixture = 'highlight-split';
     });
     await page.goto('/notes');
+    await expandDetails(page);
     const scroller = scrollerOf(page);
     await expect
       .poll(async () =>
@@ -269,6 +273,7 @@ test.describe('US4: scrolling and fill-container', () => {
       globalThis.__fmFretboardFixture = 'highlight-far';
     });
     await page.goto('/notes');
+    await expandDetails(page);
     const scroller = scrollerOf(page);
     // Expected target = last highlighted column end − viewport width, clamped.
     const settled = await page.evaluate(
@@ -292,6 +297,7 @@ test.describe('US4: scrolling and fill-container', () => {
     test.skip(testInfo.project.name !== 'desktop', 'desktop only');
     await page.setViewportSize({ width: 2560, height: 900 });
     await page.goto('/notes');
+    await expandDetails(page);
     const scroller = scrollerOf(page);
     await expect(scroller).toBeVisible();
     const dims = await scroller.evaluate((el) => {
@@ -323,6 +329,7 @@ test.describe('keyboard operation (US5)', () => {
       globalThis.__fmFretboardEvents = [];
     });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -371,7 +378,7 @@ test.describe('keyboard operation (US5)', () => {
 
   test('focus ring is visible on an unmarked cell, within 100 ms (SC-007)', async ({ page }) => {
     await cellAt(page, 4, 2).focus();
-    const ring = page.locator('.focus-ring');
+    const ring = page.locator('.focus-ring-outer');
     await expect(ring).toBeVisible();
     const times: number[] = [];
     for (let i = 0; i < 5; i++) {
@@ -417,15 +424,15 @@ test.describe('keyboard operation (US5)', () => {
   test('toggle shows the description text', async ({ page }) => {
     await withFixture(page, 'empty'); // blank board: the empty description
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
-    const toggle = page.getByRole('button', { name: 'Show text description' });
+    const toggle = page.getByRole('button', { name: 'Describe this view' });
     await toggle.click();
-    await expect(page.getByRole('button', { name: 'Hide text description' })).toHaveAttribute(
+    await expect(page.getByRole('button', { name: 'Describe this view' })).toHaveAttribute(
       'aria-expanded',
       'true'
     );
     const description = page.locator('p.description');
     await expect(description).toBeVisible();
-    await expect(description).toHaveText('No positions marked.');
+    await expect(description).toHaveText('Nothing is displayed.');
   });
 });
 
@@ -437,7 +444,7 @@ test.describe('accessibility and responsive (US5)', () => {
         await page.goto(path);
         if (path !== '/') {
           await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
-          await page.getByRole('button', { name: 'Show text description' }).click();
+          await page.getByRole('button', { name: 'Describe this view' }).click();
         }
         await runAxe(page);
       });
@@ -448,11 +455,13 @@ test.describe('accessibility and responsive (US5)', () => {
     for (const width of [320, 360, 768, 1280, 2560]) {
       await page.setViewportSize({ width, height: 800 });
       await page.goto('/notes');
+      await expandDetails(page);
       await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
       await expectNoHorizontalScroll(page);
     }
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.evaluate(() => {
       document.documentElement.style.fontSize = '200%'; // CSSOM: allowed under the style-src CSP
       window.dispatchEvent(new Event('resize'));
@@ -474,6 +483,7 @@ test.describe('seven-string fretboard (US5, Q18)', () => {
       }
     });
     await page.goto('/notes');
+    await expandDetails(page);
     await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
   });
 
@@ -502,6 +512,7 @@ test.describe('seven-string fretboard (US5, Q18)', () => {
     for (const width of [1280, 320]) {
       await page.setViewportSize({ width, height: 800 });
       await page.goto('/notes');
+      await expandDetails(page);
       await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
       const box = await page.locator('.cell[data-string="7"][data-fret="1"]').boundingBox();
       if (!box) throw new Error('missing box');

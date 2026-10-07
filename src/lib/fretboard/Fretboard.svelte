@@ -20,6 +20,9 @@
     type Position
   } from '../instrument/instrument';
   import { describeView, positionName } from './description';
+  import Minimap, { type MinimapDot } from './Minimap.svelte';
+  import ViewAids from './ViewAids.svelte';
+  import { legendGroups } from './legend';
   import {
     DEFAULT_METRICS,
     DOUBLE_INLAY_FRETS,
@@ -44,8 +47,11 @@
   import { layoutTags } from './tags';
   import { applyPulses } from './pulse';
   import { readMetrics } from './metrics';
+  import { reducePinch, type PinchState } from './pinch';
   import { animateScroll, browserClock } from './scroll-animation';
   import { tokenDuration } from './motion';
+  import { printInlinePx } from './print-layout';
+  import { adoptKeys, reconcileMarkers, type KeyedMarker, type MotionKind } from './transition';
   import type {
     DrawnMarker,
     FretboardProps,
@@ -57,6 +63,10 @@
   /** Vertical gap (px) between a marked string's label and its text mark. */
   const STRING_MARK_OFFSET = 9;
   const NO_MARKERS = { markers: [], labelMode: 'none' } as const;
+  /** Whole mode: marker labels are omitted below this glyph scale (shape still carries function). */
+  const LABEL_MIN_SCALE = 0.75;
+  /** `--target-min`: a column narrower than this is too small to tap reliably in whole mode. */
+  const TARGET_MIN_PX = 44;
 
   let {
     instrument,
@@ -64,10 +74,13 @@
     variant = 'interactive',
     onactivate,
     pulses = [],
-    ontag
+    ontag,
+    fit = 'comfortable',
+    onfit,
+    printing: printRequested = false,
+    takeAnchor
   }: FretboardProps = $props();
 
-  const uid = $props.id();
   const thumb = $derived(variant === 'thumbnail');
   const preview = $derived(variant === 'preview');
   /** Decorative variants: no markers, tags, band, arrows, scrolling or handlers. */
@@ -112,14 +125,24 @@
   /** `--duration-short` in ms; 0 when missing or under reduced motion (tokens zero it out). */
   const scrollDuration = () => tokenDuration(root);
 
+  /** How the model that is on screen arrived (026): set once per model update, before the patch. */
+  let activeKind: MotionKind = 'none';
+  /** Kinds in which a removed marker fades out; every other removal is immediate. */
+  const FADES_OUT: readonly MotionKind[] = ['slide', 'by-role', 'cross-fade', 'reveal'];
+
   /**
-   * Intro (F5, 017): comparison markers fade over `--duration-short`. A marker with `appear`
-   * (a layer reveal) starts after `appear × (short − fast)` and fades and scales in over
-   * `--duration-fast`, so the whole sequence fits in `--duration-short`; reduced motion zeroes
-   * both. Every other marker appears at once. Never 0 ms: see `markerOut`.
+   * Intro (026 data-model §7). `fade`: opacity over `--duration-short`. `reveal` (a layer
+   * switched on): starts after `appear × (short − fast)` and fades and scales in over
+   * `--duration-fast`, so the whole sequence fits in `--duration-short`. A marker with `from`
+   * (comparison) also slides from there to its own cell. `instant`: nothing. Reduced motion
+   * zeroes every duration. Never 0 ms: see `markerOut`.
    */
-  function markerIn(node: Element, mk: { comparison: boolean; appear?: number }) {
-    if (mk.appear !== undefined) {
+  function markerIn(
+    node: Element,
+    mk: { enter: KeyedMarker['enter']; appear?: number; slideFrom?: { x: number; y: number } }
+  ) {
+    if (mk.slideFrom && mounted) startSlideFrom(node as SVGGElement, mk.slideFrom);
+    if (mk.enter === 'reveal' && mk.appear !== undefined) {
       const short = tokenDuration(root);
       const fast = tokenDuration(root, '--duration-fast');
       const shape = node.querySelector<SVGGElement>('.shape');
@@ -135,11 +158,27 @@
     }
     // Never 0: Svelte 5 keyed-each groups never finish when some items' transitions complete
     // synchronously (duration 0) and others asynchronously. 1 ms is visually instant.
-    return fade(node, { duration: Math.max(1, mk.comparison ? tokenDuration(root) : 0) });
+    return fade(node, { duration: Math.max(1, mk.enter === 'instant' ? 0 : tokenDuration(root)) });
   }
-  /** Outro: comparison markers fade; every other removal is immediate and never staggered. */
-  function markerOut(node: Element, comparison: boolean) {
-    return fade(node, { duration: Math.max(1, comparison ? tokenDuration(root) : 0) });
+  /** Outro: fades in the moving kinds; every other removal is immediate and never staggered. */
+  function markerOut(node: Element) {
+    return fade(node, {
+      duration: Math.max(1, FADES_OUT.includes(activeKind) ? tokenDuration(root) : 0)
+    });
+  }
+  /**
+   * Comparison enter: write the base marker's transform without a transition, then target the
+   * marker's own cell on the next frame, so it slides out of the base marker (same CSSOM
+   * technique as `mounted`).
+   */
+  function startSlideFrom(node: SVGGElement, from: { x: number; y: number }) {
+    const target = node.style.transform;
+    node.style.transition = 'none';
+    node.style.transform = `translate(${from.x}px, ${from.y}px)`;
+    requestAnimationFrame(() => {
+      node.style.transition = '';
+      node.style.transform = target;
+    });
   }
   function arrowFade(node: Element, direction: { in: boolean }) {
     const d = tokenDuration(root);
@@ -155,10 +194,48 @@
         )
   );
   const markByString = $derived(new Map(stringMarks.map((mk) => [mk.string, mk.label])));
+  /** A boolean, so a marker-only model change does not re-derive the layout. */
+  const hasStringMarks = $derived(stringMarks.length > 0);
+  /**
+   * Print layout (R-11): the whole neck at the nominal print width, whatever the screen's fit,
+   * container width, scroll or arrangement, so every print of a view is the same.
+   */
+  const printing = $derived(printRequested && !compact);
+  const layoutWidth = $derived(printing ? printInlinePx(root) : containerWidth);
+  const layoutFit = $derived(printing ? 'whole' : fit);
   const layout = $derived(
-    layoutFretboard(instrument, metrics, containerWidth, variant, stringMarks.length > 0)
+    layoutFretboard(instrument, metrics, layoutWidth, variant, hasStringMarks, layoutFit)
   );
   const lastFret = $derived(layout.columns.length - 1);
+
+  /**
+   * Fit availability (025): the interactive neck overflows its container at comfortable size.
+   * Reported once measured and on every change; never by thumbnail/preview.
+   */
+  const overflows = $derived(containerWidth > 0 && layout.naturalWidth > containerWidth);
+  let lastOverflow: boolean | undefined;
+  $effect(() => {
+    const value = overflows;
+    if (!mounted || compact || containerWidth === 0) return;
+    if (value === lastOverflow) return;
+    lastOverflow = value;
+    untrack(() => onfit?.({ kind: 'overflow', value }));
+  });
+
+  /** Highlighted valid positions in layout space for the minimap. */
+  const minimapDots = $derived.by((): MinimapDot[] => {
+    if (compact || !layout.scrolls) return [];
+    const rowIndex = new Map(layout.rows.map((r, i) => [r.string, i]));
+    const dots: MinimapDot[] = [];
+    for (const mk of model.markers) {
+      if (mk.emphasis !== 'highlighted' || !isValidPosition(instrument, mk)) continue;
+      const row = rowIndex.get(mk.string);
+      const col = layout.columns[mk.fret];
+      if (row === undefined || !col) continue;
+      dots.push({ x: col.center, row });
+    }
+    return dots;
+  });
 
   const singleInlays = $derived(
     INLAY_FRETS.filter((f) => f <= lastFret).map((f) => layout.columns[f].center)
@@ -253,17 +330,57 @@
     untrack(() => {
       const prev = anchored;
       anchored = current;
-      const viewport = el.clientWidth;
+      // Pure checks first: reading `clientWidth` forces a synchronous reflow.
       if (prev === null) {
-        if (current.mirrored) el.scrollLeft = scrollForNutOffset(current, 0, viewport);
+        if (current.mirrored) el.scrollLeft = scrollForNutOffset(current, 0, el.clientWidth);
         return;
       }
       if (prev.width === current.width && prev.mirrored === current.mirrored) return;
       if (!prev.mirrored && !current.mirrored) return; // right-handed keeps the browser's own scroll
       if (holdWidth !== null) return;
+      const viewport = el.clientWidth;
       const offset = nutOffset(prev, scrollBefore, viewport);
       stopAutoScroll();
       el.scrollLeft = scrollForNutOffset(current, offset, viewport);
+    });
+  });
+
+  /**
+   * Scroll anchor on a fit switch (FR-013): after whole ↔ comfortable keep the highlighted (or
+   * CAGED-focus) groups visible, else the nut offset the layout already preserved. An accepted
+   * small-fret notice centres the tapped position instead (clamped). Instant, no animation.
+   */
+  let lastFit = untrack(() => fit);
+  $effect(() => {
+    const mode = fit;
+    const current = layout;
+    const el = scroller;
+    if (!el || compact || containerWidth === 0 || mode === lastFit) return;
+    lastFit = mode;
+    untrack(() => {
+      const width = el.clientWidth;
+      const maxScroll = Math.max(0, current.width - width);
+      const accepted = mode === 'comfortable' ? (takeAnchor?.() ?? null) : null;
+      let target: number | null;
+      if (accepted && isValidPosition(instrument, accepted)) {
+        target = Math.min(
+          Math.max(current.columns[accepted.fret].center - width / 2, 0),
+          maxScroll
+        );
+      } else if (model.autoScroll) {
+        const groups = model.autoScroll.groups.map((g) =>
+          g.filter((p) => isValidPosition(instrument, p))
+        );
+        target = groupScrollTarget(current, groups, { scrollLeft: el.scrollLeft, width });
+      } else {
+        const positions = model.markers.filter(
+          (mk) => mk.emphasis === 'highlighted' && isValidPosition(instrument, mk)
+        );
+        target = autoScrollTarget(current, positions, { scrollLeft: el.scrollLeft, width });
+      }
+      if (target === null) return;
+      stopAutoScroll();
+      el.scrollLeft = target;
     });
   });
 
@@ -284,26 +401,38 @@
     if (!scroller || thumb) return;
     if (key === lastHighlightKey) return;
     lastHighlightKey = key;
+    let frame = 0;
     untrack(() => {
-      if (!scroller || key === '') return;
-      const viewport = { scrollLeft: scroller.scrollLeft, width: scroller.clientWidth };
-      let target: number | null;
-      if (model.autoScroll) {
-        const groups = model.autoScroll.groups.map((g) =>
-          g.filter((p) => isValidPosition(instrument, p))
-        );
-        target = groupScrollTarget(layout, groups, viewport);
-      } else {
-        const positions = key.split(',').map((k) => {
-          const [string, fret] = k.split(':').map(Number);
-          return { string, fret };
-        });
-        target = autoScrollTarget(layout, positions, viewport);
-      }
-      if (target === null) return;
-      stopAutoScroll();
-      cancelScroll = animateScroll(scroller, target, scrollDuration(), browserClock);
+      // A board that fits has nothing to scroll.
+      const el = scroller;
+      if (!el || key === '' || !layout.scrolls) return;
+      const run = () => {
+        const viewport = { scrollLeft: el.scrollLeft, width: el.clientWidth };
+        let target: number | null;
+        if (model.autoScroll) {
+          const groups = model.autoScroll.groups.map((g) =>
+            g.filter((p) => isValidPosition(instrument, p))
+          );
+          target = groupScrollTarget(layout, groups, viewport);
+        } else {
+          const positions = key.split(',').map((k) => {
+            const [string, fret] = k.split(':').map(Number);
+            return { string, fret };
+          });
+          target = autoScrollTarget(layout, positions, viewport);
+        }
+        if (target === null) return;
+        stopAutoScroll();
+        cancelScroll = animateScroll(el, target, duration, browserClock);
+      };
+      const duration = scrollDuration();
+      if (duration <= 0) return run();
+      // Animated: measure in the next frame, still before it paints. Reading the scroll
+      // geometry here would force a synchronous reflow of the board just patched, inside the
+      // control → board budget (≤ 100 ms).
+      frame = requestAnimationFrame(run);
     });
+    return () => cancelAnimationFrame(frame);
   });
 
   // Shape tags (Full neck): measured widths feed the pure layout; absent tags reserve nothing.
@@ -487,22 +616,83 @@
     });
   });
 
+  /**
+   * Keys of the markers last drawn, with the model they were drawn for. Plain variables: the
+   * list is rebuilt inside `keyed`, which runs once per model, pulse or instrument change.
+   */
+  /** The model the board mounted with never animates in; later models carry their own kind. */
+  const mountModel = untrack(() => model);
+  const motionAttr = $derived<MotionKind>(model === mountModel ? 'none' : (model.motion ?? 'none'));
+  let drawnBefore: readonly KeyedMarker[] = [];
+  let drawnFor: object | undefined;
+  let generation = 0;
+
+  /** A new model reconciles by its `motion`; any other change (pulse, instrument) keeps keys. */
+  const keyed = $derived.by((): readonly KeyedMarker[] => {
+    const list = Object.values(drawnMap).filter((mk) => mk.emphasis !== 'hidden');
+    const modelChanged = drawnFor !== undefined && model !== drawnFor;
+    const first = drawnFor === undefined;
+    drawnFor = model;
+    if (modelChanged) generation++;
+    const kind: MotionKind = modelChanged ? (model.motion ?? 'none') : 'none';
+    const prev = drawnBefore;
+    let out = reconcileMarkers(prev, list, kind, generation);
+    if (!modelChanged && !first) out = adoptKeys(prev, out);
+    if (modelChanged || first) activeKind = kind;
+    drawnBefore = out;
+    return out;
+  });
+
   const drawn = $derived(
-    Object.entries(drawnMap)
-      .filter(([, mk]) => mk.emphasis !== 'hidden')
-      .map(([key, mk]) => ({
-        key,
+    keyed.map(({ key: id, mk, enter, from }) => {
+      const base = from && isValidPosition(instrument, from) ? from : null;
+      return {
+        id,
+        enter,
+        key: positionKey(mk),
         mk,
         x: layout.columns[mk.fret].center,
         y: rowOf(layout, mk.string).center,
-        label: labelFit(mk),
+        slideFrom: base
+          ? { x: layout.columns[base.fret].center, y: rowOf(layout, base.string).center }
+          : undefined,
+        label: layout.markerScale < LABEL_MIN_SCALE && !printing ? null : labelFit(mk),
         tone: mk.emphasis === 'highlighted' ? mk.tone : undefined,
         badge:
           mk.octaveBadge === true && model.labelMode === 'note'
             ? `${octaveOf(positionPitch(instrument, mk))}`
             : null
-      }))
+      };
+    })
   );
+
+  const narrowestColumn = $derived(
+    layout.columns.reduce((min, c) => Math.min(min, c.end - c.start), Infinity)
+  );
+
+  /**
+   * Two-finger pinch (025 R-06): passive touch listeners feed the pure reducer; a completed pinch
+   * requests a mode (in → whole, out → comfortable). One finger never emits; scrolling is native.
+   */
+  $effect(() => {
+    const el = scroller;
+    if (!el || compact) return;
+    let state: PinchState = { kind: 'idle' };
+    const onTouches = (e: TouchEvent) => {
+      const points = Array.from(e.touches, (t) => ({ x: t.clientX, y: t.clientY }));
+      const r = reducePinch(state, { type: 'touches', points });
+      state = r.state;
+      if (r.effect.kind === 'pinch') {
+        onfit?.({ kind: 'request', mode: r.effect.direction === 'in' ? 'whole' : 'comfortable' });
+      }
+    };
+    const opts = { passive: true } as const;
+    const types = ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const;
+    for (const t of types) el.addEventListener(t, onTouches, opts);
+    return () => {
+      for (const t of types) el.removeEventListener(t, onTouches);
+    };
+  });
 
   let gesture: GestureState = { kind: 'idle' };
   let activePointers = 0;
@@ -525,7 +715,11 @@
       svgEl
         ?.querySelector<SVGElement>(`.cell[data-string="${p.string}"][data-fret="${p.fret}"]`)
         ?.focus();
-      onactivate?.({ string: p.string, fret: p.fret });
+      const position = { string: p.string, fret: p.fret };
+      onactivate?.(position);
+      if (fit === 'whole' && narrowestColumn < TARGET_MIN_PX) {
+        onfit?.({ kind: 'small-tap', position });
+      }
     }
   }
 
@@ -662,22 +856,6 @@
   }
 
   const description = $derived(model.description ?? describeView(instrument, model));
-  let liveText = $state('');
-  let lastDescription: string | undefined;
-  let showDescription = $state(false);
-
-  // Announce only after the first render and only when the description actually changes.
-  $effect(() => {
-    const d = description;
-    if (lastDescription === undefined) {
-      lastDescription = d;
-      return;
-    }
-    if (d !== lastDescription) {
-      lastDescription = d;
-      liveText = d;
-    }
-  });
 
   const diamond = (half: number) => `0,${-half} ${half},0 0,${half} ${-half},0`;
 
@@ -828,6 +1006,7 @@
         height={layout.height}
         {viewBox}
         bind:this={svgEl}
+        data-motion={motionAttr}
         onpointerdown={onPointerDown}
         onpointermove={onPointerMove}
         onpointerup={onPointerEnd}
@@ -865,8 +1044,13 @@
             >
           {/each}
         </g>
-        <g aria-hidden="true" class="markers">
-          {#each drawn as d (d.mk.pulse?.id ?? d.mk.id ?? d.key)}
+        <g
+          aria-hidden="true"
+          class="markers"
+          data-marker-scale={layout.markerScale}
+          style:--marker-scale={printing ? layout.markerScale : undefined}
+        >
+          {#each drawn as d (d.id)}
             <g
               class="marker {d.mk.function} {d.mk.emphasis}{d.tone ? ` tone-${d.tone}` : ''}"
               class:comparison={d.mk.variant === 'comparison'}
@@ -878,53 +1062,62 @@
               data-key={d.key}
               transform="translate({d.x} {d.y})"
               style:transform={mounted ? `translate(${d.x}px, ${d.y}px)` : undefined}
-              in:markerIn={{ comparison: d.mk.variant === 'comparison', appear: d.mk.appear }}
-              out:markerOut={d.mk.variant === 'comparison'}
+              in:markerIn={{ enter: d.enter, appear: d.mk.appear, slideFrom: d.slideFrom }}
+              out:markerOut
             >
               <g class="shape">
-                {#if d.mk.function === 'root'}
-                  <rect
-                    class="glyph"
-                    x={-metrics.markerRoot / 2}
-                    y={-metrics.markerRoot / 2}
-                    width={metrics.markerRoot}
-                    height={metrics.markerRoot}
-                    rx={metrics.markerRoot / 5}
-                  />
-                {:else if d.mk.function === 'fifth'}
-                  <polygon class="glyph" points={diamond(metrics.markerMedium / 2 + 2)} />
-                {:else if d.mk.function === 'degree'}
-                  <circle class="glyph outline" r={metrics.markerSmall / 2} />
-                {:else if d.mk.function === 'neutral'}
-                  <circle class="glyph ring" r={metrics.markerMedium / 2} />
-                {:else}
-                  <circle class="glyph" r={metrics.markerMedium / 2} />
-                {/if}
-                {#if d.mk.extra && d.mk.function === 'degree'}
-                  <circle class="extra-dot" aria-hidden="true" cy={metrics.markerSmall / 2 + 3} />
-                {/if}
-                {#if d.mk.ring}
-                  <circle class="connection-ring" aria-hidden="true" style:--ring-base={ringBase} />
-                {/if}
-                {#if d.label}
-                  <text
-                    class="marker-label"
-                    class:normal={d.label.size === 'normal'}
-                    class:min={d.label.size === 'min'}
-                    aria-hidden="true"
-                    >{#if d.label.lines.length === 2}<tspan x="0" dy="-0.55em"
-                        >{d.label.lines[0]}</tspan
-                      ><tspan x="0" dy="1.1em">{d.label.lines[1]}</tspan>{:else}{d.label
-                        .lines[0]}{/if}</text
-                  >
-                {/if}
-                {#if d.badge}
-                  <text
-                    class="octave-badge"
-                    x={metrics.markerMedium / 2}
-                    y={-metrics.markerMedium / 2}>{d.badge}</text
-                  >
-                {/if}
+                <g
+                  class="glyph-scale"
+                  transform={layout.markerScale < 1 ? `scale(${layout.markerScale})` : undefined}
+                >
+                  {#if d.mk.function === 'root'}
+                    <rect
+                      class="glyph"
+                      x={-metrics.markerRoot / 2}
+                      y={-metrics.markerRoot / 2}
+                      width={metrics.markerRoot}
+                      height={metrics.markerRoot}
+                      rx={metrics.markerRoot / 5}
+                    />
+                  {:else if d.mk.function === 'fifth'}
+                    <polygon class="glyph" points={diamond(metrics.markerMedium / 2 + 2)} />
+                  {:else if d.mk.function === 'degree'}
+                    <circle class="glyph outline" r={metrics.markerSmall / 2} />
+                  {:else if d.mk.function === 'neutral'}
+                    <circle class="glyph ring" r={metrics.markerMedium / 2} />
+                  {:else}
+                    <circle class="glyph" r={metrics.markerMedium / 2} />
+                  {/if}
+                  {#if d.mk.extra && d.mk.function === 'degree'}
+                    <circle class="extra-dot" aria-hidden="true" cy={metrics.markerSmall / 2 + 3} />
+                  {/if}
+                  {#if d.mk.ring}
+                    <circle
+                      class="connection-ring"
+                      aria-hidden="true"
+                      style:--ring-base={ringBase}
+                    />
+                  {/if}
+                  {#if d.label}
+                    <text
+                      class="marker-label"
+                      class:normal={d.label.size === 'normal'}
+                      class:min={d.label.size === 'min'}
+                      aria-hidden="true"
+                      >{#if d.label.lines.length === 2}<tspan x="0" dy="-0.55em"
+                          >{d.label.lines[0]}</tspan
+                        ><tspan x="0" dy="1.1em">{d.label.lines[1]}</tspan>{:else}{d.label
+                          .lines[0]}{/if}</text
+                    >
+                  {/if}
+                  {#if d.badge}
+                    <text
+                      class="octave-badge"
+                      x={metrics.markerMedium / 2}
+                      y={-metrics.markerMedium / 2}>{d.badge}</text
+                    >
+                  {/if}
+                </g>
               </g>
             </g>
           {/each}
@@ -960,15 +1153,17 @@
           </g>
         {/if}
         {#if inside}
-          <rect
-            class="focus-ring"
-            aria-hidden="true"
-            x={layout.columns[stop.fret].start + 1.5}
-            y={rowOf(layout, stop.string).top + 1.5}
-            width={layout.columns[stop.fret].end - layout.columns[stop.fret].start - 3}
-            height={rowOf(layout, stop.string).bottom - rowOf(layout, stop.string).top - 3}
-            rx="4"
-          />
+          {#each ['focus-ring-outer', 'focus-ring-inner'] as ring (ring)}
+            <rect
+              class="focus-ring {ring}"
+              aria-hidden="true"
+              x={layout.columns[stop.fret].start + 1.5}
+              y={rowOf(layout, stop.string).top + 1.5}
+              width={layout.columns[stop.fret].end - layout.columns[stop.fret].start - 3}
+              height={rowOf(layout, stop.string).bottom - rowOf(layout, stop.string).top - 3}
+              rx="4"
+            />
+          {/each}
         {/if}
         {#each layout.rows as row (row.string)}
           <g role="row" data-string={row.string}>
@@ -1001,17 +1196,10 @@
         <div class="hold" aria-hidden="true" style:inline-size={`${holdWidth}px`}></div>
       {/if}
     </div>
-    <div class="sr-only" aria-live="polite" aria-atomic="true">{liveText}</div>
-    <button
-      type="button"
-      class="description-toggle"
-      aria-expanded={showDescription}
-      aria-controls="{uid}-description"
-      onclick={() => (showDescription = !showDescription)}
-    >
-      {showDescription ? m.fretboard_description_hide() : m.fretboard_description_show()}
-    </button>
-    <p class="description" id="{uid}-description" hidden={!showDescription}>{description}</p>
+    {#if layout.scrolls && !printing}
+      <Minimap {layout} {scroller} dots={minimapDots} />
+    {/if}
+    <ViewAids {description} legend={legendGroups(model)} {printing} />
   </div>
 {/if}
 
@@ -1024,7 +1212,7 @@
   .scroller {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    touch-action: auto;
+    touch-action: pan-x pan-y;
   }
 
   .tags {
@@ -1075,6 +1263,8 @@
 
   svg {
     display: block;
+    /* Board paint never inherits the surface text colour: identical in both themes. */
+    color: var(--fb-color-number);
     touch-action: manipulation;
   }
 
@@ -1083,12 +1273,12 @@
   }
 
   .hover-hint rect {
-    fill: var(--color-hint-surface);
-    stroke: var(--color-border);
+    fill: var(--fb-color-neutral);
+    stroke: var(--fb-color-neutral-stroke);
   }
 
   .hover-hint text {
-    fill: var(--color-hint-text);
+    fill: var(--fb-color-label-on-neutral);
     font-size: var(--marker-label-min-size);
     font-weight: 700;
   }
@@ -1107,16 +1297,18 @@
   }
 
   .wood {
-    fill: var(--color-fretboard-wood);
+    fill: var(--fb-color-wood);
+    stroke: var(--fb-color-edge);
+    stroke-width: var(--fb-edge-width);
   }
 
   .region-band {
-    fill: var(--region-band);
+    fill: var(--fb-region-band);
   }
 
   .fret-line,
   .string {
-    stroke: var(--color-fretboard-line);
+    stroke: var(--fb-color-line);
   }
 
   .fret-line {
@@ -1146,15 +1338,15 @@
   }
 
   .nut {
-    fill: var(--color-nut);
+    fill: var(--fb-color-nut);
   }
 
   .inlay {
-    fill: var(--color-inlay);
+    fill: var(--fb-color-inlay);
   }
 
   text {
-    fill: var(--color-text-muted);
+    fill: var(--fb-color-number);
     font-family: var(--font-family-notes);
     font-variant-numeric: tabular-nums;
     text-anchor: middle;
@@ -1177,7 +1369,7 @@
 
   .fret-number.inlay-fret {
     font-weight: 700;
-    fill: var(--color-text);
+    fill: var(--fb-color-number-strong);
   }
 
   .cell {
@@ -1191,54 +1383,51 @@
 
   .focus-ring {
     fill: none;
-    stroke: var(--color-focus-ring);
-    stroke-width: var(--focus-ring-width);
     pointer-events: none;
   }
 
-  .sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  /* Two-tone ring: wide outer stroke under a narrow inner stroke, visible on any fill. */
+  .focus-ring-outer {
+    stroke: var(--color-focus-ring-outer);
+    stroke-width: var(--focus-ring-width);
   }
 
-  .description-toggle {
-    min-block-size: 44px;
-    min-inline-size: 44px;
-    margin-block-start: var(--space-2, 0.5rem);
-    padding-inline: var(--space-3, 0.75rem);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    cursor: pointer;
+  .focus-ring-inner {
+    stroke: var(--color-focus-ring-inner);
+    stroke-width: calc(var(--focus-ring-width) / 3);
   }
 
-  .description {
-    margin-block: var(--space-2, 0.5rem) 0;
-    overflow-wrap: anywhere;
+  /* Only the six change situations animate (026): every other model change is instant. */
+  [data-motion='none'] .marker,
+  [data-motion='none'] .shape {
+    transition: none;
   }
 
   .marker {
     pointer-events: none;
     transition:
       transform var(--duration-short) var(--ease-standard),
-      opacity var(--duration-medium) var(--ease-standard);
+      opacity var(--duration-short) var(--ease-standard);
   }
 
   .shape {
+    transition: transform var(--duration-short);
+  }
+
+  /* Focus dims and restores emphasis over `--duration-medium`; every other kind stays short. */
+  [data-motion='focus'] .marker {
+    transition:
+      transform var(--duration-short) var(--ease-standard),
+      opacity var(--duration-medium) var(--ease-standard);
+  }
+
+  [data-motion='focus'] .shape {
     transition: transform var(--duration-medium);
   }
 
   .marker.highlighted .shape {
     transform: scale(var(--emph-highlight-scale));
-    filter: drop-shadow(0 0 var(--marker-elevation-stroke) var(--color-text));
+    filter: drop-shadow(0 0 var(--marker-elevation-stroke) var(--fb-color-elevation));
   }
 
   /* Arpeggio layer: smaller and slightly translucent; shape still carries the function. */
@@ -1257,7 +1446,7 @@
   }
 
   .marker.layer-triad .glyph {
-    stroke: var(--color-text);
+    stroke: var(--fb-color-outline);
     stroke-width: var(--marker-triad-stroke);
   }
 
@@ -1266,12 +1455,12 @@
   }
 
   .marker .extra-dot {
-    fill: var(--color-text);
+    fill: var(--fb-color-outline);
     r: var(--marker-extra-dot);
   }
   .marker .connection-ring {
     fill: none;
-    stroke: var(--connection-ring);
+    stroke: var(--fb-color-outline);
     stroke-width: var(--connection-ring-width);
     r: calc(var(--ring-base) * 1px + var(--connection-ring-gap));
   }
@@ -1302,16 +1491,9 @@
   }
 
   .marker.comparison .glyph {
-    stroke: var(--color-text);
+    stroke: var(--fb-color-outline);
     stroke-width: var(--marker-stroke);
     stroke-dasharray: var(--marker-dash) var(--marker-dash-gap);
-  }
-
-  @media (prefers-contrast: more) {
-    .marker.comparison .glyph {
-      stroke: CanvasText;
-      stroke-width: var(--marker-stroke);
-    }
   }
 
   .arrows {
@@ -1319,21 +1501,21 @@
   }
 
   .arrow-line {
-    stroke: var(--color-text);
+    stroke: var(--fb-color-outline);
     stroke-width: var(--marker-stroke);
   }
 
   .arrowhead {
-    fill: var(--color-text);
+    fill: var(--fb-color-outline);
     stroke: none;
   }
 
   .arrows text.arrow-label {
-    fill: var(--color-text);
+    fill: var(--fb-color-outline);
     font-size: var(--marker-label-min-size);
     font-weight: 700;
     paint-order: stroke;
-    stroke: var(--color-surface-raised);
+    stroke: var(--fb-color-arrow-halo);
     stroke-width: 3px;
   }
 
@@ -1346,82 +1528,111 @@
   }
 
   .marker.root .glyph {
-    fill: var(--color-root);
+    fill: var(--fb-color-root);
   }
 
   .marker.third .glyph {
-    fill: var(--color-third);
+    fill: var(--fb-color-third);
   }
 
   .marker.fifth .glyph {
-    fill: var(--color-fifth);
+    fill: var(--fb-color-fifth);
   }
 
   .glyph.ring {
-    fill: var(--color-neutral-note);
-    stroke: var(--color-neutral-note-stroke);
+    fill: var(--fb-color-neutral);
+    stroke: var(--fb-color-neutral-stroke);
     stroke-width: var(--marker-neutral-stroke-width);
   }
 
   .marker.neutral.highlighted .glyph {
-    fill: var(--color-note-highlight);
-    stroke: var(--color-neutral-note-stroke);
+    fill: var(--fb-color-note-highlight);
+    stroke: var(--fb-color-neutral-stroke);
   }
 
   .marker.neutral.highlighted.tone-1 .glyph {
-    fill: var(--octave-tone-1);
+    fill: var(--fb-octave-tone-1);
   }
   .marker.neutral.highlighted.tone-2 .glyph {
-    fill: var(--octave-tone-2);
+    fill: var(--fb-octave-tone-2);
   }
   .marker.neutral.highlighted.tone-3 .glyph {
-    fill: var(--octave-tone-3);
+    fill: var(--fb-octave-tone-3);
   }
   .marker.neutral.highlighted.tone-4 .glyph {
-    fill: var(--octave-tone-4);
+    fill: var(--fb-octave-tone-4);
   }
   .marker.neutral.highlighted.tone-5 .glyph {
-    fill: var(--octave-tone-5);
+    fill: var(--fb-octave-tone-5);
   }
   .marker.neutral.highlighted.tone-6 .glyph {
-    fill: var(--octave-tone-6);
+    fill: var(--fb-octave-tone-6);
   }
   .marker.neutral.highlighted.tone-7 .glyph {
-    fill: var(--octave-tone-7);
+    fill: var(--fb-octave-tone-7);
   }
 
   .marker.neutral.highlighted text.marker-label {
-    fill: var(--color-note-highlight-label);
+    fill: var(--fb-color-note-highlight-label);
   }
 
   .marker text.octave-badge {
-    fill: var(--color-text);
+    fill: var(--fb-color-number-strong);
     font-size: var(--marker-badge-size);
     font-weight: 700;
     text-anchor: start;
     paint-order: stroke;
-    stroke: var(--color-surface-raised);
+    stroke: var(--fb-color-arrow-halo);
     stroke-width: 2px;
   }
 
   .glyph.outline {
     fill: none;
-    stroke: var(--color-degree-stroke);
+    stroke: var(--fb-color-degree-stroke);
     stroke-width: var(--marker-stroke);
   }
 
   .marker text.marker-label {
-    fill: var(--color-marker-label);
+    fill: var(--fb-color-label);
     font-size: var(--marker-label-size);
     font-weight: 700;
   }
 
   .marker.neutral text.marker-label,
   .marker.degree text.marker-label {
-    fill: var(--color-neutral-note-stroke);
+    fill: var(--fb-color-label-on-neutral);
   }
 
   .marker text.marker-label.min {
     font-size: var(--marker-label-min-size);
+  }
+
+  @media print {
+    .scroller {
+      overflow: visible;
+    }
+
+    svg[role='grid'] {
+      inline-size: 100%;
+      block-size: auto;
+      max-block-size: var(--print-board-max-block);
+      break-inside: avoid;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+
+    .fret-number,
+    .string-label {
+      font-size: max(var(--font-size-sm), var(--print-text-min));
+    }
+
+    /* Markers are scaled by --marker-scale: raise the label so it still prints at >= 7 pt. */
+    .marker text.marker-label,
+    .marker text.marker-label.min {
+      font-size: max(
+        var(--marker-label-min-size),
+        calc(var(--print-text-min) / var(--marker-scale, 1))
+      );
+    }
   }
 </style>

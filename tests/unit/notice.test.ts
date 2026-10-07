@@ -1,7 +1,11 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import Notice from '../../src/lib/shell/Notice.svelte';
+import { hexToSrgb } from './a11y/color';
+import { parseTokenSheet, resolveLightDark } from './a11y/tokens';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -107,5 +111,52 @@ describe('Notice', () => {
   it('is unchanged without an action', () => {
     render(Notice, { message: 'Hello', ondismiss: () => {} });
     expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
+
+  describe('calm in both themes (026)', () => {
+    const css = readFileSync('src/lib/shell/Notice.svelte', 'utf8');
+    const sheet = parseTokenSheet();
+
+    it('is non-blocking: no dialog or alert role, no fixed overlay, no focus trap', () => {
+      render(Notice, { message: 'Sound is unavailable', ondismiss: () => {} });
+      const status = screen.getByRole('status');
+      expect(status.getAttribute('role')).toBe('status');
+      expect(status.getAttribute('aria-modal')).toBeNull();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(css).not.toMatch(/position:\s*fixed/);
+      expect(css).not.toMatch(/z-index/);
+    });
+
+    it('is dismissible', async () => {
+      const ondismiss = vi.fn();
+      render(Notice, { message: 'Limit reached', ondismiss });
+      await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+      expect(ondismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps its text inside two lines of copy (no multi-paragraph body)', () => {
+      render(Notice, { message: 'Sound is unavailable', ondismiss: () => {} });
+      const status = screen.getByRole('status');
+      expect(status.querySelectorAll('p,ul,ol,br').length).toBeLessThanOrEqual(1);
+      expect(css).not.toMatch(/min-block-size:\s*\d+(rem|px|vh)/);
+    });
+
+    it('uses no error-red token in either theme', () => {
+      for (const name of [
+        '--color-notice-surface',
+        '--color-notice-text',
+        '--color-notice-border'
+      ]) {
+        const value = sheet.root[name];
+        expect(value, name).toBeDefined();
+        for (const hex of resolveLightDark(value).filter((v) => v.startsWith('#'))) {
+          const [r, g, b] = hexToSrgb(hex);
+          const redDominant = r > 0.55 && r > g * 1.6 && r > b * 1.6;
+          expect(redDominant, `${name} ${hex}`).toBe(false);
+        }
+      }
+      expect(css).not.toMatch(/--color-(error|danger|root)/);
+    });
   });
 });

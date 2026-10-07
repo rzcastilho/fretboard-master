@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe } from './support/helpers';
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Tools' });
 
@@ -16,6 +16,7 @@ test('card opens tool with five named zones @smoke', async ({ page }) => {
 
 test('nav order and aria-current @smoke', async ({ page }) => {
   await page.goto('/triads');
+  await expandDetails(page);
   await expect(nav(page).getByRole('link')).toHaveText([
     'Home',
     'Fretboard Notes',
@@ -84,12 +85,14 @@ for (const [path, heading, title] of [
 
 test('/triads/ redirects to /triads', async ({ page }) => {
   await page.goto('/triads/');
+  await expandDetails(page);
   await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   await expect(page).toHaveTitle('Triads — Fretboard Master');
 });
 
 test('layout: fretboard largest; context panel placement', async ({ page }, info) => {
   await page.goto('/triads');
+  await expandDetails(page);
   const box = async (name: string) => {
     const r = await page.getByRole('region', { name }).boundingBox();
     if (!r) throw new Error(`no box for ${name}`);
@@ -102,9 +105,15 @@ test('layout: fretboard largest; context panel placement', async ({ page }, info
   expect(area(c)).toBeGreaterThan(area(b));
   expect(area(c)).toBeGreaterThan(area(d));
   expect(area(c)).toBeGreaterThan(area(e));
-  const width = page.viewportSize()?.width ?? 0;
-  if (width >= 1024) {
+  const arrangement = await page.locator('main .grid').getAttribute('data-arrangement');
+  if (arrangement === 'wide-side') {
+    // Details in the right column, beside the fretboard.
     expect(d.x).toBeGreaterThanOrEqual(c.x + c.width - 1);
+  } else if (arrangement === 'medium' || arrangement === 'wide-stacked') {
+    // Fretboard full width; actions and details side by side below it.
+    expect(d.y).toBeGreaterThanOrEqual(c.y + c.height - 1);
+    expect(e.y).toBeGreaterThanOrEqual(c.y + c.height - 1);
+    expect(d.x).toBeGreaterThanOrEqual(e.x + e.width - 1);
   } else {
     expect(d.y).toBeGreaterThanOrEqual(c.y + c.height - 1);
     expect(e.y).toBeLessThan(d.y);

@@ -453,6 +453,15 @@ describe('centerScrollTarget', () => {
     expect(centerScrollTarget(layout, 8, 10, { scrollLeft: target + 0.3, width })).toBeNull();
   });
 
+  it('is null when the whole band is already in view', () => {
+    const a = layout.columns[8].start;
+    const b = layout.columns[10].end;
+    expect(centerScrollTarget(layout, 8, 10, { scrollLeft: a - 10, width: b - a + 20 })).toBeNull();
+    expect(
+      centerScrollTarget(layout, 8, 10, { scrollLeft: a + 5, width: b - a + 20 })
+    ).not.toBeNull();
+  });
+
   it('centres mirrored layouts through layout.columns', () => {
     const left = build(withPresentation(STANDARD_GUITAR, 'left', 'lowest-top'));
     const m = (a: number, b: number) =>

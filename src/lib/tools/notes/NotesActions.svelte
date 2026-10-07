@@ -1,6 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import ChoiceGroup from '../ChoiceGroup.svelte';
+  import { shortcuts } from '$lib/state/shortcuts.svelte';
   import type { ListenState } from '$lib/state/notes-model';
   import type { Background, LabelType } from '$lib/state/notes-view';
 
@@ -64,6 +65,7 @@
     options={labels}
     current={labelType}
     onchoose={onlabeltype}
+    keyshortcuts={shortcuts.enabled ? 'L' : undefined}
   />
   <div class="group">
     <button type="button" aria-pressed={hideNames} onclick={() => onhidenames(!hideNames)}>
@@ -73,6 +75,7 @@
     <button
       type="button"
       aria-disabled={!listen.enabled}
+      aria-keyshortcuts={shortcuts.enabled ? 'P' : undefined}
       aria-describedby={listenReason === null ? undefined : 'notes-listen-reason'}
       onclick={() => {
         if (listen.enabled) onlisten();
@@ -122,7 +125,7 @@
   }
 
   button[aria-pressed='true'] {
-    background: var(--color-note-highlight);
-    color: var(--color-note-highlight-label);
+    background: var(--color-accent);
+    color: var(--color-accent-text);
   }
 </style>

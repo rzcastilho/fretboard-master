@@ -3,6 +3,7 @@
  * hydration, and holds the "this link was incomplete" notice. Writes nothing to storage: the
  * opened view and any instrument override live in memory for this load only.
  */
+import { measure } from '$lib/measure/measure.svelte';
 import { isIncomplete, readReceivedHref, toolOfHref } from '$lib/link/receive';
 import { musicalOf } from '$lib/link/types';
 import type { ToolId } from '$lib/shell/tools';
@@ -42,6 +43,7 @@ export const opening = {
       else if (s.tool === 'triads') triads.receive(s.view);
       else caged.receive(s.view, s.temporary);
       if (isIncomplete(r)) incomplete = { screen: s.tool };
+      measure.linkOpened(s.tool);
     } catch {
       const tool = toolOfHref(href);
       incomplete = { screen: tool ?? 'home' };

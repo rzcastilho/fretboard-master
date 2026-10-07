@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PREFS_KEY } from '../../src/lib/prefs/storage';
+import { measure } from '../../src/lib/measure/measure.svelte';
 import { GAP_WARNING } from '../../src/lib/i18n/gaps';
 import { language, resetLanguageForTests } from '../../src/lib/state/language.svelte';
 import { preferences, resetPreferencesForTests } from '../../src/lib/state/preferences.svelte';
@@ -183,6 +185,22 @@ describe('gap reporting with stubbed missing text (SC-007)', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('tells measurement once per locale and key, beside the console warning', () => {
+    vi.stubGlobal('__FM_MISSING_TEXT__', { en: [], 'pt-BR': ['some_key'], es: ['some_key'] });
+    device(['en-US']);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const missing = vi.spyOn(measure, 'missingText').mockImplementation(() => {});
+    language.start(null);
+    expect(missing).not.toHaveBeenCalled();
+    language.restore('pt-BR');
+    language.restore('en');
+    language.restore('pt-BR');
+    expect(missing).toHaveBeenCalledTimes(1);
+    language.restore('es');
+    expect(missing).toHaveBeenCalledTimes(2);
+    expect(missing).toHaveBeenCalledWith('some_key');
   });
 });
 

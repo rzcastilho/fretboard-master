@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, runAxe } from './support/helpers';
 
 const sizes = [
   { name: 'phone', width: 360, height: 740 },
@@ -15,6 +15,7 @@ const arrows = (page: Page) => board(page).locator('g.arrows .arrow');
 
 async function openTriads(page: Page) {
   await page.goto('/triads');
+  await expandDetails(page);
   await expect(board(page).locator('.marker')).toHaveCount(3);
 }
 
@@ -165,6 +166,7 @@ const tags = (page: Page) => page.getByRole('group', { name: 'Shapes' }).getByRo
 /** A major, strings 3-2-1, Full neck (six shapes). */
 async function openFullNeck(page: Page) {
   await page.goto('/triads');
+  await expandDetails(page);
   await page
     .getByRole('group', { name: 'Root' })
     .getByRole('button', { name: 'A', exact: true })
@@ -234,6 +236,7 @@ async function openFixture(page: Page, fixture?: 'SHORT-7' | 'AF-1-12' | 'NC-UNI
     }, fixture);
   }
   await page.goto('/triads');
+  await expandDetails(page);
   await board(page).waitFor();
 }
 
@@ -259,8 +262,10 @@ for (const size of sizes) {
       await pickG2nd432(page);
       await compareToggle(page).click();
       await expect(compareList(page).getByRole('radio', { name: 'minor' })).toBeChecked();
-      const keys = await markerKeys(page);
-      expect(keys.sort()).toEqual(['2:11', '2:12', '3:12', '4:12']);
+      // The previous shape cross-fades out over `--duration-short` (026), so wait for it to go.
+      await expect
+        .poll(async () => (await markerKeys(page)).sort())
+        .toEqual(['2:11', '2:12', '3:12', '4:12']);
       await expect(board(page).locator('.marker.comparison[data-key="2:11"]')).toHaveCount(1);
       await expect(arrows(page)).toHaveCount(1);
       await expect(arrows(page).first()).toContainText('1 fret');
@@ -474,12 +479,14 @@ for (const size of sizes) {
       await expect(comparisonMarkers(page)).toHaveCount(1);
     });
 
-    test('US5-4: a root change re-creates every marker node', async ({ page }) => {
+    test('US5-4: a root change slides: each marker keeps its node (026 FR-017)', async ({
+      page
+    }) => {
       await openTriads(page);
       await stampMarkers(page);
       await rootButton(page, 'D').click();
       await expect(board(page).locator('.marker')).toHaveCount(3);
-      await expect(board(page).locator('.marker[data-stamp]')).toHaveCount(0);
+      await expect(board(page).locator('.marker[data-stamp]')).toHaveCount(3);
     });
 
     test('US5-4: a string-set change re-creates every marker node', async ({ page }) => {

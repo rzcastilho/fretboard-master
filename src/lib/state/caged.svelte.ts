@@ -49,6 +49,7 @@ import {
 import {
   equalsCagedView,
   initialCagedView,
+  motionKind,
   resetCaged,
   selectRoot,
   setConnections,
@@ -68,6 +69,7 @@ import { buildCagedListen, type ListenSource } from './caged-listen';
 import { DEFAULT_TEMPO, isTempo, type Tempo } from './listen';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
+import { createMotionTracker, withMotion } from './motion-track';
 
 /** Layer reveal window; equals `--duration-short` (asserted by a test). */
 export const REVEAL_WINDOW_MS = 300;
@@ -138,12 +140,21 @@ const effectiveName = $derived<string>(
     : tuningLabel(tuning)
 );
 
+const motionOf = createMotionTracker<CagedViewState, Instrument>(
+  motionKind,
+  (a, b) => a.labelType !== b.labelType
+);
+
+/** `display.model.motion` says how the markers moved from the previous view (026). */
 const display = $derived<CagedDisplay>(
-  buildCagedModel(view, instrument, { tuningName: effectiveName, temporary }, transition, {
-    reveal,
-    layerChange,
-    triadChange
-  })
+  withMotion(
+    buildCagedModel(view, instrument, { tuningName: effectiveName, temporary }, transition, {
+      reveal,
+      layerChange,
+      triadChange
+    }),
+    motionOf(view, instrument)
+  )
 );
 
 /**
@@ -235,6 +246,7 @@ export const caged = {
     return instrument;
   },
   get display(): CagedDisplay {
+    motionOf.consume();
     return display;
   },
   get temporary(): boolean {

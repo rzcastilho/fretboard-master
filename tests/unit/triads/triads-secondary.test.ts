@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import TriadsSecondary from '../../../src/lib/tools/triads/TriadsSecondary.svelte';

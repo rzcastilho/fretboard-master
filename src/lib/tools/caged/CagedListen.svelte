@@ -3,6 +3,7 @@
   import type { ListenSource } from '$lib/state/caged-listen';
   import { TEMPOS, type Tempo } from '$lib/state/listen';
   import ChoiceGroup from '../ChoiceGroup.svelte';
+  import { shortcuts } from '$lib/state/shortcuts.svelte';
 
   interface Props {
     enabled: boolean;
@@ -62,6 +63,7 @@
   <button
     type="button"
     aria-disabled={enabled ? undefined : 'true'}
+    aria-keyshortcuts={shortcuts.enabled ? 'P' : undefined}
     aria-describedby={!enabled && reason !== null ? 'caged-listen-reason' : undefined}
     onclick={() => {
       if (enabled) onlisten();

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -26,6 +27,13 @@ describe('HomeScreen', () => {
     render(HomeScreen);
     const banner = screen.getByRole('banner');
     expect(within(banner).getByRole('group', { name: 'Sound' })).toBeTruthy();
+  });
+
+  it('puts the theme selector in header.top, one activation away', () => {
+    render(HomeScreen);
+    const banner = screen.getByRole('banner');
+    const group = within(banner).getByRole('group', { name: 'Theme' });
+    expect(within(group).getAllByRole('radio')).toHaveLength(3);
   });
 
   it('renders exactly three tool cards in order', () => {

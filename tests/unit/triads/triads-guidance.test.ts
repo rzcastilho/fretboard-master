@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AF_1_12, NC_UNISON } from '../../../src/lib/instrument/fixtures';

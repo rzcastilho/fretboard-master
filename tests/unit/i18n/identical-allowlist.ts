@@ -29,7 +29,9 @@ const SHARED: readonly string[] = [
   'tuning_af23',
   'instrument_preset_label',
   'caged_key_name',
-  'share_title_caged'
+  'share_title_caged',
+  'summary_separator',
+  'summary_note_separator'
 ];
 
 /** 021: syllables spelled the same as English (es: all seven; pt-BR: Mi, Sol, Si only). */

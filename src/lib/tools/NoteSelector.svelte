@@ -1,6 +1,7 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
   import { labelPair, spellingPair, spokenPair } from '$lib/notation/notation';
+  import { overflow } from './overflow';
 
   interface Props {
     /** Selected pitch classes (0–11, C = 0). */
@@ -8,9 +9,14 @@
     ontoggle: (pc: number) => void;
     /** Group name; defaults to the Notes label. */
     label?: string;
+    /**
+     * `split` (default): two `.controls-row` groups of six. `single`: one row of twelve, for
+     * tools whose zone B needs the second row for other controls.
+     */
+    layout?: 'split' | 'single';
   }
 
-  let { selected, ontoggle, label }: Props = $props();
+  let { selected, ontoggle, label, layout = 'split' }: Props = $props();
 
   // Derived so a notation or accidental change relabels the keys in place (N-1).
   const notes = $derived(
@@ -22,30 +28,51 @@
       name: spokenPair(pc)
     }))
   );
+
+  const rows = $derived(layout === 'split' ? [notes.slice(0, 6), notes.slice(6)] : [notes]);
 </script>
 
 <div class="selector" role="group" aria-label={label ?? m.notes_selector_label()}>
-  {#each notes as n (n.pc)}
-    <button
-      type="button"
-      class:natural={!n.altered}
-      class:altered={n.altered}
-      aria-pressed={selected.includes(n.pc)}
-      aria-label={n.name}
-      onclick={() => ontoggle(n.pc)}
-    >
-      {n.label}
-    </button>
+  {#each rows as row, r (r)}
+    <div class="controls-row keys" use:overflow>
+      {#each row as n (n.pc)}
+        <button
+          type="button"
+          class:natural={!n.altered}
+          class:altered={n.altered}
+          aria-pressed={selected.includes(n.pc)}
+          aria-label={n.name}
+          onclick={() => ontoggle(n.pc)}
+        >
+          {n.label}
+        </button>
+      {/each}
+    </div>
   {/each}
 </div>
 
 <style>
-  /* Track floor is rem-based, so it grows with the user's text size: at 100 % six keys fit a
-     320 px row; at 200 % they wrap to more rows instead of overlapping (US4). */
+  /* Two groups of six share one line where there is room; on the narrow arrangement they
+     stack as two rows. */
   .selector {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(2.2rem, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
+  }
+
+  .selector > .controls-row {
+    flex: 1 1 auto;
+  }
+
+  :global([data-arrangement='narrow']) .selector {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  /* Keys share the row's width; the floor keeps each a full touch target, so a row that cannot
+     fit scrolls on its own (narrow) or wraps (elsewhere) instead of shrinking them. */
+  .keys button {
+    flex: 1 0 var(--target-min);
   }
 
   button {
@@ -73,8 +100,8 @@
   }
 
   button[aria-pressed='true'] {
-    background: var(--color-note-highlight);
-    color: var(--color-note-highlight-label);
+    background: var(--color-accent);
+    color: var(--color-accent-text);
     border-style: solid;
   }
 </style>

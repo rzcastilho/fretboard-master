@@ -11,7 +11,7 @@
 </script>
 
 {#if playback.sequencePlaying}
-  <button type="button" class="stop" onclick={stop}>
+  <button type="button" class="stop" data-print="omit" onclick={stop}>
     <svg
       class="icon"
       viewBox="0 0 24 24"

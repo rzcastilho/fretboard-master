@@ -431,7 +431,7 @@ test.describe('screen reader parity (US3)', () => {
       await cell(page, 1, 0).focus();
       await page.keyboard.press(hand === 'Left-handed' ? 'ArrowLeft' : 'ArrowRight');
       expect(await focused(page)).toBe('1:1');
-      await expect(page.locator('.focus-ring')).toBeVisible();
+      await expect(page.locator('.focus-ring-outer')).toBeVisible();
       const label = await cell(page, 1, 1).getAttribute('aria-label');
       expect(label).toMatch(/^F, string 1, fret 1\b/);
 

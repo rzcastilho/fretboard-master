@@ -141,6 +141,7 @@
 <dialog
   bind:this={dialog}
   class="instrument-panel"
+  data-print="omit"
   aria-labelledby="{uid}-title"
   oncancel={() => instrument.cancel()}
   onclose={onClose}

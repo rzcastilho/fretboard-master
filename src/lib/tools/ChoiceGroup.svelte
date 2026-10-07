@@ -18,6 +18,8 @@
     describedby?: string;
     /** Arrows, Home and End move focus onto disabled options too; only enabled ones are chosen. */
     reachDisabled?: boolean;
+    /** Keys that act on this group from anywhere (aria-keyshortcuts); omitted when undefined. */
+    keyshortcuts?: string;
   }
 
   let {
@@ -27,7 +29,8 @@
     onchoose,
     disabled = false,
     describedby,
-    reachDisabled = false
+    reachDisabled = false,
+    keyshortcuts
   }: Props = $props();
 
   const NEXT: Readonly<Record<string, number>> = {
@@ -73,6 +76,7 @@
   class="group"
   role="radiogroup"
   aria-label={name}
+  aria-keyshortcuts={keyshortcuts}
   aria-disabled={disabled ? 'true' : undefined}
   aria-describedby={disabled ? describedby : undefined}
 >
@@ -135,7 +139,7 @@
   }
 
   button[aria-checked='true'] {
-    background: var(--color-note-highlight);
-    color: var(--color-note-highlight-label);
+    background: var(--color-accent);
+    color: var(--color-accent-text);
   }
 </style>

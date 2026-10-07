@@ -11,7 +11,7 @@
   }
 </script>
 
-<fieldset>
+<fieldset data-print="omit">
   <legend>{m.language_label()}</legend>
   <div class="options">
     {#each LANGUAGES as { tag } (tag)}

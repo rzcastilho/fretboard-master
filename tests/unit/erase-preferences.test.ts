@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +25,12 @@ describe('ErasePreferences', () => {
     expect(opener()).toBeTruthy();
     expect(screen.queryByText('Erase all preferences on this device?')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+  });
+
+  it('renders a div, not a nested section', () => {
+    const { container } = render(ErasePreferences);
+    expect(container.querySelector('section')).toBeNull();
+    expect(container.querySelector('div.erase')).toBeTruthy();
   });
 
   it('confirming shows question, Erase and Cancel inline with focus on Cancel', async () => {

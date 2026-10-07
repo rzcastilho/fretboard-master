@@ -15,6 +15,7 @@ import {
   closeCard,
   equalsNotesView,
   initialNotesView,
+  motionKind,
   openCard,
   reset,
   revalidate,
@@ -34,6 +35,7 @@ import {
 } from './notes-view';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
+import { createMotionTracker, withMotion } from './motion-track';
 
 /** Remembered label type: part of the initial view and of `reset()` (010). */
 let preferredLabel: LabelType = 'name';
@@ -46,7 +48,15 @@ const initialView = (i: Instrument): NotesViewState => ({
 let view = $state<NotesViewState>(initialView(STANDARD_GUITAR));
 let instrument = $state.raw<Instrument>(STANDARD_GUITAR);
 
-const display = $derived<NotesDisplay>(buildNotesModel(view, instrument));
+const motionOf = createMotionTracker<NotesViewState, Instrument>(
+  motionKind,
+  (a, b) => a.labelType !== b.labelType || a.hideNames !== b.hideNames
+);
+
+/** `display.model.motion` says how the markers moved from the previous view (026). */
+const display = $derived<NotesDisplay>(
+  withMotion(buildNotesModel(view, instrument), motionOf(view, instrument))
+);
 
 /** Apply a transition; a changed view stops playback (FR-012a), a no-op does nothing. */
 function apply(next: NotesViewState): void {
@@ -63,6 +73,7 @@ export const notes = {
     return instrument;
   },
   get display(): NotesDisplay {
+    motionOf.consume();
     return display;
   },
   toggleNote(pc: PitchClass): void {

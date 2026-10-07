@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { expandDetails, runAxe } from './support/helpers';
 
 const sizes = [
   { name: 'phone', width: 360, height: 740 },
@@ -13,6 +13,7 @@ const tags = (page: Page) => page.getByRole('group', { name: 'Shapes' }).getByRo
 /** A major, strings 3-2-1, Full neck. */
 async function openFullNeck(page: Page) {
   await page.goto('/triads');
+  await expandDetails(page);
   await page
     .getByRole('group', { name: 'Root' })
     .getByRole('button', { name: 'A', exact: true })
@@ -141,6 +142,7 @@ test.describe('triads guidance recovery in Full neck (US3)', () => {
       globalThis.__fmInstrument = 'NC-UNISON';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'Full neck' }).click();
     await expect(page.getByRole('button', { name: 'See all notes' })).toBeVisible();
     await runAxe(page);
@@ -177,6 +179,7 @@ const rootPattern = async (page: Page) => {
 test.describe('triads Full neck special cases (US5)', () => {
   test('US5-1: C major 6-5-4 equals 5-4-3; 4-3-2 differs from 3-2-1 (C16)', async ({ page }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'Full neck' }).click();
     await expect(tags(page).first()).toBeVisible();
 
@@ -204,6 +207,7 @@ test.describe('triads Full neck special cases (US5)', () => {
     page
   }) => {
     await page.goto('/triads');
+    await expandDetails(page);
     await page.getByRole('radio', { name: 'augmented' }).click();
     await page.getByRole('radio', { name: 'Full neck' }).click();
     await expect(tags(page)).toHaveCount(6);
@@ -232,6 +236,7 @@ test.describe('triads Full neck special cases (US5)', () => {
       globalThis.__fmInstrument = 'SHORT-7';
     });
     await page.goto('/triads');
+    await expandDetails(page);
     await page
       .getByRole('group', { name: 'Root' })
       .getByRole('button', { name: 'A', exact: true })
