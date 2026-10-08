@@ -89,13 +89,13 @@ h1[tabindex='-1']:focus-visible {
 .controls-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+  align-items: flex-end;
+  gap: var(--space-2) var(--group-gap);
 }
 
 [data-arrangement='narrow'] .controls-row {
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--space-2) var(--space-3);
 }
 
 .controls-row[data-overflow='end'] {
@@ -149,6 +149,19 @@ main .grid > :is(.b, .c, .d, .e) > h2 {
   color: var(--color-text-muted);
 }
 
+/* Zone B's groups carry their own names (030): its heading stays for assistive tech only. */
+main .grid > .b > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /*
  * Landscape (025 US4). Zone headings stay in the accessibility tree but leave the layout; zone B
  * becomes one horizontally scrollable strip; the app bar shows icons only, with the text as a
@@ -189,6 +202,55 @@ main .grid > :is(.b, .c, .d, .e) > h2 {
   display: contents;
 }
 
+/*
+ * App bar (030). One raised band on every screen: navigation tabs at the start, the tool
+ * utilities at the end. `data-compact` (narrow and landscape) keeps icons only, with each label
+ * clipped and shown as a tooltip; `data-landscape` additionally pins the bar height.
+ */
+header.app-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--bar-padding-block) var(--space-4);
+  background: var(--color-bar-surface);
+  border-block-end: var(--border-width) solid var(--color-border-subtle);
+}
+
+header.app-bar nav {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+header.app-bar .bar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: auto;
+  min-inline-size: 0;
+}
+
+/* Utilities are quiet icon buttons in the bar's text colour, not accent links; the box stays
+   the .link-button family's. */
+header.app-bar .bar-tools .link-button {
+  gap: var(--space-1);
+  color: var(--color-text);
+}
+
+@media (hover: hover) {
+  header.app-bar .bar-tools .link-button:hover:not(:disabled, [aria-disabled='true']) {
+    text-decoration: none;
+    background: var(--color-surface-hover);
+  }
+}
+
+/* Bar controls on the raised band use the page surface for their own box. */
+header.app-bar .bar-tools :is(.btn, .option):not([aria-pressed='true']) {
+  background: var(--color-surface);
+}
+
 /* min-block-size, not block-size: at 200% text the icons wrap to a second row, and a fixed height
    would let that row spill over the strip below. */
 header[data-landscape] {
@@ -197,14 +259,32 @@ header[data-landscape] {
   padding-block: 0;
 }
 
+/* Icon-only controls pack edge to edge so the utilities fit one row at 320 px. */
+header[data-compact] .bar-tools {
+  gap: 0;
+}
+
+header[data-compact] .bar-tools :is(.btn, .option, .link-button) {
+  padding-inline: var(--space-2);
+}
+
+/* Icon tabs keep their box (never shrink into a neighbour) and wrap when the row is full. */
+header[data-compact] nav li {
+  flex: none;
+}
+
+header[data-compact] nav a {
+  padding-inline: var(--space-2);
+}
+
 header[data-landscape] nav ul {
   flex-wrap: nowrap;
 }
 
 .bar-icon {
-  display: none;
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
+  display: inline-block;
+  inline-size: var(--bar-icon-size);
+  block-size: var(--bar-icon-size);
   flex: none;
   fill: none;
   stroke: currentColor;
@@ -213,20 +293,14 @@ header[data-landscape] nav ul {
   stroke-linejoin: round;
 }
 
-/* Icons show in landscape only; elsewhere the text label is the whole control. */
-header[data-landscape] .bar-icon {
-  display: inline-block;
-}
-
-header[data-landscape] :is(a, button) {
-  position: relative;
+header.app-bar :is(a, button) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 /* The label stays in the accessibility tree (clip, not display or visibility). */
-header[data-landscape] .bar-label {
+header[data-compact] .bar-label {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -238,19 +312,21 @@ header[data-landscape] .bar-label {
   border: 0;
 }
 
-/* Tooltip on hover and keyboard focus. */
-header[data-landscape] :is(a, button):is(:hover, :focus-visible) > .bar-label {
+/* Tooltip on hover and keyboard focus: a caption strip under the bar, so it can never be wider
+   than the screen. The bar is the containing block. */
+header[data-compact] :is(a, button):is(:hover, :focus-visible) > .bar-label {
   inset-block-start: 100%;
-  inset-inline-start: 50%;
-  inline-size: max-content;
+  inset-inline: var(--space-4);
+  inline-size: auto;
   block-size: auto;
   margin: 0;
   padding: var(--space-1) var(--space-2);
   overflow: visible;
   clip-path: none;
-  transform: translateX(-50%);
+  white-space: normal;
   z-index: 3;
   font-size: var(--font-size-sm);
+  text-align: center;
   color: var(--color-text);
   background: var(--color-surface-raised);
   border: var(--border-width) solid var(--color-border);

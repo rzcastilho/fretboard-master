@@ -6,6 +6,7 @@
   import InstrumentSummary from './InstrumentSummary.svelte';
   import LanguageSelector from './LanguageSelector.svelte';
   import ThemeSelector from './ThemeSelector.svelte';
+  import BarIcon from './BarIcon.svelte';
   import { screenTitle } from './screens';
   import { TOOLS } from './tools';
   import ToolCard from './ToolCard.svelte';
@@ -18,14 +19,20 @@
   <title>{screenTitle('home')}</title>
 </svelte:head>
 
-<header class="top">
+<header class="app-bar top">
   <h1 tabindex="-1">{m.app_name()}</h1>
-  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- /about route (typed by resolve) lands in US3 -->
-  <a class="about link-button" data-print="omit" href="/about">{m.nav_about()}</a>
-  <LanguageSelector />
-  <ThemeSelector />
-  <StopButton />
-  <SoundControl />
+  <div class="bar-tools">
+    <StopButton />
+    <SoundControl />
+    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- /about route (typed by resolve) lands in US3 -->
+    <a class="about link-button" data-print="omit" href="/about"
+      ><BarIcon name="about" /><span class="bar-label">{m.nav_about()}</span></a
+    >
+  </div>
+  <div class="prefs">
+    <LanguageSelector />
+    <ThemeSelector />
+  </div>
 </header>
 
 <main>
@@ -43,17 +50,22 @@
 
 <style>
   .top {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    row-gap: var(--space-3);
+    padding-block: var(--space-3);
   }
 
   h1 {
     margin: 0;
     font-size: var(--font-size-xl);
+    letter-spacing: var(--letter-spacing-wordmark);
+  }
+
+  /* Language and theme stay one tap away on the first screen, as their own row of the bar. */
+  .prefs {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--group-gap);
   }
 
   main {

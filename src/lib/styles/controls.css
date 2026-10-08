@@ -197,3 +197,126 @@
     text-decoration: underline;
   }
 }
+
+/*
+ * Grouped controls (030). A choice is its name over a joined segment of .option buttons; the
+ * narrow arrangement and landscape strip fall back to spaced pills, which wrap cleanly.
+ */
+.choice {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.choice-name,
+.chips-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  min-inline-size: 0;
+}
+
+.segment > .option {
+  border-radius: 0;
+  margin-inline-start: calc(-1 * var(--border-width));
+}
+
+.segment > .option:first-child {
+  margin-inline-start: 0;
+  border-start-start-radius: var(--radius-md);
+  border-end-start-radius: var(--radius-md);
+}
+
+.segment > .option:last-child {
+  border-start-end-radius: var(--radius-md);
+  border-end-end-radius: var(--radius-md);
+}
+
+/* The chosen option's accent border wins over its neighbours' grey ones. */
+.segment > .option:is([aria-pressed='true'], [aria-checked='true'], [aria-current]),
+.segment > .option:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+:is([data-arrangement='narrow'], [data-arrangement='landscape']) .segment {
+  gap: var(--space-1);
+}
+
+:is([data-arrangement='narrow'], [data-arrangement='landscape']) .segment > .option {
+  margin-inline-start: 0;
+  border-radius: var(--radius-md);
+}
+
+/* Note keys: naturals on the page surface, altered keys tinted, as on a keyboard. */
+.segment > .option.altered:not([aria-pressed='true']) {
+  background: var(--color-key-altered);
+}
+
+/* Chips: a radio fieldset drawn as pills; the input covers its label and stays focusable. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.chips label {
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target-min);
+  min-inline-size: var(--target-min);
+  padding: var(--space-1) var(--space-3);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.chips input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.chips label:has(input:checked) {
+  color: var(--color-accent-text);
+  font-weight: var(--font-weight-bold);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.chips label:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (hover: hover) {
+  .chips label:not(:has(input:checked)):hover {
+    background: var(--color-surface-raised);
+  }
+}
+
+/* Chips drawn on the raised bar sit on the page surface when hovered. */
+header.app-bar .chips label:not(:has(input:checked)):hover {
+  background: var(--color-surface-hover);
+}

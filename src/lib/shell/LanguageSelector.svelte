@@ -13,7 +13,7 @@
 
 <fieldset data-print="omit">
   <legend>{m.language_label()}</legend>
-  <div class="options">
+  <div class="chips">
     {#each LANGUAGES as { tag } (tag)}
       <label lang={tag}>
         <input type="radio" {name} value={tag} checked={language.current === tag} onchange={pick} />
@@ -34,27 +34,8 @@
   legend {
     padding: 0;
     margin-block-end: var(--space-1);
-    color: var(--color-text);
-  }
-
-  .options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-3);
-  }
-
-  label {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    color: var(--color-text);
-    cursor: pointer;
-  }
-
-  input {
-    margin: 0;
-    accent-color: var(--color-accent);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-muted);
   }
 </style>

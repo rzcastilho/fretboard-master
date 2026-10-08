@@ -9,6 +9,11 @@
   import SoundControl from '$lib/shell/SoundControl.svelte';
   import StopButton from '$lib/shell/StopButton.svelte';
   import { screenTitle } from '$lib/shell/screens';
+  import { viewport } from '$lib/state/viewport.svelte';
+
+  const compact = $derived(
+    viewport.arrangement !== undefined && !viewport.arrangement.startsWith('wide')
+  );
 
   const LEGEND = [
     { fn: 'root', name: m.legend_root_name, meaning: m.legend_root_meaning },
@@ -21,11 +26,13 @@
   <title>{screenTitle('about')}</title>
 </svelte:head>
 
-<header aria-label={m.zone_app_bar()}>
+<header class="app-bar" aria-label={m.zone_app_bar()} data-compact={compact ? '' : undefined}>
   <AppNav current="about" />
-  <StopButton />
-  <SoundControl />
-  <LanguagePanel />
+  <div class="bar-tools">
+    <StopButton />
+    <SoundControl />
+    <LanguagePanel />
+  </div>
 </header>
 
 <main>
@@ -67,15 +74,6 @@
 </main>
 
 <style>
-  header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-4);
-    padding: var(--space-2) var(--space-4);
-  }
-
   main {
     padding: var(--space-4);
     max-inline-size: 65ch;

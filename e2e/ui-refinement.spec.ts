@@ -120,11 +120,15 @@ const metrics = (loc: Locator): Promise<Metrics> =>
 
 const SHAPE = ['minBlock', 'padding', 'radius', 'border', 'fontSize'] as const;
 
-function expectSameShape(label: string, cells: readonly (readonly [string, Metrics])[]) {
+function expectSameShape(
+  label: string,
+  cells: readonly (readonly [string, Metrics])[],
+  keys: readonly (typeof SHAPE)[number][] = SHAPE
+) {
   expect(cells.length, `${label}: instances found`).toBeGreaterThan(1);
   const [firstName, first] = cells[0];
   for (const [name, m] of cells.slice(1)) {
-    for (const key of SHAPE) {
+    for (const key of keys) {
       expect(m[key], `${label}: ${key} of ${name} equals ${firstName}`).toBe(first[key]);
     }
   }
@@ -167,7 +171,13 @@ test.describe('control families look the same everywhere', () => {
     await expect(toggle).toBeVisible();
     cells.push(['notation toggle', await metrics(toggle)]);
 
-    expectSameShape('.option', cells);
+    // Options sit in joined segments (030): the radius belongs to the segment's ends, not to
+    // every option, so the shared box is everything but the radius.
+    expectSameShape(
+      '.option',
+      cells,
+      SHAPE.filter((k) => k !== 'radius')
+    );
     for (const s of states) {
       expect(s.selected.fontWeight, `${s.name}: selected is heavier`).not.toBe(s.normal.fontWeight);
       expect(s.selected.background, `${s.name}: selected is filled`).not.toBe(s.normal.background);

@@ -195,6 +195,16 @@
   --color-sound-panel-border: var(--color-border);
   --card-min-inline: 16rem;
 
+  /* App bar and grouped controls (030) */
+  --bar-padding-block: var(--space-2);
+  --bar-icon-size: 1.25rem;
+  --tab-indicator-width: 2px;
+  --group-gap: var(--space-5);
+  --popover-width: 22rem;
+  --color-key-altered: light-dark(#e9ebef, #161b22);
+  --color-bar-surface: var(--color-surface-raised);
+  --letter-spacing-wordmark: -0.01em;
+
   /* Tool layout grid: narrow/medium = A / B / C / E / D stacked (R-10) */
   --tool-grid-areas: 'a' 'b' 'c' 'e' 'd';
   --tool-grid-columns: minmax(0, 1fr);
