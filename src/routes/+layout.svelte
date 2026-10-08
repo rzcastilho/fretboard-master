@@ -11,6 +11,7 @@
   import { opening } from '$lib/state/opening.svelte';
   import { playback } from '$lib/state/playback.svelte';
   import { print } from '$lib/state/print.svelte';
+  import { startViewport } from '$lib/state/viewport.svelte';
   import { onMount } from 'svelte';
   import { preferences } from '$lib/state/preferences.svelte';
   import { matchShortcut, toShortcutEvent } from '$lib/state/shortcuts';
@@ -25,6 +26,9 @@
   let { children } = $props();
 
   onMount(() => print.start());
+  // 025: track the window so `data-arrangement` and the bar's `data-compact` follow it. Absent at
+  // prerender (media-query fallback in tokens.css), written once mounted.
+  onMount(() => startViewport());
 
   const screen = $derived(SCREENS.find((s) => s.path === page.url.pathname)?.id ?? 'home');
 

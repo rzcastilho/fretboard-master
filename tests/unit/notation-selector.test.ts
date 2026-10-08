@@ -65,9 +65,11 @@ describe('NotationSelector (Note names fieldset)', () => {
 
   it('each label enforces --target-min', () => {
     render(NotationSelector);
-    const css = readFileSync('src/lib/shell/NotationSelector.svelte', 'utf8');
-    expect(css).toMatch(/min-block-size:\s*var\(--target-min\)/);
-    expect(css).toMatch(/min-inline-size:\s*var\(--target-min\)/);
+    // The chip rules are shared (controls.css, 030): the label is the touch target.
+    const css = readFileSync('src/lib/styles/controls.css', 'utf8');
+    const chips = css.slice(css.indexOf('.chips label {'));
+    expect(chips).toMatch(/min-block-size:\s*var\(--target-min\)/);
+    expect(chips).toMatch(/min-inline-size:\s*var\(--target-min\)/);
   });
 });
 

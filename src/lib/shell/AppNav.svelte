@@ -42,7 +42,7 @@
   <ul>
     {#each items as item (item.id)}
       {@const isCurrent = item.id === current}
-      <li>
+      <li class:home={item.id === 'home'} class:about={item.id === 'about'}>
         <a
           href={item.path}
           onclick={(e) => carry(e, item.id)}
@@ -61,33 +61,51 @@
 <style>
   ul {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
-    gap: var(--space-2) var(--space-4);
+    gap: var(--space-1);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   a {
-    display: inline-flex;
-    align-items: center;
+    gap: var(--space-1);
     min-block-size: var(--target-min);
     min-inline-size: var(--target-min);
-    padding-inline: var(--space-2);
+    padding-inline: var(--space-3);
     box-sizing: border-box;
-    color: var(--color-accent);
-    border-block-end: var(--indicator-width) solid transparent;
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-medium);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    /* The indicator is drawn inside the box so the current tab keeps the row's height. */
+    box-shadow: inset 0 calc(-1 * var(--tab-indicator-width)) 0 transparent;
+    transition:
+      background-color var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard);
   }
 
   a.current {
-    font-weight: var(--font-weight-bold);
     color: var(--color-text);
-    border-block-end-color: var(--color-text);
+    font-weight: var(--font-weight-bold);
+    background: var(--color-surface);
+    box-shadow: inset 0 calc(-1 * var(--tab-indicator-width)) 0 var(--color-accent);
+  }
+
+  /* Home and About frame the tool tabs: a gap on each side sets them apart. */
+  .home {
+    margin-inline-end: var(--space-2);
+  }
+
+  .about {
+    margin-inline-start: var(--space-2);
   }
 
   @media (hover: hover) {
     a:not(.current):hover {
-      text-decoration: underline;
+      color: var(--color-text);
+      background: var(--color-surface-hover);
     }
   }
 </style>

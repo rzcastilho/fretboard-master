@@ -50,14 +50,21 @@
     display: contents;
   }
 
+  /* A tray on its own row under the bar's controls: in flow, so it covers nothing. */
   .panel {
     flex: 1 1 100%;
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-4);
+    align-items: flex-start;
+    gap: var(--space-3) var(--group-gap);
     min-inline-size: 0;
-    padding: var(--space-2) 0;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border: var(--border-width) solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .close {
+    margin-inline-start: auto;
   }
 </style>

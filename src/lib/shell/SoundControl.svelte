@@ -149,7 +149,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-1);
     min-inline-size: 0;
   }
 

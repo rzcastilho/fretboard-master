@@ -36,7 +36,7 @@
 
 <div class="selector" role="group" aria-label={label ?? m.notes_selector_label()}>
   {#each rows as row, r (r)}
-    <div class="controls-row keys" use:overflow>
+    <div class="controls-row segment keys" use:overflow>
       {#each row as n (n.pc)}
         <button
           type="button"
@@ -67,6 +67,11 @@
 
   .selector > .controls-row {
     flex: 1 1 auto;
+    gap: 0;
+  }
+
+  :global([data-arrangement='narrow']) .selector > .controls-row {
+    gap: var(--space-1);
   }
 
   :global([data-arrangement='narrow']) .selector {

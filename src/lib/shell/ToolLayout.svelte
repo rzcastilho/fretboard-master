@@ -20,7 +20,7 @@
   import { currentLink, share } from '$lib/state/share.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { opening } from '$lib/state/opening.svelte';
-  import { startViewport, viewport } from '$lib/state/viewport.svelte';
+  import { measureViewport, viewport } from '$lib/state/viewport.svelte';
   import { linkNoticeMessage } from './link-notice';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
@@ -31,6 +31,10 @@
   let { tool }: { tool: ToolId } = $props();
 
   const landscape = $derived(viewport.arrangement === 'landscape');
+  // Icon-only bar below the wide arrangements: the labels become tooltips (global.css).
+  const compact = $derived(
+    viewport.arrangement !== undefined && !viewport.arrangement.startsWith('wide')
+  );
 
   const name = $derived(TOOLS.find((t) => t.id === tool)?.name() ?? '');
 
@@ -57,9 +61,10 @@
   // link; later changes are debounced. Only the store is read here, never `url.searchParams`.
   onMount(() => openToolAddress(tool));
 
-  // 025: track the window so `data-arrangement` follows it. Absent at prerender (media-query
-  // fallback in tokens.css), written once mounted.
-  onMount(() => startViewport());
+  // The root layout tracks the window; the tool re-reads it once so the arrangement (and the
+  // fretboard width it weighs) is current on the first frame of this screen.
+  onMount(() => measureViewport());
+
   $effect(() => {
     scheduleAddress(currentLink(tool));
   });
@@ -72,15 +77,22 @@
   <title>{screenTitle(tool)}</title>
 </svelte:head>
 
-<header aria-label={m.zone_app_bar()} data-landscape={landscape ? '' : undefined}>
+<header
+  class="app-bar"
+  aria-label={m.zone_app_bar()}
+  data-landscape={landscape ? '' : undefined}
+  data-compact={compact ? '' : undefined}
+>
   <AppNav current={tool} />
-  <ShareButton {tool} />
-  <InstrumentButton />
-  <TuningBadge {tool} />
-  <StopButton />
-  <SoundControl />
-  <NotationToggle />
-  <LanguagePanel />
+  <div class="bar-tools">
+    <TuningBadge {tool} />
+    <StopButton />
+    <ShareButton {tool} />
+    <InstrumentButton />
+    <NotationToggle />
+    <SoundControl />
+    <LanguagePanel />
+  </div>
 </header>
 
 {#if instrumentNotice !== null}
@@ -142,15 +154,6 @@
 </main>
 
 <style>
-  header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-4);
-    padding: var(--space-2) var(--space-4);
-  }
-
   .share-notice {
     padding: var(--space-2) var(--space-4) 0;
   }
