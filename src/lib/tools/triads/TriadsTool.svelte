@@ -176,15 +176,11 @@
   section,
   .d {
     padding: var(--space-4);
-    background: var(--color-surface-raised);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
     min-inline-size: 0;
   }
 
   h2 {
     margin: 0 0 var(--space-2);
-    font-size: var(--font-size-md);
   }
 
   .b {

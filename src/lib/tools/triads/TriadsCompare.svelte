@@ -38,7 +38,7 @@
   <div class="compare">
     <button
       type="button"
-      class="toggle"
+      class="option"
       aria-pressed={compare.on}
       bind:this={toggle}
       onclick={() => onsetcompare(!compare.on)}
@@ -76,30 +76,6 @@
     flex-wrap: wrap;
     gap: var(--space-3);
     align-items: center;
-  }
-
-  .toggle {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface-raised);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  .toggle[aria-pressed='true'] {
-    background: var(--color-surface);
-    border-width: calc(var(--border-width) * 2);
-    border-color: var(--color-text);
-  }
-
-  .toggle:focus-visible {
-    outline: var(--focus-ring-width) solid var(--color-focus-ring);
-    outline-offset: var(--focus-ring-offset, 2px);
   }
 
   .list {

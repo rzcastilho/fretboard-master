@@ -51,14 +51,14 @@ test.describe('narrow (US3)', () => {
       await open(page, tool, 320, 800);
       const rows = zone(page, 'b').locator('.controls-row');
       await expect(rows).toHaveCount(2);
-      // Each row is one line tall (plus the edge fade cue where it scrolls), never a menu.
+      // Rows wrap (029): every control stays inside the screen width, never in a menu.
       for (const row of await rows.all()) {
         const r = await box(row);
-        expect(r.height).toBeLessThan(80);
+        expect(r.x).toBeGreaterThanOrEqual(0);
+        expect(r.x + r.width).toBeLessThanOrEqual(320);
+        await expect(row).not.toHaveAttribute('data-overflow', /.+/);
       }
       await expect(zone(page, 'b').locator('[aria-haspopup]')).toHaveCount(0);
-      // At 320 px at least one strip is wider than the screen and shows the cue.
-      await expect(zone(page, 'b').locator('.controls-row[data-overflow]').first()).toBeVisible();
     });
   }
 

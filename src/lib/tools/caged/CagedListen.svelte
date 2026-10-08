@@ -62,6 +62,7 @@
   <!-- aria-disabled (not disabled) keeps Listen focusable so the reason can be read. -->
   <button
     type="button"
+    class="btn"
     aria-disabled={enabled ? undefined : 'true'}
     aria-keyshortcuts={shortcuts.enabled ? 'P' : undefined}
     aria-describedby={!enabled && reason !== null ? 'caged-listen-reason' : undefined}
@@ -89,27 +90,8 @@
     align-items: center;
   }
 
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  button[aria-disabled='true'] {
-    color: var(--color-disabled-text);
-    border-color: var(--color-disabled-border);
-    cursor: not-allowed;
-  }
-
   .reason {
     flex-basis: 100%;
-    font-size: var(--font-size-sm, 0.875em);
+    font-size: var(--font-size-sm);
   }
 </style>

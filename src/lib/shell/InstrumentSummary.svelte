@@ -26,19 +26,10 @@
   }
 </script>
 
-<button type="button" class="instrument-summary" onclick={open}>{text}</button>
+<button type="button" class="instrument-summary btn" onclick={open}>{text}</button>
 
 <style>
   .instrument-summary {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
     overflow-wrap: anywhere;
     text-align: start;
   }

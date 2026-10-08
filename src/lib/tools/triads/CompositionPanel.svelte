@@ -149,12 +149,12 @@
   {#if composition.suggestion || composition.switchTo}
     <div class="spelling">
       {#if composition.suggestion}
-        <button type="button" onclick={() => onswitch?.()}>
+        <button type="button" class="btn" onclick={() => onswitch?.()}>
           {m.triads_suggestion({ root: noteLabel(composition.suggestion) })}
         </button>
       {/if}
       {#if composition.switchTo}
-        <button type="button" onclick={() => onswitch?.()}>
+        <button type="button" class="btn" onclick={() => onswitch?.()}>
           {m.triads_switch({ root: noteLabel(composition.switchTo) })}
         </button>
       {/if}
@@ -169,18 +169,14 @@
     margin: 0;
   }
 
-  h2 {
-    font-size: var(--font-size-md);
-  }
-
   h3 {
     margin-block-start: var(--space-2);
-    font-size: var(--font-size-sm, 0.875em);
+    font-size: var(--font-size-sm);
   }
 
   .name {
-    font-weight: 700;
-    font-size: var(--font-size-lg, 1.125em);
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-lg);
   }
 
   ul {
@@ -196,7 +192,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
   }
 
   svg {
@@ -205,7 +201,7 @@
 
   .columns {
     display: grid;
-    gap: var(--space-4, 1rem);
+    gap: var(--space-4);
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--panel-column-min)), 1fr));
   }
 
@@ -223,14 +219,14 @@
 
   .changed-tag {
     white-space: nowrap;
-    font-size: var(--font-size-sm, 0.875em);
-    font-weight: 400;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
     padding-inline: var(--space-1);
-    border: var(--border-width, 1px) solid var(--color-border);
-    border-radius: var(--radius-md, 4px);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-sm);
   }
 
   strong {
-    font-weight: 800;
+    font-weight: var(--font-weight-bold);
   }
 </style>

@@ -15,7 +15,7 @@
     align-items: center;
     gap: var(--space-2);
     margin: var(--space-2) 0 0;
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
   }
 
   svg {

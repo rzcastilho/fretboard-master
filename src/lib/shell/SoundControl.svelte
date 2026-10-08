@@ -55,7 +55,7 @@
 >
   <button
     type="button"
-    class="mute"
+    class="mute option"
     aria-pressed={unavailable ? undefined : playback.muted ? 'true' : 'false'}
     aria-disabled={unavailable ? 'true' : undefined}
     aria-describedby="sound-status"
@@ -89,7 +89,7 @@
 
   <button
     type="button"
-    class="settings"
+    class="settings btn"
     aria-expanded={open ? 'true' : 'false'}
     aria-controls="sound-panel"
     bind:this={settingsButton}
@@ -157,23 +157,6 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: 0;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  button[aria-pressed='true'] {
-    background: var(--color-surface-raised);
-  }
-
-  button[aria-disabled='true'] {
-    color: var(--color-text-muted);
-    cursor: default;
   }
 
   .icon {
@@ -189,7 +172,8 @@
     padding: var(--space-3);
     background: var(--color-surface-raised);
     border: var(--border-width) solid var(--color-sound-panel-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-overlay);
   }
 
   .panel[hidden] {

@@ -150,15 +150,15 @@
     cursor: pointer;
     touch-action: manipulation;
     background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm, 4px);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-sm);
     box-sizing: border-box;
   }
 
   .minimap:focus-visible {
     outline: var(--focus-ring-width) solid var(--color-focus-ring-outer);
     outline-offset: var(--focus-ring-offset);
-    box-shadow: 0 0 0 calc(var(--focus-ring-offset) + 1px) var(--color-focus-ring-inner);
+    box-shadow: 0 0 0 calc(var(--focus-ring-offset) + var(--unit-px)) var(--color-focus-ring-inner);
   }
 
   svg {

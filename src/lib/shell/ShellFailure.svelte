@@ -18,7 +18,7 @@
 
 <section class="failure">
   <p>{m.failure_message()}</p>
-  <a class="home" href={resolve('/')} onclick={goHome}>{m.failure_go_home()}</a>
+  <a class="home link-button" href={resolve('/')} onclick={goHome}>{m.failure_go_home()}</a>
 </section>
 
 <style>
@@ -32,12 +32,5 @@
     color: var(--color-notice-text);
     border: var(--border-width) solid var(--color-notice-border);
     border-radius: var(--radius-md);
-  }
-
-  .home {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
   }
 </style>

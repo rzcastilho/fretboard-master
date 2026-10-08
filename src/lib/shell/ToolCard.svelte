@@ -35,10 +35,17 @@
     box-sizing: border-box;
     background: var(--color-surface-raised);
     color: var(--color-text);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
     text-decoration: none;
     overflow-wrap: anywhere;
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  @media (hover: hover) {
+    .card:hover {
+      background: var(--color-surface-hover);
+    }
   }
 
   .name {
@@ -48,9 +55,6 @@
 
   .continue {
     align-self: flex-start;
-    padding: var(--space-1) var(--space-2);
-    border: var(--border-width) solid var(--color-accent);
-    border-radius: var(--radius-md);
     color: var(--color-accent);
     font-size: var(--font-size-md);
     font-weight: var(--font-weight-bold);

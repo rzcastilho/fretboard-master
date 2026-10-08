@@ -147,8 +147,11 @@
     <div class="unsupported">
       <p role="status">{caged.display.unsupportedNotice}</p>
       <div class="actions">
-        <button type="button" onclick={viewInStandard}>{m.caged_view_in_standard()}</button>
-        <button type="button" onclick={() => openTriadsFromCaged()}>{m.caged_go_to_triads()}</button
+        <button type="button" class="btn" onclick={viewInStandard}
+          >{m.caged_view_in_standard()}</button
+        >
+        <button type="button" class="btn" onclick={() => openTriadsFromCaged()}
+          >{m.caged_go_to_triads()}</button
         >
       </div>
     </div>
@@ -170,14 +173,14 @@
       <div class="steps">
         <button
           type="button"
-          class="step"
+          class="btn"
           aria-disabled={caged.display.steps.previous ? undefined : 'true'}
           aria-keyshortcuts={shortcuts.enabled ? ',' : undefined}
           onclick={() => caged.step(-1)}>{m.caged_previous_shape()}</button
         >
         <button
           type="button"
-          class="step"
+          class="btn"
           aria-disabled={caged.display.steps.next ? undefined : 'true'}
           aria-keyshortcuts={shortcuts.enabled ? '.' : undefined}
           onclick={() => caged.step(1)}>{m.caged_next_shape()}</button
@@ -220,7 +223,7 @@
         {/if}
         <button
           type="button"
-          class="conn-switch"
+          class="switch"
           role="switch"
           aria-checked={caged.state.connections}
           aria-disabled={caged.display.tuningClass === 'non-compatible' ? 'true' : undefined}
@@ -229,13 +232,13 @@
               caged.setConnections(!caged.state.connections);
           }}
         >
-          <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
           {m.caged_show_connections()}
           <span class="state" aria-hidden="true"
             >{caged.state.connections ? m.caged_switch_on() : m.caged_switch_off()}</span
           >
         </button>
-        <button type="button" onclick={() => caged.reset()}>{m.caged_reset()}</button>
+        <button type="button" class="btn" onclick={() => caged.reset()}>{m.caged_reset()}</button>
       </ContextZone>
     </div>
   {/snippet}
@@ -244,21 +247,17 @@
 <style>
   section {
     padding: var(--space-4);
-    background: var(--color-surface-raised);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
     min-inline-size: 0;
   }
 
   h2 {
     margin: 0 0 var(--space-2);
-    font-size: var(--font-size-md);
   }
 
   .key {
     margin: var(--space-3) 0 0;
-    font-size: var(--font-size-lg, var(--font-size-md));
-    font-weight: 600;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
   }
 
   .fit {
@@ -282,78 +281,14 @@
     gap: var(--space-3);
   }
 
-  .actions button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-4);
-    font: inherit;
-  }
-
   .steps {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-3);
   }
 
-  .step {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-4);
-    font: inherit;
-  }
-
-  .step[aria-disabled='true'] {
-    color: var(--color-disabled-text);
-    border-color: var(--color-disabled-border);
-    cursor: not-allowed;
-  }
-
-  .conn-switch {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
+  .switch {
     margin-inline-end: var(--space-3);
-    padding-inline: var(--space-4);
-    font: inherit;
-  }
-
-  .track {
-    position: relative;
-    inline-size: 2.25rem;
-    block-size: 1.25rem;
-    border: var(--border-width) solid currentColor;
-    border-radius: 999px;
-    flex: none;
-  }
-
-  .thumb {
-    position: absolute;
-    inset-block: 2px;
-    inset-inline-start: 2px;
-    inline-size: calc(1.25rem - 4px - 2 * var(--border-width));
-    background: currentColor;
-    border-radius: 50%;
-  }
-
-  .conn-switch[aria-checked='true'] .thumb {
-    inset-inline-start: auto;
-    inset-inline-end: 2px;
-  }
-
-  .conn-switch[aria-checked='true'] .track {
-    background: var(--color-surface);
-  }
-
-  .state {
-    font-weight: 600;
-  }
-
-  .conn-switch[aria-disabled='true'] {
-    color: var(--color-disabled-text);
-    border-color: var(--color-disabled-border);
-    cursor: not-allowed;
   }
 
   h2:focus {
@@ -363,9 +298,6 @@
   .d {
     grid-area: d;
     padding: var(--space-4);
-    background: var(--color-surface-raised);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
     min-inline-size: 0;
   }
   .e {

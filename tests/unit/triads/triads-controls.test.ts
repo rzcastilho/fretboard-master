@@ -23,7 +23,12 @@ describe('TriadsControls (US2)', () => {
     render(TriadsTool);
     const root = screen.getByRole('group', { name: 'Root' });
     expect(within(root).getAllByRole('button')).toHaveLength(12);
-    expect(within(root).getByText('C♯ / D♭')).toBeTruthy();
+    // The two spellings are separate spans so they can stack at narrow width (029).
+    expect(
+      within(root)
+        .getAllByRole('button')
+        .some((b) => b.textContent === 'C♯ / D♭')
+    ).toBe(true);
   });
 
   it('marks the current choices and labels sets with setLabel', () => {

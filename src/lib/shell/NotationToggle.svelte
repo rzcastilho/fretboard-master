@@ -23,6 +23,7 @@
   {#each NOTATIONS as value (value)}
     <button
       type="button"
+      class="option"
       aria-pressed={notation.effective === value}
       onclick={() => notation.choose(value)}
       ><BarIcon name={value} /><span class="bar-label">{SAMPLE[value]()}</span></button
@@ -34,27 +35,5 @@
   .toggle {
     display: inline-flex;
     gap: var(--space-1);
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: 0 var(--space-2);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--color-text);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  button[aria-pressed='true'] {
-    background: var(--color-surface-raised);
-    font-weight: 600;
-  }
-
-  button:focus-visible {
-    outline: var(--focus-ring-width) solid var(--color-focus-ring);
-    outline-offset: 2px;
   }
 </style>

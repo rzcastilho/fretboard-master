@@ -58,6 +58,7 @@
   <!-- aria-disabled (not disabled) keeps the commands focusable and visible at the ends. -->
   <button
     type="button"
+    class="btn"
     aria-disabled={!canDown}
     aria-describedby={octave.applies ? undefined : HINT_ID}
     onclick={() => {
@@ -68,6 +69,7 @@
   </button>
   <button
     type="button"
+    class="btn"
     aria-disabled={!canUp}
     aria-describedby={octave.applies ? undefined : HINT_ID}
     onclick={() => {
@@ -81,6 +83,7 @@
   {/if}
   <button
     type="button"
+    class="btn"
     aria-disabled={!listen.enabled}
     aria-keyshortcuts={shortcuts.enabled ? 'P' : undefined}
     onclick={() => {
@@ -91,6 +94,7 @@
   </button>
   <button
     type="button"
+    class="btn"
     aria-disabled={!viewInCaged.enabled}
     aria-describedby={viewInCaged.enabled ? undefined : CAGED_NOTE_ID}
     onclick={() => {
@@ -105,6 +109,7 @@
   {#if compareOn}
     <button
       type="button"
+      class="btn"
       aria-disabled={!listenComparison.enabled}
       onclick={() => {
         if (listenComparison.enabled) onlistencomparison();
@@ -113,7 +118,7 @@
       {m.triads_compare_listen()}
     </button>
   {/if}
-  <button type="button" onclick={() => onreset()}>{m.triads_reset()}</button>
+  <button type="button" class="btn" onclick={() => onreset()}>{m.triads_reset()}</button>
 </div>
 
 <style>
@@ -124,25 +129,7 @@
     align-items: center;
   }
 
-  button {
-    min-block-size: var(--touch-target-min, 44px);
-    padding: var(--space-2) var(--space-3);
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    font: inherit;
-    cursor: pointer;
-  }
-
   .hint {
     color: var(--color-text-muted);
-  }
-
-  button[aria-disabled='true'] {
-    color: var(--color-disabled-text);
-    border-color: var(--color-disabled-border);
-    opacity: var(--disabled-opacity);
-    cursor: not-allowed;
   }
 </style>

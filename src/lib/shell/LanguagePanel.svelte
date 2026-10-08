@@ -40,7 +40,7 @@
       <LanguageSelector />
       <NotationSelector />
       <ThemeSelector />
-      <button type="button" class="close" onclick={close}>{m.language_close()}</button>
+      <button type="button" class="close btn" onclick={close}>{m.language_close()}</button>
     </div>
   {/if}
 </div>
@@ -59,17 +59,5 @@
     gap: var(--space-2) var(--space-4);
     min-inline-size: 0;
     padding: var(--space-2) 0;
-  }
-
-  .close {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 </style>

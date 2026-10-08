@@ -27,18 +27,18 @@
   }
 </script>
 
-<div class="stepper">
+<div class="field">
   <span class="label" id="{uid}-label">{m.instrument_frets_label()}</span>
-  <div class="controls">
+  <div class="stepper">
     <button
       type="button"
       aria-label={m.instrument_frets_decrease()}
       disabled={value === MIN_FRETS}
-      class="step minus"
+      class="btn minus"
       onclick={() => instrument.stepFrets(-1)}
     ></button>
     <div
-      class="value"
+      class="value stepper-value"
       role="spinbutton"
       tabindex="0"
       aria-labelledby="{uid}-label"
@@ -53,14 +53,14 @@
       type="button"
       aria-label={m.instrument_frets_increase()}
       disabled={value === MAX_FRETS}
-      class="step plus"
+      class="btn plus"
       onclick={() => instrument.stepFrets(1)}
     ></button>
   </div>
 </div>
 
 <style>
-  .stepper {
+  .field {
     display: grid;
     gap: var(--space-2);
   }
@@ -69,28 +69,10 @@
     font-weight: var(--font-weight-bold);
   }
 
-  .controls {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-
   button,
   .value {
     display: grid;
     place-items: center;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-  }
-
-  button {
-    background: transparent;
-    cursor: pointer;
   }
 
   /* Decorative glyphs live in CSS; the accessible name comes from aria-label. */
@@ -100,16 +82,5 @@
 
   .plus::before {
     content: '+';
-  }
-
-  button:disabled {
-    color: var(--color-text-muted);
-    cursor: not-allowed;
-  }
-
-  .value {
-    background: var(--color-surface-raised);
-    font-weight: var(--font-weight-bold);
-    font-variant-numeric: tabular-nums;
   }
 </style>

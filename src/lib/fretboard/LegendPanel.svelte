@@ -117,11 +117,11 @@
   }
 
   .name {
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
   }
 
   .meaning {
-    flex: 1 1 12rem;
+    flex: 1 1 var(--item-min-inline);
     min-inline-size: 0;
     overflow-wrap: anywhere;
   }

@@ -160,3 +160,10 @@ export function resolveLightDark(value: string): readonly [string, string] {
   if (args.length !== 2) throw new Error(`light-dark() needs two arguments: ${value}`);
   return [args[0], args[1]];
 }
+
+/** Every custom-property name declared anywhere in the token sheet (all blocks and at-rules). */
+export function declaredTokenNames(css: string = readFileSync(TOKENS_PATH, 'utf8')): Set<string> {
+  const names = new Set<string>();
+  for (const m of stripComments(css).matchAll(/(?:^|[;{}\s])(--[\w-]+)\s*:/g)) names.add(m[1]);
+  return names;
+}

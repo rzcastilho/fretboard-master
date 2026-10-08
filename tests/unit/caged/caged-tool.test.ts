@@ -391,7 +391,7 @@ describe('CagedTool: Show connections (016 US3)', () => {
       caged.display.connections.length
     );
     // Position shown by text, not color alone.
-    expect(sw().querySelector('.track')).toBeTruthy();
+    expect(sw().querySelector('.switch-track')).toBeTruthy();
     expect(sw().textContent).toMatch(/On/i);
     await fireEvent.click(sw());
     await tick();

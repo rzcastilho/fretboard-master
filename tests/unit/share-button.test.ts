@@ -73,8 +73,12 @@ describe('ShareButton', () => {
 
   it('declares the 44×44 touch target token', async () => {
     const { readFileSync } = await import('node:fs');
-    const source = readFileSync('src/lib/shell/ShareButton.svelte', 'utf8');
-    expect(source).toContain('min-block-size: var(--target-min)');
-    expect(source).toContain('min-inline-size: var(--target-min)');
+    // The size comes from the shared .link-button family (029).
+    expect(readFileSync('src/lib/shell/ShareButton.svelte', 'utf8')).toMatch(
+      /class="[^"]*\blink-button\b/
+    );
+    const family = readFileSync('src/lib/styles/controls.css', 'utf8');
+    expect(family).toMatch(/\.link-button \{[^}]*min-block-size: var\(--target-min\)/);
+    expect(family).toMatch(/\.link-button \{[^}]*min-inline-size: var\(--target-min\)/);
   });
 });

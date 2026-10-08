@@ -45,11 +45,13 @@
   {#if confirming}
     <p>{m.about_erase_question()}</p>
     <div class="actions">
-      <button type="button" onclick={confirmErase}>{m.about_erase_confirm()}</button>
-      <button type="button" bind:this={cancel} onclick={close}>{m.about_erase_cancel()}</button>
+      <button type="button" class="btn" onclick={confirmErase}>{m.about_erase_confirm()}</button>
+      <button type="button" class="btn" bind:this={cancel} onclick={close}
+        >{m.about_erase_cancel()}</button
+      >
     </div>
   {:else}
-    <button type="button" bind:this={opener} onclick={open}>{m.about_erase()}</button>
+    <button type="button" class="btn" bind:this={opener} onclick={open}>{m.about_erase()}</button>
   {/if}
 </div>
 
@@ -66,17 +68,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    color: inherit;
-    background: transparent;
-    border: var(--border-width) solid currentColor;
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 </style>

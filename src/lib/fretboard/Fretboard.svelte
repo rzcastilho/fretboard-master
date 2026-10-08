@@ -1250,7 +1250,7 @@
   }
 
   .tag.pressed {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     background: var(--color-surface);
     border-width: calc(var(--border-width) * 2);
     border-color: var(--color-text);
@@ -1258,7 +1258,7 @@
 
   .tag .detail {
     font-size: var(--marker-label-min-size);
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
   }
 
   svg {
@@ -1280,7 +1280,7 @@
   .hover-hint text {
     fill: var(--fb-color-label-on-neutral);
     font-size: var(--marker-label-min-size);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
   }
 
   .fretboard-preview {
@@ -1312,7 +1312,7 @@
   }
 
   .fret-line {
-    stroke-width: 1px;
+    stroke-width: var(--fb-stroke-hairline);
   }
 
   .string-1 {
@@ -1364,11 +1364,11 @@
   }
 
   .fret-number {
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
   }
 
   .fret-number.inlay-fret {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     fill: var(--fb-color-number-strong);
   }
 
@@ -1462,7 +1462,7 @@
     fill: none;
     stroke: var(--fb-color-outline);
     stroke-width: var(--connection-ring-width);
-    r: calc(var(--ring-base) * 1px + var(--connection-ring-gap));
+    r: calc(var(--ring-base) * var(--unit-px) + var(--connection-ring-gap));
   }
 
   .marker.pulse .shape {
@@ -1513,10 +1513,10 @@
   .arrows text.arrow-label {
     fill: var(--fb-color-outline);
     font-size: var(--marker-label-min-size);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     paint-order: stroke;
     stroke: var(--fb-color-arrow-halo);
-    stroke-width: 3px;
+    stroke-width: var(--fb-label-halo-width);
   }
 
   .marker.dimmed {
@@ -1579,11 +1579,11 @@
   .marker text.octave-badge {
     fill: var(--fb-color-number-strong);
     font-size: var(--marker-badge-size);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-anchor: start;
     paint-order: stroke;
     stroke: var(--fb-color-arrow-halo);
-    stroke-width: 2px;
+    stroke-width: var(--fb-glyph-halo-width);
   }
 
   .glyph.outline {
@@ -1595,7 +1595,7 @@
   .marker text.marker-label {
     fill: var(--fb-color-label);
     font-size: var(--marker-label-size);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
   }
 
   .marker.neutral text.marker-label,

@@ -27,6 +27,7 @@
     <p class="summary">{summary}</p>
     <button
       type="button"
+      class="btn"
       aria-expanded={expanded}
       aria-controls={contentId}
       onclick={() => contextPanel.toggle()}
@@ -51,23 +52,10 @@
 
   /* Wraps instead of truncating, so it stays whole at 200% text. */
   .summary {
-    flex: 1 1 12rem;
+    flex: 1 1 var(--item-min-inline);
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
     overflow-wrap: anywhere;
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 
   /* The wrapper adds no box: the children keep the zone's own flex or block layout. */
