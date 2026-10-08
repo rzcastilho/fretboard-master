@@ -116,6 +116,6 @@
   }
 
   .name {
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
   }
 </style>

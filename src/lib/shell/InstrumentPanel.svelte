@@ -209,7 +209,7 @@
             <div class="string-row">
               <button
                 type="button"
-                class="step"
+                class="btn step"
                 aria-label={m.instrument_string_lower({ string: row.string })}
                 disabled={!row.canLower}
                 onclick={(e) => step(e, row.string, -1)}
@@ -218,13 +218,13 @@
               </button>
               <button
                 type="button"
-                class="note"
+                class="btn note"
                 aria-label={row.noteName}
                 onclick={() => instrument.playString(row.string)}>{row.label}</button
               >
               <button
                 type="button"
-                class="step"
+                class="btn step"
                 aria-label={m.instrument_string_raise({ string: row.string })}
                 disabled={!row.canRaise}
                 onclick={(e) => step(e, row.string, 1)}
@@ -281,11 +281,14 @@
         </figure>
       {/if}
       <div class="actions">
-        <button type="button" onclick={() => instrument.restoreDefault()}>
+        <button type="button" class="btn" onclick={() => instrument.restoreDefault()}>
           {m.instrument_restore_default()}
         </button>
-        <button type="button" class="primary" onclick={confirm}>{m.instrument_confirm()}</button>
-        <button type="button" onclick={() => instrument.cancel()}>{m.instrument_close()}</button>
+        <button type="button" class="btn primary" onclick={confirm}>{m.instrument_confirm()}</button
+        >
+        <button type="button" class="btn" onclick={() => instrument.cancel()}
+          >{m.instrument_close()}</button
+        >
       </div>
     </div>
   {/if}
@@ -304,7 +307,8 @@
     max-block-size: var(--instrument-sheet-max-block-size);
     inset: auto 0 0 0;
     margin: 0;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-overlay);
   }
 
   @media (min-width: 1024px) {
@@ -438,27 +442,10 @@
     gap: var(--space-2);
   }
 
-  .string-row button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
   .string-row .note {
     min-inline-size: calc(var(--target-min) * 2);
     font-family: var(--font-family-notes);
     font-weight: var(--font-weight-bold);
-  }
-
-  .string-row button:disabled {
-    color: var(--color-text-muted);
-    cursor: not-allowed;
   }
 
   .preview {
@@ -475,22 +462,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-  }
-
-  .actions button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-4);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  .actions .primary {
-    font-weight: var(--font-weight-bold);
-    background: var(--color-surface-raised);
   }
 </style>

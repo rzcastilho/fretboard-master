@@ -36,7 +36,7 @@
   {/each}
 </dl>
 
-<label class="switch">
+<label class="toggle-row">
   <input
     type="checkbox"
     role="switch"
@@ -74,13 +74,13 @@
     min-inline-size: var(--space-5);
     padding: var(--space-1) var(--space-2);
     font: inherit;
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
     text-align: center;
     border: var(--border-width) solid currentColor;
     border-radius: var(--radius-md);
   }
 
-  .switch {
+  .toggle-row {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
@@ -88,7 +88,7 @@
     cursor: pointer;
   }
 
-  .switch input {
+  .toggle-row input {
     inline-size: var(--space-5);
     block-size: var(--space-5);
     margin: 0;
@@ -96,16 +96,5 @@
 
   .hint {
     margin: var(--space-1) 0 0;
-  }
-
-  .sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 </style>

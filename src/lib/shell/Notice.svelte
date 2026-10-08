@@ -26,10 +26,10 @@
   <div class="notice" data-print="omit" role="status" aria-live="polite">
     <p>{message}</p>
     {#each actions ?? [] as action (action.label)}
-      <button type="button" onclick={action.onclick}>{action.label}</button>
+      <button type="button" class="link-button" onclick={action.onclick}>{action.label}</button>
     {/each}
     {#if ondismiss}
-      <button type="button" onclick={dismiss}>{m.notice_dismiss()}</button>
+      <button type="button" class="link-button" onclick={dismiss}>{m.notice_dismiss()}</button>
     {/if}
   </div>
 {/if}
@@ -53,17 +53,5 @@
   p {
     margin: 0;
     line-height: 1.4;
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: inherit;
-    background: transparent;
-    border: var(--border-width) solid var(--color-notice-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 </style>

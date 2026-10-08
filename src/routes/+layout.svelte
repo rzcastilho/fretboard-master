@@ -20,6 +20,7 @@
   import { recordFailure } from '$lib/shell/failure';
   import '$lib/styles/tokens.css';
   import '$lib/styles/global.css';
+  import '$lib/styles/controls.css';
 
   let { children } = $props();
 

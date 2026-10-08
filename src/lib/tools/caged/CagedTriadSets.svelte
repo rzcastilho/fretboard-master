@@ -40,7 +40,7 @@
     <p class="summary">{triad.summary}</p>
   {/if}
   {#if triad.handoff !== null && onopen}
-    <button type="button" class="open-triads" onclick={onopen}>{m.caged_triad_open()}</button>
+    <button type="button" class="btn open-triads" onclick={onopen}>{m.caged_triad_open()}</button>
   {/if}
 </div>
 
@@ -59,12 +59,10 @@
 
   .summary {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
   }
 
   .open-triads {
     align-self: flex-start;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
   }
 </style>

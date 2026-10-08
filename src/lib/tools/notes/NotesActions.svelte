@@ -68,12 +68,18 @@
     keyshortcuts={shortcuts.enabled ? 'L' : undefined}
   />
   <div class="group">
-    <button type="button" aria-pressed={hideNames} onclick={() => onhidenames(!hideNames)}>
+    <button
+      type="button"
+      class="option"
+      aria-pressed={hideNames}
+      onclick={() => onhidenames(!hideNames)}
+    >
       {m.notes_hide_names()}
     </button>
     <!-- aria-disabled (not disabled) keeps Listen focusable so the reason can be read. -->
     <button
       type="button"
+      class="btn"
       aria-disabled={!listen.enabled}
       aria-keyshortcuts={shortcuts.enabled ? 'P' : undefined}
       aria-describedby={listenReason === null ? undefined : 'notes-listen-reason'}
@@ -86,8 +92,8 @@
     {#if listenReason !== null}
       <span id="notes-listen-reason" class="reason">{listenReason}</span>
     {/if}
-    <button type="button" onclick={onclear}>{m.notes_clear()}</button>
-    <button type="button" onclick={onreset}>{m.notes_reset()}</button>
+    <button type="button" class="btn" onclick={onclear}>{m.notes_clear()}</button>
+    <button type="button" class="btn" onclick={onreset}>{m.notes_reset()}</button>
   </div>
 </div>
 
@@ -100,32 +106,9 @@
     align-items: center;
   }
 
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  button[aria-disabled='true'] {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
   .reason {
     flex-basis: 100%;
-    font-size: var(--font-size-sm, 0.875em);
+    font-size: var(--font-size-sm);
     color: var(--color-text);
-  }
-
-  button[aria-pressed='true'] {
-    background: var(--color-accent);
-    color: var(--color-accent-text);
   }
 </style>

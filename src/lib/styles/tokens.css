@@ -13,6 +13,9 @@
   --color-accent: light-dark(#13466a, #c2e0f8);
   --color-accent-text: light-dark(#ffffff, #101317);
   --color-border: light-dark(#9ca3af, #6b7480);
+  --color-border-subtle: light-dark(#e3e6ea, #262c34);
+  --color-surface-hover: light-dark(#e7eaee, #232931);
+  --color-shadow: light-dark(rgb(0 0 0 / 0.14), rgb(0 0 0 / 0.5));
   /* Disabled controls: greyed, never error red (feature 006) */
   --color-disabled-text: light-dark(#6b7280, #8a929e);
   --color-disabled-border: light-dark(#d1d5db, #3a414b);
@@ -40,11 +43,24 @@
   --font-size-lg: 1.25rem;
   --font-size-xl: 1.75rem;
   --font-weight-normal: 400;
+  --font-weight-medium: 600;
   --font-weight-bold: 700;
   --line-height: 1.5;
 
   /* Shape */
+  --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-pill: 999px;
+  --shadow-overlay: 0 var(--space-2) var(--space-6) var(--color-shadow);
+  --switch-track-inline: 2.25rem;
+  --switch-track-block: 1.25rem;
+  --switch-thumb-inset: 2px;
+  --item-min-inline: 12rem;
+  --unit-px: 1px;
+  --fb-stroke-hairline: 1px;
+  --fb-label-halo-width: 3px;
+  --fb-glyph-halo-width: 2px;
   --border-width: 1px;
   --focus-ring-width: 3px;
   --focus-ring-offset: 2px;
@@ -206,6 +222,9 @@
     --color-notice-text: light-dark(#000000, #ffffff);
     --color-text-muted: var(--color-text);
     --color-border: var(--color-text);
+    --color-border-subtle: var(--color-text);
+    --color-surface-hover: light-dark(#e1e4e8, #1a1f26);
+    --color-shadow: transparent;
     --color-disabled-text: GrayText;
     --color-disabled-border: GrayText;
     --color-notice-border: var(--color-text);

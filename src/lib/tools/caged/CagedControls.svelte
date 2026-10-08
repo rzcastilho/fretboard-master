@@ -42,7 +42,7 @@
       onchoose={onquality}
     />
     {#if switchTo}
-      <button type="button" class="switch" onclick={onswitch}>
+      <button type="button" class="btn" onclick={onswitch}>
         {m.caged_switch_spelling({ root: noteLabel(switchTo) })}
       </button>
     {/if}
@@ -55,16 +55,5 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-  }
-
-  .switch {
-    min-block-size: var(--target-min);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 </style>

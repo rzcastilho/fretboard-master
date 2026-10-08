@@ -75,7 +75,7 @@
 <button
   bind:this={opener}
   type="button"
-  class="panels-opener"
+  class="btn panels-opener"
   data-print="omit"
   aria-expanded={landscape && open ? 'true' : 'false'}
   aria-controls="tool-panels"
@@ -97,7 +97,7 @@
     <button
       bind:this={closeButton}
       type="button"
-      class="panels-close"
+      class="btn panels-close"
       data-print="omit"
       onclick={() => void close()}>{m.panels_close()}</button
     >
@@ -116,7 +116,7 @@
     flex-direction: column;
     gap: var(--space-4);
     position: fixed;
-    inset-block: var(--landscape-bar-height, 3.5rem) 0;
+    inset-block: var(--landscape-bar-height) 0;
     inset-inline-end: 0;
     inline-size: min(var(--side-panel-max), 50vw);
     box-sizing: border-box;
@@ -124,6 +124,7 @@
     overflow-y: auto;
     background: var(--color-surface);
     border-inline-start: var(--border-width) solid var(--color-border);
+    box-shadow: var(--shadow-overlay);
     z-index: 2;
     animation: panels-slide var(--duration-short) ease-out;
   }
@@ -134,28 +135,10 @@
 
   .panels-close {
     align-self: flex-end;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 
   .panels-opener {
     grid-area: p;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 
   .panels-opener[hidden] {

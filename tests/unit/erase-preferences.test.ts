@@ -73,7 +73,7 @@ describe('ErasePreferences', () => {
     expect(goto).toHaveBeenCalledWith('/');
   });
 
-  it('buttons use the --target-min size token', () => {
+  it('buttons use the --target-min size token', async () => {
     render(ErasePreferences);
     // jsdom does not resolve component CSS reliably; assert the rule is in the source.
     const src = import.meta.glob('../../src/lib/shell/ErasePreferences.svelte', {
@@ -81,6 +81,11 @@ describe('ErasePreferences', () => {
       import: 'default',
       eager: true
     });
-    expect(Object.values(src)[0]).toContain('var(--target-min)');
+    expect(Object.values(src)[0]).toContain('class="btn"');
+    // The size comes from the shared .btn family (029).
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('src/lib/styles/controls.css', 'utf8')).toMatch(
+      /\.btn,\s*\.option \{[^}]*min-block-size: var\(--target-min\)/
+    );
   });
 });

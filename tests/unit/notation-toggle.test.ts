@@ -69,10 +69,12 @@ describe('NotationToggle', () => {
   });
 
   it('each button enforces --target-min (44×44) and a visible focus ring', () => {
-    const css = readFileSync('src/lib/shell/NotationToggle.svelte', 'utf8');
-    expect(css).toMatch(/min-block-size:\s*var\(--target-min\)/);
-    expect(css).toMatch(/min-inline-size:\s*var\(--target-min\)/);
-    expect(css).toMatch(/:focus-visible/);
+    // The size comes from the shared .option family (029); the focus ring is global.
+    expect(readFileSync('src/lib/shell/NotationToggle.svelte', 'utf8')).toContain('class="option"');
+    const family = readFileSync('src/lib/styles/controls.css', 'utf8');
+    expect(family).toMatch(/\.btn,\s*\.option \{[^}]*min-block-size:\s*var\(--target-min\)/);
+    expect(family).toMatch(/\.btn,\s*\.option \{[^}]*min-inline-size:\s*var\(--target-min\)/);
+    expect(readFileSync('src/lib/styles/global.css', 'utf8')).toMatch(/:focus-visible/);
   });
 
   it('agrees with the panel radios', async () => {

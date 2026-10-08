@@ -51,16 +51,16 @@
     </ul>
   {/if}
   <div class="actions">
-    <button type="button" onclick={() => onaddnote(info.pitchClass)}>
+    <button type="button" class="btn" onclick={() => onaddnote(info.pitchClass)}>
       {m.notes_card_see_every()}
     </button>
-    <button type="button" onclick={() => ontriads(info.pitchClass)}>
+    <button type="button" class="btn" onclick={() => ontriads(info.pitchClass)}>
       {m.notes_card_triads_from_note()}
     </button>
-    <button type="button" onclick={() => oncaged(info.pitchClass)}>
+    <button type="button" class="btn" onclick={() => oncaged(info.pitchClass)}>
       {m.notes_card_caged()}
     </button>
-    <button type="button" onclick={onclose}>{m.notes_card_close()}</button>
+    <button type="button" class="btn" onclick={onclose}>{m.notes_card_close()}</button>
   </div>
 </section>
 
@@ -98,7 +98,7 @@
   }
 
   dt {
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
   }
 
   dt::after {
@@ -123,18 +123,5 @@
     flex-wrap: wrap;
     gap: var(--space-2);
     margin-block-start: var(--space-3);
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 </style>

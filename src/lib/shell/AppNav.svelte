@@ -84,4 +84,10 @@
     color: var(--color-text);
     border-block-end-color: var(--color-text);
   }
+
+  @media (hover: hover) {
+    a:not(.current):hover {
+      text-decoration: underline;
+    }
+  }
 </style>

@@ -52,6 +52,7 @@
   <div class="buttons">
     <button
       type="button"
+      class="btn"
       aria-expanded={showDescription}
       aria-controls="{uid}-description"
       onclick={() => (showDescription = !showDescription)}
@@ -60,6 +61,7 @@
     </button>
     <button
       type="button"
+      class="btn"
       bind:this={legendButton}
       aria-expanded={legendOpen}
       aria-controls="{uid}-legend"
@@ -98,29 +100,6 @@
     flex-wrap: wrap;
     gap: var(--space-2);
     margin-block-start: var(--space-2);
-  }
-
-  button {
-    min-block-size: 44px;
-    min-inline-size: 44px;
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  .sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 
   .legend {

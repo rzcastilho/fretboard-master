@@ -59,7 +59,7 @@
       {@const why = reason(s)}
       <button
         type="button"
-        class="layer"
+        class="switch layer"
         role="switch"
         aria-checked={s.on}
         aria-disabled={s.disabled ? 'true' : undefined}
@@ -68,6 +68,7 @@
           if (!s.disabled) ontoggle(row.layer);
         }}
       >
+        <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
         <MarkerSample fn={row.fn} layer={row.sample} />
         {#if row.layer === 'scale' && extraSampleShown}
           <MarkerSample fn="degree" extra />
@@ -95,7 +96,7 @@
   legend {
     padding: 0;
     margin-block-end: var(--space-2);
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
   }
 
   .rows {
@@ -105,45 +106,7 @@
   }
 
   .layer {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
     text-align: start;
     overflow-wrap: anywhere;
-  }
-
-  .layer:focus-visible {
-    outline: var(--focus-ring-width) solid var(--color-focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .layer[aria-checked='true'] {
-    border-color: var(--color-text);
-    font-weight: 600;
-  }
-
-  .layer[aria-disabled='true'] {
-    color: var(--color-disabled-text);
-    border-color: var(--color-disabled-border);
-    cursor: not-allowed;
-  }
-
-  .state {
-    font-weight: 600;
-  }
-
-  .sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 </style>

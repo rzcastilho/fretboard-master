@@ -83,8 +83,8 @@ h1[tabindex='-1']:focus-visible {
 }
 
 /*
- * Zone B control rows (025). Rows wrap where there is room; on the narrow arrangement each row
- * stays on one line and scrolls on its own, with an edge fade where more content lies.
+ * Zone B control rows (025). Rows wrap onto further lines, so every control stays on screen
+ * (029 SC-005); the narrow arrangement uses a tighter gap.
  */
 .controls-row {
   display: flex;
@@ -94,18 +94,8 @@ h1[tabindex='-1']:focus-visible {
 }
 
 [data-arrangement='narrow'] .controls-row {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-}
-
-[data-arrangement='narrow'] .controls-row::-webkit-scrollbar {
-  display: none;
-}
-
-[data-arrangement='narrow'] .controls-row > * {
-  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-1);
 }
 
 .controls-row[data-overflow='end'] {
@@ -124,6 +114,39 @@ h1[tabindex='-1']:focus-visible {
     #000 calc(100% - var(--edge-fade-width)),
     transparent
   );
+}
+
+/*
+ * Zones (029). B and E sit on the page; C keeps its frame; D is a raised panel. Padding and
+ * grid areas stay with the tool components.
+ */
+/* Zone C keeps --color-border: on phones the board overflows the frame, so its edge is in the
+   frozen board snapshots. */
+main .grid > .c {
+  background: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+main .grid > .d {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-lg);
+}
+
+@media (prefers-contrast: more) {
+  main .grid > .d {
+    border: var(--border-width) solid var(--color-border-subtle);
+  }
+}
+
+main .grid[data-arrangement='narrow'] section:is(.b, .e) {
+  padding: 0;
+}
+
+main .grid > :is(.b, .c, .d, .e) > h2 {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
 }
 
 /*

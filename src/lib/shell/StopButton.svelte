@@ -11,7 +11,7 @@
 </script>
 
 {#if playback.sequencePlaying}
-  <button type="button" class="stop" data-print="omit" onclick={stop}>
+  <button type="button" class="stop btn" data-print="omit" onclick={stop}>
     <svg
       class="icon"
       viewBox="0 0 24 24"
@@ -33,14 +33,6 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    color: var(--color-text);
-    background: transparent;
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 
   .icon {

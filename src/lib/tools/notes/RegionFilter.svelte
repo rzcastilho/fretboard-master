@@ -60,11 +60,11 @@
   set: (v: number) => void
 )}
   <div class="stepper">
-    <button type="button" aria-label={lower} onclick={() => set(value - 1)}
+    <button type="button" class="btn" aria-label={lower} onclick={() => set(value - 1)}
       >{m.notes_region_minus_glyph()}</button
     >
     <div
-      class="value"
+      class="stepper-value"
       role="spinbutton"
       tabindex="0"
       aria-label={name}
@@ -75,7 +75,7 @@
     >
       {value}
     </div>
-    <button type="button" aria-label={raise} onclick={() => set(value + 1)}
+    <button type="button" class="btn" aria-label={raise} onclick={() => set(value + 1)}
       >{m.notes_region_plus_glyph()}</button
     >
   </div>
@@ -102,6 +102,7 @@
     {#each shortcuts as sc (sc.key)}
       <button
         type="button"
+        class="option"
         aria-pressed={region.start === sc.start && region.end === sc.end}
         onclick={() => onshortcut(sc.key)}
       >
@@ -124,40 +125,8 @@
     flex-direction: column;
   }
 
-  .stepper {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-  }
-
-  .value {
+  .stepper-value {
     display: grid;
     place-items: center;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-2);
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  .shortcuts button[aria-pressed='true'] {
-    background: var(--color-accent);
-    color: var(--color-accent-text);
   }
 </style>

@@ -21,7 +21,7 @@
 <header class="top">
   <h1 tabindex="-1">{m.app_name()}</h1>
   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- /about route (typed by resolve) lands in US3 -->
-  <a class="about" data-print="omit" href="/about">{m.nav_about()}</a>
+  <a class="about link-button" data-print="omit" href="/about">{m.nav_about()}</a>
   <LanguageSelector />
   <ThemeSelector />
   <StopButton />
@@ -56,14 +56,6 @@
     font-size: var(--font-size-xl);
   }
 
-  .about {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    color: var(--color-accent);
-  }
-
   main {
     /* Inline padding is capped by the viewport so 200 % text zoom at 320 px keeps room for text. */
     padding: var(--space-4) min(var(--space-4), 5vw);
@@ -73,12 +65,14 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--card-min-inline)), 1fr));
     gap: var(--space-4);
+    align-items: stretch;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .cards > li {
+    display: block;
     min-inline-size: 0;
   }
 

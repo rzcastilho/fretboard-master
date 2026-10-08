@@ -84,6 +84,7 @@
   {#each options as o (o.value)}
     <button
       type="button"
+      class="option"
       role="radio"
       aria-checked={current === o.value}
       aria-label={o.ariaLabel}
@@ -108,38 +109,12 @@
     align-items: center;
   }
 
+  :global([data-arrangement='narrow']) .group {
+    gap: var(--space-1);
+  }
+
   .name {
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
     color: var(--color-text);
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-1) var(--space-3);
-    font: inherit;
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  button[aria-disabled='true'] {
-    color: var(--color-disabled-text);
-    border-color: var(--color-disabled-border);
-    cursor: not-allowed;
-  }
-
-  button[aria-checked='true'][aria-disabled='true'] {
-    background: var(--color-surface);
-    color: var(--color-disabled-text);
-    border-width: calc(var(--border-width) * 2);
-  }
-
-  button[aria-checked='true'] {
-    background: var(--color-accent);
-    color: var(--color-accent-text);
   }
 </style>

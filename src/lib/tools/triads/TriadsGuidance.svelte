@@ -23,10 +23,14 @@
         : m.triads_does_not_close()}
     </p>
     {#if shape.kind === 'does-not-close' && anotherSet !== null}
-      <button type="button" onclick={onanotherset}>{m.triads_another_set()}</button>
+      <button type="button" class="link-button" onclick={onanotherset}
+        >{m.triads_another_set()}</button
+      >
     {/if}
     {#if seeAllNotes}
-      <button type="button" onclick={onseeallnotes}>{m.triads_see_all_notes()}</button>
+      <button type="button" class="link-button" onclick={onseeallnotes}
+        >{m.triads_see_all_notes()}</button
+      >
     {/if}
   </div>
 {/if}

@@ -136,7 +136,7 @@
     fill: none;
     stroke: var(--fb-color-outline);
     stroke-width: var(--connection-ring-width);
-    r: calc(var(--ring-base) * 1px + var(--connection-ring-gap));
+    r: calc(var(--ring-base) * var(--unit-px) + var(--connection-ring-gap));
   }
   .layer-triad .glyph {
     stroke: var(--fb-color-outline);

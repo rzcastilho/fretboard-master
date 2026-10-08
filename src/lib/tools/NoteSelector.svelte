@@ -29,6 +29,8 @@
     }))
   );
 
+  const SEPARATOR = ' / ';
+
   const rows = $derived(layout === 'split' ? [notes.slice(0, 6), notes.slice(6)] : [notes]);
 </script>
 
@@ -38,13 +40,16 @@
       {#each row as n (n.pc)}
         <button
           type="button"
+          class="option"
           class:natural={!n.altered}
           class:altered={n.altered}
           aria-pressed={selected.includes(n.pc)}
           aria-label={n.name}
           onclick={() => ontoggle(n.pc)}
         >
-          {n.label}
+          {#each n.label.split(SEPARATOR) as part, i (i)}{#if i > 0}<span class="slash"
+                >{SEPARATOR}</span
+              >{/if}<span class="part">{part}</span>{/each}
         </button>
       {/each}
     </div>
@@ -71,37 +76,20 @@
 
   /* Keys share the row's width; the floor keeps each a full touch target, so a row that cannot
      fit scrolls on its own (narrow) or wraps (elsewhere) instead of shrinking them. */
+  .keys {
+    align-items: stretch;
+  }
+
   .keys button {
     flex: 1 0 var(--target-min);
   }
 
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding: var(--space-1);
-    font: inherit;
-    font-weight: 600;
-    line-height: 1.2;
-    text-align: center;
-    color: var(--color-text);
-    border: var(--border-width) solid var(--color-text);
-    border-radius: var(--radius-md);
-    cursor: pointer;
+  /* On the narrow arrangement the two spellings of a key stack instead of wrapping unevenly. */
+  :global([data-arrangement='narrow']) .keys .slash {
+    display: none;
   }
 
-  button.natural {
-    background: var(--color-surface);
-  }
-
-  button.altered {
-    background: transparent;
-    border-style: dashed;
-    font-size: var(--font-size-sm);
-  }
-
-  button[aria-pressed='true'] {
-    background: var(--color-accent);
-    color: var(--color-accent-text);
-    border-style: solid;
+  :global([data-arrangement='narrow']) .keys .part {
+    display: block;
   }
 </style>

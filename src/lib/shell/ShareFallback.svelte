@@ -31,7 +31,9 @@
   <span id={regionId} class="sr-only">{m.share_fallback_region()}</span>
   <label id={labelId} for={inputId}>{m.share_fallback_label()}</label>
   <input id={inputId} bind:this={input} type="text" readonly value={href} />
-  <button type="button" onclick={() => share.closeFallback()}>{m.notice_dismiss()}</button>
+  <button type="button" class="link-button" onclick={() => share.closeFallback()}
+    >{m.notice_dismiss()}</button
+  >
 </section>
 
 <style>
@@ -52,39 +54,16 @@
     line-height: 1.4;
   }
 
-  .sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   input {
-    flex: 1 1 12rem;
+    flex: 1 1 var(--item-min-inline);
     inline-size: 100%;
     min-inline-size: 0;
     min-block-size: var(--target-min);
     padding-inline: var(--space-3);
     font: inherit;
     color: var(--color-text);
-    background: var(--color-surface, transparent);
+    background: var(--color-surface);
     border: var(--border-width) solid var(--color-notice-border);
     border-radius: var(--radius-md);
-  }
-
-  button {
-    min-block-size: var(--target-min);
-    min-inline-size: var(--target-min);
-    padding-inline: var(--space-3);
-    font: inherit;
-    color: inherit;
-    background: transparent;
-    border: var(--border-width) solid var(--color-notice-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
   }
 </style>

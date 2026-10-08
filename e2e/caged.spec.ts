@@ -558,7 +558,7 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
         }
         if (el.closest('[role="group"][aria-label="Key"]')) return 'key';
         if (el.getAttribute('role') === 'switch') return 'connections';
-        if (el.classList.contains('switch')) return 'switch';
+        if (/^Switch to/.test((el.textContent ?? '').trim())) return 'switch';
         if (el.closest('[role="region"][aria-label="Fretboard"], svg') || el.closest('.view-aids'))
           return 'board';
         if (el.classList.contains('tag')) return 'tags';
