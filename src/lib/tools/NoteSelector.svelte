@@ -70,11 +70,13 @@
     gap: 0;
   }
 
-  :global([data-arrangement='narrow']) .selector > .controls-row {
+  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']))
+    .selector
+    > .controls-row {
     gap: var(--space-1);
   }
 
-  :global([data-arrangement='narrow']) .selector {
+  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow'])) .selector {
     flex-direction: column;
     flex-wrap: nowrap;
   }
@@ -90,11 +92,11 @@
   }
 
   /* On the narrow arrangement the two spellings of a key stack instead of wrapping unevenly. */
-  :global([data-arrangement='narrow']) .keys .slash {
+  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow'])) .keys .slash {
     display: none;
   }
 
-  :global([data-arrangement='narrow']) .keys .part {
+  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow'])) .keys .part {
     display: block;
   }
 </style>

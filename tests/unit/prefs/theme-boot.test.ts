@@ -4,6 +4,12 @@ import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { MAX_RAW_LENGTH, THEMES } from '../../../src/lib/prefs/schema';
 import { PREFS_KEY } from '../../../src/lib/prefs/storage';
+import {
+  arrangementFor,
+  LANDSCAPE_MAX_HEIGHT,
+  MEDIUM_MAX,
+  NARROW_MAX
+} from '../../../src/lib/shell/layout';
 
 const source = readFileSync('static/theme-boot.js', 'utf8');
 
@@ -108,5 +114,47 @@ describe('theme-boot.js source', () => {
   });
   it('never calls setItem or removeItem', () => {
     expect(source).not.toMatch(/\.(setItem|removeItem)\b/);
+  });
+});
+
+describe('theme-boot.js provisional arrangement', () => {
+  /** Run the script on `pathname` with a `w × h` window; returns the root's `data-arrangement`. */
+  function arrangementAt(pathname: string, w: number, h: number): string | undefined {
+    const dataset: Record<string, string> = {};
+    runInNewContext(source, {
+      document: { documentElement: { dataset } },
+      localStorage: { getItem: () => null },
+      location: { pathname },
+      innerWidth: w,
+      innerHeight: h
+    });
+    return dataset.arrangement;
+  }
+
+  const chrome = { mainPadding: 16, gap: 16, zoneBorder: 1 };
+  it.each([
+    [320, 568],
+    [360, 740],
+    [NARROW_MAX, 900],
+    [NARROW_MAX + 1, 900],
+    [MEDIUM_MAX, 1366],
+    [740, 360],
+    [900, LANDSCAPE_MAX_HEIGHT]
+  ])('matches arrangementFor at %i × %i', (w, h) => {
+    expect(arrangementAt('/triads', w, h)).toBe(
+      arrangementFor({ width: w, height: h, neckWidth: 0, chrome })
+    );
+  });
+  it('guesses wide-side above the medium width (the neck is not known yet)', () => {
+    expect(arrangementAt('/caged', 1440, 900)).toBe('wide-side');
+  });
+  it.each(['/notes', '/caged', '/about', '/triads/'])('applies on %s', (path) => {
+    expect(arrangementAt(path, 360, 740)).toBe('narrow');
+  });
+  it.each(['/', '/triads/x', '/privacy'])('leaves %s alone', (path) => {
+    expect(arrangementAt(path, 360, 740)).toBeUndefined();
+  });
+  it('does not throw without a window (theme still applies)', () => {
+    expect(run(withRaw(JSON.stringify({ theme: 'dark' }))).theme).toBe('dark');
   });
 });

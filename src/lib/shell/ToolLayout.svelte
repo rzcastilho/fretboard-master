@@ -20,7 +20,7 @@
   import { currentLink, share } from '$lib/state/share.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { opening } from '$lib/state/opening.svelte';
-  import { measureViewport, viewport } from '$lib/state/viewport.svelte';
+  import { measureViewport, mirrorArrangementOnRoot, viewport } from '$lib/state/viewport.svelte';
   import { linkNoticeMessage } from './link-notice';
   import { screenTitle } from './screens';
   import SoundControl from './SoundControl.svelte';
@@ -64,6 +64,7 @@
   // The root layout tracks the window; the tool re-reads it once so the arrangement (and the
   // fretboard width it weighs) is current on the first frame of this screen.
   onMount(() => measureViewport());
+  mirrorArrangementOnRoot();
 
   $effect(() => {
     scheduleAddress(currentLink(tool));
