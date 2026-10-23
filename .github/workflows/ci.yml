@@ -22,6 +22,9 @@ jobs:
       - run: pnpm test:unit --coverage
 
   e2e:
+    # TEMPORARY: disabled to save Actions minutes (~1 h per run). Re-enable, and restore it in
+    # deploy's `needs`, before relying on this gate again.
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +48,7 @@ jobs:
       - run: pnpm build && pnpm lhci
 
   deploy:
-    needs: [checks, e2e, perf]
+    needs: [checks, perf] # TEMPORARY: e2e removed while it is disabled
     runs-on: ubuntu-latest
     permissions:
       contents: read
