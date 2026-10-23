@@ -186,8 +186,13 @@ test.describe('measurement US2: never in the way', () => {
   const SCREENS = ['/', '/notes', '/triads', '/caged', '/about'];
 
   /** Visible alerts or status messages: measurement must never raise one. */
+  // The CAGED rotate hint (016) shows once per portrait-phone context, a frame after the heading,
+  // so it would make the count racy; it never depends on `/m`.
   const notices = (page: Page): Promise<number> =>
-    page.locator('[role="alert"], [role="status"]:not(:empty)').count();
+    page
+      .locator('[role="alert"], [role="status"]:not(:empty)')
+      .filter({ hasNotText: 'Turn your phone sideways' })
+      .count();
 
   /** Visible state that must not depend on whether `/m` works. */
   async function walk(page: Page): Promise<string[]> {
@@ -258,8 +263,13 @@ test.describe('measurement US2: never in the way', () => {
       await page.route('**/m', handler);
       const actual = await walk(page);
       expect(actual).toEqual(baseline.visible);
-      // No error beyond what the healthy run already raises (e.g. pre-existing CSP noise).
-      expect(errors.filter((e) => !baseline.errors.includes(e))).toEqual([]);
+      // No error beyond what the healthy run already raises (e.g. pre-existing CSP noise). A beacon
+      // that follows the 302 off-site is blocked by `connect-src 'self'`: the browser logs that
+      // block itself, which is the policy working, not an error from the app (quickstart US2-1).
+      const blockedRedirect = /^Connecting to 'https:\/\/example\.invalid\/' violates/;
+      expect(
+        errors.filter((e) => !baseline.errors.includes(e) && !blockedRedirect.test(e))
+      ).toEqual([]);
       await context.close();
     });
   }

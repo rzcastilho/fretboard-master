@@ -106,6 +106,9 @@
   }
 
   .layer {
+    /* At 320 px and 200 % text the name and state drop below the track instead of overflowing. */
+    flex-wrap: wrap;
+    max-inline-size: 100%;
     text-align: start;
     overflow-wrap: anywhere;
   }

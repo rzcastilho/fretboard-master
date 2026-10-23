@@ -99,9 +99,12 @@ const storedPrefs = (page: Page) =>
     return raw === null ? null : (JSON.parse(raw) as Record<string, unknown>);
   }, PREFS_KEY);
 
+// `lastTool` is recorded on every tool screen; the rotate hint (016) the moment it shows on a
+// portrait phone. Neither is a preference the link may change.
+const RECORDED = new Set(['lastTool', 'rotateHint']);
 const withoutLastTool = (r: Record<string, unknown> | null) => {
   if (r === null) return null;
-  return Object.fromEntries(Object.entries(r).filter(([k]) => k !== 'lastTool'));
+  return Object.fromEntries(Object.entries(r).filter(([k]) => !RECORDED.has(k)));
 };
 
 test.describe('open link US1: land on exactly the shared view', () => {
@@ -563,7 +566,8 @@ test.describe('open link US4: address and history after opening', () => {
 // ---- Polish: accessibility, small screens, offline --------------------------------------------
 
 const BOTH_NOTICES = `/caged?v=1&rt=2&q=banana&${DROP_D}`;
-const anyNotice = (page: Page) => page.locator('[role="status"].notice');
+// The link notices sit under the app bar; the CAGED rotate hint (portrait phones) is not one.
+const anyNotice = (page: Page) => page.locator('.share-notice [role="status"].notice');
 
 test.describe('open link polish: accessibility and resilience', () => {
   test('both notices visible: zero axe violations', async ({ page }) => {

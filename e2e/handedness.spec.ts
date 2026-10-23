@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
+import { expandDetails, expectNoHorizontalScroll, readAudioLog, runAxe } from './support/helpers';
 
 const ADJUSTED = 'We adjusted the view to the new instrument';
 
@@ -33,6 +33,8 @@ const openNotes = async (page: Page) => {
     .getByRole('link', { name: /^(Continue: )?Fretboard Notes/ })
     .click();
   await page.getByRole('grid', { name: 'Fretboard' }).waitFor();
+  // The narrow arrangement folds the context panel (region presets) behind "Show details".
+  await expandDetails(page);
 };
 
 const openTriads = async (page: Page) => {

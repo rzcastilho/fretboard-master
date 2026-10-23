@@ -123,6 +123,8 @@ test('scrolling under 4× CPU throttle has no long animation frame over 50 ms (S
 /** Two-finger pinch from the scroller's centre: fingers start `from` px apart and end `to` apart. */
 async function pinch(page: Page, from: number, to: number) {
   const cdp = await page.context().newCDPSession(page);
+  // Seven strings push the board's centre below a 640 px fold; touches must land on it.
+  await page.locator('.fretboard .scroller').scrollIntoViewIfNeeded();
   const box = await page.locator('.fretboard .scroller').boundingBox();
   if (!box) throw new Error('no scroller box');
   const cx = Math.round(box.x + box.width / 2);

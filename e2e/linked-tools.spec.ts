@@ -339,6 +339,7 @@ test.describe('linked tools: history only follows screens (US5)', () => {
     await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);
     await pick(page, 'A');
     await nav(page).getByRole('link', { name: 'Triads' }).click();
+    await expandDetails(page);
     await expect(page.getByText('A major — Root position', { exact: true })).toBeVisible();
     await page.goBack();
     await expect(page).toHaveURL(/\/notes(\?v=1&.*)?$/);

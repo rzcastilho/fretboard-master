@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isMainThread } from 'node:worker_threads';
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { svelteTesting } from '@testing-library/svelte/vite';
@@ -35,7 +36,9 @@ function workerCap(
 
 export default defineConfig(({ mode }) => {
   const override = process.env.FM_APP_VERSION;
-  if (override && mode !== 'test') {
+  // SvelteKit's postbuild workers (analyse, prerender) re-load this file in the default mode
+  // only to read the Svelte config; the real build already enforced the rule on the main thread.
+  if (override && mode !== 'test' && isMainThread) {
     throw new Error('FM_APP_VERSION may only be set for `--mode test` builds.');
   }
   const version = mode === 'test' && override ? override : pkg.version;

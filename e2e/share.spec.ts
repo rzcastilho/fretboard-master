@@ -130,7 +130,8 @@ test.describe('share US1-2: desktop copies the link', () => {
     await expandDetails(page);
     await shareButton(page).click();
     await expect(statusRegion(page, 'Link copied')).toBeVisible();
-    await page.getByRole('button', { name: 'Dismiss' }).click();
+    // On a portrait phone the CAGED rotate hint (016) has its own Dismiss.
+    await statusRegion(page, 'Link copied').getByRole('button', { name: 'Dismiss' }).click();
     await expect(statusRegion(page, 'Link copied')).toHaveCount(0);
   });
 });

@@ -1,0 +1,40 @@
+name: Update Linux snapshots
+
+# CI compares screenshots against `*-linux.png` baselines, which cannot be produced on macOS.
+# Run it by pushing any commit to a `snapshots/**` branch (or dispatch it once it is on main),
+# download the artifact, review the images, then commit them.
+on:
+  push:
+    branches: ['snapshots/**']
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'Optional Playwright --grep filter'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:test
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Regenerate baselines
+        env:
+          GREP: ${{ inputs.grep }}
+        # Only specs that take screenshots; failures elsewhere in them must not block the upload.
+        run: |
+          specs=$(grep -rl toHaveScreenshot e2e)
+          pnpm exec playwright test $specs --project=phone --project=phone-touch --project=desktop \
+            --update-snapshots=all ${GREP:+--grep "$GREP"} || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-snapshots
+          path: e2e/**/*-linux.png
+          if-no-files-found: error

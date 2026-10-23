@@ -489,6 +489,7 @@ test.describe('caged triad polish: accessibility and persistence', () => {
     // triad set (`ts`), not just any link: the address already has `v=1&` from the start.
     await expect(page).toHaveURL(/\/caged\?v=1&.*[?&]ts=[^-&]/);
     await page.reload();
+    await expandDetails(page);
     await expect(layerSwitch(page, 'Triad')).toHaveAttribute('aria-checked', 'true');
     await expect(setOption(page, '3-2-1')).toBeChecked();
     expect(await triadKeys(page)).toEqual(before);
