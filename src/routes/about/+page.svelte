@@ -9,11 +9,12 @@
   import SoundControl from '$lib/shell/SoundControl.svelte';
   import StopButton from '$lib/shell/StopButton.svelte';
   import { screenTitle } from '$lib/shell/screens';
-  import { viewport } from '$lib/state/viewport.svelte';
+  import { mirrorArrangementOnRoot, viewport } from '$lib/state/viewport.svelte';
 
   const compact = $derived(
     viewport.arrangement !== undefined && !viewport.arrangement.startsWith('wide')
   );
+  mirrorArrangementOnRoot();
 
   const LEGEND = [
     { fn: 'root', name: m.legend_root_name, meaning: m.legend_root_meaning },

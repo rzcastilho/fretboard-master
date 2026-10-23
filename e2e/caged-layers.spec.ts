@@ -216,6 +216,7 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
     expect((await storedLabels())?.caged).toBe('name');
     await expect.poll(() => page.url()).toContain('lb=name');
     await page.reload();
+    await expandDetails(page);
     await expect(labelRadio(page, 'Note names')).toBeChecked();
     await page.getByRole('button', { name: 'Reset tool' }).click();
     await expect(labelRadio(page, 'Note names')).toBeChecked();
@@ -232,13 +233,20 @@ test.describe('caged layers US1: see the scale inside the shape', () => {
     await keyButton(page, 2).click();
     await shape(page, 'C').click();
     await layerSwitch(page, 'Scale').click();
-    const all = live_(await marks(page));
-    const s7 = all.filter((x) => x.string === 7);
-    const s2 = all.filter((x) => x.string === 2);
+    const frets = (m: Mark[], string: number) =>
+      m
+        .filter((x) => x.string === string)
+        .map((x) => x.fret)
+        .sort((a, b) => a - b);
+    // Markers of the previous view may still be leaving (026 motion): wait for the board to settle.
+    await expect
+      .poll(async () => {
+        const all = live_(await marks(page));
+        return JSON.stringify(frets(all, 7)) === JSON.stringify(frets(all, 2));
+      })
+      .toBe(true);
+    const s7 = live_(await marks(page)).filter((x) => x.string === 7);
     expect(s7.length).toBeGreaterThan(0);
-    expect(s7.map((x) => x.fret).sort((a, b) => a - b)).toEqual(
-      s2.map((x) => x.fret).sort((a, b) => a - b)
-    );
     for (const x of s7) expect(x.classes).toMatch(/\bdegree\b/);
   });
 

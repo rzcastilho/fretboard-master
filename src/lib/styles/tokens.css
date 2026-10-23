@@ -388,7 +388,8 @@
 /*
  * Arrangements (025 contracts/ui.md §5). `data-arrangement` is written by the tool layout after
  * mount from the viewport store, so it can weigh the fretboard's width, which media queries
- * cannot. The media-query rules above stay as the prerender and no-JS fallback. Zone order in
+ * cannot. Before that, theme-boot.js writes a provisional value on the root from the window
+ * size. The media-query rules above stay as the no-JS fallback. Zone order in
  * the DOM is B, C, E, D for every tool; only the placement differs.
  */
 [data-arrangement='narrow'] {
@@ -420,6 +421,10 @@
   --tool-grid-areas: 'b p' 'c c';
   --tool-grid-columns: minmax(0, 1fr) auto;
   --tool-grid-rows: auto minmax(0, 1fr);
+}
+
+/* The root carries the arrangement too (theme-boot.js, ToolLayout): size the grid, not the root. */
+[data-arrangement='landscape'] main .grid {
   block-size: calc(100dvh - var(--landscape-bar-height) - 2 * var(--space-4));
   gap: var(--space-2);
 }

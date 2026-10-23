@@ -559,8 +559,17 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
         if (el.closest('[role="group"][aria-label="Key"]')) return 'key';
         if (el.getAttribute('role') === 'switch') return 'connections';
         if (/^Switch to/.test((el.textContent ?? '').trim())) return 'switch';
-        if (el.closest('[role="region"][aria-label="Fretboard"], svg') || el.closest('.view-aids'))
+        const text = (el.textContent ?? '').trim();
+        // 025: the minimap and Fit to screen are board aids (shown below the wide arrangements).
+        if (
+          el.closest('[role="region"][aria-label="Fretboard"], svg') ||
+          el.closest('.view-aids') ||
+          el.classList.contains('minimap') ||
+          text === 'Fit to screen'
+        )
           return 'board';
+        // Narrow only: the details toggle and the rotate hint's Dismiss (016) are not under test.
+        if (/^(Show|Hide) details$/.test(text) || el.closest('[role="status"]')) return 'skip';
         if (el.classList.contains('tag')) return 'tags';
         if (/^(Previous|Next) shape$/.test((el.textContent ?? '').trim())) return 'steps';
         if ((el.textContent ?? '').trim() === 'Reset tool') return 'reset';
@@ -568,9 +577,10 @@ test.describe('caged polish: accessibility (Q24, Q25)', () => {
         return `other:${el.tagName}:${(el.textContent ?? '').trim().slice(0, 20)}`;
       });
     const seen: string[] = [];
-    for (let i = 0; i < 40; i++) {
+    // Narrow adds the minimap, board aids and the details toggle to the walk.
+    for (let i = 0; i < 60; i++) {
       const k = await kind();
-      if (seen[seen.length - 1] !== k) seen.push(k);
+      if (k !== 'skip' && seen[seen.length - 1] !== k) seen.push(k);
       if (k === 'reset') break;
       await page.keyboard.press('Tab');
     }

@@ -110,12 +110,20 @@ test.describe('caged focus US1: focus on one shape', () => {
     await expect(cTags.nth(1)).toHaveAttribute('aria-pressed', 'true');
     await expect(cTags.nth(0)).toHaveAttribute('aria-pressed', 'false');
     await page.waitForTimeout(700); // let the centring scroll settle
-    const band = await board(page).locator('.region-band').boundingBox();
+    // Relative to the board: clicking the Shape radio may scroll the page on a phone.
+    const bandBox = async () => {
+      const [b, r] = await Promise.all([
+        board(page).locator('.region-band').boundingBox(),
+        board(page).boundingBox()
+      ]);
+      return b && r ? { ...b, x: b.x - r.x, y: b.y - r.y } : null;
+    };
+    const band = await bandBox();
     await radio(page, 'C').click();
     await page.waitForTimeout(700);
     await expect(cTags.nth(1)).toHaveAttribute('aria-pressed', 'true');
     await expect(cTags.nth(0)).toHaveAttribute('aria-pressed', 'false');
-    expect(await board(page).locator('.region-band').boundingBox()).toEqual(band);
+    expect(await bandBox()).toEqual(band);
   });
 
   test('a 12-fret instrument disables D', async ({ page }) => {

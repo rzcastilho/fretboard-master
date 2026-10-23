@@ -29,7 +29,7 @@
   padding: var(--space-1) var(--space-3);
 }
 
-[data-arrangement='narrow'] .option {
+:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']) .option {
   padding: var(--space-1) var(--space-2);
 }
 
@@ -247,11 +247,20 @@
   z-index: 1;
 }
 
-:is([data-arrangement='narrow'], [data-arrangement='landscape']) .segment {
+:is(
+    :is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']),
+    :is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape'])
+  )
+  .segment {
   gap: var(--space-1);
 }
 
-:is([data-arrangement='narrow'], [data-arrangement='landscape']) .segment > .option {
+:is(
+    :is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']),
+    :is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape'])
+  )
+  .segment
+  > .option {
   margin-inline-start: 0;
   border-radius: var(--radius-md);
 }

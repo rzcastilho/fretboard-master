@@ -109,6 +109,7 @@ test.describe('remembered preferences: US1', () => {
       .click();
     await expect(page.getByText('C minor — Root position', { exact: true })).toBeVisible();
     await page.reload();
+    await expandDetails(page);
     await expect(page.getByText('C major — Root position', { exact: true })).toBeVisible();
     await page.goto('/notes');
     await expandDetails(page);

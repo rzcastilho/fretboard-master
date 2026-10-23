@@ -139,6 +139,10 @@ async function shell(page: Page, tool: Tool = 'notes') {
 }
 
 test.describe('control families look the same everywhere', () => {
+  // Computed styles are compared, not animated: with motion the selected colours are read
+  // mid-transition right after a click.
+  test.use({ reducedMotion: 'reduce' });
+
   test('.option: same box in Notes, Triads, CAGED and the notation toggle; selected is bold and filled', async ({
     page
   }) => {

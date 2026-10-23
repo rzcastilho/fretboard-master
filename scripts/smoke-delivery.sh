@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Delivery smoke checks (contracts/http-delivery.md, quickstart §7).
-# Usage: scripts/smoke-delivery.sh <base-url>   e.g. https://fretboard-master.pages.dev
+# Usage: scripts/smoke-delivery.sh <base-url>   e.g. https://fretboard-master-5o7.pages.dev
 set -u
 
 if [ $# -ne 1 ]; then
@@ -35,7 +35,7 @@ else
 fi
 
 # screens
-for p in / /notes /triads /about; do
+for p in / /notes /triads /caged /about; do
   code=$(status "${base}${p}")
   [ "$code" = 200 ] && pass "$p -> 200" || fail "$p -> $code (expected 200)"
 done
@@ -58,9 +58,6 @@ else
   fail "/nope -> $code or notice missing"
 fi
 rm -f "$body"
-
-code=$(status "${base}/caged")
-[ "$code" = 404 ] && pass "/caged -> 404" || fail "/caged -> $code (expected 404)"
 
 # case sensitivity: 404 or home-with-notice
 body=$(mktemp)

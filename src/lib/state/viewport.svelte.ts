@@ -61,6 +61,21 @@ export const viewport = {
   }
 };
 
+/**
+ * Mirror the measured arrangement on the root, replacing theme-boot.js's provisional value, so
+ * root-keyed rules (the compact bar) follow resizes; leaving the screen clears it. Call during
+ * component initialisation of a screen whose bar or zones depend on the arrangement.
+ */
+export function mirrorArrangementOnRoot(): void {
+  $effect(() => {
+    const arrangement = viewport.arrangement;
+    if (arrangement) document.documentElement.dataset.arrangement = arrangement;
+  });
+  $effect(() => () => {
+    delete document.documentElement.dataset.arrangement;
+  });
+}
+
 /** Start tracking resize and root font size changes; returns the cleanup. Browser only. */
 export function startViewport(): () => void {
   measureViewport();
