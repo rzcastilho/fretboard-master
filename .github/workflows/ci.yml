@@ -59,13 +59,15 @@ jobs:
       - uses: jdx/mise-action@v2
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # The project is `fretboard-master`, but its pages.dev subdomain is `fretboard-master-5o7`
+      # (the bare name was already taken on pages.dev).
       - name: Compute target URL
         run: |
           slug=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-28)
           if [ "$BRANCH" = main ]; then
-            echo "TARGET_URL=https://fretboard-master.pages.dev" >> "$GITHUB_ENV"
+            echo "TARGET_URL=https://fretboard-master-5o7.pages.dev" >> "$GITHUB_ENV"
           else
-            echo "TARGET_URL=https://${slug}.fretboard-master.pages.dev" >> "$GITHUB_ENV"
+            echo "TARGET_URL=https://${slug}.fretboard-master-5o7.pages.dev" >> "$GITHUB_ENV"
           fi
       - name: Deploy while probing availability
         run: |

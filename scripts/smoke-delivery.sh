@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Delivery smoke checks (contracts/http-delivery.md, quickstart §7).
-# Usage: scripts/smoke-delivery.sh <base-url>   e.g. https://fretboard-master.pages.dev
+# Usage: scripts/smoke-delivery.sh <base-url>   e.g. https://fretboard-master-5o7.pages.dev
 set -u
 
 if [ $# -ne 1 ]; then
