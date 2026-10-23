@@ -73,12 +73,20 @@ jobs:
             echo "TARGET_URL=https://${slug}.fretboard-master-5o7.pages.dev" >> "$GITHUB_ENV"
           fi
       - name: Deploy while probing availability
+        # The probe checks the switch from one version to the next; a target's first deploy has
+        # nothing to switch from (its alias answers 522 or 404 until the upload lands).
         run: |
+          deploy() { pnpm exec wrangler pages deploy build --project-name fretboard-master --branch "$BRANCH"; }
+          if [ "$(curl -s -o /dev/null -w '%{http_code}' "$TARGET_URL/")" != 200 ]; then
+            echo "first deploy to $TARGET_URL: availability probe skipped"
+            deploy
+            exit
+          fi
           stop=$(mktemp -u)
           node scripts/deploy-availability-probe.mjs "$TARGET_URL" --stop-file "$stop" > probe.log 2>&1 &
           probe=$!
           status=0
-          pnpm exec wrangler pages deploy build --project-name fretboard-master --branch "$BRANCH" || status=$?
+          deploy || status=$?
           touch "$stop"
           wait $probe || { cat probe.log; status=1; }
           cat probe.log
