@@ -4,11 +4,14 @@
 
 Fretboard Master is a browser-only, no-account web app of three interactive study tools for guitarists: **Fretboard Notes** (where every note is), **Triads** (major, minor, diminished, and augmented, in every inversion on every adjacent string set), and **CAGED** (the five major and minor shapes, with triad, arpeggio, pentatonic, and scale layers). Every view is calculated on the device from the user's own instrument (6 or 7 strings, preset or custom tunings, left- or right-handed) and can be heard. The app ships in English, Portuguese, and Spanish, keeps preferences on the device, and shares views by link. It has no lessons, accounts, or gamification. Correct theory is non-negotiable.
 
+A fourth tool, **Metronome**, extends the app for speed practice: one drift-free click engine behind three modes (Ratios Training, which alternates two subdivisions at a fixed tempo; a plain Metronome; and Speed Training, which climbs from a start to a target tempo), plus an independent practice timer. Timing accuracy is its product.
+
 ## Source documents
 
 | Document | Waves | Covers |
 |---|---|---|
 | [fretboard-master/](../fretboard-master/00-overview.md) (13-file macro-spec) | 001–007 | Full product spec, version 1.0, 30 September 2026 |
+| [metronome-trainer-spec.md](../metronome-trainer-spec.md) | 008–010 | Metronome tool: three modes, count-in, beat indicator, practice timer, 29 October 2026 |
 
 ## Wave sequence
 
@@ -60,6 +63,25 @@ Accessibility audit, small-screen comfort, themes and motion, the About and priv
 3. [003 — Themes, motion, and print](007-comfort-and-launch-readiness/003-themes-motion-and-print.md) — light and dark themes, contrast variant, motion system, print
 4. [004 — About page, privacy, and keyboard shortcuts](007-comfort-and-launch-readiness/004-about-privacy-and-shortcuts.md) — full About page, privacy posture, shortcuts
 5. [005 — Anonymous usage measurement and error reporting](007-comfort-and-launch-readiness/005-anonymous-measurement.md) — conditional on Q-1
+
+### 008 — Ratios training
+The Metronome tool arrives as the app's fourth tool, starting with Ratios Training, the only mode the source observed on camera and the focus of its acceptance criteria. The wave builds that mode up one audible layer at a time: a drift-free click with run controls, then subdivisions, the count-in, alternation between two ratios, and remembered settings. It comes first among the metronome waves because the engine it builds is shared by every later mode, and because Ratios Training alone is a complete practice tool (decided at calibration).
+1. [001 — Metronome tool and steady click](008-ratios-training/001-metronome-tool-and-click-engine.md) — home card, BPM and beats, running view, dots, Pause/Resume/Reset, timing guarantees, background clicks
+2. [002 — Subdivisions](008-ratios-training/002-subdivisions.md) — Loop 1 dropdown, eight subdivisions, soft click, `SUB n`
+3. [003 — Count-in](008-ratios-training/003-count-in.md) — toggle, initial and repeat count-in, single pulsing dot
+4. [004 — Alternate two ratios](008-ratios-training/004-alternating-ratios.md) — Subdivision ratio section, Loop 2, repeat count-in at every switch
+5. [005 — Remembered metronome settings](008-ratios-training/005-remembered-metronome-settings.md) — per-mode settings in the existing preferences store
+
+### 009 — More modes
+Adds the two modes the source shows only as tab labels, with behaviour inferred from the source's stated defaults: a plain click for everyday playing along, and Speed Training for gradual tempo building. They follow Ratios Training because they reuse its engine, count-in and run controls almost unchanged. Tap tempo and plain-mode subdivisions close the wave because the source marks them nice-to-have.
+1. [001 — Mode tabs and plain Metronome](009-more-modes/001-mode-tabs-and-plain-metronome.md) — tab bar, tab switch stops playback, plain click mode
+2. [002 — Speed Training](009-more-modes/002-speed-training.md) — start, target, increment, loops per step, hold or stop at target
+3. [003 — Tap tempo and subdivisions in plain Metronome](009-more-modes/003-tap-tempo-and-metronome-subdivisions.md) — optional extras, confirm before building
+
+### 010 — Practice sessions
+Surrounds the metronome with what a real practice session needs: a countdown to time-box each exercise, and the whole app working with no signal. It comes last because both are independent of the click itself, and offline use benefits every tool, so it is easiest to build once every tool exists.
+1. [001 — Practice timer](010-practice-sessions/001-practice-timer.md) — 1–10 minute presets, seven-segment readout, chime, independent of the metronome
+2. [002 — Practise offline](010-practice-sessions/002-offline-practice.md) — whole app usable offline after first load, installable, updates on next launch
 
 ## How to use this folder
 
@@ -264,6 +286,37 @@ Work through the waves in order, and through the files in order within each wave
 | § 7 Accessibility in the design | 007-comfort-and-launch-readiness/001-describe-this-view-and-legend.md |
 | § 8 What the design avoids | Not sliced: design guard-rails, referenced in 007-comfort-and-launch-readiness/003 |
 
+### metronome-trainer-spec.md
+
+| Source section | Covered by |
+|---|---|
+| § Overview (intro, observed vs inferred) | Not sliced: background. Observed and inferred status set the order of waves 008 and 009 |
+| § Overview: Scope | Not sliced: scope boundary. Lesson content, accounts, syncing and authoring stay out; folded into the scope lines of 008-ratios-training/001 and 005 |
+| § Overview: Platform | 008-ratios-training/001 (browser, desktop and mobile, audio), 010-practice-sessions/002. Dark theme replaced by the app's themes (decided at calibration) |
+| § Shared metronome engine: parameters table | 008-ratios-training/001 (BPM, # of Beats), 008-ratios-training/003 (Count In rows) |
+| § Shared metronome engine: Audio | 008-ratios-training/001 (accented and normal clicks, lookahead, background), 008-ratios-training/002 (soft subdivision click) |
+| § Shared metronome engine: Visual beat indicator | 008-ratios-training/001 (dots), 008-ratios-training/003 (single pulsing count-in dot) |
+| § Shared metronome engine: Status line | 008-ratios-training/001, 002, 003 |
+| § Mode 1 — Metronome *(inferred)* | 009-more-modes/001 (plain click), 009-more-modes/003 (tap tempo, subdivisions) |
+| § Mode 2 — Speed Training *(inferred)* | 009-more-modes/002-speed-training.md |
+| § Mode 3 — Ratios Training *(observed)*: settings panel | 008-ratios-training/001 (BPM, beats, Start), 003 (count-in rows), 002 and 004 (Loop 1, Loop 2, Subdivision ratio) |
+| § Mode 3 — Ratios Training: subdivision options | 008-ratios-training/002-subdivisions.md |
+| § Mode 3 — Ratios Training: sequence | 008-ratios-training/004-alternating-ratios.md |
+| § Run states and controls: state diagram and controls table | 008-ratios-training/001 (Start, Pause, Resume, Reset), 008-ratios-training/004 (loop states), 009-more-modes/001 (mode tabs) |
+| § Run states and controls: persistence | 008-ratios-training/005-remembered-metronome-settings.md |
+| § Run states and controls: keyboard and per-click display | 008-ratios-training/001-metronome-tool-and-click-engine.md |
+| § Practice timer *(observed)* | 010-practice-sessions/001-practice-timer.md |
+| § UI layout and visual design: metronome card | 008-ratios-training/001 (rows, button, status box, Pause and Reset), 008-ratios-training/002 and 004 (dropdowns, section header), 009-more-modes/001 (tab bar) |
+| § UI layout and visual design: colour tokens | 008-ratios-training/001 and 010-practice-sessions/001: mapped to roles in the app's existing themes (accent, secondary accent, danger), not added as new values |
+| § UI layout and visual design: responsive | 008-ratios-training/001 (96 px pill minimum), 009-more-modes/001 (tab icons drop on phones) |
+| § Non-functional requirements: timing, audio start | 008-ratios-training/001, 002 |
+| § Non-functional requirements: offline, no account | 010-practice-sessions/002-offline-practice.md |
+| § Non-functional requirements: settings persist per mode | 008-ratios-training/005-remembered-metronome-settings.md |
+| § Non-functional requirements: accessibility | 008-ratios-training/001; already baseline for the app since 007-comfort-and-launch-readiness/001 |
+| § Acceptance criteria | Split by feature: sequence and status line → 008-ratios-training/004; 2 beats → 001, 002; Count In Off → 003; ratio Off → 004; Pause/Resume/Reset → 001; Speed Training → 009-more-modes/002; timer → 010-practice-sessions/001; background clicks → 008-ratios-training/001 |
+| § Open questions (not visible in the video) | Listed below under Open questions, and in the files they gate |
+| Sources (video link) | Not sliced: reference material |
+
 ## Open questions
 
 1. **Q-1** Will anonymous usage measurement be adopted? → gates 007-comfort-and-launch-readiness/005 (and anonymous error reporting in it).
@@ -275,3 +328,10 @@ Work through the waves in order, and through the files in order within each wave
 7. **Q-11** Is a privacy notice or consent required? → 007-comfort-and-launch-readiness/004.
 8. **Q-2 / Q-3** Final product name, owner, and budget → 001-mvp/001 (address and name), 007-comfort-and-launch-readiness/004.
 9. **Q-5, Q-6, Q-7, Q-9, Q-14** Post-v1 questions (open-tuning CAGED, capo, next stage, 8-string, other solfège) → no file in these waves.
+10. **Metronome: subdivisions and tap tempo in plain mode?** The source's defaults are used; confirm before building → 009-more-modes/003.
+11. **Speed Training: step size, loops per step, stop or hold at target?** Defaults used: 5 BPM, 4 loops, hold (Stop selectable) → 009-more-modes/002.
+12. **Full list of subdivision options** Only 8th Triplets and Sextuplets were seen; the source's eight-option list is used → 008-ratios-training/002.
+13. **Click sounds, and can the user choose sounds or volume?** Three sounds assumed; whether the app's mute and volume govern the metronome → 008-ratios-training/001.
+14. **Does the timer auto-start the metronome, or stop it at zero?** Assumed independent → 010-practice-sessions/001.
+15. **BPM limits** 30–300 assumed → 008-ratios-training/001.
+16. **Background playback conflicts with 001-mvp/003**, which stops sound when the app is hidden. The metronome is specified as an exception → 008-ratios-training/001.
