@@ -55,9 +55,9 @@ export const viewport = {
   },
   /** Undefined before mount (width 0): the CSS fallback applies. */
   get arrangement(): Arrangement | undefined {
-    if (width === 0 || height === 0) return undefined;
+    if (width === 0) return undefined;
     const neckWidth = layoutFretboard(instrument.current, metrics, 0, 'interactive').naturalWidth;
-    return arrangementFor({ width, height, neckWidth, chrome });
+    return arrangementFor({ width, neckWidth, chrome });
   }
 };
 

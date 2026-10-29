@@ -30,7 +30,6 @@
 
   let { tool }: { tool: ToolId } = $props();
 
-  const landscape = $derived(viewport.arrangement === 'landscape');
   // Icon-only bar below the wide arrangements: the labels become tooltips (global.css).
   const compact = $derived(
     viewport.arrangement !== undefined && !viewport.arrangement.startsWith('wide')
@@ -78,12 +77,7 @@
   <title>{screenTitle(tool)}</title>
 </svelte:head>
 
-<header
-  class="app-bar"
-  aria-label={m.zone_app_bar()}
-  data-landscape={landscape ? '' : undefined}
-  data-compact={compact ? '' : undefined}
->
+<header class="app-bar" aria-label={m.zone_app_bar()} data-compact={compact ? '' : undefined}>
   <AppNav current={tool} />
   <div class="bar-tools">
     <TuningBadge {tool} />
@@ -130,7 +124,7 @@
 {/if}
 
 <main>
-  <h1 tabindex="-1" class:sr-only={landscape} data-print="show">{name}</h1>
+  <h1 tabindex="-1" data-print="show">{name}</h1>
   <div class="grid" data-arrangement={viewport.arrangement}>
     <svelte:boundary onerror={(e) => recordFailure(tool, e)}>
       {#if tool === 'notes'}

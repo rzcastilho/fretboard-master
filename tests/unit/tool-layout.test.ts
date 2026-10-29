@@ -358,8 +358,8 @@ describe('ToolLayout arrangement (025 US3)', () => {
   });
 
   it.each([
-    ['narrow', 390, 844],
-    ['medium', 800, 1280],
+    ['reflow', 390, 844],
+    ['reflow', 800, 1280],
     ['wide-side', 2560, 1440]
   ])('writes %s from the viewport store', (name, width, height) => {
     sizeWindow(width, height);
@@ -383,7 +383,8 @@ describe('ToolLayout arrangement (025 US3)', () => {
           order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING
         ).toBeTruthy();
       }
-      expect(g.querySelector('.panels-opener')?.hasAttribute('hidden')).toBe(true);
+      expect(g.querySelector('.panels-opener')).toBeNull();
+      expect(document.querySelector('[data-landscape]')).toBeNull();
     }
   );
 });

@@ -1,21 +1,15 @@
-/** Pure responsive arrangement rules (025 data-model §5). No DOM, no Svelte. */
+/** Pure responsive arrangement rules (025 data-model §5, 030 desktop-only). No DOM, no Svelte. */
 
-export const NARROW_MAX = 599;
-export const MEDIUM_MAX = 1023;
-export const LANDSCAPE_MAX_HEIGHT = 499;
+/** Widest window that reflows (single column, compact bar). Desktop layouts start at 1024. */
+export const REFLOW_MAX = 1023;
 
-export type Arrangement = 'narrow' | 'medium' | 'wide-side' | 'wide-stacked' | 'landscape';
+export type Arrangement = 'reflow' | 'wide-side' | 'wide-stacked';
 
 /** Chrome sizes in px (from tokens, already scaled by the root font size). */
 export interface LayoutChrome {
   mainPadding: number;
   gap: number;
   zoneBorder: number;
-}
-
-/** A phone held sideways: short and wider than tall, at any width. */
-export function isPhoneLandscape(width: number, height: number): boolean {
-  return height <= LANDSCAPE_MAX_HEIGHT && width > height;
 }
 
 /** Inner width of the wide layout's 3/4 column that holds the fretboard. */
@@ -25,13 +19,10 @@ export function wideLeftColumn(width: number, chrome: LayoutChrome): number {
 
 export function arrangementFor(input: {
   width: number;
-  height: number;
   neckWidth: number;
   chrome: LayoutChrome;
 }): Arrangement {
-  const { width, height, neckWidth, chrome } = input;
-  if (isPhoneLandscape(width, height)) return 'landscape';
-  if (width <= NARROW_MAX) return 'narrow';
-  if (width <= MEDIUM_MAX) return 'medium';
+  const { width, neckWidth, chrome } = input;
+  if (width <= REFLOW_MAX) return 'reflow';
   return neckWidth <= wideLeftColumn(width, chrome) ? 'wide-side' : 'wide-stacked';
 }

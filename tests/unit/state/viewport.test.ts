@@ -17,11 +17,11 @@ describe('viewport store', () => {
 
   it('derives the arrangement from size and the active instrument', () => {
     setViewportForTests({ width: 390, height: 844 });
-    expect(viewport.arrangement).toBe('narrow');
+    expect(viewport.arrangement).toBe('reflow');
     setViewportForTests({ width: 844, height: 390 });
-    expect(viewport.arrangement).toBe('landscape');
-    setViewportForTests({ width: 800, height: 1280 });
-    expect(viewport.arrangement).toBe('medium');
+    expect(viewport.arrangement).toBe('reflow');
+    setViewportForTests({ width: 1023, height: 1280 });
+    expect(viewport.arrangement).toBe('reflow');
     expect(instrument.current.fretCount).toBeGreaterThan(0);
     setViewportForTests({ width: 2560, height: 1440 });
     expect(viewport.arrangement).toBe('wide-side');

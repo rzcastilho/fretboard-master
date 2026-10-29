@@ -90,10 +90,7 @@ export async function expectNoTruncationOrOverlap(page: Page): Promise<void> {
       (el) => visible(el)
     );
     const inScroller = (el: Element): boolean =>
-      el.closest('.scroller') !== null ||
-      // Landscape zone B is a one-row strip that scrolls on its own (contracts/ui.md §6).
-      el.closest('[data-arrangement="landscape"] .b') !== null ||
-      (dialog !== undefined && !dialog.contains(el));
+      el.closest('.scroller') !== null || (dialog !== undefined && !dialog.contains(el));
 
     for (const el of document.body.querySelectorAll('*')) {
       if (!visible(el) || inScroller(el)) continue;
@@ -143,7 +140,7 @@ export async function expectNoTruncationOrOverlap(page: Page): Promise<void> {
 }
 
 /**
- * Narrow screens collapse zone D behind a "Show details" button (025). Open it when present, so
+ * Reflow screens collapse zone D behind a "Show details" button (025). Open it when present, so
  * a test can read zone D at any width; a no-op where D is always visible or on other screens.
  */
 export async function expandDetails(page: Page): Promise<void> {

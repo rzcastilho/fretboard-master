@@ -57,7 +57,7 @@
 </div>
 
 <style>
-  /* Two groups of six share one line where there is room; on the narrow arrangement they
+  /* Two groups of six share one line where there is room; on the reflow arrangement they
      stack as two rows. */
   .selector {
     display: flex;
@@ -70,19 +70,19 @@
     gap: 0;
   }
 
-  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']))
+  :global(:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow']))
     .selector
     > .controls-row {
     gap: var(--space-1);
   }
 
-  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow'])) .selector {
+  :global(:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow'])) .selector {
     flex-direction: column;
     flex-wrap: nowrap;
   }
 
   /* Keys share the row's width; the floor keeps each a full touch target, so a row that cannot
-     fit scrolls on its own (narrow) or wraps (elsewhere) instead of shrinking them. */
+     fit scrolls on its own (reflow) or wraps (elsewhere) instead of shrinking them. */
   .keys {
     align-items: stretch;
   }
@@ -91,12 +91,12 @@
     flex: 1 0 var(--target-min);
   }
 
-  /* On the narrow arrangement the two spellings of a key stack instead of wrapping unevenly. */
-  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow'])) .keys .slash {
+  /* On the reflow arrangement the two spellings of a key stack instead of wrapping unevenly. */
+  :global(:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow'])) .keys .slash {
     display: none;
   }
 
-  :global(:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow'])) .keys .part {
+  :global(:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow'])) .keys .part {
     display: block;
   }
 </style>

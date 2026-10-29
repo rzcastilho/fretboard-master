@@ -155,12 +155,10 @@
   --arrow-head-size: 0.5rem;
   --panel-column-min: 8rem;
 
-  /* Minimap, landscape side panel, strip edge fade (feature 025) */
+  /* Minimap, strip edge fade (feature 025) */
   --minimap-row: 0.375rem;
   --minimap-dot: 0.375rem;
-  --side-panel-max: 24rem;
   --edge-fade-width: 1.5rem;
-  --landscape-bar-height: calc(var(--target-min) + 2 * var(--space-2));
 
   --font-family-notes: 'FM Accidentals', var(--font-family-ui);
 
@@ -205,7 +203,7 @@
   --color-bar-surface: var(--color-surface-raised);
   --letter-spacing-wordmark: -0.01em;
 
-  /* Tool layout grid: narrow/medium = A / B / C / E / D stacked (R-10) */
+  /* Tool layout grid: reflow = A / B / C / E / D stacked (R-10) */
   --tool-grid-areas: 'a' 'b' 'c' 'e' 'd';
   --tool-grid-columns: minmax(0, 1fr);
   --tool-grid-rows: auto auto minmax(20rem, 1fr) auto auto;
@@ -366,15 +364,9 @@
 }
 
 /*
- * Breakpoints (design §5.1): 600px and 1024px. CSS custom properties cannot be used in
- * media queries, so these literals live here and nowhere else.
- * 600px: medium — no token changes needed yet; reserved for later slices.
+ * Breakpoint (design §5.1, 030): 1024px. CSS custom properties cannot be used in media
+ * queries, so this literal lives here and nowhere else.
  */
-@media (min-width: 600px) {
-  :root {
-    --tool-grid-columns: minmax(0, 1fr);
-  }
-}
 
 /* Wide (>= 1024px): D beside C; the C track is the largest. */
 @media (min-width: 1024px) {
@@ -392,13 +384,12 @@
  * size. The media-query rules above stay as the no-JS fallback. Zone order in
  * the DOM is B, C, E, D for every tool; only the placement differs.
  */
-[data-arrangement='narrow'] {
+[data-arrangement='reflow'] {
   --tool-grid-areas: 'b' 'c' 'e' 'd';
   --tool-grid-columns: minmax(0, 1fr);
   --tool-grid-rows: auto minmax(20rem, 1fr) auto auto;
 }
 
-[data-arrangement='medium'],
 [data-arrangement='wide-stacked'] {
   --tool-grid-areas: 'b b' 'c c' 'e d';
   --tool-grid-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -409,22 +400,4 @@
   --tool-grid-areas: 'b d' 'c d' 'e d';
   --tool-grid-columns: minmax(0, 3fr) minmax(0, 1fr);
   --tool-grid-rows: auto minmax(24rem, 1fr) auto;
-}
-
-/*
- * Landscape phone (025 contracts/ui.md §5, §7). The bar is one icon-only row, zone B a one-row
- * strip with the Panels button at its end, zone C takes the rest of the height. Zones E and D
- * live in the sliding panel (SidePanels), so they take no grid area. JS-only: landscape is
- * decided by `isPhoneLandscape`, never by an orientation media query.
- */
-[data-arrangement='landscape'] {
-  --tool-grid-areas: 'b p' 'c c';
-  --tool-grid-columns: minmax(0, 1fr) auto;
-  --tool-grid-rows: auto minmax(0, 1fr);
-}
-
-/* The root carries the arrangement too (theme-boot.js, ToolLayout): size the grid, not the root. */
-[data-arrangement='landscape'] main .grid {
-  block-size: calc(100dvh - var(--landscape-bar-height) - 2 * var(--space-4));
-  gap: var(--space-2);
 }

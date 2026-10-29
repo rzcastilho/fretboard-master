@@ -127,7 +127,6 @@ test.describe('print: US5', () => {
       page.getByRole('group', { name: 'Theme' }),
       page.locator('section.b'),
       page.getByRole('slider', { name: 'Fretboard overview' }),
-      page.locator('.panels-opener'),
       page.locator('[data-print="omit"]').first()
     ]) {
       await expect(hidden).toBeHidden();

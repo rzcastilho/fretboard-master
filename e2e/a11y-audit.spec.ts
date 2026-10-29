@@ -298,11 +298,10 @@ interface Arrangement {
 }
 
 const ARRANGEMENTS: Arrangement[] = [
-  { name: 'narrow', size: { width: 390, height: 844 }, frets: 24, expect: 'narrow' },
-  { name: 'medium', size: { width: 800, height: 1000 }, frets: 24, expect: 'medium' },
+  { name: 'reflow', size: { width: 390, height: 844 }, frets: 24, expect: 'reflow' },
+  { name: 'reflow-800', size: { width: 800, height: 1000 }, frets: 24, expect: 'reflow' },
   { name: 'wide-side', size: { width: 1440, height: 900 }, frets: 12, expect: 'wide-side' },
-  { name: 'wide-stacked', size: { width: 1440, height: 900 }, frets: 24, expect: 'wide-stacked' },
-  { name: 'landscape', size: { width: 844, height: 390 }, frets: 24, expect: 'landscape' }
+  { name: 'wide-stacked', size: { width: 1440, height: 900 }, frets: 24, expect: 'wide-stacked' }
 ];
 
 async function openArranged(page: Page, tool: string, a: Arrangement) {
@@ -326,8 +325,8 @@ test.describe('axe: arrangements, panel, whole mode, minimap (025)', () => {
 
   for (const tool of ARRANGEMENT_TOOLS) {
     for (const a of ARRANGEMENTS) {
-      if (a.name === 'narrow') {
-        test(`${tool} — narrow collapsed`, async ({ page }) => {
+      if (a.name === 'reflow') {
+        test(`${tool} — reflow collapsed`, async ({ page }) => {
           await openArranged(page, tool, a);
           await expect(page.getByRole('button', { name: 'Show details' })).toHaveAttribute(
             'aria-expanded',
@@ -335,24 +334,13 @@ test.describe('axe: arrangements, panel, whole mode, minimap (025)', () => {
           );
           await runAxe(page);
         });
-        test(`${tool} — narrow expanded`, async ({ page }) => {
+        test(`${tool} — reflow expanded`, async ({ page }) => {
           await openArranged(page, tool, a);
           await page.getByRole('button', { name: 'Show details' }).click();
           await expect(page.getByRole('button', { name: 'Hide details' })).toHaveAttribute(
             'aria-expanded',
             'true'
           );
-          await runAxe(page);
-        });
-      } else if (a.name === 'landscape') {
-        test(`${tool} — landscape panel closed`, async ({ page }) => {
-          await openArranged(page, tool, a);
-          await runAxe(page);
-        });
-        test(`${tool} — landscape panel open`, async ({ page }) => {
-          await openArranged(page, tool, a);
-          await page.getByRole('button', { name: 'Panels', exact: true }).click();
-          await expect(page.getByRole('region', { name: 'Actions and details' })).toBeVisible();
           await runAxe(page);
         });
       } else {

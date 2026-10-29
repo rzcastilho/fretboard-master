@@ -17,7 +17,6 @@
   import FitNotice from '$lib/tools/FitNotice.svelte';
   import FitToggle from '$lib/tools/FitToggle.svelte';
   import ContextZone from '$lib/tools/ContextZone.svelte';
-  import SidePanels from '$lib/tools/SidePanels.svelte';
   import { notation } from '$lib/state/notation.svelte';
   import { solfegeName } from '$lib/notation/notation';
   import { preferences } from '$lib/state/preferences.svelte';
@@ -158,91 +157,85 @@
   {/if}
 </section>
 
-<SidePanels>
-  {#snippet actions()}
-    <section class="e" data-print="omit" aria-labelledby="caged-zone-e">
-      <h2 id="caged-zone-e">{m.zone_actions()}</h2>
-      <FitToggle />
-      <ChoiceGroup
-        name={m.caged_group_labels()}
-        options={labels}
-        current={caged.state.labelType}
-        onchoose={caged.setLabelType}
-        keyshortcuts={shortcuts.enabled ? 'L' : undefined}
+<section class="e" data-print="omit" aria-labelledby="caged-zone-e">
+  <h2 id="caged-zone-e">{m.zone_actions()}</h2>
+  <FitToggle />
+  <ChoiceGroup
+    name={m.caged_group_labels()}
+    options={labels}
+    current={caged.state.labelType}
+    onchoose={caged.setLabelType}
+    keyshortcuts={shortcuts.enabled ? 'L' : undefined}
+  />
+  <div class="steps">
+    <button
+      type="button"
+      class="btn"
+      aria-disabled={caged.display.steps.previous ? undefined : 'true'}
+      aria-keyshortcuts={shortcuts.enabled ? ',' : undefined}
+      onclick={() => caged.step(-1)}>{m.caged_previous_shape()}</button
+    >
+    <button
+      type="button"
+      class="btn"
+      aria-disabled={caged.display.steps.next ? undefined : 'true'}
+      aria-keyshortcuts={shortcuts.enabled ? '.' : undefined}
+      onclick={() => caged.step(1)}>{m.caged_next_shape()}</button
+    >
+  </div>
+  {#if instrument.adjustedIn === 'caged'}
+    <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
+  {/if}
+  {#if noteOpen}
+    <Notice
+      message={m.caged_solfege_note({
+        c: solfegeName('C'),
+        a: solfegeName('A'),
+        g: solfegeName('G'),
+        e: solfegeName('E'),
+        d: solfegeName('D')
+      })}
+      ondismiss={() => (noteOpen = false)}
+    />
+  {/if}
+  {#if hintOpen}
+    <Notice message={m.caged_rotate_hint()} ondismiss={() => (hintOpen = false)} />
+  {/if}
+</section>
+<div class="d">
+  <ContextZone summary={caged.display.summary}>
+    <CagedLayerList
+      switches={caged.switches}
+      extraSampleShown={caged.display.extraSampleShown}
+      ontoggle={(layer) => caged.toggleLayer(layer)}
+    />
+    {#if caged.display.triad}
+      <CagedTriadSets
+        triad={caged.display.triad}
+        onselect={(set) => caged.selectTriadSet(set)}
+        onopen={() => openTriadsFromCagedTriad()}
       />
-      <div class="steps">
-        <button
-          type="button"
-          class="btn"
-          aria-disabled={caged.display.steps.previous ? undefined : 'true'}
-          aria-keyshortcuts={shortcuts.enabled ? ',' : undefined}
-          onclick={() => caged.step(-1)}>{m.caged_previous_shape()}</button
-        >
-        <button
-          type="button"
-          class="btn"
-          aria-disabled={caged.display.steps.next ? undefined : 'true'}
-          aria-keyshortcuts={shortcuts.enabled ? '.' : undefined}
-          onclick={() => caged.step(1)}>{m.caged_next_shape()}</button
-        >
-      </div>
-      {#if instrument.adjustedIn === 'caged'}
-        <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
-      {/if}
-      {#if noteOpen}
-        <Notice
-          message={m.caged_solfege_note({
-            c: solfegeName('C'),
-            a: solfegeName('A'),
-            g: solfegeName('G'),
-            e: solfegeName('E'),
-            d: solfegeName('D')
-          })}
-          ondismiss={() => (noteOpen = false)}
-        />
-      {/if}
-      {#if hintOpen}
-        <Notice message={m.caged_rotate_hint()} ondismiss={() => (hintOpen = false)} />
-      {/if}
-    </section>
-  {/snippet}
-  {#snippet details()}
-    <div class="d">
-      <ContextZone summary={caged.display.summary}>
-        <CagedLayerList
-          switches={caged.switches}
-          extraSampleShown={caged.display.extraSampleShown}
-          ontoggle={(layer) => caged.toggleLayer(layer)}
-        />
-        {#if caged.display.triad}
-          <CagedTriadSets
-            triad={caged.display.triad}
-            onselect={(set) => caged.selectTriadSet(set)}
-            onopen={() => openTriadsFromCagedTriad()}
-          />
-        {/if}
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          aria-checked={caged.state.connections}
-          aria-disabled={caged.display.tuningClass === 'non-compatible' ? 'true' : undefined}
-          onclick={() => {
-            if (caged.display.tuningClass !== 'non-compatible')
-              caged.setConnections(!caged.state.connections);
-          }}
-        >
-          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-          {m.caged_show_connections()}
-          <span class="state" aria-hidden="true"
-            >{caged.state.connections ? m.caged_switch_on() : m.caged_switch_off()}</span
-          >
-        </button>
-        <button type="button" class="btn" onclick={() => caged.reset()}>{m.caged_reset()}</button>
-      </ContextZone>
-    </div>
-  {/snippet}
-</SidePanels>
+    {/if}
+    <button
+      type="button"
+      class="switch"
+      role="switch"
+      aria-checked={caged.state.connections}
+      aria-disabled={caged.display.tuningClass === 'non-compatible' ? 'true' : undefined}
+      onclick={() => {
+        if (caged.display.tuningClass !== 'non-compatible')
+          caged.setConnections(!caged.state.connections);
+      }}
+    >
+      <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+      {m.caged_show_connections()}
+      <span class="state" aria-hidden="true"
+        >{caged.state.connections ? m.caged_switch_on() : m.caged_switch_off()}</span
+      >
+    </button>
+    <button type="button" class="btn" onclick={() => caged.reset()}>{m.caged_reset()}</button>
+  </ContextZone>
+</div>
 
 <style>
   section {

@@ -16,13 +16,13 @@
   const uid = $props.id();
   const contentId = $derived(`${uid}-content`);
 
-  // Only the narrow arrangement collapses. Before mount there is no arrangement, so the
+  // Only the reflow arrangement collapses. Before mount there is no arrangement, so the
   // content stays visible (the no-JS and prerender fallback).
-  const narrow = $derived(viewport.arrangement === 'narrow');
+  const reflow = $derived(viewport.arrangement === 'reflow');
   const expanded = $derived(contextPanel.expanded);
 </script>
 
-{#if narrow}
+{#if reflow}
   <div class="summary-row" data-print="omit">
     <p class="summary">{summary}</p>
     <button
@@ -36,7 +36,7 @@
     </button>
   </div>
 {/if}
-<div id={contentId} class="content" data-print="show" hidden={narrow && !expanded && !print.active}>
+<div id={contentId} class="content" data-print="show" hidden={reflow && !expanded && !print.active}>
   {@render children()}
 </div>
 

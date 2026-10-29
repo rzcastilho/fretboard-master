@@ -29,7 +29,7 @@
   padding: var(--space-1) var(--space-3);
 }
 
-:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']) .option {
+:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow']) .option {
   padding: var(--space-1) var(--space-2);
 }
 
@@ -200,7 +200,7 @@
 
 /*
  * Grouped controls (030). A choice is its name over a joined segment of .option buttons; the
- * narrow arrangement and landscape strip fall back to spaced pills, which wrap cleanly.
+ * reflow arrangement falls back to spaced pills, which wrap cleanly.
  */
 .choice {
   display: inline-flex;
@@ -247,20 +247,11 @@
   z-index: 1;
 }
 
-:is(
-    :is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']),
-    :is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape'])
-  )
-  .segment {
+:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow']) .segment {
   gap: var(--space-1);
 }
 
-:is(
-    :is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']),
-    :is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape'])
-  )
-  .segment
-  > .option {
+:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow']) .segment > .option {
   margin-inline-start: 0;
   border-radius: var(--radius-md);
 }
