@@ -58,8 +58,6 @@ export interface Preferences {
   readonly handedness: Handedness;
   /** 013; absent or invalid in a stored record → 'highest-top'. */
   readonly orientation: Orientation;
-  /** 016; absent or invalid in a stored record → false. Stored as `rotateHint`, only when true. */
-  readonly rotateHintShown: boolean;
   /** 019; absent or invalid in a stored record → 'medium'. Stored only when not 'medium'. */
   readonly tempo: Tempo;
   /** 020; absent or invalid in a stored record → null (no stored choice). Stored only when non-null. */
@@ -93,7 +91,6 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   labels: Object.freeze({ notes: 'name', triads: 'interval', caged: 'interval' }),
   handedness: 'right',
   orientation: 'highest-top',
-  rotateHintShown: false,
   tempo: 'medium',
   language: null,
   notation: null,
@@ -114,7 +111,7 @@ export const PRIVACY_CATEGORIES = {
   sound: ['muted', 'volume', 'tempo'],
   theme: ['theme'],
   labelsAndTool: ['labels', 'lastTool'],
-  hints: ['rotateHintShown', 'cagedNoteShown'],
+  hints: ['cagedNoteShown'],
   shortcuts: ['shortcuts']
 } as const satisfies Record<string, readonly (keyof Preferences)[]>;
 
@@ -159,7 +156,6 @@ const recordSchema = v.object({
   ),
   handedness: v.fallback(v.picklist(['right', 'left']), d.handedness),
   orientation: v.fallback(v.picklist(['highest-top', 'lowest-top']), d.orientation),
-  rotateHint: v.fallback(v.boolean(), d.rotateHintShown),
   tempo: v.fallback(v.picklist(TEMPO_VALUES), d.tempo),
   language: v.fallback(v.nullable(v.picklist(LANGUAGE_TAGS)), null),
   notation: v.fallback(v.nullable(v.picklist(NOTATIONS)), null),
@@ -193,7 +189,6 @@ export function parsePreferences(raw: string | null): Preferences {
       labels: { notes: r.labels.notes, triads: r.labels.triads, caged: r.labels.caged },
       handedness: r.handedness,
       orientation: r.orientation,
-      rotateHintShown: r.rotateHint,
       tempo: r.tempo,
       language: r.language,
       notation: r.notation,
@@ -220,8 +215,8 @@ export function tuningOfPreferences(p: Preferences): Tuning {
 /**
  * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
  * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013),
- * `rotateHint` only when true (016), `labels.caged` only when `'name'` (017),
- * `tempo` (after `rotateHint`) only when not `'medium'` (019), `language` (after `tempo`) only
+ * `labels.caged` only when `'name'` (017),
+ * `tempo` (after `orientation`) only when not `'medium'` (019), `language` (after `tempo`) only
  * when non-null (020), then `notation` (non-null), `accidentals` (not `'sharps'`) and
  * `cagedNote` (true only) (021), then `theme` (non-null) (026), then `shortcuts` (false only) last (027).
  */
@@ -242,7 +237,6 @@ export function serializePreferences(p: Preferences): string {
     },
     ...(p.handedness === 'left' ? { handedness: 'left' } : {}),
     ...(p.orientation === 'lowest-top' ? { orientation: 'lowest-top' } : {}),
-    ...(p.rotateHintShown ? { rotateHint: true } : {}),
     ...(p.tempo === 'medium' ? {} : { tempo: p.tempo }),
     ...(p.language === null ? {} : { language: p.language }),
     ...(p.notation === null ? {} : { notation: p.notation }),

@@ -2538,7 +2538,7 @@ describe('Fretboard fit to screen (025 US2)', () => {
     }
   });
 
-  it('emits request(whole) on a completed pinch in and request(comfortable) on pinch out', async () => {
+  it('two simultaneous touches never emit a fit request', async () => {
     const restore = stubWidth(320);
     try {
       const onfit = vi.fn();
@@ -2548,29 +2548,24 @@ describe('Fretboard fit to screen (025 US2)', () => {
       await fireEvent.touchStart(scroller, { touches: touches(200) });
       await fireEvent.touchMove(scroller, { touches: touches(100) });
       await fireEvent.touchEnd(scroller, { touches: [] });
-      expect(onfit).toHaveBeenCalledWith({ kind: 'request', mode: 'whole' });
       await fireEvent.touchStart(scroller, { touches: touches(100) });
       await fireEvent.touchMove(scroller, { touches: touches(200) });
       await fireEvent.touchEnd(scroller, { touches: [] });
-      expect(onfit).toHaveBeenCalledWith({ kind: 'request', mode: 'comfortable' });
+      expect(onfit.mock.calls.filter(([e]) => e.kind !== 'overflow')).toHaveLength(0);
     } finally {
       restore();
     }
   });
 
-  it('one finger never emits a request', async () => {
+  it('a single touch tap activates a position like a click', async () => {
     const restore = stubWidth(320);
     try {
-      const onfit = vi.fn();
-      const { container } = render(Fretboard, { instrument: long, onfit });
+      const onactivate = vi.fn();
+      const { container } = render(Fretboard, { instrument: long, onactivate });
       await tick();
-      const scroller = container.querySelector('.scroller') as HTMLElement;
-      await fireEvent.touchStart(scroller, { touches: [touches(0)[0]] });
-      await fireEvent.touchMove(scroller, {
-        touches: [{ identifier: 1, clientX: 300, clientY: 100 }]
-      });
-      await fireEvent.touchEnd(scroller, { touches: [] });
-      expect(onfit.mock.calls.filter(([e]) => e.kind === 'request')).toHaveLength(0);
+      const svg = container.querySelector('svg[role="grid"]') as SVGSVGElement;
+      tap(svg, 100, 100, 'touch');
+      expect(onactivate).toHaveBeenCalledTimes(1);
     } finally {
       restore();
     }

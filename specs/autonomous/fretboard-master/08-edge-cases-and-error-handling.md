@@ -41,8 +41,8 @@ The identifiers `EC-area.number` follow the areas of file 03.
 | EC-3.2 | Label that does not fit in the marker (double accidentals, dual spelling, long names such as "Sol♯") | The text shrinks to a minimum legible size; below it, the label abbreviates and the full name appears on the card or in the hint |
 | EC-3.3 | Tap between two positions | Selects the position whose center is nearest |
 | EC-3.4 | Drag that starts on a marker | Treated as scrolling if the finger moves beyond a small threshold; otherwise, as a tap |
-| EC-3.5 | Pinch gesture on the fretboard | Switches between the two modes of FR-3.14; there is no free zoom. *[Assumption A-10.]* |
-| EC-3.6 | Fretboard with 24 frets and 7 strings on a 320-wide screen | Comfortable mode is the default; the minimap is always visible |
+| EC-3.5 | *[Changed by slice 030: desktop-only target.]* | |
+| EC-3.6 | Fretboard with 24 frets and 7 strings in a 1024-wide window | Comfortable mode is the default; the minimap is always visible *[Changed by slice 030: desktop-only target.]* |
 | EC-3.7 | No position to display | The fretboard appears empty, with one overlaid guidance line specific to the tool (EC-4.1, EC-5.2, EC-6.1) |
 
 ## Area 4 — Fretboard Notes

@@ -34,10 +34,6 @@ html {
 
 body {
   margin: 0;
-  padding-top: env(safe-area-inset-top);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--font-size-md);

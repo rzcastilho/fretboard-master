@@ -215,7 +215,7 @@ stateDiagram-v2
 1. In class, Marcos builds the view he wants to show: CAGED, A minor, E shape in focus, Chord and Pentatonic layers.
 2. He taps **Share** (FR-10.1).
 3. The system generates a link that describes the tool, the view state, and the instrument, and copies it or hands it to the device's sharing mechanism (FR-10.2).
-4. The student opens the link on a phone.
+4. The student opens the link on another computer. *[Changed by slice 030: desktop-only target.]*
 5. The system opens the tool directly in the described state, in the **student's** language, notation, and handedness (FR-10.4).
 6. If the instrument in the link differs from the student's preferred instrument, the system shows the view with the instrument from the link and a notice: "This view uses [tuning from the link]", with the actions **Use mine** and **Adopt this one** (FR-10.5).
 

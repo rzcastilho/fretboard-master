@@ -17,7 +17,7 @@ import { STANDARD_GUITAR, withPresentation } from '../../../src/lib/instrument/i
 import { playback } from '../../../src/lib/state/playback.svelte';
 import { caged, resetCagedForTests } from '../../../src/lib/state/caged.svelte';
 import { instrument, resetInstrumentForTests } from '../../../src/lib/state/instrument.svelte';
-import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
+import { resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import CagedTool from '../../../src/lib/tools/caged/CagedTool.svelte';
 
 beforeEach(() => {
@@ -417,73 +417,14 @@ describe('CagedTool: Show connections (016 US3)', () => {
   });
 });
 
-describe('CagedTool: rotate hint (016 US4)', () => {
-  const HINT = 'Turn your phone sideways to see more of the neck.';
-  const viewport = (w: number, h: number) => {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: h });
-  };
-  const resize = async (w: number, h: number) => {
-    viewport(w, h);
-    await fireEvent(window, new Event('resize'));
-    await tick();
-  };
-
-  it('shows on a portrait phone with nothing recorded, and records it', async () => {
-    viewport(390, 844);
+describe('CagedTool: no phone notice', () => {
+  it('shows no notice at portrait size (390×844)', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
     render(CagedTool);
     await tick();
-    expect(screen.getByText(HINT)).toBeTruthy();
-    expect(preferences.rotateHintShown).toBe(true);
-  });
-
-  it('is non-modal and dismissible', async () => {
-    viewport(390, 844);
-    render(CagedTool);
-    await tick();
-    expect(screen.queryByRole('dialog')).toBeNull();
-    const notice = screen.getByText(HINT).closest('.notice') as HTMLElement;
-    await fireEvent.click(within(notice).getByRole('button', { name: 'Dismiss' }));
-    await tick();
-    expect(screen.queryByText(HINT)).toBeNull();
-  });
-
-  it('hides on rotation to landscape and does not return', async () => {
-    viewport(390, 844);
-    render(CagedTool);
-    await tick();
-    await resize(844, 390);
-    expect(screen.queryByText(HINT)).toBeNull();
-    await resize(390, 844);
-    expect(screen.queryByText(HINT)).toBeNull();
-  });
-
-  it('hides on unmount', async () => {
-    viewport(390, 844);
-    const { unmount } = render(CagedTool);
-    await tick();
-    unmount();
-    expect(screen.queryByText(HINT)).toBeNull();
-  });
-
-  it('does not show once recorded', async () => {
-    viewport(390, 844);
-    preferences.markRotateHintShown();
-    render(CagedTool);
-    await tick();
-    expect(screen.queryByText(HINT)).toBeNull();
-  });
-
-  it.each([
-    ['tablet', 768, 1024],
-    ['desktop', 1280, 800],
-    ['landscape phone', 844, 390]
-  ])('never shows or records on %s', async (_n, w, h) => {
-    viewport(w, h);
-    render(CagedTool);
-    await tick();
-    expect(screen.queryByText(HINT)).toBeNull();
-    expect(preferences.rotateHintShown).toBe(false);
+    expect(screen.queryByText(/phone/i)).toBeNull();
+    expect(document.querySelector('.notice')).toBeNull();
   });
 });
 

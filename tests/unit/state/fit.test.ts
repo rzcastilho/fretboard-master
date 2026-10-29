@@ -29,18 +29,6 @@ describe('fit store', () => {
     expect(fit.mode).toBe('comfortable');
   });
 
-  it('request switches only when available and different', () => {
-    fit.handle({ kind: 'request', mode: 'whole' });
-    expect(fit.mode).toBe('comfortable');
-    fit.handle({ kind: 'overflow', value: true });
-    fit.handle({ kind: 'request', mode: 'comfortable' });
-    expect(fit.mode).toBe('comfortable');
-    fit.handle({ kind: 'request', mode: 'whole' });
-    expect(fit.mode).toBe('whole');
-    fit.handle({ kind: 'request', mode: 'whole' });
-    expect(fit.mode).toBe('whole');
-  });
-
   it('overflow change keeps the mode; effective follows availability', () => {
     fit.handle({ kind: 'overflow', value: true });
     fit.toggle();

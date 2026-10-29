@@ -72,38 +72,6 @@ test.describe('home screen', () => {
     });
   }
 
-  test('safe areas keep content inside insets', async ({ page, browserName }) => {
-    test.skip(browserName !== 'chromium', 'CDP only on Chromium');
-    await page.setViewportSize({ width: 360, height: 740 });
-    const cdp = await page.context().newCDPSession(page);
-    const targets = () => [
-      page.getByRole('banner'),
-      page.getByRole('heading', { level: 1 }),
-      page.getByRole('banner').getByRole('link', { name: 'About' }),
-      ...[0, 1].map((i) => page.getByRole('list').getByRole('link').nth(i))
-    ];
-    const cases = [
-      { top: 47, bottom: 34, left: 0, right: 0 },
-      { top: 0, bottom: 0, left: 47, right: 47 }
-    ];
-    for (const insets of cases) {
-      await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets });
-      const vp = { width: 360, height: 740 };
-      await page.evaluate(() => window.scrollTo(0, 0));
-      for (const target of targets()) {
-        const r = await box(target);
-        expect(r.y).toBeGreaterThanOrEqual(insets.top);
-        expect(r.x).toBeGreaterThanOrEqual(insets.left);
-        expect(r.x + r.width).toBeLessThanOrEqual(vp.width - insets.right);
-      }
-      // The header grew with the theme choice (026), so the cards may scroll: the bottom inset
-      // is checked at the end of the page, where the last card must clear it.
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-      const last = await box(page.getByRole('list').getByRole('link').last());
-      expect(last.y + last.height).toBeLessThanOrEqual(vp.height - insets.bottom);
-    }
-  });
-
   test('200% text zoom: no horizontal scroll or overlap', async ({ page }) => {
     // CSSOM (not addStyleTag): style-src 'self' blocks injected <style> elements.
     await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));

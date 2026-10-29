@@ -186,13 +186,8 @@ test.describe('measurement US2: never in the way', () => {
   const SCREENS = ['/', '/notes', '/triads', '/caged', '/about'];
 
   /** Visible alerts or status messages: measurement must never raise one. */
-  // The CAGED rotate hint (016) shows once per portrait-phone context, a frame after the heading,
-  // so it would make the count racy; it never depends on `/m`.
   const notices = (page: Page): Promise<number> =>
-    page
-      .locator('[role="alert"], [role="status"]:not(:empty)')
-      .filter({ hasNotText: 'Turn your phone sideways' })
-      .count();
+    page.locator('[role="alert"], [role="status"]:not(:empty)').count();
 
   /** Visible state that must not depend on whether `/m` works. */
   async function walk(page: Page): Promise<string[]> {

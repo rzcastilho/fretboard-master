@@ -20,7 +20,6 @@
   import { notation } from '$lib/state/notation.svelte';
   import { solfegeName } from '$lib/notation/notation';
   import { preferences } from '$lib/state/preferences.svelte';
-  import { isPhonePortrait } from '$lib/state/rotate-hint';
   import Notice from '$lib/shell/Notice.svelte';
   import type { CagedLabelType } from '$lib/state/caged-view';
   import { tick } from 'svelte';
@@ -54,18 +53,6 @@
     }
   });
 
-  // Rotate hint (016 US4): shown once on a portrait phone, recorded the moment it appears.
-  let vw = $state(0);
-  let vh = $state(0);
-  let hintOpen = $state(false);
-  $effect(() => {
-    if (!isPhonePortrait(vw, vh)) hintOpen = false;
-    else if (!hintOpen && !preferences.rotateHintShown) {
-      hintOpen = true;
-      preferences.markRotateHintShown();
-    }
-  });
-
   // Solfège note (021 US5): shapes keep letter names; explained once, recorded the moment it appears.
   let noteOpen = $state(false);
   $effect(() => {
@@ -93,8 +80,6 @@
     if (__FM_FAULT_INJECTION__) (globalThis.__fmFretboardEvents ??= []).push({ ...p });
   }
 </script>
-
-<svelte:window bind:innerWidth={vw} bind:innerHeight={vh} />
 
 <section class="b" data-print="omit" aria-labelledby="caged-zone-b">
   <h2 id="caged-zone-b">{m.zone_main_controls()}</h2>
@@ -197,9 +182,6 @@
       })}
       ondismiss={() => (noteOpen = false)}
     />
-  {/if}
-  {#if hintOpen}
-    <Notice message={m.caged_rotate_hint()} ondismiss={() => (hintOpen = false)} />
   {/if}
 </section>
 <div class="d">

@@ -132,8 +132,6 @@ export interface DrawnMarker extends Marker {
 /** Renderer → store events for fit to screen. No screen coordinates (Principle III). */
 export type FitEvent =
   | { readonly kind: 'overflow'; readonly value: boolean }
-  /** Pinch in → 'whole', pinch out → 'comfortable'. */
-  | { readonly kind: 'request'; readonly mode: FitMode }
   | { readonly kind: 'small-tap'; readonly position: Position };
 
 export interface FretboardProps {
