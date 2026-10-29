@@ -34,11 +34,11 @@ const box = async (loc: Locator) => {
 const minimap = (page: Page) => page.getByRole('slider', { name: 'Fretboard overview' });
 const fitToggle = (page: Page) => page.getByRole('button', { name: 'Fit to screen' });
 
-test.describe('narrow (US3)', () => {
+test.describe('reflow (US3)', () => {
   for (const tool of TOOLS) {
-    test(`narrow order: ${tool}`, async ({ page }) => {
+    test(`reflow order: ${tool}`, async ({ page }) => {
       await open(page, tool, 320, 800);
-      await expect(grid(page)).toHaveAttribute('data-arrangement', 'narrow');
+      await expect(grid(page)).toHaveAttribute('data-arrangement', 'reflow');
       const [b, c, e, d] = await Promise.all(
         (['b', 'c', 'e', 'd'] as const).map((z) => box(zone(page, z)))
       );
@@ -47,7 +47,7 @@ test.describe('narrow (US3)', () => {
       expect(e.y).toBeLessThan(d.y);
     });
 
-    test(`narrow zone B rows: ${tool}`, async ({ page }) => {
+    test(`reflow zone B rows: ${tool}`, async ({ page }) => {
       await open(page, tool, 320, 800);
       const rows = zone(page, 'b').locator('.controls-row');
       await expect(rows).toHaveCount(2);
@@ -86,21 +86,7 @@ test.describe('narrow (US3)', () => {
   });
 });
 
-test.describe('medium, wide (US3)', () => {
-  test('medium: B and C full width, E and D side by side', async ({ page }) => {
-    await open(page, 'triads', 800, 1000);
-    await expect(grid(page)).toHaveAttribute('data-arrangement', 'medium');
-    const [b, c, e, d] = await Promise.all(
-      (['b', 'c', 'e', 'd'] as const).map((z) => box(zone(page, z)))
-    );
-    expect(Math.abs(b.width - c.width)).toBeLessThan(2);
-    expect(Math.abs(e.y - d.y)).toBeLessThan(2);
-    expect(e.x).toBeLessThan(d.x);
-    expect(b.y).toBeLessThan(c.y);
-    expect(c.y).toBeLessThan(e.y);
-    await expect(page.getByRole('button', { name: /details$/ })).toHaveCount(0);
-  });
-
+test.describe('wide (US3)', () => {
   test('1440 / 24 frets: wide-stacked, no Fit to screen, no minimap', async ({ page }) => {
     await open(page, 'notes', 1440, 900, 24);
     await expect(grid(page)).toHaveAttribute('data-arrangement', 'wide-stacked');
@@ -141,7 +127,7 @@ test.describe('medium, wide (US3)', () => {
     await chip.click();
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
     await page.setViewportSize({ width: 800, height: 1000 });
-    await expect(grid(page)).toHaveAttribute('data-arrangement', 'medium');
+    await expect(grid(page)).toHaveAttribute('data-arrangement', 'reflow');
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
     await page.setViewportSize({ width: 1440, height: 900 });
     await expect(grid(page)).toHaveAttribute('data-arrangement', 'wide-side');
@@ -161,14 +147,14 @@ test.describe('no page horizontal scroll (US3)', () => {
 });
 
 test.describe('arrangement a11y (US3)', () => {
-  test('axe: narrow collapsed and expanded', async ({ page }) => {
+  test('axe: reflow collapsed and expanded', async ({ page }) => {
     await open(page, 'caged', 390, 844);
     await runAxe(page);
     await page.getByRole('button', { name: 'Show details' }).click();
     await runAxe(page);
   });
 
-  test('axe: medium and wide', async ({ page }) => {
+  test('axe: reflow at 800 and wide', async ({ page }) => {
     await open(page, 'triads', 800, 1000);
     await runAxe(page);
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -178,8 +164,7 @@ test.describe('arrangement a11y (US3)', () => {
 
 test.describe('arrangement screenshots (US3)', () => {
   const CASES = [
-    { name: 'narrow', tool: 'notes', width: 390, height: 844, frets: 12 },
-    { name: 'medium', tool: 'triads', width: 800, height: 1000, frets: 12 },
+    { name: 'reflow', tool: 'notes', width: 390, height: 844, frets: 12 },
     { name: 'wide-side', tool: 'caged', width: 1440, height: 900, frets: 12 },
     { name: 'wide-stacked', tool: 'notes', width: 1440, height: 900, frets: 24 }
   ] as const;

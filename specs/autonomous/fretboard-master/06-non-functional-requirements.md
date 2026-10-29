@@ -13,13 +13,13 @@
 | NFR-9 | Musical correctness |
 | NFR-10 | Evolution |
 
-"Reference phone" is a mid-range device about four years old, on a mobile network of median quality. *[Assumption A-12.]*
+"Desktop reference profile" is a mid-range laptop on typical broadband, measured with the Lighthouse desktop preset. *[Assumption A-12.]* *[Changed by slice 030: desktop-only target.]*
 
 ---
 
 ## NFR-1 — Performance
 
-**NFR-1.1** On the reference phone, the home screen is usable within 3 seconds of opening the address.
+**NFR-1.1** On the desktop reference profile, the home screen is usable within 3 seconds of opening the address. *[Changed by slice 030: desktop-only target.]*
 
 **NFR-1.2** Opening a tool from the home screen, or switching between tools, takes up to 300 milliseconds until the fretboard is interactive.
 
@@ -29,23 +29,23 @@
 
 **NFR-1.5** Once loaded, the application does not depend on the network for any function: calculation, drawing, and sound happen on the device.
 
-**NFR-1.6** Scrolling and dragging the fretboard follow the finger without perceptible stutter on the reference phone, including with 7 strings, 24 frets, and every CAGED layer on.
+**NFR-1.6** Scrolling and dragging the fretboard follow the pointer without perceptible stutter on the desktop reference profile, including with 7 strings, 24 frets, and every CAGED layer on. *[Changed by slice 030: desktop-only target.]*
 
-**NFR-1.7** The volume of data transferred on first opening is compatible with NFR-1.1 on a median mobile network; the sound material does not block fretboard interactivity and can load after the essentials.
+**NFR-1.7** The volume of data transferred on first opening is compatible with NFR-1.1 on typical broadband; the sound material does not block fretboard interactivity and can load after the essentials. *[Changed by slice 030: desktop-only target.]*
 
 ---
 
 ## NFR-2 — Compatibility and responsiveness
 
-**NFR-2.1** The application works on the two most recent major versions of the browsers in current use on desktop and on phone.
+**NFR-2.1** The application works on the two most recent major versions of the desktop browsers in current use. *[Changed by slice 030: desktop-only target.]*
 
-**NFR-2.2** Every function is available at logical widths from 320 to 2560 units, in portrait and landscape. No function is exclusive to one screen size (C-4).
+**NFR-2.2** Every function is available in windows from 1024 to 2560 CSS px wide; below 1024 CSS px, content reflows down to 320 CSS px under browser zoom. No function is exclusive to one window size (C-4). *[Changed by slice 030: desktop-only target.]*
 
 **NFR-2.3** The application accepts touch, pointer, and keyboard, alone or combined, without a mode for the user to choose.
 
 **NFR-2.4** The page never scrolls horizontally at any width. The only area with horizontal scrolling is the fretboard (FR-3.12).
 
-**NFR-2.5** The application respects the safe areas of the screen (notches, rounded corners, system bars) on phones.
+**NFR-2.5** *[Changed by slice 030: desktop-only target.]*
 
 **NFR-2.6** The application remains usable with text enlarged up to 200% by the browser.
 
@@ -63,7 +63,7 @@
 
 **NFR-3.4** Every view has an equivalent text description (FR-3.18), updated when the view changes and announced to screen readers unobtrusively. Controls expose their name, role, and state to assistive technologies.
 
-**NFR-3.5** Every touch target measures at least 44 × 44 logical units, including each fretboard position in comfortable fret size. In "whole fretboard visible" mode on a narrow screen, where frets can be smaller, the tap selects the nearest position and the system offers comfortable mode (FR-3.14).
+**NFR-3.5** Interactive targets meet WCAG 2.2 SC 2.5.8 (Target Size, Minimum). In "whole fretboard visible" mode, where frets can be smaller, the selection picks the nearest position and the system offers comfortable mode (FR-3.14). *[Changed by slice 030: desktop-only target.]*
 
 **NFR-3.6** With the reduced-motion preference active on the device, fretboard transitions are instantaneous or reduced to a brief fade; the emphasis synchronized with sound (FR-7.6) is kept because it is information, not decoration.
 

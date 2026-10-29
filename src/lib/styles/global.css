@@ -34,10 +34,6 @@ html {
 
 body {
   margin: 0;
-  padding-top: env(safe-area-inset-top);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--font-size-md);
@@ -84,7 +80,7 @@ h1[tabindex='-1']:focus-visible {
 
 /*
  * Zone B control rows (025). Rows wrap onto further lines, so every control stays on screen
- * (029 SC-005); the narrow arrangement uses a tighter gap.
+ * (029 SC-005); the reflow arrangement uses a tighter gap.
  */
 .controls-row {
   display: flex;
@@ -93,7 +89,7 @@ h1[tabindex='-1']:focus-visible {
   gap: var(--space-2) var(--group-gap);
 }
 
-:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']) .controls-row {
+:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow']) .controls-row {
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-3);
 }
@@ -117,8 +113,8 @@ h1[tabindex='-1']:focus-visible {
 }
 
 /*
- * Zones (029). B and E sit on the page; C keeps its frame; D is a raised panel. Padding and
- * grid areas stay with the tool components.
+ * Zones (029). B sits on the page and C keeps its frame. Padding and grid areas stay with the
+ * tool components; E and D carry their own styles (they were never matched by `> .d` / `> .e`).
  */
 /* Zone C keeps --color-border: on phones the board overflows the frame, so its edge is in the
    frozen board snapshots. */
@@ -128,22 +124,11 @@ main .grid > .c {
   border-radius: var(--radius-md);
 }
 
-main .grid > .d {
-  background: var(--color-surface-raised);
-  border-radius: var(--radius-lg);
-}
-
-@media (prefers-contrast: more) {
-  main .grid > .d {
-    border: var(--border-width) solid var(--color-border-subtle);
-  }
-}
-
-:is([data-arrangement='narrow'] .grid, .grid[data-arrangement='narrow']) section:is(.b, .e) {
+:is([data-arrangement='reflow'] .grid, .grid[data-arrangement='reflow']) section:is(.b, .e) {
   padding: 0;
 }
 
-main .grid > :is(.b, .c, .d, .e) > h2 {
+main .grid > :is(.b, .c) > h2 {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-muted);
@@ -163,55 +148,9 @@ main .grid > .b > h2 {
 }
 
 /*
- * Landscape (025 US4). Zone headings stay in the accessibility tree but leave the layout; zone B
- * becomes one horizontally scrollable strip; the app bar shows icons only, with the text as a
- * tooltip on hover and keyboard focus.
- */
-:is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape']) h2 {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
-:is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape']) .b {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--space-2);
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-}
-
-:is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape'])
-  .b::-webkit-scrollbar {
-  display: none;
-}
-
-:is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape']) .b > *,
-:is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape'])
-  .b
-  .controls-row
-  > * {
-  flex: none;
-}
-
-:is([data-arrangement='landscape'] .grid, .grid[data-arrangement='landscape'])
-  .b
-  :is(.controls, .selector, .controls-row) {
-  display: contents;
-}
-
-/*
  * App bar (030). One raised band on every screen: navigation tabs at the start, the tool
- * utilities at the end. `data-compact` (narrow and landscape) keeps icons only, with each label
- * clipped and shown as a tooltip; `data-landscape` additionally pins the bar height. On tool
+ * utilities at the end. `data-compact` (reflow) keeps icons only, with each label
+ * clipped and shown as a tooltip. On tool
  * screens the root's `data-arrangement` (set before first paint by theme-boot.js) selects the
  * same rules, so the prerendered bar already has its final size.
  */
@@ -259,73 +198,24 @@ header.app-bar .bar-tools :is(.btn, .option):not([aria-pressed='true']) {
   background: var(--color-surface);
 }
 
-/* min-block-size, not block-size: at 200% text the icons wrap to a second row, and a fixed height
-   would let that row spill over the strip below. */
-:is(header[data-landscape], :root[data-arrangement='landscape'] header.app-bar) {
-  gap: var(--space-2);
-  min-block-size: var(--landscape-bar-height);
-  padding-block: 0;
-}
-
 /* Icon-only controls pack edge to edge so the utilities fit one row at 320 px. */
-:is(
-    header[data-compact],
-    :root:is(
-        [data-arrangement='narrow'],
-        [data-arrangement='medium'],
-        [data-arrangement='landscape']
-      )
-      header.app-bar
-  )
-  .bar-tools {
+:is(header[data-compact], :root[data-arrangement='reflow'] header.app-bar) .bar-tools {
   gap: 0;
 }
 
-:is(
-    header[data-compact],
-    :root:is(
-        [data-arrangement='narrow'],
-        [data-arrangement='medium'],
-        [data-arrangement='landscape']
-      )
-      header.app-bar
-  )
+:is(header[data-compact], :root[data-arrangement='reflow'] header.app-bar)
   .bar-tools
   :is(.btn, .option, .link-button) {
   padding-inline: var(--space-2);
 }
 
 /* Icon tabs keep their box (never shrink into a neighbour) and wrap when the row is full. */
-:is(
-    header[data-compact],
-    :root:is(
-        [data-arrangement='narrow'],
-        [data-arrangement='medium'],
-        [data-arrangement='landscape']
-      )
-      header.app-bar
-  )
-  nav
-  li {
+:is(header[data-compact], :root[data-arrangement='reflow'] header.app-bar) nav li {
   flex: none;
 }
 
-:is(
-    header[data-compact],
-    :root:is(
-        [data-arrangement='narrow'],
-        [data-arrangement='medium'],
-        [data-arrangement='landscape']
-      )
-      header.app-bar
-  )
-  nav
-  a {
+:is(header[data-compact], :root[data-arrangement='reflow'] header.app-bar) nav a {
   padding-inline: var(--space-2);
-}
-
-:is(header[data-landscape], :root[data-arrangement='landscape'] header.app-bar) nav ul {
-  flex-wrap: nowrap;
 }
 
 .bar-icon {
@@ -347,16 +237,7 @@ header.app-bar :is(a, button) {
 }
 
 /* The label stays in the accessibility tree (clip, not display or visibility). */
-:is(
-    header[data-compact],
-    :root:is(
-        [data-arrangement='narrow'],
-        [data-arrangement='medium'],
-        [data-arrangement='landscape']
-      )
-      header.app-bar
-  )
-  .bar-label {
+:is(header[data-compact], :root[data-arrangement='reflow'] header.app-bar) .bar-label {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -370,15 +251,7 @@ header.app-bar :is(a, button) {
 
 /* Tooltip on hover and keyboard focus: a caption strip under the bar, so it can never be wider
    than the screen. The bar is the containing block. */
-:is(
-    header[data-compact],
-    :root:is(
-        [data-arrangement='narrow'],
-        [data-arrangement='medium'],
-        [data-arrangement='landscape']
-      )
-      header.app-bar
-  )
+:is(header[data-compact], :root[data-arrangement='reflow'] header.app-bar)
   :is(a, button):is(:hover, :focus-visible)
   > .bar-label {
   inset-block-start: 100%;

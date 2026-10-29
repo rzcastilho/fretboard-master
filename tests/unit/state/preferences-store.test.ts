@@ -292,50 +292,18 @@ describe('left-handed and orientation (013, US4)', () => {
   });
 });
 
-describe('rotate hint (016 US4)', () => {
-  it('is false by default and true when the record has rotateHint', () => {
-    preferences.start(fakeStorage());
-    expect(preferences.rotateHintShown).toBe(false);
-    resetPreferencesForTests();
-    preferences.start(fakeStorage({ [PREFS_KEY]: '{"version":1,"rotateHint":true}' }));
-    expect(preferences.rotateHintShown).toBe(true);
-  });
-
-  it('markRotateHintShown is idempotent and persists rotateHint', () => {
-    const s = fakeStorage();
+describe('legacy rotateHint (030 US4)', () => {
+  it('a stored rotateHint is ignored, other fields apply, and the first write drops it', () => {
+    const s = fakeStorage({
+      [PREFS_KEY]: '{"version":1,"rotateHint":true,"frets":18,"muted":true}'
+    });
     preferences.start(s);
-    preferences.markRotateHintShown();
-    const writes = s.calls.set;
-    preferences.markRotateHintShown();
-    expect(s.calls.set).toBe(writes);
-    expect(preferences.rotateHintShown).toBe(true);
-    expect(JSON.parse(s.data.get(PREFS_KEY) as string).rotateHint).toBe(true);
-  });
-
-  it('with storage unavailable it does not throw and the in-load flag holds', () => {
-    const s = fakeStorage();
-    s.fail.get = s.fail.set = s.fail.remove = true;
-    preferences.start(s);
-    expect(() => preferences.markRotateHintShown()).not.toThrow();
-    expect(preferences.rotateHintShown).toBe(true);
-  });
-
-  it('erase clears it', () => {
-    const s = fakeStorage();
-    preferences.start(s);
-    preferences.markRotateHintShown();
-    preferences.erase();
-    expect(preferences.rotateHintShown).toBe(false);
-    expect(s.data.has(PREFS_KEY)).toBe(false);
-  });
-
-  it('Reset tool does not clear it', () => {
-    const s = fakeStorage();
-    preferences.start(s);
-    preferences.markRotateHintShown();
-    caged.reset();
-    expect(preferences.rotateHintShown).toBe(true);
-    expect(JSON.parse(s.data.get(PREFS_KEY) as string).rotateHint).toBe(true);
+    expect(preferences.noticeVisible).toBe(false);
+    expect(instrument.active.fretCount).toBe(18);
+    expect(playback.muted).toBe(true);
+    expect('rotateHintShown' in preferences).toBe(false);
+    preferences.toolOpened('notes');
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string)).not.toHaveProperty('rotateHint');
   });
 });
 

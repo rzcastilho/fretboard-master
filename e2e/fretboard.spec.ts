@@ -71,11 +71,7 @@ async function withFixture(page: Page, name: string): Promise<void> {
 }
 
 test.describe('markers (US2)', () => {
-  test('all-markers fixture is distinguishable in grayscale', async ({ page }, testInfo) => {
-    // Capturing a board wider than a mobile-emulated viewport enlarges the viewport, which
-    // reflows the responsive triads controls above it and offsets the capture; the phone and
-    // desktop projects cover the same board.
-    test.skip(!!testInfo.project.use.isMobile, 'element capture reflows under mobile emulation');
+  test('all-markers fixture is distinguishable in grayscale', async ({ page }) => {
     await withFixture(page, 'all-markers');
     const grid = page.getByRole('grid', { name: 'Fretboard' });
     for (const fn of ['root', 'third', 'fifth', 'degree', 'neutral']) {
@@ -207,8 +203,9 @@ test.describe('US4: scrolling and fill-container', () => {
   const maxScroll = (page: Page) =>
     scrollerOf(page).evaluate((el) => el.scrollWidth - el.clientWidth);
 
-  test('highlight-far auto-scrolls once to the minimal position', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'desktop', 'board fits on desktop');
+  test('highlight-far auto-scrolls once to the minimal position', async ({ page }) => {
+    // The board only overflows in a narrow viewport (zoomed-in desktop).
+    await page.setViewportSize({ width: 640, height: 400 });
     await page.addInitScript(() => {
       globalThis.__fmFretboardFixture = 'highlight-far';
     });
@@ -239,10 +236,9 @@ test.describe('US4: scrolling and fill-container', () => {
     expect(Math.min(result.left, result.right)).toBeLessThan(2);
   });
 
-  test('highlight-split aligns the lowest highlighted fret to the start', async ({
-    page
-  }, testInfo) => {
-    test.skip(testInfo.project.name === 'desktop', 'board fits on desktop');
+  test('highlight-split aligns the lowest highlighted fret to the start', async ({ page }) => {
+    // The board only overflows in a narrow viewport (zoomed-in desktop).
+    await page.setViewportSize({ width: 640, height: 400 });
     await page.addInitScript(() => {
       globalThis.__fmFretboardFixture = 'highlight-split';
     });
@@ -266,8 +262,9 @@ test.describe('US4: scrolling and fill-container', () => {
     expect(await scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
   });
 
-  test('reduced motion reaches the target in the first frame', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'desktop', 'board fits on desktop');
+  test('reduced motion reaches the target in the first frame', async ({ page }) => {
+    // The board only overflows in a narrow viewport (zoomed-in desktop).
+    await page.setViewportSize({ width: 640, height: 400 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.addInitScript(() => {
       globalThis.__fmFretboardFixture = 'highlight-far';
@@ -291,10 +288,7 @@ test.describe('US4: scrolling and fill-container', () => {
     expect(await scroller.evaluate((el) => el.scrollLeft)).toBe(settled.later);
   });
 
-  test('at 2560 px the board fills zone C and does not scroll (US4-5)', async ({
-    page
-  }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop', 'desktop only');
+  test('at 2560 px the board fills zone C and does not scroll (US4-5)', async ({ page }) => {
     await page.setViewportSize({ width: 2560, height: 900 });
     await page.goto('/notes');
     await expandDetails(page);
@@ -408,8 +402,9 @@ test.describe('keyboard operation (US5)', () => {
     expect(times[2]).toBeLessThan(100);
   });
 
-  test('keyboard focus on an off-screen cell scrolls it into view', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'desktop', 'board fits on desktop');
+  test('keyboard focus on an off-screen cell scrolls it into view', async ({ page }) => {
+    // The board only overflows in a narrow viewport (zoomed-in desktop).
+    await page.setViewportSize({ width: 640, height: 400 });
     await cellAt(page, 1, 0).focus();
     for (let i = 0; i < 22; i++) await page.keyboard.press('ArrowRight');
     await expect

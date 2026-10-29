@@ -4,6 +4,7 @@ import {
   DEFAULT_PREFERENCES,
   MAX_RAW_LENGTH,
   PREFS_VERSION,
+  PRIVACY_CATEGORIES,
   TOOL_IDS,
   parsePreferences,
   serializePreferences,
@@ -34,7 +35,6 @@ describe('constants and defaults (FR-018)', () => {
       labels: { notes: 'name', triads: 'interval', caged: 'interval' },
       handedness: 'right',
       orientation: 'highest-top',
-      rotateHintShown: false,
       tempo: 'medium',
       language: null,
       notation: null,
@@ -336,7 +336,6 @@ describe('serializePreferences', () => {
       labels: { notes: 'octave', triads: 'name', caged: 'interval' },
       handedness: 'right',
       orientation: 'highest-top',
-      rotateHintShown: false,
       tempo: 'medium',
       language: null,
       notation: null,
@@ -392,7 +391,6 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       labels: { notes: 'octave', triads: 'name', caged: 'interval' },
       handedness: 'right',
       orientation: 'highest-top',
-      rotateHintShown: false,
       tempo: 'medium',
       language: null,
       notation: null,
@@ -527,34 +525,28 @@ describe('left-handed and orientation (013): reader rules 19–22, writer rules 
   });
 });
 
-describe('rotate hint (016 US4)', () => {
+describe('legacy rotateHint (030 US4)', () => {
   const p = (extra: Record<string, unknown>) =>
     parsePreferences(JSON.stringify({ version: 1, ...extra }));
 
-  it('a record without rotateHint parses to false', () => {
-    expect(p({}).rotateHintShown).toBe(false);
-  });
-  it('parses a stored true', () => {
-    expect(p({ rotateHint: true }).rotateHintShown).toBe(true);
-  });
-  it.each(['yes', 1, null, {}, []])('invalid rotateHint %j → false, other fields kept', (bad) => {
-    const r = p({ rotateHint: bad, frets: 18, muted: true });
-    expect(r.rotateHintShown).toBe(false);
-    expect([r.fretCount, r.muted]).toEqual([18, true]);
-  });
-  it('writes rotateHint only when true; version stays 1', () => {
+  it.each([true, false, 'yes', 1, null, {}, []])(
+    'a stored rotateHint %j never throws and changes no other field',
+    (v) => {
+      const base = p({ frets: 18, muted: true });
+      const withHint = p({ rotateHint: v, frets: 18, muted: true });
+      expect(withHint).toEqual(base);
+      expect('rotateHintShown' in withHint).toBe(false);
+    }
+  );
+  it('serialization omits rotateHint for every input', () => {
     expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('rotateHint');
-    const raw = serializePreferences({ ...DEFAULT_PREFERENCES, rotateHintShown: true });
-    expect(raw).toContain('"rotateHint":true');
-    expect(JSON.parse(raw).version).toBe(1);
-  });
-  it('existing fixtures serialize byte-identical', () => {
     for (const f of FIXTURES) {
       if (f.raw === null || f.raw.length > 16_384) continue;
-      const parsed = parsePreferences(f.raw);
-      expect(parsed.rotateHintShown).toBe(false);
-      expect(serializePreferences(parsed)).not.toContain('rotateHint');
+      expect(serializePreferences(parsePreferences(f.raw))).not.toContain('rotateHint');
     }
+  });
+  it('hints privacy category is only cagedNoteShown', () => {
+    expect(PRIVACY_CATEGORIES.hints).toEqual(['cagedNoteShown']);
   });
 });
 
@@ -614,17 +606,15 @@ describe('tempo (019 US2)', () => {
       expect([r.fretCount, r.muted, r.tuningId]).toEqual([18, true, 'AF-3']);
     }
   );
-  it('writes tempo only when not medium, after rotateHint', () => {
+  it('writes tempo only when not medium, after orientation', () => {
     expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('tempo');
     expect(serializePreferences({ ...DEFAULT_PREFERENCES, tempo: 'slow' })).toBe(
       '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"tempo":"slow"}'
     );
     const keys = Object.keys(
-      JSON.parse(
-        serializePreferences({ ...DEFAULT_PREFERENCES, rotateHintShown: true, tempo: 'fast' })
-      )
+      JSON.parse(serializePreferences({ ...DEFAULT_PREFERENCES, tempo: 'fast' }))
     );
-    expect(keys.slice(-2)).toEqual(['rotateHint', 'tempo']);
+    expect(keys.slice(-1)).toEqual(['tempo']);
   });
   it('tempo-fast round-trips byte-identical', () => {
     const r = raw('tempo-fast');
@@ -671,7 +661,6 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   }),
   handedness: fc.constantFrom('right', 'left'),
   orientation: fc.constantFrom('highest-top', 'lowest-top'),
-  rotateHintShown: fc.boolean(),
   tempo: fc.constantFrom('slow', 'medium', 'fast'),
   language: fc.constantFrom(null, 'en', 'pt-BR', 'es'),
   notation: fc.constantFrom(null, 'letters', 'solfege'),
@@ -845,7 +834,6 @@ describe('stored keys (027 FR-019(e))', () => {
     'labels',
     'handedness',
     'orientation',
-    'rotateHint',
     'tempo',
     'language',
     'notation',
@@ -865,7 +853,6 @@ describe('stored keys (027 FR-019(e))', () => {
     labels: { notes: 'octave', triads: 'name', caged: 'name' },
     handedness: 'left',
     orientation: 'lowest-top',
-    rotateHintShown: true,
     tempo: 'fast',
     language: 'es',
     notation: 'letters',

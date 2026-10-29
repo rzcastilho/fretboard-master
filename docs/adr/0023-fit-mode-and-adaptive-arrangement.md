@@ -1,6 +1,6 @@
 # ADR 0023: Fit mode and adaptive arrangement
 
-- **Status**: Accepted
+- **Status**: Partially superseded by 0029 (landscape arrangement, pinch)
 - **Source**: spec 025-minimap-fit-and-landscape (research R-01, R-02, R-03, R-09, R-10)
 
 ## Context

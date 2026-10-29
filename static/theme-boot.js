@@ -14,9 +14,6 @@
 (function () {
   try {
     if (!/^\/(notes|triads|caged|about)\/?$/.test(location.pathname)) return;
-    var w = innerWidth,
-      h = innerHeight;
-    document.documentElement.dataset.arrangement =
-      h <= 499 && w > h ? 'landscape' : w <= 599 ? 'narrow' : w <= 1023 ? 'medium' : 'wide-side';
+    document.documentElement.dataset.arrangement = innerWidth <= 1023 ? 'reflow' : 'wide-side';
   } catch (e) {}
 })();

@@ -95,7 +95,7 @@ const CAGED_LINK_FULL =
 const CAGED_LINK =
   /\/caged\?v=1&rt=9&sp=none&q=minor&fc=E\.0&ly=10100&cn=0&ts=-&lb=interval&tmp=0&sc=6&tu=AF-1&fr=22$/;
 
-test.describe('share US1-1: phone sends the view through the system sheet', () => {
+test.describe('share US1-1: a touch device sends the view through the system sheet', () => {
   test('sheet receives { url, title } once and nothing is shown', async ({ page }) => {
     await stubPlatform(page, { coarse: true, share: 'ok' });
     await setUpCagedAMinorE(page);
@@ -130,7 +130,6 @@ test.describe('share US1-2: desktop copies the link', () => {
     await expandDetails(page);
     await shareButton(page).click();
     await expect(statusRegion(page, 'Link copied')).toBeVisible();
-    // On a portrait phone the CAGED rotate hint (016) has its own Dismiss.
     await statusRegion(page, 'Link copied').getByRole('button', { name: 'Dismiss' }).click();
     await expect(statusRegion(page, 'Link copied')).toHaveCount(0);
   });

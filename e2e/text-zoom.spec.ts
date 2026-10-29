@@ -3,10 +3,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { expectNoHorizontalScroll, expectNoTruncationOrOverlap } from './support/helpers';
 
 const ARRANGEMENTS = [
-  { name: 'narrow', width: 320, height: 800, expected: 'narrow' },
-  { name: 'medium', width: 800, height: 1000, expected: 'medium' },
-  { name: 'wide', width: 1280, height: 900, expected: /^wide-/ },
-  { name: 'landscape', width: 844, height: 390, expected: 'landscape' }
+  { name: 'reflow-320', width: 320, height: 800, expected: 'reflow' },
+  { name: 'reflow-800', width: 800, height: 1000, expected: 'reflow' },
+  { name: 'wide', width: 1280, height: 900, expected: /^wide-/ }
 ] as const;
 
 const TOOLS = ['notes', 'triads', 'caged'] as const;
@@ -91,7 +90,7 @@ test.describe('200% text size (US5)', () => {
     }
   }
 
-  test('summary wraps at narrow, never truncated', async ({ page }) => {
+  test('summary wraps at reflow, never truncated', async ({ page }) => {
     await open(page, 'triads', { width: 320, height: 800 });
     const summary = page.locator('.summary-row .summary').first();
     await expect(summary).toBeVisible();

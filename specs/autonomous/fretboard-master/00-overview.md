@@ -78,7 +78,7 @@ This version has no lessons and no explanatory text. The teaching lives **in the
 | M-4 | Review by two independent guitar teachers | Zero theory errors in the views of the sample defined in file 11 |
 | M-5 | First interaction with the fretboard after opening the application | Median ≤ 15 seconds |
 | M-6 | Sessions in which the user hears at least one sound | ≥ 50% |
-| M-7 | Phone sessions with at least one fretboard interaction | Proportion equivalent to desktop (difference ≤ 10 percentage points) |
+*[Changed by slice 030: desktop-only target.]*
 
 M-5 to M-7 depend on anonymous, aggregate measurement (see `05-integrations.md`, INT-2, and open question Q-1).
 
@@ -87,7 +87,7 @@ M-5 to M-7 depend on anonymous, aggregate measurement (see `05-integrations.md`,
 - **C-1** The application runs in a browser, without installation.
 - **C-2** There is no sign-up and no authentication. The application collects no personal data.
 - **C-3** The application requires an internet connection to load.
-- **C-4** Phone and desktop have the same priority: no feature is exclusive to either.
+- **C-4** Desktop and laptop browsers are the target; every function works from 1024 to 2560 CSS px. *[Changed by slice 030: desktop-only target.]*
 - **C-5** The three languages launch together.
 - **C-6** Every view is calculated from the configured tuning; no diagram is drawn only for standard tuning.
 - **C-7** The product is new; there is no legacy system to replace or integrate with.

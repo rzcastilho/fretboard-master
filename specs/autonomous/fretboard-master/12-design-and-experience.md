@@ -71,7 +71,7 @@ Emphasis levels (FR-3.9):
 
 - One sans-serif family, highly legible at small sizes, with fixed-width numerals (for fret and string numbers).
 - The symbols ♯, ♭, 𝄪, and 𝄫 must exist in the label typeface or be drawn as graphic elements, with the same weight and alignment as the letters.
-- Marker labels have a minimum size legible at arm's length on a phone; below that minimum, EC-3.2 applies.
+- Marker labels have a minimum size legible at normal viewing distance; below that minimum, EC-3.2 applies.
 
 ### 3.5 Motion
 
@@ -131,21 +131,16 @@ Control patterns:
 
 | Range | Logical width | Layout |
 |---|---|---|
-| Narrow | 320–599 | One column: A, B, C, E, D. The fretboard scrolls horizontally. The controls in B fit in at most two rows; whatever exceeds them becomes a scrollable strip of options |
-| Medium | 600–1023 | One column with the fretboard at full width; D beside E, below the fretboard |
-| Wide | 1024 or more | Two columns: fretboard on the left taking most of the space; D on the right. B above the fretboard |
+| Reflow | below 1024 (zoom only) | One column: A, B, C, E, D. The fretboard scrolls horizontally. *[Changed by slice 030: desktop-only target.]* |
+| Wide | 1024 or more | Two columns: fretboard on the left taking most of the space; D on the right (side), or stacked below the fretboard. B above the fretboard. *[Changed by slice 030: desktop-only target.]* |
 
-### 5.2 Phone in portrait
+### 5.2 (Removed)
 
-- The fretboard shows five to seven frets at comfortable size, with the minimap (FR-3.13).
-- Zone B sits above the fretboard and zone E immediately below it, within thumb reach.
-- The context panel (D) sits below E and can collapse to a one-line summary ("A major · 1st inversion · C♯ – E – A").
+*[Changed by slice 030: desktop-only target.]*
 
-### 5.3 Phone in landscape
+### 5.3 (Removed)
 
-- The fretboard takes the full width and almost the full height (FR-3.19).
-- Bar A reduces to icons; B becomes a thin strip above the fretboard; D and E live in a sliding panel opened by a button.
-- It is the recommended orientation for CAGED; the application suggests rotating the device the first time the tool is opened in portrait (FR-3.19).
+*[Changed by slice 030: desktop-only target.]*
 
 ### 5.4 Desktop
 
@@ -182,7 +177,7 @@ Control patterns:
 - Keyboard focus on the fretboard is a high-contrast ring around the position.
 - Each view has a "Describe this view" button, which shows the equivalent text (FR-3.18).
 - The light and dark themes are checked for the contrast of the markers over the fretboard, which is the critical point.
-- Touch targets follow NFR-3.5; in particular, the twelve buttons of the note selector on a 320-wide screen are arranged in two rows of six.
+- Target size follows NFR-3.5; the note selector wraps in reflow. *[Changed by slice 030: desktop-only target.]*
 
 ## 8. What the design avoids
 

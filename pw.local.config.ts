@@ -8,6 +8,6 @@ export default defineConfig({
     : (process.env.PW_WORKERS ?? '50%'),
   use: { ...base.use, locale: 'en-US' },
   projects: (base.projects ?? [])
-    .filter((p) => ['phone', 'phone-touch', 'desktop', 'nojs'].includes(p.name as string))
+    .filter((p) => ['desktop', 'nojs'].includes(p.name as string))
     .map((p) => ({ ...p, use: { ...p.use, channel: 'chrome' } }))
 });

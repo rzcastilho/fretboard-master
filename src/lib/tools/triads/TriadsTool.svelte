@@ -14,7 +14,6 @@
   import FitNotice from '$lib/tools/FitNotice.svelte';
   import FitToggle from '$lib/tools/FitToggle.svelte';
   import ContextZone from '$lib/tools/ContextZone.svelte';
-  import SidePanels from '$lib/tools/SidePanels.svelte';
   import { triads } from '$lib/state/triads.svelte';
   import { noteLabel } from '$lib/notation/notation';
   import { qualityName } from '$lib/state/triads-model';
@@ -109,68 +108,56 @@
     <WideStretchMark />
   {/if}
 </section>
-<SidePanels>
-  {#snippet actions()}
-    <section class="e" data-print="omit" aria-labelledby="triads-zone-e">
-      <h2 id="triads-zone-e">{m.zone_actions()}</h2>
-      <FitToggle />
-      {#if instrument.adjustedIn === 'triads' && triads.notice === null}
-        <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
-      {/if}
-      {#if triads.notice?.kind === 'compare-swapped'}
-        {#key triads.notice}
-          <Notice
-            message={m.triads_compare_swapped({ quality: qualityName(triads.notice.quality) })}
-            ondismiss={triads.dismissNotice}
-          />
-        {/key}
-      {/if}
-      {#if triads.notice?.kind === 'compare-off-for-shape'}
-        {#key triads.notice}
-          <Notice
-            message={m.triads_notice_compare_off_for_shape()}
-            ondismiss={triads.dismissNotice}
-          />
-        {/key}
-      {/if}
-      {#if triads.notice?.kind === 'compare-omitted'}
-        {#key triads.notice}
-          <Notice message={omittedMessage(triads.notice.notes)} ondismiss={triads.dismissNotice} />
-        {/key}
-      {/if}
-      <TriadsCompare
-        compare={triads.display.compare}
-        onsetcompare={triads.setCompare}
-        oncomparequality={triads.setCompareQuality}
+<section class="e" data-print="omit" aria-labelledby="triads-zone-e">
+  <h2 id="triads-zone-e">{m.zone_actions()}</h2>
+  <FitToggle />
+  {#if instrument.adjustedIn === 'triads' && triads.notice === null}
+    <Notice message={m.instrument_adjusted()} ondismiss={instrument.dismissAdjusted} />
+  {/if}
+  {#if triads.notice?.kind === 'compare-swapped'}
+    {#key triads.notice}
+      <Notice
+        message={m.triads_compare_swapped({ quality: qualityName(triads.notice.quality) })}
+        ondismiss={triads.dismissNotice}
       />
-      <TriadsSecondary
-        labelType={triads.state.labelType}
-        onlabeltype={triads.setLabelType}
-        octave={triads.display.octave}
-        onoctaveup={triads.octaveUp}
-        onoctavedown={triads.octaveDown}
-        listen={triads.display.listen}
-        onlisten={triads.listen}
-        viewInCaged={triads.display.viewInCaged}
-        onviewincaged={openCagedFromTriads}
-        compareOn={triads.display.compare.on && triads.display.compare.offered}
-        listenComparison={triads.display.listenComparison}
-        onlistencomparison={triads.listenComparison}
-        onreset={triads.reset}
-      />
-    </section>
-  {/snippet}
-  {#snippet details()}
-    <div class="d">
-      <ContextZone summary={triads.display.summary}>
-        <CompositionPanel
-          composition={triads.display.composition}
-          onswitch={triads.switchSpelling}
-        />
-      </ContextZone>
-    </div>
-  {/snippet}
-</SidePanels>
+    {/key}
+  {/if}
+  {#if triads.notice?.kind === 'compare-off-for-shape'}
+    {#key triads.notice}
+      <Notice message={m.triads_notice_compare_off_for_shape()} ondismiss={triads.dismissNotice} />
+    {/key}
+  {/if}
+  {#if triads.notice?.kind === 'compare-omitted'}
+    {#key triads.notice}
+      <Notice message={omittedMessage(triads.notice.notes)} ondismiss={triads.dismissNotice} />
+    {/key}
+  {/if}
+  <TriadsCompare
+    compare={triads.display.compare}
+    onsetcompare={triads.setCompare}
+    oncomparequality={triads.setCompareQuality}
+  />
+  <TriadsSecondary
+    labelType={triads.state.labelType}
+    onlabeltype={triads.setLabelType}
+    octave={triads.display.octave}
+    onoctaveup={triads.octaveUp}
+    onoctavedown={triads.octaveDown}
+    listen={triads.display.listen}
+    onlisten={triads.listen}
+    viewInCaged={triads.display.viewInCaged}
+    onviewincaged={openCagedFromTriads}
+    compareOn={triads.display.compare.on && triads.display.compare.offered}
+    listenComparison={triads.display.listenComparison}
+    onlistencomparison={triads.listenComparison}
+    onreset={triads.reset}
+  />
+</section>
+<div class="d">
+  <ContextZone summary={triads.display.summary}>
+    <CompositionPanel composition={triads.display.composition} onswitch={triads.switchSpelling} />
+  </ContextZone>
+</div>
 
 <style>
   section,

@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 describe('ContextZone (025 US3)', () => {
-  it('narrow: shows the summary and a collapsed Show details button by default', () => {
+  it('reflow: shows the summary and a collapsed Show details button by default', () => {
     setViewportForTests({ width: 390, height: 844 });
     mount();
     expect(screen.getByText(SUMMARY)).toBeTruthy();
@@ -32,7 +32,7 @@ describe('ContextZone (025 US3)', () => {
     expect(content?.hidden).toBe(true);
   });
 
-  it('narrow: the button expands and collapses the content', async () => {
+  it('reflow: the button expands and collapses the content', async () => {
     setViewportForTests({ width: 390, height: 844 });
     mount();
     await fireEvent.click(screen.getByRole('button', { name: 'Show details' }));
@@ -53,11 +53,8 @@ describe('ContextZone (025 US3)', () => {
     expect(contextPanel.expanded).toBe(true);
   });
 
-  it.each([
-    ['medium', 800, 1280],
-    ['wide', 1440, 900]
-  ])('%s: no summary row and the content is visible', (_name, width, height) => {
-    setViewportForTests({ width, height });
+  it('wide: no summary row and the content is visible', () => {
+    setViewportForTests({ width: 1440, height: 900 });
     mount();
     expect(screen.queryByText(SUMMARY)).toBeNull();
     expect(screen.queryByRole('button', { name: /details/ })).toBeNull();

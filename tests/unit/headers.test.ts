@@ -62,6 +62,12 @@ describe('static/_headers', () => {
     expect(html.match(/<script\b/g)).toHaveLength(1);
   });
 
+  it('viewport meta has no viewport-fit=cover (030)', () => {
+    const html = readFileSync(join(process.cwd(), 'src/app.html'), 'utf8');
+    expect(html).toMatch(/<meta name="viewport"/);
+    expect(html).not.toContain('viewport-fit');
+  });
+
   it.each(['/', '/*.html', '/notes', '/triads', '/about', '/404.html'])(
     'revalidates HTML at %s',
     (path) => {

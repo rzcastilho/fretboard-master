@@ -1,5 +1,23 @@
 <!--
 Sync Impact Report
+- Version change: 1.12.0 → 2.0.0 (MAJOR: Principle VII redefined from phone-and-desktop equal
+  priority to a desktop-only target; Principle V's touch-target rule redefined; Principle VI's
+  reference profile redefined).
+- Reason: the owner targets desktop and laptop browsers only (slice 030). Phone-only behaviors
+  (rotate hint, phone-landscape and medium arrangements, pinch sizing, safe areas) are removed.
+- Modified principles: V (touch targets → WCAG 2.2 SC 2.5.8; reflow to 320 CSS px under zoom
+  kept), VI (desktop reference profile, Lighthouse desktop preset, Home ≤ 3 s, tool ≤ 3.5 s,
+  score ≥ 90; other rows unchanged), VII (window widths 1024–2560 CSS px, zoom reflow below).
+- Modified sections: Technology Stack (E2E row, Browsers row), Development Workflow and Quality
+  Gates (merge gate, verification tiers).
+- Added / removed sections: none.
+- Dependent guidance updated: `CLAUDE.md`, `playwright.config.ts`, `pw.local.config.ts`,
+  `lighthouserc.cjs`, `.github/workflows/update-snapshots.yml`,
+  `specs/autonomous/fretboard-master/{00,01,02,03,06,08,09,12}-*.md`, `docs/adr/0023-*`,
+  `docs/adr/0029-desktop-only-target.md` (new).
+- Prior amendments: the 1.12.0 report and earlier history follow.
+
+Prior amendments (1.12.0 report):
 - Version change: 1.11.0 → 1.12.0 (MINOR: Principle VI Lighthouse and load-time budgets set to
   what the single-bundle architecture delivers; layout shift becomes a gate)
 - Modified principles: VI (Performance Budgets) — Home screen usable after opening: ≤ 3 s →
@@ -115,7 +133,10 @@ Rationale: correctness and "never blank" behavior can't be verified by hand acro
   - note function by marker shape plus label;
   - emphasis by opacity plus size;
   - comparison by dashed outline plus arrow.
-- Touch targets MUST be at least 44×44 CSS px in comfortable fretboard mode.
+- Interactive targets MUST meet WCAG 2.2 SC 2.5.8 (Target Size, Minimum).
+- Below 1024 CSS px (browser zoom or a narrow window), content MUST reflow to one column down
+  to 320 CSS px with no horizontal page scrolling; only the fretboard may scroll horizontally
+  (WCAG 2.2 SC 1.4.10).
 - Every fretboard view MUST have an equivalent text description, announced politely to screen
   readers.
 - The product MUST honor `prefers-reduced-motion` and `prefers-contrast`.
@@ -128,19 +149,19 @@ gets done worse.
 
 ### VI. Performance Budgets Are Gates
 
-On the reference device profile (throttled mid-range phone, median mobile network), CI MUST
-enforce these budgets:
+On the desktop reference profile (mid-range laptop on typical broadband: Lighthouse `desktop`
+preset), CI MUST enforce these budgets:
 
 | Budget | Target |
 |---|---|
-| Home screen usable after opening | ≤ 4.5 s |
-| Tool screen usable after opening | ≤ 5 s |
+| Home screen usable after opening | ≤ 3 s |
+| Tool screen usable after opening | ≤ 3.5 s |
 | Tool open or switch | ≤ 300 ms |
 | Control change to fretboard update | ≤ 100 ms |
 | Instrument change | ≤ 300 ms |
 | Tap to sound, after audio unlock | ≤ 100 ms |
 | Initial JavaScript, gzip | ≤ 150 KB |
-| Lighthouse mobile performance score | ≥ 70 |
+| Lighthouse desktop performance score | ≥ 90 |
 | Cumulative layout shift | ≤ 0.1 |
 
 - Sound material MUST NOT block the fretboard from becoming interactive.
@@ -148,7 +169,8 @@ enforce these budgets:
 - A budget regression MUST fail the build.
 - Raising a budget requires a constitution amendment.
 
-Rationale: NFR-1 and NFR-7. Players use this on phones propped on amplifiers.
+Rationale: NFR-1 and NFR-7. Players use this on a laptop beside the instrument; a slow first
+screen loses them before the first note.
 
 ### VII. Design System Fidelity
 
@@ -170,8 +192,10 @@ Rationale: NFR-1 and NFR-7. Players use this on phones propped on amplifiers.
   forbidden for normal situations. Error red MUST NOT be used for normal situations.
 - The product MUST NOT include reward mechanics, confetti, mascots, overlay tutorials, or a
   photorealistic fretboard.
-- Phone and desktop have equal priority. Every function MUST work from 320 to 2560 CSS px,
-  and only the fretboard may scroll horizontally.
+- The product targets desktop and laptop browsers. Every function MUST work in windows from
+  1024 to 2560 CSS px wide, with no truncation or overlap, and only the fretboard may scroll
+  horizontally. Below 1024 CSS px the zoom reflow of Principle V applies. Phones are not
+  supported but MUST NOT be blocked.
 - Motion MUST explain change (only the note that changes moves) and stay within the
   documented durations.
 
@@ -234,14 +258,14 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 | Styling | Plain CSS with custom-property design tokens. Media queries for theme, reduced motion, contrast, print |
 | Fonts | Self-hosted accidentals subset covering ♯ ♭ 𝄪 𝄫 (loaded via `unicode-range`); letters and digits use the system UI stack with tabular numerals (`font-variant-numeric: tabular-nums`). See ADR 0006 |
 | Unit and property tests | Vitest + fast-check |
-| E2E and accessibility | Playwright (phone and desktop profiles) + @axe-core/playwright |
+| E2E and accessibility | Playwright (desktop profile, plus Firefox and WebKit smoke and no-JS) + @axe-core/playwright |
 | Performance | Lighthouse CI with budgets, plus a bundle-size check |
 | Lint and format | ESLint (with import-boundary rules) + Prettier + `svelte-check` |
 | Tool installation | mise (`mise.toml` at the repo root pins every tool version) |
 | Package manager | pnpm, installed through mise (lockfile committed) |
 | CI | GitHub Actions |
 | Hosting | Cloudflare Pages: static, atomic zero-downtime deploys, HTTPS, PR previews |
-| Browsers | Last two major versions of the evergreen browsers, desktop and mobile |
+| Browsers | Last two major versions of the evergreen desktop browsers |
 
 - **Source layout:**
   - `src/lib/{theory,instrument,audio,fretboard,state,link,prefs,notation}`
@@ -274,18 +298,18 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
   - Typecheck, `svelte-check`, lint (including import boundaries), format check.
   - Vitest with at least 95% line and branch coverage on `src/lib/theory`, and at least 80%
     overall.
-  - Playwright on a phone profile (360 px) and a desktop profile, with zero axe violations.
+  - Playwright on the desktop profile, at 1024 px, 2560 px and the zoom reflow sizes, with zero
+    axe violations.
   - Lighthouse budgets and bundle-size check (Principle VI).
 - **Verification tiers:** the merge gate is enforced in CI. Local runs during implementation
   stay targeted so each slice moves fast.
   - Per task or checkpoint: typecheck/`svelte-check` and lint when relevant, the unit tests for
     the touched modules, and only the Playwright specs the slice adds or edits, on the
     `desktop` project alone (`pnpm test:e2e:fast <spec files>`).
-  - Screenshot baselines are generated for every profile that owns them (phone, phone-touch,
-    desktop), but only for the snapshot tests a task adds or changes (filtered with `-g`).
+  - Screenshot baselines are generated for the `desktop` project only, and only for the snapshot tests a task adds or changes (filtered with `-g`).
   - End of slice, once: `pnpm verify` (check, lint, format, full Vitest with coverage, build,
     bundle-size check, and the full Playwright suite on `desktop`).
-  - CI runs the full matrix (phone, phone-touch, desktop, Firefox and WebKit smoke, no-JS,
+  - CI runs the full matrix (desktop, Firefox and WebKit smoke, no-JS,
     Lighthouse). Agents MUST NOT run that matrix locally except to reproduce a CI failure.
 - **Review:** at least one approving review. Reviewers MUST check principle compliance and
   that the change delivers the spec's acceptance scenarios, no more and no less.
@@ -326,4 +350,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 1.12.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-23
+**Version**: 2.0.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-29

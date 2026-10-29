@@ -9,7 +9,7 @@ test('card opens tool with five named zones @smoke', async ({ page }) => {
   await page.getByRole('link', { name: 'Triads — What is a chord made of?' }).click();
   await expect(page).toHaveURL(/\/triads(\?v=1&.*)?$/);
   await expect(page.getByRole('banner')).toBeVisible();
-  // The narrow arrangement folds the context panel behind "Show details".
+  // The reflow arrangement folds the context panel behind "Show details".
   await expandDetails(page);
   for (const name of ['Main controls', 'Fretboard', 'Composition', 'Actions']) {
     await expect(page.getByRole('region', { name })).toBeVisible();
@@ -105,14 +105,14 @@ test('layout: fretboard largest; context panel placement', async ({ page }, info
   );
   const area = (r: { width: number; height: number }) => r.width * r.height;
   const arrangement = await page.locator('main .grid').getAttribute('data-arrangement');
-  // Narrow: zone B's wrapped rows may outgrow the fretboard, so B is not compared (029 SC-001).
-  if (arrangement !== 'narrow') expect(area(c)).toBeGreaterThan(area(b));
+  // Reflow: zone B's wrapped rows may outgrow the fretboard, so B is not compared (029 SC-001).
+  if (arrangement !== 'reflow') expect(area(c)).toBeGreaterThan(area(b));
   expect(area(c)).toBeGreaterThan(area(d));
   expect(area(c)).toBeGreaterThan(area(e));
   if (arrangement === 'wide-side') {
     // Details in the right column, beside the fretboard.
     expect(d.x).toBeGreaterThanOrEqual(c.x + c.width - 1);
-  } else if (arrangement === 'medium' || arrangement === 'wide-stacked') {
+  } else if (arrangement === 'wide-stacked') {
     // Fretboard full width; actions and details side by side below it.
     expect(d.y).toBeGreaterThanOrEqual(c.y + c.height - 1);
     expect(e.y).toBeGreaterThanOrEqual(c.y + c.height - 1);

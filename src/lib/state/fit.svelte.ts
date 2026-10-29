@@ -52,9 +52,6 @@ export const fit = {
         available = event.value;
         dropStaleNotice();
         return;
-      case 'request':
-        if (available && event.mode !== mode) setMode(event.mode);
-        return;
       case 'small-tap':
         if (effectiveMode() === 'whole' && !noticeDismissed) {
           notice = { position: event.position };

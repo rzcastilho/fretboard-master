@@ -47,7 +47,6 @@
   import { layoutTags } from './tags';
   import { applyPulses } from './pulse';
   import { readMetrics } from './metrics';
-  import { reducePinch, type PinchState } from './pinch';
   import { animateScroll, browserClock } from './scroll-animation';
   import { tokenDuration } from './motion';
   import { printInlinePx } from './print-layout';
@@ -669,30 +668,6 @@
   const narrowestColumn = $derived(
     layout.columns.reduce((min, c) => Math.min(min, c.end - c.start), Infinity)
   );
-
-  /**
-   * Two-finger pinch (025 R-06): passive touch listeners feed the pure reducer; a completed pinch
-   * requests a mode (in → whole, out → comfortable). One finger never emits; scrolling is native.
-   */
-  $effect(() => {
-    const el = scroller;
-    if (!el || compact) return;
-    let state: PinchState = { kind: 'idle' };
-    const onTouches = (e: TouchEvent) => {
-      const points = Array.from(e.touches, (t) => ({ x: t.clientX, y: t.clientY }));
-      const r = reducePinch(state, { type: 'touches', points });
-      state = r.state;
-      if (r.effect.kind === 'pinch') {
-        onfit?.({ kind: 'request', mode: r.effect.direction === 'in' ? 'whole' : 'comfortable' });
-      }
-    };
-    const opts = { passive: true } as const;
-    const types = ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const;
-    for (const t of types) el.addEventListener(t, onTouches, opts);
-    return () => {
-      for (const t of types) el.removeEventListener(t, onTouches);
-    };
-  });
 
   let gesture: GestureState = { kind: 'idle' };
   let activePointers = 0;

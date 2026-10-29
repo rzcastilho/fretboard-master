@@ -184,7 +184,7 @@ The final colors and shapes are defined in `12-design-and-experience.md`. No inf
 
 **FR-3.18** Every view has an equivalent text description, available to screen readers and visible on demand. Example: "A major, first inversion, strings 4, 3, and 2: string 4, fret 11, C sharp, third; string 3, fret 9, E, fifth; string 2, fret 10, A, root."
 
-**FR-3.19** On a phone, rotating the device to landscape enlarges the fretboard to fill the width; the tool controls rearrange without losing functions (see file 12). The first time the CAGED tool is opened on a phone in portrait, the system suggests rotating the device, in a dismissible notice that does not repeat.
+**FR-3.19** *[Changed by slice 030: desktop-only target.]*
 
 ---
 

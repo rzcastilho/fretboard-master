@@ -37,7 +37,6 @@ export interface ExpectedPreferences {
   readonly handedness: 'right' | 'left';
   readonly orientation: 'highest-top' | 'lowest-top';
   /** 016: absent or invalid in a record → false. */
-  readonly rotateHintShown: boolean;
   /** 019: absent or invalid in a record → 'medium'. */
   readonly tempo: Tempo;
   /** 020: absent or invalid in a record → null (no stored choice). */
@@ -78,7 +77,6 @@ const defaults: ExpectedPreferences = {
   labels: { notes: 'name', triads: 'interval', caged: 'interval' },
   handedness: 'right',
   orientation: 'highest-top',
-  rotateHintShown: false,
   tempo: 'medium',
   language: null,
   notation: null,
@@ -117,7 +115,6 @@ export const FIXTURES: readonly PrefsFixture[] = [
     labels: { notes: 'octave', triads: 'name', caged: 'interval' },
     handedness: 'right',
     orientation: 'highest-top',
-    rotateHintShown: false,
     tempo: 'medium',
     language: null,
     notation: null,

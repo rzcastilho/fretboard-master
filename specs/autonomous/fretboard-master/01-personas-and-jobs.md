@@ -9,7 +9,7 @@ No persona has an account or a profile in the system. All of them use the same a
 | | |
 |---|---|
 | **Who she is** | 19 years old, started playing four months ago with videos and a printed method book. 6-string guitar, standard tuning. |
-| **Context of use** | Phone propped on the amplifier or the music stand, guitar on her lap. Sessions of 5 to 15 minutes. |
+| **Context of use** | Laptop on a desk or stand beside the instrument, guitar on her lap. Sessions of 5 to 15 minutes. *[Changed by slice 030: desktop-only target.]* |
 | **What she knows** | Open chords, the names of the open strings, some tablature. |
 | **What blocks her** | When the method says "play a G on string 4", she counts fret by fret from the open string. Sharps and flats confuse her. |
 | **What she wants** | To check quickly where a note is and hear whether it is right. |
@@ -20,7 +20,7 @@ No persona has an account or a profile in the system. All of them use the same a
 | | |
 |---|---|
 | **Who he is** | 34 years old, has played for 15 years in a bar band. Learned everything by ear and from tablature. Tunes a half step down and, for some songs, to Drop D. |
-| **Context of use** | Desktop at home in the evening, sessions of 20 to 40 minutes; phone at rehearsal. |
+| **Context of use** | Desktop at home in the evening, sessions of 20 to 40 minutes. *[Changed by slice 030: desktop-only target.]* |
 | **What he knows** | Dozens of chords and licks, the minor pentatonic in one position. |
 | **What blocks him** | He does not know why the shapes work. When the keyboard player says "it's just the A triad in first inversion", he has no answer. |
 | **What he wants** | To name what he already plays: see which notes form the chord he is fretting and where the root, third, and fifth are. |
@@ -57,7 +57,7 @@ No persona has an account or a profile in the system. All of them use the same a
 | E-2 | Person who navigates by keyboard only | The whole fretboard and every control are keyboard-operable (NFR-3.2) |
 | E-3 | Person using a screen reader | Every view has an equivalent text description (NFR-3.4, FR-3.18) |
 | E-4 | Person sensitive to motion | Animations respect the device's reduced-motion preference (NFR-3.6) |
-| E-5 | User on a small phone (320 logical width) | No feature is lost; the fretboard scrolls horizontally (FR-3.12) |
+| E-5 | User zoomed to 400 % (320 CSS px) | No feature is lost; the fretboard scrolls horizontally (FR-3.12). *[Changed by slice 030: desktop-only target.]* |
 | E-6 | User on a slow connection | Light initial load; once loaded, the application does not depend on the network to calculate or to play sounds (NFR-1) |
 | E-7 | User in a quiet environment | Sound is optional and can be switched off persistently (FR-7.8) |
 | E-8 | User with local storage blocked | The application works with defaults and states that preferences will not be remembered (edge case EC-9.1) |

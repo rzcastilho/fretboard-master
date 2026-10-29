@@ -13,7 +13,7 @@
 </script>
 
 <script lang="ts">
-  // Decorative 24×24 stroke icons for the landscape app bar (025 US4). Never the accessible name.
+  // Decorative 24×24 stroke icons for the compact reflow app bar (025 US4). Never the accessible name.
   const PATHS: Readonly<Record<BarIconName, string>> = {
     home: 'M3 11l9-8 9 8M5 10v10h14V10',
     notes: 'M9 18V5l11-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm11-2a3 3 0 11-6 0 3 3 0 016 0z',

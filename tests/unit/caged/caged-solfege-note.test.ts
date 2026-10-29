@@ -100,14 +100,14 @@ describe('CagedTool: solfège note (021 US5)', () => {
     expect(note()).toBeNull();
   });
 
-  it('is non-modal and independent of the rotate hint; both may show', async () => {
+  it('is non-modal and shows alone at portrait size (no rotate hint)', async () => {
     viewport(390, 844);
     notation.choose('solfege');
     render(CagedTool);
     await tick();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByText(NOTE_EN)).toBeTruthy();
-    expect(screen.getByText('Turn your phone sideways to see more of the neck.')).toBeTruthy();
+    expect(screen.queryByText('Turn your phone sideways to see more of the neck.')).toBeNull();
     expect(caged.state).toBeTruthy();
   });
 });

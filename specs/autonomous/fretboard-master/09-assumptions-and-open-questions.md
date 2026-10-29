@@ -13,7 +13,7 @@
 | Instrument | 6 and 7 strings, right-handed and left-handed, alternate tunings |
 | Audio | Notes and triads can be heard |
 | Languages | English, Portuguese, and Spanish, with switchable notation |
-| Devices | Phone and desktop with the same priority |
+| Devices | Desktop and laptop browsers *[Changed by slice 030: desktop-only target.]* |
 | Connectivity | Always online |
 
 ## 2. Assumptions
@@ -33,7 +33,7 @@ Decisions made during drafting, without confirmation. Each one can be reversed; 
 | A-9 | The fretboard has slightly decreasing fret spacing, not real proportion, to preserve the touch area on the high frets | FR-3.6 | Presentation only |
 | A-10 | There is no free zoom on the fretboard; there are two modes (whole and comfortable) | FR-3.14, EC-3.5 | Presentation only |
 | A-11 | The Triad, Pentatonic, and Scale layers require a shape in focus | FR-6.12 | Affects FR-6.8 to FR-6.12 |
-| A-12 | Reference phone: mid-range, about four years old, median mobile network | NFR-1 | Performance targets |
+| A-12 | Desktop reference profile: mid-range laptop, typical broadband (Lighthouse desktop preset) | NFR-1 | Performance targets *[Changed by slice 030: desktop-only target.]* |
 | A-13 | Printing or capturing a view with a legible result is a requirement | NFR-2.7 | Can be removed without impact |
 | A-14 | Availability target of 99.5% per month | NFR-7.1 | The target only |
 | A-15 | Tens of thousands of monthly users in the first year | NFR-7.3 | Delivery sizing only |

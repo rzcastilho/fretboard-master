@@ -160,7 +160,6 @@ for (const size of sizes) {
   });
 }
 
-// Runs once per project (phone 360 px, phone-touch 320 px, desktop 1280 px).
 test.describe('custom tuning accessibility (SC-008)', () => {
   test('axe: zero violations with Custom rows shown', async ({ page }) => {
     await page.goto('/');
