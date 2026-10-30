@@ -14,6 +14,8 @@ The merge gate runs in CI. Locally, keep runs targeted (constitution "Verificati
 | End of slice, once           | `pnpm verify`                                                                       |
 
 - `test:e2e:fast` runs the `desktop` project only, on installed Google Chrome (`pw.local.config.ts`); bundled Chromium does not launch on this macOS.
+- Outside CI, `pnpm verify` skips screenshot assertions and `e2e/perf.spec.ts` (constitution 2.1.0). Linux baselines come only from `.github/workflows/update-snapshots.yml`.
+- A task that needs a human (listening by ear, a real-browser check on another OS) is done once its automatable part passes: record the human step under a "Manual checks" note in `tasks.md`, tick the task, and list the step in the PR description.
 - Rebuild (`pnpm build:test`) only after changing `src/`; e2e reuses a running `serve-build` server locally.
 - Do NOT run `pnpm test:e2e` (full desktop, Firefox, WebKit, no-JS matrix) or `pnpm lhci` locally, except to reproduce a CI failure.
 - Unit tests run in the `node` environment by default. A test file that renders a component or touches `document`, `window` or `localStorage` MUST start with `// @vitest-environment jsdom` (otherwise it fails with `document is not defined`). Pure logic tests need no docblock.

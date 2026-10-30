@@ -1,10 +1,19 @@
 // Local merge gate. Holds a per-worktree lock so overlapping `pnpm verify` runs cannot pile up,
 // starve the machine, and collide on the shared `coverage/` directory.
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 
 const LOCK_DIR = 'node_modules/.cache';
 const LOCK = `${LOCK_DIR}/verify.lock`;
+
+// Outside CI, screenshot assertions and perf.spec.ts are skipped: Linux baselines come only from
+// update-snapshots.yml and the throttled timings depend on the machine (constitution 2.1.0).
+const E2E = process.env.CI
+  ? 'pnpm test:e2e:fast'
+  : `pnpm test:e2e:fast --ignore-snapshots ${readdirSync('e2e')
+      .filter((f) => f.endsWith('.spec.ts') && f !== 'perf.spec.ts')
+      .map((f) => `e2e/${f}`)
+      .join(' ')}`;
 
 const STEPS = [
   'pnpm check',
@@ -14,7 +23,7 @@ const STEPS = [
   'pnpm build',
   'node scripts/check-bundle-size.mjs build',
   'pnpm build:test',
-  'pnpm test:e2e:fast'
+  E2E
 ];
 
 function alive(pid) {
