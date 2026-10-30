@@ -10,23 +10,39 @@ export interface MetronomeSettings {
   readonly bpm: number;
   readonly beats: number;
   readonly subdivision: Subdivision;
+  /** Count-in switch (033). Turning it off keeps both counts. */
+  readonly countIn: boolean;
+  /** Clicks before the first loop, 0–8. */
+  readonly initialCountIn: number;
+  /** Clicks before each repeat, 0–8. Stored only; no playback effect yet. */
+  readonly repeatCountIn: number;
 }
 
 /** The numeric fields adjusted by steppers. */
-export type SettingField = 'bpm' | 'beats';
+export type SettingField = 'bpm' | 'beats' | 'initialCountIn' | 'repeatCountIn';
 
 export const MIN_BEATS = 1;
 export const MAX_BEATS = 16;
 
+export const MIN_COUNT_IN = 0;
+export const MAX_COUNT_IN = 8;
+export const DEFAULT_INITIAL_COUNT_IN = 4;
+export const DEFAULT_REPEAT_COUNT_IN = 2;
+
 export const DEFAULT_SETTINGS: Readonly<MetronomeSettings> = Object.freeze({
   bpm: 85,
   beats: 4,
-  subdivision: DEFAULT_SUBDIVISION
+  subdivision: DEFAULT_SUBDIVISION,
+  countIn: true,
+  initialCountIn: DEFAULT_INITIAL_COUNT_IN,
+  repeatCountIn: DEFAULT_REPEAT_COUNT_IN
 });
 
 const LIMITS: Record<SettingField, readonly [number, number]> = {
   bpm: [MIN_BPM, MAX_BPM],
-  beats: [MIN_BEATS, MAX_BEATS]
+  beats: [MIN_BEATS, MAX_BEATS],
+  initialCountIn: [MIN_COUNT_IN, MAX_COUNT_IN],
+  repeatCountIn: [MIN_COUNT_IN, MAX_COUNT_IN]
 };
 
 function clampTo(v: number, [min, max]: readonly [number, number]): number {
@@ -39,6 +55,16 @@ export const clampBpm = (v: number): number => clampTo(v, LIMITS.bpm);
 
 /** 1–16, rounded; NaN → 1. */
 export const clampBeats = (v: number): number => clampTo(v, LIMITS.beats);
+
+/** 0–8, rounded; NaN → `fallback`. */
+export function clampCount(v: number, fallback: number): number {
+  if (Number.isNaN(v)) return fallback;
+  return clampTo(v, [MIN_COUNT_IN, MAX_COUNT_IN]);
+}
+
+/** Clicks in the count-in of a run: the Initial Count In when the switch is on, else 0. */
+export const effectiveCountIn = (s: MetronomeSettings): number =>
+  s.countIn ? s.initialCountIn : 0;
 
 /** A number or numeric string that is one of 1-8, otherwise null. Never throws. */
 export function toSubdivision(v: unknown): Subdivision | null {

@@ -1,39 +1,60 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import type { DotState } from '$lib/state/metronome-view';
-  import { statusParams } from '$lib/state/metronome-view';
+  import type { CountInView, DotState } from '$lib/state/metronome-view';
+  import { countInDot, statusParams } from '$lib/state/metronome-view';
 
   let {
     beat,
     beats,
     bpm,
     sub,
-    dots
-  }: { beat: number; beats: number; bpm: number; sub: number; dots: readonly DotState[] } =
-    $props();
+    dots,
+    countIn = null
+  }: {
+    beat: number;
+    beats: number;
+    bpm: number;
+    sub: number;
+    dots: readonly DotState[];
+    countIn?: CountInView | null;
+  } = $props();
 
-  const status = $derived(statusParams(beat, beats, sub));
+  const status = $derived(statusParams(beat, beats, sub, countIn));
 </script>
 
 <div class="status">
   <p class="position">
-    <span class="part"
-      >{#if status.kind === 'beat'}{m.metronome_status_beat({
-          beat: status.beat,
-          beats: status.beats
-        })}{:else}{m.metronome_status_beat_none({ beats: status.beats })}{/if}</span
-    ><span class="sep">{m.summary_separator()}</span><span class="part"
-      >{m.metronome_status_sub({ count: status.sub })}</span
-    >
+    {#if status.kind === 'count-in'}
+      <span class="part">{m.metronome_status_count_in({ click: status.click, count: status.total })}</span>
+    {:else if status.kind === 'count-in-none'}
+      <span class="part">{m.metronome_status_count_in_none({ count: status.total })}</span>
+    {:else}
+      <span class="part"
+        >{#if status.kind === 'beat'}{m.metronome_status_beat({
+            beat: status.beat,
+            beats: status.beats
+          })}{:else}{m.metronome_status_beat_none({ beats: status.beats })}{/if}</span
+      ><span class="sep">{m.summary_separator()}</span><span class="part"
+        >{m.metronome_status_sub({ count: status.sub })}</span
+      >
+    {/if}
   </p>
   <p class="tempo">
     <span class="digits">{bpm}</span> <span class="unit">{m.metronome_bpm_unit()}</span>
   </p>
-  <ol class="dots" aria-hidden="true">
-    {#each dots as state, i (i)}
-      <li class="dot" data-state={state}></li>
-    {/each}
-  </ol>
+  {#if countIn}
+    <ol class="dots count-in" aria-hidden="true">
+      {#key countIn.click}
+        <li class="dot pulse" data-state={countInDot(countIn.click)}></li>
+      {/key}
+    </ol>
+  {:else}
+    <ol class="dots" aria-hidden="true">
+      {#each dots as state, i (i)}
+        <li class="dot" data-state={state}></li>
+      {/each}
+    </ol>
+  {/if}
 </div>
 
 <style>
@@ -99,6 +120,16 @@
     opacity: var(--emph-dim-opacity);
   }
 
+  .dot.pulse[data-state='lit'] {
+    animation: count-in-pulse var(--duration-base) var(--ease-standard);
+  }
+
+  @keyframes count-in-pulse {
+    50% {
+      transform: scale(var(--metronome-pulse-scale));
+    }
+  }
+
   /* Forced colours repaint backgrounds: keep lit, played and idle dots apart by fill and outline. */
   @media (forced-colors: active) {
     .dot {
@@ -122,6 +153,10 @@
   @media (prefers-reduced-motion: reduce) {
     .dot {
       transition: none;
+    }
+
+    .dot.pulse[data-state='lit'] {
+      animation: none;
     }
   }
 </style>

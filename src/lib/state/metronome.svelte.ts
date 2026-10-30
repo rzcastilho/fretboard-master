@@ -12,25 +12,35 @@ import { m } from '$lib/paraglide/messages.js';
 import {
   clampBeats,
   clampBpm,
+  clampCount,
+  DEFAULT_INITIAL_COUNT_IN,
+  DEFAULT_REPEAT_COUNT_IN,
   DEFAULT_SETTINGS,
+  effectiveCountIn,
   stepSetting,
   toSubdivision,
   type MetronomeSettings
 } from './metronome-settings';
 import { subdivisionName } from './metronome-subdivision-names';
-import { beatDots, type DotState } from './metronome-view';
+import { beatDots, type CountInView, type DotState } from './metronome-view';
 import { playback } from './playback.svelte';
 
 export type RunPhase = 'settings' | 'starting' | 'running' | 'paused';
 
 interface SegmentOptions {
   readonly startBeat: number;
+  readonly countIn?: { readonly from: number; readonly total: number };
 }
+
+type Stage = 'count-in' | 'loop';
 
 const state = $state<{
   phase: RunPhase;
   settings: MetronomeSettings;
   beat: number;
+  stage: Stage;
+  countInClick: number;
+  countInTotal: number;
   announcement: string;
   soundNotice: boolean;
   generation: number;
@@ -38,6 +48,9 @@ const state = $state<{
   phase: 'settings',
   settings: DEFAULT_SETTINGS,
   beat: 0,
+  stage: 'loop',
+  countInClick: 0,
+  countInTotal: 0,
   announcement: '',
   soundNotice: false,
   generation: 0
@@ -62,7 +75,7 @@ function realFrames(): SchedulerDeps['frames'] {
 }
 
 /** Begin a click segment. The unlock must happen in this call stack: it is the user's gesture. */
-function beginSegment({ startBeat }: SegmentOptions): void {
+function beginSegment({ startBeat, countIn }: SegmentOptions): void {
   const unlocked = playback.clickSink();
   const sink = 'sink' in overrides ? (overrides.sink ?? null) : unlocked;
   const generation = ++state.generation;
@@ -71,6 +84,12 @@ function beginSegment({ startBeat }: SegmentOptions): void {
       onBeat(beat) {
         if (scheduler !== live || state.generation !== generation) return;
         state.beat = beat;
+        state.stage = 'loop';
+        if (state.phase === 'starting') state.phase = 'running';
+      },
+      onCountIn(click) {
+        if (scheduler !== live || state.generation !== generation) return;
+        state.countInClick = click;
         if (state.phase === 'starting') state.phase = 'running';
       },
       onSuspended() {
@@ -92,34 +111,51 @@ function beginSegment({ startBeat }: SegmentOptions): void {
     beats: state.settings.beats,
     startBeat,
     clicksPerBeat: state.settings.subdivision,
+    ...(countIn ? { countIn } : {}),
     run: generation,
     pressedAtMs: performance.now()
   });
 }
 
 function start(): void {
+  const k = effectiveCountIn(state.settings);
   state.soundNotice = false;
   state.beat = 0;
-  state.announcement = m.metronome_announce_started({
+  state.stage = k > 0 ? 'count-in' : 'loop';
+  state.countInClick = 0;
+  state.countInTotal = k;
+  const params = {
     bpm: state.settings.bpm,
     beats: state.settings.beats,
     subdivision: subdivisionName(state.settings.subdivision)
-  });
-  beginSegment({ startBeat: 1 });
+  };
+  state.announcement =
+    k > 0
+      ? m.metronome_announce_started_count_in({ ...params, count: k })
+      : m.metronome_announce_started(params);
+  beginSegment(k > 0 ? { startBeat: 1, countIn: { from: 0, total: k } } : { startBeat: 1 });
 }
 
 function pauseState(): void {
   state.generation++;
   state.phase = 'paused';
-  state.announcement = m.metronome_announce_paused({
-    beat: state.beat,
-    beats: state.settings.beats
-  });
+  state.announcement =
+    state.stage === 'count-in'
+      ? state.countInClick > 0
+        ? m.metronome_announce_paused_count_in({
+            click: state.countInClick,
+            count: state.countInTotal
+          })
+        : m.metronome_announce_paused_count_in_none({ count: state.countInTotal })
+      : m.metronome_announce_paused({ beat: state.beat, beats: state.settings.beats });
 }
 
 function pause(): void {
-  const frozen = scheduler?.halt('pause') ?? 0;
-  if (frozen > 0) state.beat = frozen;
+  const frozen = scheduler?.halt('pause');
+  if (frozen?.kind === 'beat') {
+    state.beat = frozen.beat;
+    state.stage = 'loop';
+  } else if (frozen?.kind === 'count-in') state.countInClick = frozen.click;
   scheduler = null;
   pauseState();
 }
@@ -127,7 +163,22 @@ function pause(): void {
 function resume(): void {
   const { beats } = state.settings;
   state.announcement = m.metronome_announce_resumed();
+  if (state.stage === 'count-in') {
+    // Continue from the next count-in click; the loop's first beat follows the last one.
+    beginSegment({
+      startBeat: 1,
+      countIn: { from: state.countInClick, total: state.countInTotal }
+    });
+    return;
+  }
   beginSegment({ startBeat: state.beat === 0 ? 1 : (state.beat % beats) + 1 });
+}
+
+function clearRun(): void {
+  state.beat = 0;
+  state.stage = 'loop';
+  state.countInClick = 0;
+  state.countInTotal = 0;
 }
 
 function reset(): void {
@@ -136,7 +187,7 @@ function reset(): void {
   scheduler = null;
   state.generation++;
   state.phase = 'settings';
-  state.beat = 0;
+  clearRun();
   state.soundNotice = false;
   state.announcement = m.metronome_announce_reset();
 }
@@ -154,6 +205,17 @@ function step(field: 'bpm' | 'beats', dir: 1 | -1): void {
   state.settings = stepSetting(state.settings, field, dir);
 }
 
+function setCount(field: 'initialCountIn' | 'repeatCountIn', v: number): void {
+  if (state.phase !== 'settings') return;
+  const fallback = field === 'initialCountIn' ? DEFAULT_INITIAL_COUNT_IN : DEFAULT_REPEAT_COUNT_IN;
+  state.settings = { ...state.settings, [field]: clampCount(v, fallback) };
+}
+
+function stepCount(field: 'initialCountIn' | 'repeatCountIn', dir: 1 | -1): void {
+  if (state.phase !== 'settings') return;
+  state.settings = stepSetting(state.settings, field, dir);
+}
+
 export const metronome = {
   get phase(): RunPhase {
     return state.phase;
@@ -164,8 +226,16 @@ export const metronome = {
   get beat(): number {
     return state.beat;
   },
+  /** Non-null only while a run is showing its count-in. */
+  get countIn(): CountInView | null {
+    return state.phase !== 'settings' && state.stage === 'count-in'
+      ? { click: state.countInClick, total: state.countInTotal }
+      : null;
+  },
   get dots(): readonly DotState[] {
-    return state.phase === 'settings' ? [] : beatDots(state.settings.beats, state.beat);
+    return state.phase === 'settings' || state.stage === 'count-in'
+      ? []
+      : beatDots(state.settings.beats, state.beat);
   },
   get announcement(): string {
     return state.announcement;
@@ -181,6 +251,16 @@ export const metronome = {
   stepBpm: (dir: 1 | -1): void => step('bpm', dir),
   setBeats: (v: number): void => setField('beats', v),
   stepBeats: (dir: 1 | -1): void => step('beats', dir),
+  /** Settings phase only; non-booleans are ignored. Turning it off keeps both counts. */
+  setCountIn: (v: unknown): void => {
+    if (state.phase === 'settings' && typeof v === 'boolean') {
+      state.settings = { ...state.settings, countIn: v };
+    }
+  },
+  setInitialCountIn: (v: number): void => setCount('initialCountIn', v),
+  stepInitialCountIn: (dir: 1 | -1): void => stepCount('initialCountIn', dir),
+  setRepeatCountIn: (v: number): void => setCount('repeatCountIn', v),
+  stepRepeatCountIn: (dir: 1 | -1): void => stepCount('repeatCountIn', dir),
   /** Settings phase only; values that are not one of the eight subdivisions are ignored. */
   setSubdivision: (v: unknown): void => {
     if (state.phase !== 'settings') return;
@@ -208,19 +288,22 @@ export const metronome = {
     scheduler = null;
     state.phase = 'settings';
     state.settings = DEFAULT_SETTINGS;
-    state.beat = 0;
+    clearRun();
     state.soundNotice = false;
   }
 };
 
 /** Test seam: inject scheduler deps (fake clock/frames/sink) and reset all state. Vitest only. */
-export function resetMetronomeForTests(deps: Partial<SchedulerDeps> = {}): void {
+export function resetMetronomeForTests(
+  deps: Partial<SchedulerDeps> = {},
+  settings: Partial<MetronomeSettings> = {}
+): void {
   scheduler?.halt('leave');
   scheduler = null;
   overrides = deps;
   state.phase = 'settings';
-  state.settings = DEFAULT_SETTINGS;
-  state.beat = 0;
+  state.settings = { ...DEFAULT_SETTINGS, ...settings };
+  clearRun();
   state.announcement = '';
   state.soundNotice = false;
   state.generation = 0;

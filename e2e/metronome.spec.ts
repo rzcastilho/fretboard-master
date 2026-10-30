@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { injectAudioFault, injectFault, readAudioLog } from './support/helpers';
+import { countInOff, injectAudioFault, injectFault, readAudioLog } from './support/helpers';
 
 async function clicks(page: Page) {
   return (await readAudioLog(page)).flatMap((e) => (e.type === 'click' ? [e] : []));
@@ -20,6 +20,7 @@ test.describe('metronome: steady click (US1)', () => {
       .click();
     await expect(page).toHaveURL(/\/metronome$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Metronome' })).toBeVisible();
+    await countInOff(page);
     await start(page).click(); // click 2 of 2 on the way to a running click (SC-005)
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
     await expect(page.locator('.dot')).toHaveCount(4);
@@ -59,6 +60,7 @@ test.describe('metronome: steady click (US1)', () => {
   test('US1-2: with 2 beats the status reads BEAT n/2', async ({ page }) => {
     await page.goto('/metronome');
     await page.getByRole('slider', { name: '# of Beats' }).fill('2');
+    await countInOff(page);
     await start(page).click();
     await expect(page.locator('.position')).toHaveText(/BEAT [12]\/2 · SUB 3/);
   });
@@ -67,6 +69,7 @@ test.describe('metronome: steady click (US1)', () => {
     page
   }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThan(0);
     const [first] = await clicks(page);
@@ -79,6 +82,7 @@ test.describe('metronome: steady click (US1)', () => {
     page
   }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThan(0);
     await page.evaluate(() => {
@@ -98,6 +102,7 @@ test.describe('metronome: steady click (US1)', () => {
 
   test('FR-018: muting mid-run keeps the status stepping', async ({ page }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
     await page.getByRole('button', { name: /Mute sound/ }).click();
@@ -116,6 +121,7 @@ test.describe('metronome: steady click (US1)', () => {
   }) => {
     await injectAudioFault(page, 'context');
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     const notice = page.getByText('Sound is unavailable; the beat is shown visually.');
     await expect(notice).toBeVisible();
@@ -158,6 +164,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     page
   }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     await expect(page.locator('.position')).toHaveText('BEAT 3/4 · SUB 3', { timeout: 10_000 });
     await pause(page).click();
@@ -186,11 +193,13 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
 
   test('US2-3: Reset returns to the settings view with the values kept', async ({ page }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
     await reset(page).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
     await expect(start(page)).toBeFocused();
+    await countInOff(page);
     await start(page).click();
     await expect(page.locator('.digits')).toHaveText('85');
     await expect(page.locator('.dot')).toHaveCount(4);
@@ -221,6 +230,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     page
   }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
     await page.getByRole('link', { name: 'Fretboard Notes', exact: true }).first().click();
@@ -230,6 +240,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     expect(
       (await readAudioLog(page)).some((e) => e.type === 'click-cancel' && e.reason === 'leave')
     ).toBe(true);
+    await countInOff(page);
     await start(page).click();
     await expect(page.locator('.digits')).toHaveText('85');
     await expect(page.locator('.dot')).toHaveCount(4);
@@ -292,6 +303,7 @@ test.describe('metronome: tempo and beats (US3)', () => {
     await page.goto('/metronome');
     await bpmSlider(page).fill('120');
     await beatsSlider(page).fill('6');
+    await countInOff(page);
     await start(page).click();
     await expect(page.locator('.digits')).toHaveText('120');
     await expect(page.locator('.dot')).toHaveCount(6);

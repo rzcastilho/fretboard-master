@@ -26,8 +26,17 @@ function setup(opts: { sink?: 'none' | 'ok' | 'unavailable' } = {}) {
           running: Promise.resolve(opts.sink !== 'unavailable')
         };
   const beats: number[] = [];
+  const order: string[] = [];
+  const countIns: number[] = [];
   const events: SchedulerEvents = {
-    onBeat: (b) => beats.push(b),
+    onBeat: (b) => {
+      beats.push(b);
+      order.push('beat');
+    },
+    onCountIn: (c) => {
+      countIns.push(c);
+      order.push('count-in');
+    },
     onSuspended: vi.fn(),
     onSoundUnavailable: vi.fn()
   };
@@ -55,7 +64,7 @@ function setup(opts: { sink?: 'none' | 'ok' | 'unavailable' } = {}) {
   };
   const starts = (): number[] =>
     port.sources.flatMap((s) => (s as unknown as FakeSource).startCalls);
-  return { port, clock, frames, events, beats, scheduler, advance, begin, starts };
+  return { port, clock, frames, events, beats, countIns, order, scheduler, advance, begin, starts };
 }
 
 describe('click grid maths', () => {
@@ -144,10 +153,10 @@ describe('createClickScheduler', () => {
     frames.flush();
     expect(beats.at(-1)).toBe(3);
     const frozen = scheduler.halt('pause');
-    expect(frozen).toBe(3);
+    expect(frozen).toEqual({ kind: 'beat', beat: 3 });
     const startsBefore = port.sources.length;
     beats.length = 0;
-    await begin({ startBeat: (frozen % 4) + 1 });
+    await begin({ startBeat: ((frozen.kind === 'beat' ? frozen.beat : 0) % 4) + 1 });
     for (let i = 0; i < 100; i++) {
       advance(25);
       frames.flush();
@@ -405,7 +414,7 @@ describe('high-speed exactness (032 US3)', () => {
       const future = (port.sources as unknown as FakeSource[]).filter((s) => s.startCalls[0] > t);
       expect(future.length).toBeGreaterThan(0);
       const beat = scheduler.halt('pause');
-      expect(beat).toBe(2);
+      expect(beat).toEqual({ kind: 'beat', beat: 2 });
       for (const s of future) expect(s.stopCalls.length).toBe(1);
       const count = starts().length;
       advance(5000);
@@ -421,18 +430,18 @@ describe('high-speed exactness (032 US3)', () => {
   it('T031: halt before any click sounded returns 0', async () => {
     const { scheduler, begin } = setup();
     await begin({ bpm: 120, clicksPerBeat: 4 });
-    expect(scheduler.halt('pause')).toBe(0);
+    expect(scheduler.halt('pause')).toEqual({ kind: 'none' });
   });
 
   it('T031: pausing right after a beat click, and after some soft clicks, returns that beat', async () => {
     const a = setup();
     await a.begin({ bpm: 120, clicksPerBeat: 4 });
     a.advance(1030, 1); // beat 3 click at 1.02 only
-    expect(a.scheduler.halt('pause')).toBe(3);
+    expect(a.scheduler.halt('pause')).toEqual({ kind: 'beat', beat: 3 });
     const b = setup();
     await b.begin({ bpm: 120, clicksPerBeat: 4 });
     b.advance(1020 + 130 + 10, 1); // beat 3 + two soft clicks
-    expect(b.scheduler.halt('pause')).toBe(3);
+    expect(b.scheduler.halt('pause')).toEqual({ kind: 'beat', beat: 3 });
   });
 
   it('T031: resume begins with the next beat click ≤ 50 ms after the press, then its sub clicks', async () => {
@@ -440,10 +449,10 @@ describe('high-speed exactness (032 US3)', () => {
     await begin({ bpm: 120, clicksPerBeat: 3 });
     advance(1100, 1);
     const frozen = scheduler.halt('pause');
-    expect(frozen).toBe(3);
+    expect(frozen).toEqual({ kind: 'beat', beat: 3 });
     const before = port.sources.length;
     const pressed = port.currentTime;
-    await begin({ startBeat: (frozen % 4) + 1, clicksPerBeat: 3, run: 2 });
+    await begin({ startBeat: ((frozen.kind === 'beat' ? frozen.beat : 0) % 4) + 1, clicksPerBeat: 3, run: 2 });
     advance(400, 1);
     const fresh = (port.sources.slice(before) as unknown as FakeSource[]).map(
       (s) => [s.startCalls[0], s.buffer] as const
@@ -488,5 +497,228 @@ describe('high-speed exactness (032 US3)', () => {
       expect(2 + k * step).toBeGreaterThanOrEqual(now + START_LEAD_S - 1e-9);
       if (k > 0) expect(2 + (k - 1) * step).toBeLessThan(now + START_LEAD_S);
     }
+  });
+});
+
+describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
+  it('E1: absent countIn, total = from and total 0 reproduce the 032 schedule', async () => {
+    const runs: number[][] = [];
+    for (const countIn of [undefined, { from: 2, total: 2 }, { from: 0, total: 0 }]) {
+      const { scheduler, begin, advance, starts, port } = setup();
+      port.currentTime = 5;
+      await begin({ bpm: 100, clicksPerBeat: 3, countIn });
+      advance(4000);
+      runs.push(starts());
+      scheduler.halt('leave');
+    }
+    expect(runs[1]).toEqual(runs[0]);
+    expect(runs[2]).toEqual(runs[0]);
+  });
+
+  it('E2: grid timing over BPM 30–300 × r 0–8 × n 1–8 and one beat between last count-in and first loop', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 30, max: 300 }),
+        fc.integer({ min: 0, max: 8 }),
+        fc.integer({ min: 1, max: 8 }),
+        (bpm, r, n) => {
+          const T = 60 / bpm;
+          const seg = {
+            anchor: 3.5,
+            period: T,
+            perBeat: n,
+            startBeat: 1,
+            beats: 4,
+            countInRemaining: r,
+            countInFrom: 0
+          };
+          for (let i = 0; i < r; i++) {
+            expect(Math.abs(clickAt(seg, i).when - (3.5 + i * T))).toBeLessThan(0.002);
+          }
+          for (let j = 0; j < 20; j++) {
+            const ideal = 3.5 + r * T + (j * T) / n;
+            expect(Math.abs(clickAt(seg, r + j).when - ideal)).toBeLessThan(0.002);
+          }
+          if (r > 0) {
+            expect(
+              Math.abs(clickAt(seg, r).when - clickAt(seg, r - 1).when - T)
+            ).toBeLessThan(0.002);
+          }
+        }
+      )
+    );
+  });
+
+  it('E3: count-in clicks are accented, no sub/normal precedes the first loop click', async () => {
+    const { scheduler, begin, advance, starts, port } = setup();
+    await begin({ bpm: 120, clicksPerBeat: 3, countIn: { from: 0, total: 3 } });
+    advance(3000);
+    const sources = port.sources as unknown as FakeSource[];
+    const accent = sources[0].buffer;
+    for (let i = 0; i < 3; i++) {
+      expect(sources[i].buffer).toBe(accent);
+      expect(sources[i].startCalls.length).toBe(1);
+    }
+    expect(sources[3].buffer).toBe(accent); // loop beat 1 is accented too
+    expect(sources[4].buffer).not.toBe(accent); // then a sub click
+    expect(starts().length).toBeGreaterThan(5);
+    scheduler.halt('leave');
+  });
+
+  it('E4: the first click (count-in) is at anchor within START_LEAD_S', async () => {
+    const { scheduler, begin, starts, port } = setup();
+    port.currentTime = 10;
+    await begin({ countIn: { from: 0, total: 4 } });
+    expect(starts()[0]).toBeCloseTo(10 + START_LEAD_S, 9);
+    scheduler.halt('leave');
+  });
+
+  it('E5: onCountIn(from+c+1) once per count-in click, then onBeat; never interleaved', async () => {
+    const { scheduler, begin, advance, frames, countIns, beats, order } = setup();
+    await begin({ bpm: 120, countIn: { from: 1, total: 4 } });
+    for (let i = 0; i < 160; i++) {
+      advance(25);
+      frames.flush();
+    }
+    expect(countIns).toEqual([2, 3, 4]);
+    expect(beats.slice(0, 3)).toEqual([1, 2, 3]);
+    expect(order.slice(0, 5)).toEqual(['count-in', 'count-in', 'count-in', 'beat', 'beat']);
+    expect(order.lastIndexOf('count-in')).toBeLessThan(order.indexOf('beat'));
+    scheduler.halt('leave');
+  });
+
+  it('E6: halt returns the last audible slot and stops pending sources', async () => {
+    const mid = setup();
+    await mid.begin({ bpm: 60, countIn: { from: 0, total: 4 } });
+    mid.advance(1500); // clicks at .02, 1.02 sounded
+    const pendingSources = (mid.port.sources as unknown as FakeSource[]).filter(
+      (s) => s.startCalls[0] > mid.port.currentTime
+    );
+    expect(pendingSources.length).toBeGreaterThan(0);
+    expect(mid.scheduler.halt('pause')).toEqual({ kind: 'count-in', click: 2 });
+    for (const s of pendingSources) expect(s.stopCalls.length).toBe(1);
+
+    const loop = setup();
+    await loop.begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    loop.advance(1600); // loop beat 2 at 1.52
+    expect(loop.scheduler.halt('pause')).toEqual({ kind: 'beat', beat: 2 });
+
+    const none = setup();
+    await none.begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    expect(none.scheduler.halt('pause')).toEqual({ kind: 'none' });
+    expect(none.scheduler.halt('pause')).toEqual({ kind: 'none' });
+  });
+
+  it('E7: after a pump gap nothing in the past is scheduled; past the count-in reports onBeat', async () => {
+    const { port, scheduler, begin, advance, frames, starts, countIns, beats } = setup();
+    await begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    advance(25);
+    frames.flush();
+    countIns.length = 0;
+    const n = starts().length;
+    port.currentTime += 10.1;
+    const now = port.currentTime;
+    advance(25);
+    frames.flush();
+    const added = starts().slice(n);
+    expect(added.length).toBeGreaterThan(0);
+    expect(added.every((w) => w >= now)).toBe(true);
+    expect(countIns).toEqual([]);
+    expect(beats.length).toBeGreaterThan(0);
+    scheduler.halt('leave');
+  });
+
+  it('E8: a second start() while live is ignored', async () => {
+    const { port, scheduler, begin } = setup();
+    await begin({ countIn: { from: 0, total: 4 } });
+    const n = port.sources.length;
+    scheduler.start({
+      bpm: 200,
+      beats: 3,
+      startBeat: 1,
+      clicksPerBeat: 1,
+      countIn: { from: 0, total: 8 },
+      run: 2,
+      pressedAtMs: 0
+    });
+    await Promise.resolve();
+    expect(port.sources.length).toBe(n);
+    scheduler.halt('leave');
+  });
+
+  it('E9: with no sink the same grid drives onCountIn then onBeat from the clock', async () => {
+    const { scheduler, begin, advance, frames, countIns, beats } = setup({ sink: 'none' });
+    await begin({ bpm: 120, countIn: { from: 2, total: 4 } });
+    for (let i = 0; i < 100; i++) {
+      advance(25);
+      frames.flush();
+    }
+    expect(countIns).toEqual([3, 4]);
+    expect(beats.slice(0, 2)).toEqual([1, 2]);
+    scheduler.halt('leave');
+  });
+
+  it('plays clicks 3 and 4 then the loop for {from:2,total:4}; invalid specs fall back to none', async () => {
+    const ok = setup();
+    ok.port.currentTime = 1;
+    await ok.begin({ bpm: 60, countIn: { from: 2, total: 4 } });
+    ok.advance(3000);
+    const t = ok.starts();
+    expect(t[1] - t[0]).toBeCloseTo(1, 9);
+    expect(t[2] - t[1]).toBeCloseTo(1, 9);
+    ok.scheduler.halt('leave');
+
+    const plain = setup();
+    plain.port.currentTime = 1;
+    await plain.begin({ bpm: 60 });
+    plain.advance(3000);
+    for (const bad of [
+      { from: 0, total: 2.5 },
+      { from: 3, total: 2 },
+      { from: 0, total: 9 },
+      { from: -1, total: 2 }
+    ]) {
+      const bx = setup();
+      bx.port.currentTime = 1;
+      await bx.begin({ bpm: 60, countIn: bad });
+      bx.advance(3000);
+      expect(bx.starts()).toEqual(plain.starts());
+      bx.scheduler.halt('leave');
+    }
+    plain.scheduler.halt('leave');
+  });
+
+  it('clickAt carries countIn and negative slots on the combined grid', () => {
+    const seg = {
+      anchor: 0,
+      period: 0.5,
+      perBeat: 2,
+      startBeat: 1,
+      beats: 4,
+      countInRemaining: 2,
+      countInFrom: 2
+    };
+    expect(clickAt(seg, 0)).toMatchObject({ slot: -2, beat: 0, countIn: 3, kind: 'accent' });
+    expect(clickAt(seg, 1)).toMatchObject({ slot: -1, countIn: 4 });
+    expect(clickAt(seg, 2)).toMatchObject({ slot: 0, beat: 1, countIn: null, kind: 'accent' });
+    expect(clickAt(seg, 3)).toMatchObject({ slot: 0, kind: 'sub', when: 1.25 });
+    expect(skipTo(seg, 0.6)).toBe(2);
+  });
+
+  it('log entries carry countIn and negative slot', async () => {
+    globalThis.__fmAudioLog = [];
+    const { scheduler, begin, advance } = setup();
+    await begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    advance(2000);
+    scheduler.halt('leave');
+    const clicks = (globalThis.__fmAudioLog as unknown as { type: string }[]).filter(
+      (e) => e.type === 'click'
+    ) as unknown as { index: number; slot: number; beat: number; countIn: number | null }[];
+    expect(clicks.slice(0, 3).map((c) => [c.index, c.slot, c.beat, c.countIn])).toEqual([
+      [0, -2, 0, 1],
+      [1, -1, 0, 2],
+      [2, 0, 1, null]
+    ]);
+    globalThis.__fmAudioLog = [];
   });
 });

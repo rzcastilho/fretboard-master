@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { readAudioLog } from './support/helpers';
+import { countInOff, readAudioLog } from './support/helpers';
 
 async function clicks(page: Page) {
   return (await readAudioLog(page)).flatMap((e) => (e.type === 'click' ? [e] : []));
@@ -12,6 +12,7 @@ const select = (page: Page) => page.getByRole('combobox', { name: 'Loop 1' });
 test.describe('metronome subdivisions: hear them (US1)', () => {
   test('US1-1: default places two soft clicks at +1/3 and +2/3 of each beat', async ({ page }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThanOrEqual(12);
     const log = await clicks(page);
@@ -33,6 +34,7 @@ test.describe('metronome subdivisions: hear them (US1)', () => {
   test('US1-2: Quarter notes plays no sub clicks and reads SUB 1', async ({ page }) => {
     await page.goto('/metronome');
     await select(page).selectOption('1');
+    await countInOff(page);
     await start(page).click();
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThanOrEqual(4);
     expect((await clicks(page)).filter((c) => c.kind === 'sub')).toHaveLength(0);
@@ -44,6 +46,7 @@ test.describe('metronome subdivisions: hear them (US1)', () => {
   }) => {
     await page.goto('/metronome');
     await page.getByRole('slider', { name: '# of Beats' }).fill('2');
+    await countInOff(page);
     await start(page).click();
     await expect(page.locator('.dot')).toHaveCount(2);
     await expect(page.locator('.position')).toHaveText('BEAT 2/2 · SUB 3', { timeout: 5000 });
@@ -51,6 +54,7 @@ test.describe('metronome subdivisions: hear them (US1)', () => {
 
   test('US1-4: the lit dot changes once per slot, not per sub click', async ({ page }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     const changes: string[] = [];
     let last = '';
@@ -87,6 +91,7 @@ test.describe('metronome subdivisions: dropdown (US2)', () => {
     }) => {
       await page.goto('/metronome');
       await select(page).selectOption(String(n));
+      await countInOff(page);
       await start(page).click();
       await expect(page.locator('.position')).toHaveText(new RegExp(`SUB ${n}$`));
       await expect.poll(async () => (await clicks(page)).length).toBeGreaterThanOrEqual(n * 2 + 1);
@@ -114,6 +119,7 @@ test.describe('metronome subdivisions: dropdown (US2)', () => {
   }) => {
     await page.goto('/metronome');
     await select(page).selectOption('6');
+    await countInOff(page);
     await start(page).click();
     await page.getByRole('button', { name: 'Reset' }).click();
     await expect(select(page)).toHaveValue('6');
@@ -169,6 +175,7 @@ test.describe('metronome subdivisions: exact at high speed (US3)', () => {
     await page.getByRole('slider', { name: 'BPM' }).focus();
     await page.keyboard.press('End');
     await select(page).selectOption('8');
+    await countInOff(page);
     await start(page).click();
     await expect
       .poll(async () => (await clicks(page)).length, { timeout: 10_000 })
@@ -189,6 +196,7 @@ test.describe('metronome subdivisions: exact at high speed (US3)', () => {
     await page.getByRole('slider', { name: 'BPM' }).focus();
     await page.keyboard.press('Home');
     await select(page).selectOption('8');
+    await countInOff(page);
     await start(page).click();
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThanOrEqual(4);
     await page.getByRole('button', { name: 'Pause' }).click();
@@ -217,6 +225,7 @@ test.describe('metronome subdivisions: exact at high speed (US3)', () => {
     page
   }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await start(page).click();
     const main = page.getByRole('button', { name: /^(Pause|Resume)$/ });
     for (let i = 0; i < 4; i++) {

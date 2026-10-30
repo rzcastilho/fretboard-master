@@ -153,3 +153,9 @@ export async function expandDetails(page: Page): Promise<void> {
   const show = page.getByRole('button', { name: 'Show details' });
   if ((await show.count()) > 0) await show.click();
 }
+
+/** Switch Count In off before Start (033), so tests of the loop itself begin on beat 1. */
+export async function countInOff(page: Page): Promise<void> {
+  const sw = page.getByRole('switch', { name: 'Count In' });
+  if ((await sw.getAttribute('aria-checked')) === 'true') await sw.click();
+}

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClickSink } from '../../../src/lib/audio/metronome';
 import MetronomePanel from '../../../src/lib/tools/metronome/MetronomePanel.svelte';
 import { language, resetLanguageForTests } from '../../../src/lib/state/language.svelte';
+import { DEFAULT_SETTINGS } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames } from '../audio/support/fake-audio';
@@ -41,7 +42,7 @@ beforeEach(() => {
     running: Promise.resolve(true)
   };
   vi.spyOn(playback, 'clickSink').mockReturnValue(sink);
-  resetMetronomeForTests({ clock, frames });
+  resetMetronomeForTests({ clock, frames }, { countIn: false });
 });
 
 afterEach(() => {
@@ -72,6 +73,33 @@ describe('MetronomePanel status line (032)', () => {
     advance(0.2);
     await settle();
     expect(position()).toBe('BEAT 1/4 · SUB 3');
+  });
+});
+
+describe('MetronomePanel count-in (033)', () => {
+  const position = (c: HTMLElement): string =>
+    c.querySelector('.position')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+  it('shows COUNT IN with one pulsing dot, then the beat row', async () => {
+    resetMetronomeForTests({ clock, frames }, { countIn: true });
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
+    expect(position(container)).toBe('COUNT IN –/4');
+    let dots = container.querySelectorAll('.dot');
+    expect(dots).toHaveLength(1);
+    expect(dots[0].getAttribute('data-state')).toBe('upcoming');
+    expect(dots[0].closest('[aria-hidden="true"]')).toBeTruthy();
+    await settle();
+    advance(0.1);
+    await settle();
+    expect(position(container)).toBe('COUNT IN 1/4');
+    dots = container.querySelectorAll('.dot');
+    expect(dots).toHaveLength(1);
+    expect(dots[0].getAttribute('data-state')).toBe('lit');
+    advance(4 * (60 / 85));
+    await settle();
+    expect(position(container)).toBe('BEAT 1/4 · SUB 3');
+    expect(container.querySelectorAll('.dot')).toHaveLength(4);
   });
 });
 
@@ -258,7 +286,7 @@ describe('MetronomePanel settings rows (US3)', () => {
     expect(screen.queryByRole('slider')).toBeNull();
     metronome.setBpm(200);
     metronome.stepBeats(1);
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false });
   });
 });
 
