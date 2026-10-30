@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { countInOff, readAudioLog } from './support/helpers';
+import { countInOff, ratioOff, readAudioLog } from './support/helpers';
 
 async function clicks(page: Page) {
   return (await readAudioLog(page)).flatMap((e) => (e.type === 'click' ? [e] : []));
@@ -176,6 +176,7 @@ test.describe('metronome subdivisions: exact at high speed (US3)', () => {
     await page.keyboard.press('End');
     await select(page).selectOption('8');
     await countInOff(page);
+    await ratioOff(page);
     await start(page).click();
     await expect
       .poll(async () => (await clicks(page)).length, { timeout: 10_000 })

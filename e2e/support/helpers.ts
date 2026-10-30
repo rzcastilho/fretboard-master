@@ -159,3 +159,9 @@ export async function countInOff(page: Page): Promise<void> {
   const sw = page.getByRole('switch', { name: 'Count In' });
   if ((await sw.getAttribute('aria-checked')) === 'true') await sw.click();
 }
+
+/** Switch Subdivision ratio off before Start (034), so the loop repeats without alternating. */
+export async function ratioOff(page: Page): Promise<void> {
+  const sw = page.getByRole('switch', { name: 'Subdivision ratio' });
+  if ((await sw.getAttribute('aria-checked')) === 'true') await sw.click();
+}

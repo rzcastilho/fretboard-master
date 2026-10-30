@@ -9,7 +9,7 @@
   import CountInSettings from './CountInSettings.svelte';
   import RunControls from './RunControls.svelte';
   import StatusBox from './StatusBox.svelte';
-  import SubdivisionSelect from './SubdivisionSelect.svelte';
+  import RatioSettings from './RatioSettings.svelte';
   import ValueRow from './ValueRow.svelte';
 
   maybeFault('metronome');
@@ -97,7 +97,12 @@
       onrepeatset={(v) => metronome.setRepeatCountIn(v)}
       onrepeatstep={(d) => metronome.stepRepeatCountIn(d)}
     />
-    <SubdivisionSelect value={metronome.settings.subdivision} onchange={metronome.setSubdivision} />
+    <RatioSettings
+      settings={metronome.settings}
+      onswitch={(on) => metronome.setRatio(on)}
+      onloop1={metronome.setSubdivision}
+      onloop2={metronome.setLoop2}
+    />
     <button type="button" class="start" bind:this={startButton} onclick={start}>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"
         ><path d="M7 4l13 8-13 8z" /></svg
@@ -109,7 +114,7 @@
       beat={metronome.beat}
       beats={metronome.settings.beats}
       bpm={metronome.settings.bpm}
-      sub={metronome.settings.subdivision}
+      sub={metronome.sub}
       dots={metronome.dots}
       countIn={metronome.countIn}
     />

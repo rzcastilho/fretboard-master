@@ -81,11 +81,13 @@ export type AudioLogEntry =
       type: 'click';
       run: number;
       index: number;
-      /** Slot (beat position in the run; negative for count-in clicks) the click belongs to; soft clicks share their beat's slot. */
+      /** Run-global slot (count-in slots are 0 … k − 1); soft clicks share their beat's slot. */
       slot: number;
+      /** Beat within the current loop, 1…N; 0 for count-in clicks. */
       beat: number;
-      /** Count-in click number (1-based, in the run's numbering), else null. */
+      /** Click number (1-based) within its own count-in (initial or repeat), else null. */
       countIn: number | null;
+      phase: 'initial' | 'repeat' | 'loop1' | 'loop2';
       kind: ClickKind;
       accent: boolean;
       when: number;

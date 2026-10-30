@@ -7,6 +7,14 @@
 import { CLICK_S, renderClick, type ClickKind } from './click';
 import type { AudioPort, TimerClock } from './engine';
 import { log } from './log';
+import {
+  clickAt,
+  slotStart,
+  toRunPlan,
+  type CycleClick,
+  type RunPlan,
+  type SlotPosition
+} from './metronome-cycle';
 
 export const START_LEAD_S = 0.02;
 export const HORIZON_S = 1.5;
@@ -32,38 +40,35 @@ export interface SchedulerDeps {
 }
 
 export interface SchedulerEvents {
-  onBeat(beat: number): void;
-  /** A count-in click became audible; 1-based in the run's numbering (`from + 1 … total`). */
-  onCountIn(click: number): void;
+  /** A loop slot became audible; once per slot, never for sub-clicks. */
+  onBeat(beat: number, at: SlotPosition & { readonly kind: 'beat' }): void;
+  /** A count-in click (initial or repeat) became audible. */
+  onCountIn(click: number, at: SlotPosition & { readonly kind: 'count-in' }): void;
   onSuspended(): void;
   onSoundUnavailable(): void;
-}
-
-export interface CountInSpan {
-  /** Clicks already played, 0…total. */
-  readonly from: number;
-  /** Clicks in the whole count-in, 0–8. */
-  readonly total: number;
 }
 
 export interface SegmentStart {
   readonly bpm: number;
   readonly beats: number;
-  readonly startBeat: number;
-  /** Clicks per beat, 1–8: the beat click plus n − 1 soft ones. Anything else counts as 1. */
+  /** Loop 1 clicks per beat, 1–8: the beat click plus n − 1 soft ones. Anything else counts as 1. */
   readonly clicksPerBeat: number;
-  /** Accented count-in clicks before the loop; absent or invalid means none. */
-  readonly countIn?: CountInSpan;
+  /** Accented clicks before the first loop; absent or invalid means none. */
+  readonly initialCountIn?: number;
+  /** Loop 2 and the repeat count-in; absent means Loop 1 only. */
+  readonly alternate?: {
+    readonly clicksPerBeat: number;
+    readonly repeatCountIn: number;
+  };
+  /** Run-global slot to begin at; absent or invalid means 0. */
+  readonly startSlot?: number;
   readonly run: number;
   readonly pressedAtMs: number;
 }
 
 export type HaltReason = 'pause' | 'reset' | 'leave' | 'suspend';
 
-export type HaltedAt =
-  | { readonly kind: 'count-in'; readonly click: number }
-  | { readonly kind: 'beat'; readonly beat: number }
-  | { readonly kind: 'none' };
+export type HaltedAt = SlotPosition | { readonly kind: 'none' };
 
 export interface ClickScheduler {
   start(segment: SegmentStart): void;
@@ -71,93 +76,51 @@ export interface ClickScheduler {
   readonly live: boolean;
 }
 
-interface Grid {
+export interface Grid {
+  readonly plan: RunPlan;
   readonly anchor: number;
   readonly period: number;
-  readonly perBeat: number;
-  readonly startBeat: number;
-  readonly beats: number;
-  /** Count-in clicks still to play at the segment start (r); absent = 0. */
-  readonly countInRemaining?: number;
-  /** Count-in clicks already played before this segment; absent = 0. */
-  readonly countInFrom?: number;
-}
-
-export interface GridClick {
-  readonly index: number;
-  readonly when: number;
-  /** `c − r` (negative) for count-in clicks, `floor(j / perBeat)` for loop clicks. */
-  readonly slot: number;
-  /** 0 for count-in clicks. */
-  readonly beat: number;
-  /** `from + c + 1` for count-in clicks, else null. */
-  readonly countIn: number | null;
-  readonly kind: ClickKind;
-  readonly accent: boolean;
+  readonly startSlot: number;
+  /** Run-global index of the first click of `startSlot`. */
+  readonly startIndex: number;
 }
 
 /**
- * Combined grid click `c`: count-in clicks `c < r` at `anchor + c × period`, then loop click
- * `j = c − r` at `anchor + r × period + j × period / perBeat`. Never accumulated.
+ * Time of a click: `anchor + (slot − startSlot) × T + sub × T / n`. The slot difference is an
+ * integer evaluated first, so nothing accumulates.
  */
-export function clickAt(seg: Grid, c: number): GridClick {
-  const r = seg.countInRemaining ?? 0;
-  if (c < r) {
-    return {
-      index: c,
-      when: seg.anchor + c * seg.period,
-      slot: c - r,
-      beat: 0,
-      countIn: (seg.countInFrom ?? 0) + c + 1,
-      kind: 'accent',
-      accent: true
-    };
-  }
-  const j = c - r;
-  const slot = Math.floor(j / seg.perBeat);
-  const beat = ((((seg.startBeat - 1 + slot) % seg.beats) + seg.beats) % seg.beats) + 1;
-  const kind: ClickKind = j % seg.perBeat !== 0 ? 'sub' : beat === 1 ? 'accent' : 'normal';
-  return {
-    index: c,
-    when: seg.anchor + r * seg.period + (j * seg.period) / seg.perBeat,
-    slot,
-    beat,
-    countIn: null,
-    kind,
-    accent: kind === 'accent'
-  };
+export function clickTime(g: Grid, c: CycleClick): number {
+  const n = c.position.kind === 'beat' ? c.position.clicksPerBeat : 1;
+  return g.anchor + (c.slot - g.startSlot) * g.period + (c.sub * g.period) / n;
 }
 
-/** First grid click worth scheduling at `now` (skip-forward, never a burst). */
-export function skipTo(
-  seg: { anchor: number; period: number; perBeat: number; countInRemaining?: number },
-  now: number
-): number {
-  const r = seg.countInRemaining ?? 0;
-  const u = now + START_LEAD_S - seg.anchor;
-  if (u <= 0) return 0;
-  if (u <= r * seg.period) return Math.ceil(u / seg.period);
-  return r + Math.ceil(((u - r * seg.period) * seg.perBeat) / seg.period);
+const timeOf = (g: Grid, index: number): number => clickTime(g, clickAt(g.plan, index));
+
+/** First click index worth scheduling at `now` (skip-forward, never a burst). */
+export function skipTo(g: Grid, now: number): number {
+  const target = now + START_LEAD_S;
+  const u = target - g.anchor;
+  if (u <= 0) return g.startIndex;
+  let k = Math.max(g.startIndex, slotStart(g.plan, g.startSlot + Math.floor(u / g.period)));
+  while (k > g.startIndex && timeOf(g, k - 1) >= target) k--;
+  while (timeOf(g, k) < target) k++;
+  return k;
 }
 
-/** Valid `countIn` → remaining and already-played counts; anything else → no count-in. */
-function toCountIn(c: CountInSpan | undefined): { remaining: number; from: number } {
-  if (
-    !c ||
-    !Number.isInteger(c.total) ||
-    !Number.isInteger(c.from) ||
-    c.total < 0 ||
-    c.total > 8 ||
-    c.from < 0 ||
-    c.from > c.total
-  ) {
-    return { remaining: 0, from: 0 };
-  }
-  return { remaining: c.total - c.from, from: c.from };
+/** Latest click whose time is ≤ `t` (seconds on the context clock), or −1. */
+export function indexAt(g: Grid, t: number): number {
+  const u = t - g.anchor;
+  if (u < -1e-9) return -1;
+  let k = Math.max(
+    g.startIndex,
+    slotStart(g.plan, g.startSlot + Math.max(0, Math.floor(u / g.period + 1e-9)))
+  );
+  while (timeOf(g, k + 1) <= t + 1e-9) k++;
+  return timeOf(g, k) <= t + 1e-9 ? k : -1;
 }
 
-function toPerBeat(n: number): number {
-  return Number.isInteger(n) && n >= 1 && n <= 8 ? n : 1;
+function toStartSlot(v: number | undefined): number {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : 0;
 }
 
 interface Pending {
@@ -204,37 +167,33 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   /** Index of the latest grid click whose audible time has been reached, or -1. */
   function audibleIndex(): number {
     if (!seg) return -1;
-    const r = seg.countInRemaining ?? 0;
-    const t = now() - latency() - seg.anchor;
-    const k =
-      t < r * seg.period
-        ? Math.floor(t / seg.period + 1e-9)
-        : r + Math.floor(((t - r * seg.period) * seg.perBeat) / seg.period + 1e-9);
-    return k < 0 ? -1 : Math.min(k, next - 1);
+    return Math.min(indexAt(seg, now() - latency()), next - 1);
   }
 
   function schedule(g: Grid & { run: number; pressedAtMs: number }, k: number): void {
-    const c = clickAt(g, k);
+    const c = clickAt(g.plan, k);
+    const when = clickTime(g, c);
     if (visual || !sink) return;
     const bufs = buffersFor(sink);
     const source = sink.port.createBufferSource();
     source.buffer = bufs[c.kind];
     source.connect(sink.destination);
     source.onended = () => source.disconnect();
-    source.start(c.when);
-    pending.push({ when: c.when, source });
+    source.start(when);
+    pending.push({ when, source });
     log({
       type: 'click',
       run: g.run,
       index: k,
       slot: c.slot,
-      beat: c.beat,
-      countIn: c.countIn,
+      beat: c.position.kind === 'beat' ? c.position.beat : 0,
+      countIn: c.position.kind === 'count-in' ? c.position.click : null,
+      phase: c.phase,
       kind: c.kind,
-      accent: c.accent,
-      when: c.when,
+      accent: c.kind === 'accent',
+      when,
       contextTime: sink.port.currentTime,
-      pressedAtMs: k === 0 ? g.pressedAtMs : null,
+      pressedAtMs: k === g.startIndex ? g.pressedAtMs : null,
       scheduledAtMs: performance.now()
     });
   }
@@ -256,14 +215,14 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
         }
       );
     }
-    if (next === 0 && sink && !visual) {
+    if (next === seg.startIndex && sink && !visual) {
       // The context clock may have started moving after the anchor was taken: re-anchor
       // before anything is scheduled so the first (accented) click is never in the past.
       const ct = sink.port.currentTime;
       if (seg.anchor < ct + START_LEAD_S / 2) seg = { ...seg, anchor: ct + START_LEAD_S };
     }
-    if (clickAt(seg, next).when < t) next = Math.max(next, skipTo(seg, t));
-    while (clickAt(seg, next).when <= t + HORIZON_S) {
+    if (timeOf(seg, next) < t) next = Math.max(next, skipTo(seg, t));
+    while (timeOf(seg, next) <= t + HORIZON_S) {
       schedule(seg, next);
       next++;
     }
@@ -275,11 +234,11 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
     if (g !== gen || !seg) return;
     const k = audibleIndex();
     if (k >= 0) {
-      const c = clickAt(seg, k);
-      if (c.slot > reported) {
-        reported = c.slot;
-        if (c.countIn !== null) events.onCountIn(c.countIn);
-        else events.onBeat(clickAt(seg, (seg.countInRemaining ?? 0) + c.slot * seg.perBeat).beat);
+      const { slot, position } = clickAt(seg.plan, k);
+      if (slot > reported) {
+        reported = slot;
+        if (position.kind === 'count-in') events.onCountIn(position.click, position);
+        else events.onBeat(position.beat, position);
       }
     }
     frame = frames.request(() => frameLoop(g));
@@ -287,20 +246,24 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
 
   function anchorAndRun(g: number, segment: SegmentStart): void {
     if (g !== gen) return;
-    const period = 60 / segment.bpm;
-    const ci = toCountIn(segment.countIn);
-    seg = {
-      countInRemaining: ci.remaining,
-      countInFrom: ci.from,
-      anchor: now() + START_LEAD_S,
-      period,
-      perBeat: toPerBeat(segment.clicksPerBeat),
-      startBeat: segment.startBeat,
+    const plan = toRunPlan({
       beats: segment.beats,
+      clicksPerBeat: segment.clicksPerBeat,
+      initialCountIn: segment.initialCountIn,
+      alternate: segment.alternate
+    });
+    const startSlot = toStartSlot(segment.startSlot);
+    const startIndex = slotStart(plan, startSlot);
+    seg = {
+      plan,
+      anchor: now() + START_LEAD_S,
+      period: 60 / segment.bpm,
+      startSlot,
+      startIndex,
       run: segment.run,
       pressedAtMs: segment.pressedAtMs
     };
-    next = 0;
+    next = startIndex;
     reported = -Infinity;
     pump(g);
     frame = frames.request(() => frameLoop(g));
@@ -336,14 +299,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       const k = audibleIndex();
       let halted: HaltedAt = { kind: 'none' };
       if (seg && k >= 0) {
-        const c = clickAt(seg, k);
-        halted =
-          c.countIn !== null
-            ? { kind: 'count-in', click: c.countIn }
-            : {
-                kind: 'beat',
-                beat: clickAt(seg, (seg.countInRemaining ?? 0) + c.slot * seg.perBeat).beat
-              };
+        halted = clickAt(seg.plan, k).position;
       }
       const t = now();
       let count = 0;

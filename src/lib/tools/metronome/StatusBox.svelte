@@ -25,7 +25,9 @@
 <div class="status">
   <p class="position">
     {#if status.kind === 'count-in'}
-      <span class="part">{m.metronome_status_count_in({ click: status.click, count: status.total })}</span>
+      <span class="part"
+        >{m.metronome_status_count_in({ click: status.click, count: status.total })}</span
+      >
     {:else if status.kind === 'count-in-none'}
       <span class="part">{m.metronome_status_count_in_none({ count: status.total })}</span>
     {:else}

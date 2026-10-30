@@ -1,15 +1,19 @@
 <script lang="ts">
-  import { m } from '$lib/paraglide/messages.js';
   import { SUBDIVISIONS, type Subdivision } from '$lib/state/metronome-settings';
   import { subdivisionLabel } from '$lib/state/metronome-subdivision-names';
 
-  let { value, onchange }: { value: Subdivision; onchange: (v: unknown) => void } = $props();
+  let {
+    id,
+    label,
+    value,
+    onchange
+  }: { id: string; label: string; value: Subdivision; onchange: (v: unknown) => void } = $props();
 </script>
 
 <div class="field">
-  <label for="metronome-subdivision">{m.metronome_subdivision_label()}</label>
+  <label for={id}>{label}</label>
   <div class="control">
-    <select id="metronome-subdivision" {value} onchange={(e) => onchange(e.currentTarget.value)}>
+    <select {id} {value} onchange={(e) => onchange(e.currentTarget.value)}>
       {#each SUBDIVISIONS as n (n)}
         <option value={n} selected={n === value}>{subdivisionLabel(n)}</option>
       {/each}

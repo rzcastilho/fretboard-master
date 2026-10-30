@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_LOOP2,
   DEFAULT_SUBDIVISION,
   SUBDIVISIONS,
   toSubdivision,
@@ -9,6 +10,9 @@ import {
   clampBpm,
   clampCount,
   effectiveCountIn,
+  effectiveRepeatCountIn,
+  runPlanFor,
+  toRatio,
   stepSetting,
   type MetronomeSettings
 } from '../../../src/lib/state/metronome-settings';
@@ -21,7 +25,9 @@ describe('metronome settings', () => {
       subdivision: 3,
       countIn: true,
       initialCountIn: 4,
-      repeatCountIn: 2
+      repeatCountIn: 2,
+      ratio: true,
+      loop2: 6
     });
     expect(Object.isFrozen(DEFAULT_SETTINGS)).toBe(true);
   });
@@ -56,21 +62,11 @@ describe('metronome settings', () => {
     expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'bpm', -1)).toBe(true);
     expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'bpm', 1)).toBe(false);
     expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'bpm', 1)).toBe(true);
-    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'bpm', -1)).toBe(
-      false
-    );
-    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'beats', -1)).toBe(
-      true
-    );
-    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'beats', 1)).toBe(
-      false
-    );
-    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'beats', 1)).toBe(
-      true
-    );
-    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'beats', -1)).toBe(
-      false
-    );
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'bpm', -1)).toBe(false);
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'beats', -1)).toBe(true);
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'beats', 1)).toBe(false);
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'beats', 1)).toBe(true);
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'beats', -1)).toBe(false);
   });
 });
 
@@ -121,5 +117,47 @@ describe('subdivision', () => {
     for (const v of [0, 9, 2.5, NaN, '', 'x', null, undefined, {}, [], Symbol('s')]) {
       expect(toSubdivision(v)).toBeNull();
     }
+  });
+});
+
+describe('subdivision ratio settings (034)', () => {
+  const base: MetronomeSettings = { ...DEFAULT_SETTINGS };
+
+  it('S2: toRatio returns booleans as-is and true otherwise', () => {
+    expect(toRatio(false)).toBe(false);
+    expect(toRatio(true)).toBe(true);
+    for (const v of [0, 'false', null, undefined, {}, NaN]) expect(toRatio(v)).toBe(true);
+  });
+
+  it('DEFAULT_LOOP2 is Sextuplets and toSubdivision falls back to it', () => {
+    expect(DEFAULT_LOOP2).toBe(6);
+    expect(toSubdivision('x') ?? DEFAULT_LOOP2).toBe(6);
+    expect(toSubdivision(4) ?? DEFAULT_LOOP2).toBe(4);
+  });
+
+  it.each([
+    [true, true, 2, 2],
+    [true, false, 2, 0],
+    [false, true, 2, 0],
+    [false, false, 2, 0],
+    [true, true, 0, 0]
+  ])('effectiveRepeatCountIn countIn %s ratio %s r %i -> %i', (countIn, ratio, r, want) => {
+    expect(effectiveRepeatCountIn({ ...base, countIn, ratio, repeatCountIn: r })).toBe(want);
+  });
+
+  it('S3: runPlanFor builds the alternation only when the section is on', () => {
+    expect(runPlanFor(base)).toEqual({
+      clicksPerBeat: 3,
+      initialCountIn: 4,
+      alternate: { clicksPerBeat: 6, repeatCountIn: 2 }
+    });
+    const off = runPlanFor({ ...base, ratio: false });
+    expect(off).toEqual({ clicksPerBeat: 3, initialCountIn: 4 });
+    expect('alternate' in off).toBe(false);
+    expect(runPlanFor({ ...base, countIn: false })).toEqual({
+      clicksPerBeat: 3,
+      initialCountIn: 0,
+      alternate: { clicksPerBeat: 6, repeatCountIn: 0 }
+    });
   });
 });

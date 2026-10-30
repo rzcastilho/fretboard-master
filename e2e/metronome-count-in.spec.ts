@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { countInOff, readAudioLog } from './support/helpers';
+import { countInOff, ratioOff, readAudioLog } from './support/helpers';
 
 async function clicks(page: Page) {
   return (await readAudioLog(page)).flatMap((e) => (e.type === 'click' ? [e] : []));
@@ -38,7 +38,7 @@ test.describe('metronome count-in: hear it (US1)', () => {
     expect(first.pressedAtMs).not.toBeNull();
     const loop = log[4];
     expect(loop.countIn).toBeNull();
-    expect(loop.slot).toBe(0);
+    expect(loop.slot).toBe(4);
     expect(loop.kind).toBe('accent');
     expect(Math.abs(loop.when - countIn[3].when - T)).toBeLessThan(0.002);
     const texts = seen.filter((t) => t.startsWith('COUNT IN') && !t.includes('–'));
@@ -86,11 +86,14 @@ test.describe('metronome count-in: hear it (US1)', () => {
 test.describe('metronome count-in: switch and length (US2)', () => {
   test('2.5: switch off removes the rows and Start goes straight to beat 1', async ({ page }) => {
     await page.goto('/metronome');
+    await ratioOff(page);
     await expect(page.getByRole('slider')).toHaveCount(4);
     await countInOff(page);
     await expect(page.getByRole('slider')).toHaveCount(2);
     await expect(page.getByRole('slider', { name: 'Initial Count In' })).toHaveCount(0);
     await page.getByRole('switch', { name: 'Count In' }).focus();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('switch', { name: 'Subdivision ratio' })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(page.getByRole('combobox')).toBeFocused();
     await start(page).click();
@@ -171,9 +174,9 @@ test.describe('metronome count-in: pause, resume, reset (US3)', () => {
     const sinceResume = (await readAudioLog(page)).length;
     await resume(page).click();
     await expect(page.locator('.position')).toContainText('BEAT 1/4', { timeout: 8000 });
-    const after = (await readAudioLog(page)).slice(sinceResume).flatMap((e) =>
-      e.type === 'click' ? [e] : []
-    );
+    const after = (await readAudioLog(page))
+      .slice(sinceResume)
+      .flatMap((e) => (e.type === 'click' ? [e] : []));
     const counted = after.filter((c) => c.countIn !== null).map((c) => c.countIn);
     expect(counted).toEqual([3, 4]);
     const loop = after.find((c) => c.countIn === null);
@@ -183,6 +186,7 @@ test.describe('metronome count-in: pause, resume, reset (US3)', () => {
 
   test('2.9: pause in the loop then resume plays no count-in', async ({ page }) => {
     await page.goto('/metronome');
+    await ratioOff(page);
     await start(page).click();
     await expect(page.locator('.position')).toContainText('BEAT', { timeout: 8000 });
     await pause(page).click();
@@ -190,9 +194,9 @@ test.describe('metronome count-in: pause, resume, reset (US3)', () => {
     await resume(page).click();
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThan(since);
     await page.waitForTimeout(800);
-    const after = (await readAudioLog(page)).slice(since).flatMap((e) =>
-      e.type === 'click' ? [e] : []
-    );
+    const after = (await readAudioLog(page))
+      .slice(since)
+      .flatMap((e) => (e.type === 'click' ? [e] : []));
     expect(after.length).toBeGreaterThan(0);
     expect(after.every((c) => c.countIn === null)).toBe(true);
   });
@@ -214,9 +218,9 @@ test.describe('metronome count-in: pause, resume, reset (US3)', () => {
     const since = (await readAudioLog(page)).length;
     await start(page).click();
     await expect(page.locator('.position')).toContainText('BEAT 1/4', { timeout: 8000 });
-    const run = (await readAudioLog(page)).slice(since).flatMap((e) =>
-      e.type === 'click' ? [e] : []
-    );
+    const run = (await readAudioLog(page))
+      .slice(since)
+      .flatMap((e) => (e.type === 'click' ? [e] : []));
     expect(run.filter((c) => c.countIn !== null).map((c) => c.countIn)).toEqual([1, 2, 3]);
   });
 });
@@ -233,9 +237,9 @@ test.describe('metronome count-in: repeat value (US4)', () => {
     await expect(page.locator('.position')).toContainText('BEAT 2/4', { timeout: 10000 });
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
     await expect(page.getByRole('slider', { name: 'Repeat Count In' })).toHaveValue('6');
-    const run = (await readAudioLog(page)).slice(since).flatMap((e) =>
-      e.type === 'click' ? [e] : []
-    );
+    const run = (await readAudioLog(page))
+      .slice(since)
+      .flatMap((e) => (e.type === 'click' ? [e] : []));
     expect(run.filter((c) => c.countIn !== null).map((c) => c.countIn)).toEqual([1, 2, 3, 4]);
   });
 });
@@ -244,6 +248,7 @@ test.describe('metronome count-in: announcements, languages, reflow (polish)', (
   test('2.12: live-region texts, no per-click announcements', async ({ page }) => {
     await page.goto('/metronome');
     const live = page.locator('[role="status"][aria-live="polite"].sr-only');
+    await ratioOff(page);
     await start(page).click();
     await expect(live).toHaveText('Started, 85 BPM, 4 beats, 8th Triplets, count in 4');
     const seen = await page.evaluate(

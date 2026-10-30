@@ -50,3 +50,22 @@ describe('count-in status (033)', () => {
     for (const n of [1, 4, 8]) expect(countInDot(n)).toBe('lit');
   });
 });
+
+describe('display model for positions (034, data-model §7)', () => {
+  it('maps the count-in positions', () => {
+    expect(statusParams(0, 4, 3, { click: 0, total: 4 })).toEqual({
+      kind: 'count-in-none',
+      total: 4
+    });
+    expect(statusParams(0, 4, 6, { click: 1, total: 2 })).toEqual({
+      kind: 'count-in',
+      click: 1,
+      total: 2
+    });
+  });
+  it('maps the loop positions with the playing loop sub', () => {
+    expect(statusParams(0, 4, 3)).toEqual({ kind: 'none', beats: 4, sub: 3 });
+    expect(statusParams(3, 4, 6)).toEqual({ kind: 'beat', beat: 3, beats: 4, sub: 6 });
+    expect(beatDots(4, 1)).toEqual(['lit', 'upcoming', 'upcoming', 'upcoming']);
+  });
+});
