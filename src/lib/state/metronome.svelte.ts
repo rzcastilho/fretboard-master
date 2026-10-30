@@ -27,6 +27,7 @@ import {
 import { subdivisionName } from './metronome-subdivision-names';
 import { beatDots, type CountInView, type DotState } from './metronome-view';
 import { playback } from './playback.svelte';
+import { preferences } from './preferences.svelte';
 
 export type RunPhase = 'settings' | 'starting' | 'running' | 'paused';
 
@@ -180,28 +181,49 @@ function reset(): void {
   state.announcement = m.metronome_announce_reset();
 }
 
+function sameSettings(a: MetronomeSettings, b: MetronomeSettings): boolean {
+  return (Object.keys(a) as (keyof MetronomeSettings)[]).every((k) => a[k] === b[k]);
+}
+
+/** The one place the settings change: assign, then remember (035). An equal value → nothing. */
+function commit(next: MetronomeSettings): void {
+  if (next === state.settings || sameSettings(next, state.settings)) return;
+  state.settings = next;
+  preferences.remember({ metronome: { ratios: next } });
+}
+
 function setField(field: 'bpm' | 'beats', v: number): void {
   if (state.phase !== 'settings') return;
-  state.settings =
+  commit(
     field === 'bpm'
       ? { ...state.settings, bpm: clampBpm(v) }
-      : { ...state.settings, beats: clampBeats(v) };
+      : { ...state.settings, beats: clampBeats(v) }
+  );
 }
 
 function step(field: 'bpm' | 'beats', dir: 1 | -1): void {
   if (state.phase !== 'settings') return;
-  state.settings = stepSetting(state.settings, field, dir);
+  commit(stepSetting(state.settings, field, dir));
 }
 
 function setCount(field: 'initialCountIn' | 'repeatCountIn', v: number): void {
   if (state.phase !== 'settings') return;
   const fallback = field === 'initialCountIn' ? DEFAULT_INITIAL_COUNT_IN : DEFAULT_REPEAT_COUNT_IN;
-  state.settings = { ...state.settings, [field]: clampCount(v, fallback) };
+  commit({ ...state.settings, [field]: clampCount(v, fallback) });
 }
 
 function stepCount(field: 'initialCountIn' | 'repeatCountIn', dir: 1 | -1): void {
   if (state.phase !== 'settings') return;
-  state.settings = stepSetting(state.settings, field, dir);
+  commit(stepSetting(state.settings, field, dir));
+}
+
+function halt(): void {
+  scheduler?.halt('leave');
+  scheduler = null;
+  state.generation++;
+  state.phase = 'settings';
+  clearRun();
+  state.soundNotice = false;
 }
 
 export const metronome = {
@@ -254,7 +276,7 @@ export const metronome = {
   /** Settings phase only; non-booleans are ignored. Turning it off keeps both counts. */
   setCountIn: (v: unknown): void => {
     if (state.phase === 'settings' && typeof v === 'boolean') {
-      state.settings = { ...state.settings, countIn: v };
+      commit({ ...state.settings, countIn: v });
     }
   },
   setInitialCountIn: (v: number): void => setCount('initialCountIn', v),
@@ -264,20 +286,20 @@ export const metronome = {
   /** Settings phase only; non-booleans are ignored. Turning it off keeps Loop 2. */
   setRatio: (v: unknown): void => {
     if (state.phase === 'settings' && typeof v === 'boolean') {
-      state.settings = { ...state.settings, ratio: toRatio(v) };
+      commit({ ...state.settings, ratio: toRatio(v) });
     }
   },
   /** Settings phase only; values that are not one of the eight subdivisions are ignored. */
   setLoop2: (v: unknown): void => {
     if (state.phase !== 'settings') return;
     const sub = toSubdivision(v);
-    if (sub !== null) state.settings = { ...state.settings, loop2: sub };
+    if (sub !== null) commit({ ...state.settings, loop2: sub });
   },
   /** Settings phase only; values that are not one of the eight subdivisions are ignored. */
   setSubdivision: (v: unknown): void => {
     if (state.phase !== 'settings') return;
     const sub = toSubdivision(v);
-    if (sub !== null) state.settings = { ...state.settings, subdivision: sub };
+    if (sub !== null) commit({ ...state.settings, subdivision: sub });
   },
 
   /** Gesture handler. settings → start, running → pause, paused → resume, starting → ignored. */
@@ -294,14 +316,15 @@ export const metronome = {
     state.soundNotice = false;
   },
 
-  /** Route left: halt, back to the settings phase with the default values (FR-017). */
+  /** Route left: halt, back to the settings phase; the values are kept (035, FR-002). */
   screenChanged(): void {
-    scheduler?.halt('leave');
-    scheduler = null;
-    state.phase = 'settings';
-    state.settings = DEFAULT_SETTINGS;
-    clearRun();
-    state.soundNotice = false;
+    halt();
+  },
+
+  /** Apply stored or default values without writing: halts a run, back to the settings phase. */
+  restoreSettings(s: MetronomeSettings): void {
+    halt();
+    state.settings = s;
   }
 };
 

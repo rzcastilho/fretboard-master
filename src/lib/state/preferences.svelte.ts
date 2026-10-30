@@ -4,11 +4,12 @@
  * methods. The only importer of `$lib/prefs/*`.
  */
 import { startSession, type PreferencesPatch, type PrefsSession } from '$lib/prefs/session';
-import { TOOL_IDS, tuningOfPreferences } from '$lib/prefs/schema';
+import { DEFAULT_PREFERENCES, TOOL_IDS, tuningOfPreferences } from '$lib/prefs/schema';
 import type { StorageLike } from '$lib/prefs/storage';
 import type { ToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
 import { instrument } from './instrument.svelte';
+import { metronome } from './metronome.svelte';
 import { language } from './language.svelte';
 import { notation } from './notation.svelte';
 import { notes } from './notes.svelte';
@@ -57,6 +58,7 @@ export const preferences = {
     notation.start({ notation: p.notation, accidentals: p.accidentals });
     theme.start(p.theme);
     shortcuts.start(p.shortcuts);
+    metronome.restoreSettings(p.metronome.ratios);
     lastTool = p.lastTool;
     cagedNoteShown = p.cagedNoteShown;
     if (!session.available && !noticeShown) {
@@ -110,6 +112,9 @@ export const preferences = {
     notation.restore(null, 'sharps');
     theme.restore(null);
     shortcuts.restore(true);
+    metronome.restoreSettings(
+      session ? session.current.metronome.ratios : DEFAULT_PREFERENCES.metronome.ratios
+    );
     lastTool = null;
     cagedNoteShown = false;
   },

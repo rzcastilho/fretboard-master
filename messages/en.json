@@ -45,7 +45,7 @@
   "shortcuts_switch_hint": "Single-key shortcuts work when no text field is focused. Turn them off if they get in the way.",
   "about_privacy_heading": "Privacy",
   "about_privacy_no_data": "Fretboard Master collects no personal data: no account, no sign-up, no email, no name, no identifier.",
-  "about_privacy_stored": "Your settings stay only in this browser on this device: language and notation; instrument; sound, volume and tempo; theme; labels and last tool; hints shown; and the shortcuts switch. No cookies are used.",
+  "about_privacy_stored": "Your settings stay only in this browser on this device: language and notation; instrument; sound, volume and tempo; theme; labels, last tool; hints shown; shortcuts switch; and metronome settings. No cookies are used.",
   "about_privacy_erase": "Clearing browser data, or Erase my preferences below, removes them. If storage is blocked, the app still works.",
   "about_privacy_measured": "The app sends anonymous counts to its own site: tool opened, first fretboard tap, sound played, link shared, link opened, instrument changed. Each carries only tool, device type, language and instrument (strings, tuning, left-handed).",
   "about_privacy_errors": "If something breaks, an anonymous report with the view settings and instrument is sent.",

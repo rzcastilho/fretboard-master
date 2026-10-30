@@ -45,7 +45,7 @@
   "shortcuts_switch_hint": "Os atalhos de uma tecla funcionam quando nenhum campo de texto está em foco. Desative-os se atrapalharem.",
   "about_privacy_heading": "Privacidade",
   "about_privacy_no_data": "O Fretboard Master não coleta dados pessoais: sem conta, sem cadastro, sem e-mail, sem nome, sem identificador.",
-  "about_privacy_stored": "Suas configurações ficam só neste navegador, neste dispositivo: idioma e notação; instrumento; som, volume e andamento; tema; rótulos e última ferramenta; dicas já mostradas; e a chave dos atalhos de teclado. Não usamos cookies.",
+  "about_privacy_stored": "Suas configurações ficam só neste navegador, neste dispositivo: idioma e notação; instrumento; som, volume e andamento; tema; rótulos e última ferramenta; dicas já mostradas; a chave dos atalhos de teclado; e configurações do metrônomo. Não usamos cookies.",
   "about_privacy_erase": "Limpar os dados do navegador, ou Apagar minhas preferências abaixo, remove tudo isso. Se o armazenamento estiver bloqueado, o app continua funcionando.",
   "about_privacy_measured": "O app envia contagens anônimas ao próprio site: ferramenta aberta, primeiro toque no braço, som tocado, link compartilhado, link aberto, instrumento alterado. Cada uma leva só a ferramenta, o tipo de dispositivo, o idioma e o instrumento (cordas, afinação, canhoto).",
   "about_privacy_errors": "Se algo falhar, é enviado um relatório anônimo com as configurações de visualização e o instrumento.",

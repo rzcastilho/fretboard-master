@@ -45,7 +45,7 @@
   "shortcuts_switch_hint": "Los atajos de una sola tecla funcionan cuando ningún campo de texto tiene el foco. Desactívalos si estorban.",
   "about_privacy_heading": "Privacidad",
   "about_privacy_no_data": "Fretboard Master no recoge datos personales: sin cuenta, sin registro, sin correo, sin nombre, sin identificador.",
-  "about_privacy_stored": "Tus ajustes quedan solo en este navegador, en este dispositivo: idioma y notación; instrumento; sonido, volumen y tempo; tema; etiquetas y última herramienta; avisos ya mostrados; y el interruptor de atajos de teclado. No se usan cookies.",
+  "about_privacy_stored": "Tus ajustes quedan solo en este navegador, en este dispositivo: idioma y notación; instrumento; sonido, volumen y tempo; tema; etiquetas y última herramienta; avisos ya mostrados; el interruptor de atajos de teclado; y ajustes del metrónomo. No se usan cookies.",
   "about_privacy_erase": "Borrar los datos del navegador, o Borrar mis preferencias más abajo, los elimina. Si el almacenamiento está bloqueado, la app sigue funcionando.",
   "about_privacy_measured": "La app envía recuentos anónimos a su propio sitio: herramienta abierta, primer toque en el mástil, sonido reproducido, enlace compartido, enlace abierto, instrumento cambiado. Cada uno lleva solo la herramienta, el tipo de dispositivo, el idioma y el instrumento (cuerdas, afinación, zurdo).",
   "about_privacy_errors": "Si algo falla, se envía un informe anónimo con los ajustes de vista y el instrumento.",

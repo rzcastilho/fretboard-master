@@ -226,7 +226,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     await expect(start(page)).toBeFocused();
   });
 
-  test('FR-017: leaving the page halts the run and the tool comes back at 85/4', async ({
+  test('FR-017: leaving the page halts the run and the tool comes back with the same settings (85/4 here)', async ({
     page
   }) => {
     await page.goto('/metronome');

@@ -114,7 +114,7 @@ test.describe('metronome subdivisions: dropdown (US2)', () => {
     );
   });
 
-  test('US2-9: Reset keeps the choice; leaving and returning restores 8th Triplets', async ({
+  test('US2-9: Reset keeps the choice; leaving and returning keeps 8th Triplets (remembered)', async ({
     page
   }) => {
     await page.goto('/metronome');
@@ -125,7 +125,7 @@ test.describe('metronome subdivisions: dropdown (US2)', () => {
     await expect(select(page)).toHaveValue('6');
     await page.goto('/');
     await page.goto('/metronome');
-    await expect(select(page)).toHaveValue('3');
+    await expect(select(page)).toHaveValue('6');
   });
 
   test.describe('pt-BR', () => {
