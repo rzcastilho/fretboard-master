@@ -12,9 +12,11 @@ declare global {
           | 'notes'
           | 'triads'
           | 'caged'
+          | 'metronome'
           | 'notes:calculation'
           | 'triads:calculation'
-          | 'caged:calculation',
+          | 'caged:calculation'
+          | 'metronome:calculation',
           number
         >
       >

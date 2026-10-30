@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { KNOWN_PATHS, screenTitle } from '../../src/lib/shell/screens';
 
 describe('screens', () => {
-  it('KNOWN_PATHS is exactly the five screens', () => {
-    expect([...KNOWN_PATHS]).toEqual(['/', '/notes', '/triads', '/caged', '/about']);
+  it('KNOWN_PATHS is exactly the six screens', () => {
+    expect([...KNOWN_PATHS]).toEqual(['/', '/notes', '/triads', '/caged', '/metronome', '/about']);
   });
 
   it.each(['/Triads', '/triads/x', '/caged/x'])('%s is not a known path', (path) => {
@@ -18,5 +18,6 @@ describe('screens', () => {
     expect(screenTitle('home')).toBe('Fretboard Master');
     expect(screenTitle('triads')).toBe('Triads — Fretboard Master');
     expect(screenTitle('caged')).toBe('CAGED — Fretboard Master');
+    expect(screenTitle('metronome')).toBe('Metronome — Fretboard Master');
   });
 });

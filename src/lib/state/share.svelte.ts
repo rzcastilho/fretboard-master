@@ -9,7 +9,7 @@
 import { encodeLink } from '$lib/link/encode';
 import type { ShareSnapshot } from '$lib/link/types';
 import { measure } from '$lib/measure/measure.svelte';
-import type { ToolId } from '$lib/shell/tools';
+import type { FretboardToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
 import { instrument } from './instrument.svelte';
 import { notes } from './notes.svelte';
@@ -64,7 +64,7 @@ let noticeSeq = 0;
 let noticeTimer: unknown = null;
 let opener: HTMLElement | null = null;
 
-export function currentSnapshot(tool: ToolId): ShareSnapshot {
+export function currentSnapshot(tool: FretboardToolId): ShareSnapshot {
   // What is drawn: the link's instrument while a received link overrides it (023 I6).
   const musical = instrument.effectiveFor(tool);
   switch (tool) {
@@ -77,7 +77,7 @@ export function currentSnapshot(tool: ToolId): ShareSnapshot {
   }
 }
 
-export function currentLink(tool: ToolId): string {
+export function currentLink(tool: FretboardToolId): string {
   return encodeLink(currentSnapshot(tool), location.origin);
 }
 
@@ -110,7 +110,7 @@ const isAbort = (error: unknown): boolean =>
   (error as { name?: unknown }).name === 'AbortError';
 
 /** Clipboard, then the manual-copy fallback. Never throws. */
-async function copy(href: string, tool: ToolId): Promise<void> {
+async function copy(href: string, tool: FretboardToolId): Promise<void> {
   const writeText = platform.writeText;
   if (writeText === null) {
     showFallback(href);
@@ -127,7 +127,7 @@ async function copy(href: string, tool: ToolId): Promise<void> {
   }
 }
 
-async function run(tool: ToolId, title: string): Promise<void> {
+async function run(tool: FretboardToolId, title: string): Promise<void> {
   const url = currentLink(tool);
   const shareSheet = platform.share;
   if (shareSheet !== null && platform.coarsePointer) {
@@ -154,7 +154,7 @@ export const share = {
     return fallback;
   },
   /** Runs the system sheet → clipboard → manual-copy cascade. Never rejects. */
-  async share(tool: ToolId, title: string): Promise<void> {
+  async share(tool: FretboardToolId, title: string): Promise<void> {
     if (busy) return;
     busy = true;
     try {

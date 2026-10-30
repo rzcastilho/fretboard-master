@@ -24,6 +24,7 @@ test('nav order and aria-current @smoke', async ({ page }) => {
     'Fretboard Notes',
     'Triads',
     'CAGED',
+    'Metronome',
     'About'
   ]);
   await expect(nav(page).locator('[aria-current="page"]')).toHaveText('Triads');
@@ -140,3 +141,10 @@ for (const path of ['/notes', '/triads']) {
     });
   }
 }
+
+test('Metronome is the fourth nav entry and its card opens /metronome', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('list').getByRole('link').nth(3).click();
+  await expect(page).toHaveURL(/\/metronome$/);
+  await expect(nav(page).locator('[aria-current="page"]')).toHaveText('Metronome');
+});

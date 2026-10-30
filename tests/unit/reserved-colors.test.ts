@@ -179,4 +179,38 @@ describe('reserved marker colors', () => {
       });
     });
   });
+
+  describe('metronome danger token (031, FR-021)', () => {
+    const arms = (set: TokenMap, name: string) => resolveLightDark(set[name]);
+
+    it.each(['standard', 'contrast-more'] as const)(
+      'is ΔE ≥ 10 from the root colour and ≥ 3:1 on the surface (%s)',
+      (mode) => {
+        const set = SETS[mode];
+        const danger = arms(set, '--color-danger');
+        const surface = arms(set, '--color-surface');
+        danger.forEach((d, i) => {
+          expect(deltaEHex(d, set['--fb-color-root']), `${d} vs root`).toBeGreaterThanOrEqual(10);
+          expect(
+            contrastRatio(d, surface[i] ?? surface[0]),
+            `${d} on surface`
+          ).toBeGreaterThanOrEqual(3);
+        });
+      }
+    );
+
+    it('is a system colour in forced-colours mode', () => {
+      expect(sheet.forcedColors['--color-danger']).toBeDefined();
+    });
+
+    it('is referenced only in RunControls.svelte', () => {
+      const offenders = all.filter(
+        (f) =>
+          f.path !== 'src/lib/tools/metronome/RunControls.svelte' &&
+          f.path !== 'src/lib/styles/tokens.css' &&
+          /--color-danger\b/.test(f.text)
+      );
+      expect(offenders.map((f) => f.path)).toEqual([]);
+    });
+  });
 });

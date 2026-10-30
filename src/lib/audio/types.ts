@@ -75,4 +75,22 @@ export type AudioLogEntry =
       requestId: number;
       reason: 'interrupt' | 'stop' | 'hidden' | 'navigate' | 'instrument' | 'view';
     }
-  | { type: 'unavailable'; cause: 'context' | 'resume' | 'synth' };
+  | { type: 'unavailable'; cause: 'context' | 'resume' | 'synth' }
+  | {
+      type: 'click';
+      run: number;
+      index: number;
+      beat: number;
+      accent: boolean;
+      when: number;
+      contextTime: number;
+      /** Set on the first click of a segment (the Start or Resume press), else null. */
+      pressedAtMs: number | null;
+      scheduledAtMs: number;
+    }
+  | {
+      type: 'click-cancel';
+      run: number;
+      count: number;
+      reason: 'pause' | 'reset' | 'leave' | 'suspend';
+    };

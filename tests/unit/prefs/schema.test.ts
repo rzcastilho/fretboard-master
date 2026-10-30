@@ -108,6 +108,8 @@ describe('per-field fallback (US2 scenario 6)', () => {
     expect(p({ lastTool: v }).lastTool).toBeNull()
   );
   it('lastTool caged → caged', () => expect(p({ lastTool: 'caged' }).lastTool).toBe('caged'));
+  it('lastTool metronome → metronome', () =>
+    expect(p({ lastTool: 'metronome' }).lastTool).toBe('metronome'));
   it('labels.triads octave → interval', () =>
     expect(p({ labels: { triads: 'octave' } }).labels.triads).toBe('interval'));
   it('custom-tuning object keeps frets', () => {

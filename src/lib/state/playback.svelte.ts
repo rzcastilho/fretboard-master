@@ -4,6 +4,7 @@
  */
 import {
   createPlaybackEngine,
+  type AudioSink,
   type EngineDeps,
   type PlaybackEngine,
   type StopReason
@@ -140,6 +141,16 @@ export const playback = {
     engine.stop(reason);
     state.pulses = [];
     state.sequencePlaying = false;
+  },
+
+  /**
+   * The shared audio context for the metronome click (031). Call from a gesture. Its sources
+   * are outside the active request, so `stop()` for any reason never halts them.
+   */
+  clickSink(): AudioSink | null {
+    const sink = engine.sink();
+    markUnlocked();
+    return sink;
   },
 
   /** Mute or unmute; ramps gain only, never stops a sounding note. Unlocks the engine. */

@@ -5,9 +5,9 @@
   import { rememberOpener } from './instrument-opener';
   import { isStandard } from '$lib/instrument/tunings';
   import { tuningLabel } from './tuning-names';
-  import type { ToolId } from './tools';
+  import type { FretboardToolId } from './tools';
 
-  let { tool }: { tool: ToolId } = $props();
+  let { tool }: { tool: FretboardToolId } = $props();
 
   // The tool's own tuning: the received link's while an override is active (023 §2).
   const tuning = $derived(instrument.effectiveFor(tool).tuning);

@@ -7,7 +7,7 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import type { PitchClass } from '$lib/theory/pitch';
 import type { ScreenId } from '$lib/shell/screens';
-import type { ToolId } from '$lib/shell/tools';
+import type { FretboardToolId } from '$lib/shell/tools';
 import { caged } from './caged.svelte';
 import {
   cagedTriadCarry,
@@ -21,7 +21,7 @@ import {
 import { notes } from './notes.svelte';
 import { triads } from './triads.svelte';
 
-export type LinkedTool = ToolId;
+export type LinkedTool = FretboardToolId;
 
 /** Apply the carry for a user switch `from → to` (nav link). No-op if `from === to`. */
 export function linkTools(from: ScreenId, to: LinkedTool): void {

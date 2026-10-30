@@ -907,3 +907,66 @@ describe('engine timeline request (019, R-01)', () => {
     );
   });
 });
+
+describe('engine sink() (031)', () => {
+  it('unlocks within the call and shares the volume→mute chain', () => {
+    const { port, createContext, engine } = setup();
+    const sink = engine.sink();
+    expect(createContext).toHaveBeenCalledTimes(1);
+    expect(port.resumeCalls).toBe(1);
+    expect(sink?.port).toBe(port);
+    // volume → mute → destination: the sink hands out the first gain, which feeds the second.
+    expect(sink?.destination).toBe(port.gains[0]);
+    expect(port.gains[0].connected).toEqual([port.gains[1]]);
+  });
+
+  it('running resolves true after resume(), true at once when already running', async () => {
+    const { port, engine } = setup();
+    port.resumeMode = 'manual';
+    const first = engine.sink();
+    let settled = false;
+    void first?.running.then(() => (settled = true));
+    await flush();
+    expect(settled).toBe(false);
+    port.resolveResume();
+    await expect(first?.running).resolves.toBe(true);
+    await expect(engine.sink()?.running).resolves.toBe(true);
+  });
+
+  it('running resolves false when resume() rejects', async () => {
+    const { port, engine } = setup();
+    port.resumeMode = 'reject';
+    await expect(engine.sink()?.running).resolves.toBe(false);
+  });
+
+  it('returns null when the context cannot be created', () => {
+    const { ev, engine } = (() => {
+      const ev = events();
+      const engine = createPlaybackEngine(ev, {
+        createContext: () => {
+          throw new Error('no audio');
+        },
+        loadSynth: () => Promise.resolve(recordingSynth()),
+        clock: new FakeClock()
+      });
+      return { ev, engine };
+    })();
+    expect(engine.sink()).toBeNull();
+    expect(ev.onUnavailable).toHaveBeenCalledWith('context');
+  });
+
+  it('stop() for any reason leaves sink sources alone', async () => {
+    const { port, engine } = setup();
+    engine.preload();
+    await flush();
+    const sink = engine.sink();
+    const click = sink?.port.createBufferSource() as unknown as FakeSource;
+    click.start(5);
+    for (const reason of ['stop', 'hidden', 'navigate', 'instrument', 'view'] as const) {
+      engine.play(string6Open, STANDARD_GUITAR);
+      engine.stop(reason);
+    }
+    expect(click.stopCalls).toEqual([]);
+    expect(port.sources).toContain(click);
+  });
+});

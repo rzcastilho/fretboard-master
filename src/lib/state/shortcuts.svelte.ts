@@ -103,6 +103,8 @@ function listen(screen: ScreenId): boolean {
 
 /** Runs the action on `screen` through the mirrored control's store method. true iff it ran. */
 export function runShortcut(action: ShortcutAction, screen: ScreenId): boolean {
+  // The Metronome has no character-key shortcuts (FR-023); its Space and Esc live on the page.
+  if (screen === 'metronome') return false;
   switch (action) {
     case 'listen':
       return listen(screen);

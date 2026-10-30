@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('home without JavaScript', () => {
-  test('renders heading and all three cards', async ({ page }) => {
+  test('renders heading and all four cards', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: 'Fretboard Master' })).toBeVisible();
-    await expect(page.getByRole('list').getByRole('link')).toHaveCount(3);
+    await expect(page.getByRole('list').getByRole('link')).toHaveCount(4);
   });
 
   test('card links navigate as full page loads', async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('unknown address without JavaScript', () => {
     expect(response?.status()).toBe(404);
     await expect(page.getByRole('heading', { level: 1, name: 'Fretboard Master' })).toBeVisible();
     await expect(page.getByRole('status')).toContainText('We could not find that page');
-    await expect(page.getByRole('list').getByRole('link')).toHaveCount(3);
+    await expect(page.getByRole('list').getByRole('link')).toHaveCount(4);
   });
 });
 

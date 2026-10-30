@@ -2,10 +2,10 @@
   import { m } from '$lib/paraglide/messages.js';
   import { currentSnapshot, share } from '$lib/state/share.svelte';
   import { shareTitle } from './share-title';
-  import type { ToolId } from './tools';
+  import type { FretboardToolId } from './tools';
   import BarIcon from './BarIcon.svelte';
 
-  let { tool }: { tool: ToolId } = $props();
+  let { tool }: { tool: FretboardToolId } = $props();
 
   let button = $state<HTMLButtonElement | null>(null);
 

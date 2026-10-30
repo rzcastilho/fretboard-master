@@ -36,6 +36,18 @@
   {/each}
 </dl>
 
+<h3>{m.shortcuts_metronome_heading()}</h3>
+<dl class="metronome-keys">
+  <div>
+    <dt><kbd>{m.shortcuts_key_space()}</kbd></dt>
+    <dd>{m.shortcuts_metronome_toggle()}</dd>
+  </div>
+  <div>
+    <dt><kbd>{m.shortcuts_key_escape()}</kbd></dt>
+    <dd>{m.shortcuts_metronome_reset()}</dd>
+  </div>
+</dl>
+
 <label class="toggle-row">
   <input
     type="checkbox"
@@ -52,6 +64,11 @@
     display: grid;
     gap: var(--space-2);
     margin: 0 0 var(--space-3);
+  }
+
+  h3 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-md);
   }
 
   dl div {
