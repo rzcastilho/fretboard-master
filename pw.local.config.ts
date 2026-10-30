@@ -9,5 +9,9 @@ export default defineConfig({
   use: { ...base.use, locale: 'en-US' },
   projects: (base.projects ?? [])
     .filter((p) => ['desktop', 'nojs'].includes(p.name as string))
-    .map((p) => ({ ...p, use: { ...p.use, channel: 'chrome' } }))
+    // Installed Chrome locally; the bundled Chromium where browsers are pre-provisioned
+    // (PLAYWRIGHT_BROWSERS_PATH, e.g. the autonomous container).
+    .map((p) =>
+      process.env.PLAYWRIGHT_BROWSERS_PATH ? p : { ...p, use: { ...p.use, channel: 'chrome' } }
+    )
 });
