@@ -78,7 +78,7 @@ test.describe('remembered preferences: US1', () => {
     await page.goto('/');
     await page.reload();
     const cards = page.getByRole('list').getByRole('link');
-    await expect(cards).toHaveCount(3);
+    await expect(cards).toHaveCount(4);
     await expect(cards.nth(0)).toHaveAccessibleName('Fretboard Notes — Where is every note?');
     await expect(cards.nth(1)).toHaveAccessibleName('Continue: Triads. What is a chord made of?');
     await expect(page.getByText('Continue', { exact: true })).toHaveCount(1);

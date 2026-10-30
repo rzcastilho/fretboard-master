@@ -84,6 +84,8 @@ export class FakeAudioPort {
   currentTime = 0;
   sampleRate = 48000;
   state: FakeState = 'suspended';
+  outputLatency = 0;
+  baseLatency = 0;
   readonly destination = { kind: 'destination' } as unknown as AudioNode;
   readonly buffers: FakeBuffer[] = [];
   readonly sources: FakeSource[] = [];
@@ -165,5 +167,32 @@ export class FakeClock {
       tm.cb();
     }
     this.t = target;
+  }
+  /** Advance `steps` × `stepMs` (default 1000 ms), firing timers in each step. */
+  tick(steps = 1, stepMs = 1000): void {
+    for (let i = 0; i < steps; i++) this.advance(stepMs);
+  }
+}
+
+/** `FrameClock` fake: callbacks run only on a manual `flush()`. */
+export class FakeFrames {
+  private nextId = 1;
+  private cbs = new Map<number, () => void>();
+  request(cb: () => void): number {
+    const id = this.nextId++;
+    this.cbs.set(id, cb);
+    return id;
+  }
+  cancel(id: number): void {
+    this.cbs.delete(id);
+  }
+  get pendingCount(): number {
+    return this.cbs.size;
+  }
+  /** Run the callbacks queued so far (callbacks queued while flushing wait for the next flush). */
+  flush(): void {
+    const due = [...this.cbs.entries()];
+    this.cbs.clear();
+    for (const [, cb] of due) cb();
   }
 }

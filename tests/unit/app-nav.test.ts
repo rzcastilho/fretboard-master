@@ -17,6 +17,7 @@ describe('AppNav', () => {
       'Fretboard Notes',
       'Triads',
       'CAGED',
+      'Metronome',
       'About'
     ]);
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
@@ -24,6 +25,7 @@ describe('AppNav', () => {
       '/notes',
       '/triads',
       '/caged',
+      '/metronome',
       '/about'
     ]);
   });
@@ -33,6 +35,7 @@ describe('AppNav', () => {
     ['notes', 'Fretboard Notes'],
     ['triads', 'Triads'],
     ['caged', 'CAGED'],
+    ['metronome', 'Metronome'],
     ['about', 'About']
   ] as const)('marks only %s as current', (current, name) => {
     render(AppNav, { current });
@@ -103,6 +106,24 @@ describe('AppNav carry (US2)', () => {
     await click('Home');
     await click('About');
     expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('does not carry to or from the Metronome', async () => {
+    render(AppNav, { current: 'notes' });
+    await click('Metronome');
+    expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('does not carry from the Metronome to a tool', async () => {
+    render(AppNav, { current: 'metronome' });
+    await click('Triads');
+    expect(linkTools).not.toHaveBeenCalled();
+  });
+
+  it('shows the metronome icon', () => {
+    const { container } = render(AppNav, { current: 'home' });
+    const link = within(container).getByRole('link', { name: 'Metronome' });
+    expect(link.querySelector('svg')).not.toBeNull();
   });
 
   it('leaves hrefs unchanged', () => {

@@ -13,22 +13,25 @@ test.describe('home screen', () => {
     await page.goto('/');
   });
 
-  test('shows the three cards in order, no spinner or auth UI', async ({ page }) => {
+  test('shows the four cards in order, no spinner or auth UI', async ({ page }) => {
     const cards = page.getByRole('list').getByRole('link');
-    await expect(cards).toHaveCount(3);
+    await expect(cards).toHaveCount(4);
     await expect(cards.nth(0)).toHaveAccessibleName('Fretboard Notes — Where is every note?');
     await expect(cards.nth(1)).toHaveAccessibleName('Triads — What is a chord made of?');
     await expect(cards.nth(0)).toBeVisible();
     await expect(cards.nth(2)).toHaveAccessibleName('CAGED — How does the whole neck connect?');
+    await expect(cards.nth(3)).toHaveAccessibleName(/^Metronome/);
+    await expect(cards.nth(3)).toHaveAttribute('href', '/metronome');
     await expect(cards.nth(1)).toBeVisible();
     await expect(cards.nth(2)).toBeVisible();
+    await expect(cards.nth(3)).toBeVisible();
     await expect(page.getByRole('progressbar')).toHaveCount(0);
     await expect(page.getByText(/sign[ -]?(up|in)|log ?in/i)).toHaveCount(0);
   });
 
   test('each card has a decorative fretboard thumbnail and one tab stop', async ({ page }) => {
     const cards = page.getByRole('list').getByRole('link');
-    for (const i of [0, 1, 2]) {
+    for (const i of [0, 1, 2, 3]) {
       await expect(cards.nth(i).locator('svg.fretboard-thumbnail[aria-hidden="true"]')).toHaveCount(
         1
       );

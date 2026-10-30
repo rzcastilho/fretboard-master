@@ -78,7 +78,12 @@ export const PREFS_VERSION = 1 as const;
 export const MAX_RAW_LENGTH = 16_384 as const;
 
 /** Checked against `TOOLS` by a unit test. */
-export const TOOL_IDS = ['notes', 'triads', 'caged'] as const satisfies readonly ToolId[];
+export const TOOL_IDS = [
+  'notes',
+  'triads',
+  'caged',
+  'metronome'
+] as const satisfies readonly ToolId[];
 
 export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   stringCount: DEFAULT_STRING_COUNT,

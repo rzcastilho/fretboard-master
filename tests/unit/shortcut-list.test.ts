@@ -17,7 +17,7 @@ afterEach(() => {
 describe('ShortcutList', () => {
   it('renders five rows in order P . , L N with localized actions', () => {
     const { container } = render(ShortcutList);
-    const rows = [...container.querySelectorAll('dl > div')];
+    const rows = [...container.querySelectorAll('dl:not(.metronome-keys) > div')];
     expect(rows).toHaveLength(5);
     const keys = rows.map((r) => r.querySelector('dt kbd')?.textContent?.trim());
     expect(keys).toEqual(['P', '.period', ',comma', 'L', 'N']);
@@ -25,9 +25,18 @@ describe('ShortcutList', () => {
     expect(rows[4]?.querySelector('dd')?.textContent).toContain('notation');
   });
 
+  it('lists the Metronome keys in a second group, outside the shortcut switch', () => {
+    const { container } = render(ShortcutList);
+    expect(screen.getByRole('heading', { name: 'Metronome' })).toBeTruthy();
+    const rows = [...container.querySelectorAll('dl.metronome-keys > div')];
+    expect(rows.map((r) => r.querySelector('dt')?.textContent?.trim())).toEqual(['Space', 'Esc']);
+    expect(rows[0]?.querySelector('dd')?.textContent).toBe('Start, pause or resume');
+    expect(rows[1]?.querySelector('dd')?.textContent).toBe('Reset');
+  });
+
   it('punctuation keys hide the glyph and speak the name', () => {
     const { container } = render(ShortcutList);
-    const kbds = container.querySelectorAll('kbd');
+    const kbds = container.querySelectorAll('dl:not(.metronome-keys) kbd');
     for (const [i, glyph, name] of [
       [1, '.', 'period'],
       [2, ',', 'comma']

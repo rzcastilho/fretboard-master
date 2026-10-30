@@ -131,6 +131,7 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('future', { ...defaults, tuningId: 'AF-5', handedness: 'left', tempo: 'slow' }),
   fixture('wrong-types', { ...defaults, lastTool: 'caged' }),
   fixture('last-tool-caged', { ...defaults, lastTool: 'caged' }),
+  fixture('last-tool-metronome', { ...defaults, lastTool: 'metronome' }),
   fixture('markup', defaults),
   // 16 385 × 'a': one over MAX_RAW_LENGTH, so it is never parsed.
   fixture('oversize', defaults),

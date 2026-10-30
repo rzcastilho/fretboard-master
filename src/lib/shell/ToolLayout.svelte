@@ -26,9 +26,9 @@
   import SoundControl from './SoundControl.svelte';
   import StopButton from './StopButton.svelte';
   import ToolPlaceholder from './ToolPlaceholder.svelte';
-  import { TOOLS, type ToolId } from './tools';
+  import { TOOLS, type FretboardToolId } from './tools';
 
-  let { tool }: { tool: ToolId } = $props();
+  let { tool }: { tool: FretboardToolId } = $props();
 
   // Icon-only bar below the wide arrangements: the labels become tooltips (global.css).
   const compact = $derived(

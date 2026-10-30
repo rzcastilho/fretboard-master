@@ -15,6 +15,7 @@ import type {
   SynthLoader,
   TimeMark
 } from './types';
+import { log } from './log';
 
 export interface TimerClock {
   now(): number;
@@ -28,6 +29,9 @@ export interface AudioPort {
   readonly sampleRate: number;
   readonly state: AudioContextState | 'interrupted';
   readonly destination: AudioNode;
+  /** Optional: seconds between a sample being scheduled and heard (031). */
+  readonly outputLatency?: number;
+  readonly baseLatency?: number;
   resume(): Promise<void>;
   createBuffer(channels: number, length: number, sampleRate: number): AudioBuffer;
   createBufferSource(): AudioBufferSourceNode;
@@ -48,6 +52,14 @@ export interface EngineEvents {
   onUnavailable(cause: 'context' | 'resume' | 'synth'): void;
 }
 
+/** The shared context and its volume→mute chain, for sources the engine does not manage (031). */
+export interface AudioSink {
+  readonly port: AudioPort;
+  readonly destination: AudioNode;
+  /** `true` once the context is running; `false` if it could not be resumed or audio failed. */
+  readonly running: Promise<boolean>;
+}
+
 export interface PlaybackEngine {
   /** Starts loading the synth without creating an AudioContext. Call after the fretboard is interactive. */
   preload(): void;
@@ -58,6 +70,12 @@ export interface PlaybackEngine {
    * A no-op when nothing is active. Never auto-resumes.
    */
   stop(reason?: StopReason): void;
+  /**
+   * Unlocks (call within a user gesture) and hands out the shared context and its volume→mute
+   * chain; `null` when audio is unavailable. Sources started on it are not part of the active
+   * request, so `stop()` (any reason) never touches them.
+   */
+  sink(): AudioSink | null;
   /** Unlocks audio without playing (sound-control interaction). */
   unlock(): void;
   /** Ramps the mute gain over 10 ms; never stops sources. Also unlocks. */
@@ -103,11 +121,6 @@ function defaultDeps(): EngineDeps {
   };
 }
 
-/** Test builds only: append to `__fmAudioLog` (never read by app code). */
-function log(entry: AudioLogEntry): void {
-  if (__FM_FAULT_INJECTION__) (globalThis.__fmAudioLog ??= []).push(entry);
-}
-
 const volumeToGain = (v: number): number => (v / 100) ** 2;
 
 export function createPlaybackEngine(
@@ -141,6 +154,8 @@ export function createPlaybackEngine(
   let wasOn = false;
   let loadFailed = false;
   let gestureSeen = false;
+  /** Settles `true`/`false` when the latest resume() call does; `null` before any. */
+  let resumeSettled: Promise<boolean> | null = null;
   let nextRequestId = 1;
   let active: ActiveRequest | null = null;
 
@@ -262,7 +277,12 @@ export function createPlaybackEngine(
         muteGain = muteNode;
         ctx = created;
         // Unlock: resume() is called inside the gesture and deliberately not awaited (R-08).
-        created.resume().then(
+        const first = created.resume();
+        resumeSettled = first.then(
+          () => true,
+          () => false
+        );
+        first.then(
           () => {
             wasOn = true;
           },
@@ -276,7 +296,14 @@ export function createPlaybackEngine(
       }
     }
     // 'suspended' or Safari's 'interrupted': resumable, never unavailable once audio was on.
-    if (ctx.state !== 'running') ctx.resume().catch(() => resumeRejected(request));
+    if (ctx.state !== 'running') {
+      const again = ctx.resume();
+      resumeSettled = again.then(
+        () => true,
+        () => false
+      );
+      again.catch(() => resumeRejected(request));
+    }
     return ctx;
   }
 
@@ -327,6 +354,14 @@ export function createPlaybackEngine(
 
     unlock(): void {
       ensureContext();
+    },
+
+    sink(): AudioSink | null {
+      const port = ensureContext();
+      if (!port || !volumeGain) return null;
+      const running =
+        port.state === 'running' || !resumeSettled ? Promise.resolve(!failed) : resumeSettled;
+      return { port, destination: volumeGain, running: running.then((ok) => ok && !failed) };
     },
 
     setMuted(next): void {

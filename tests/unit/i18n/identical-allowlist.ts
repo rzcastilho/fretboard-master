@@ -31,7 +31,10 @@ const SHARED: readonly string[] = [
   'caged_key_name',
   'share_title_caged',
   'summary_separator',
-  'summary_note_separator'
+  'summary_note_separator',
+  'metronome_bpm_label',
+  'metronome_bpm_unit',
+  'shortcuts_key_escape'
 ];
 
 /** 021: syllables spelled the same as English (es: all seven; pt-BR: Mi, Sol, Si only). */

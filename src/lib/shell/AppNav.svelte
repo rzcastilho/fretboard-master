@@ -18,7 +18,8 @@
     { id: 'about' as const, path: '/about', label: m.nav_about(), icon: 'about' as BarIconName }
   ]);
 
-  const toolIds: readonly ScreenId[] = TOOLS.map((t) => t.id);
+  // The Metronome is not a linked tool: nothing carries to or from it.
+  const toolIds: readonly ScreenId[] = TOOLS.filter((t) => t.id !== 'metronome').map((t) => t.id);
 
   /** Carry applies at activation, only for a plain primary click to a different tool (ADR 0011). */
   function carry(e: MouseEvent, id: ScreenId): void {
@@ -30,6 +31,7 @@
       e.altKey ||
       e.defaultPrevented ||
       id === current ||
+      !toolIds.includes(current) ||
       !toolIds.includes(id)
     )
       return;

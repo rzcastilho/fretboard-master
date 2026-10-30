@@ -3,7 +3,7 @@ import { expect, type Page, type Request } from '@playwright/test';
 
 import type { AudioLogEntry } from '../../src/lib/audio/types';
 
-export type ToolId = 'notes' | 'triads';
+export type ToolId = 'notes' | 'triads' | 'metronome';
 
 /** Make the next `count` renders of a tool's zones B–E throw (test builds only). */
 export async function injectFault(page: Page, tool: ToolId, count: number): Promise<void> {

@@ -4,7 +4,7 @@
  */
 import { replaceState } from '$app/navigation';
 import { page } from '$app/state';
-import type { ToolId } from '$lib/shell/tools';
+import type { FretboardToolId } from '$lib/shell/tools';
 import { createAddressSync } from './address';
 import { currentLink } from './share.svelte';
 
@@ -43,7 +43,7 @@ function onPopState(): void {
 }
 
 /** Tool screen mounted: replace the address with the canonical link right away (A5 seam for 006/002). */
-export function openToolAddress(tool: ToolId): void {
+export function openToolAddress(tool: FretboardToolId): void {
   syncDisabled = false;
   if (!listening && typeof window !== 'undefined') {
     window.addEventListener('popstate', onPopState);
