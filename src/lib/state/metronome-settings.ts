@@ -1,17 +1,28 @@
 /** Metronome settings maths (031, data-model §1). Pure. */
 import { MAX_BPM, MIN_BPM } from '../audio/schedule';
 
+export type Subdivision = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export const SUBDIVISIONS: readonly Subdivision[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export const DEFAULT_SUBDIVISION: Subdivision = 3;
+
 export interface MetronomeSettings {
   readonly bpm: number;
   readonly beats: number;
+  readonly subdivision: Subdivision;
 }
 
-export type SettingField = keyof MetronomeSettings;
+/** The numeric fields adjusted by steppers. */
+export type SettingField = 'bpm' | 'beats';
 
 export const MIN_BEATS = 1;
 export const MAX_BEATS = 16;
 
-export const DEFAULT_SETTINGS: Readonly<MetronomeSettings> = Object.freeze({ bpm: 85, beats: 4 });
+export const DEFAULT_SETTINGS: Readonly<MetronomeSettings> = Object.freeze({
+  bpm: 85,
+  beats: 4,
+  subdivision: DEFAULT_SUBDIVISION
+});
 
 const LIMITS: Record<SettingField, readonly [number, number]> = {
   bpm: [MIN_BPM, MAX_BPM],
@@ -28,6 +39,14 @@ export const clampBpm = (v: number): number => clampTo(v, LIMITS.bpm);
 
 /** 1–16, rounded; NaN → 1. */
 export const clampBeats = (v: number): number => clampTo(v, LIMITS.beats);
+
+/** A number or numeric string that is one of 1-8, otherwise null. Never throws. */
+export function toSubdivision(v: unknown): Subdivision | null {
+  if (typeof v !== 'number' && typeof v !== 'string') return null;
+  if (typeof v === 'string' && v.trim() === '') return null;
+  const n = Number(v);
+  return (SUBDIVISIONS as readonly number[]).includes(n) ? (n as Subdivision) : null;
+}
 
 /** True when a step in `dir` would not change the field. */
 export function atLimit(s: MetronomeSettings, field: SettingField, dir: 1 | -1): boolean {

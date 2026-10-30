@@ -14,8 +14,10 @@ import {
   clampBpm,
   DEFAULT_SETTINGS,
   stepSetting,
+  toSubdivision,
   type MetronomeSettings
 } from './metronome-settings';
+import { subdivisionName } from './metronome-subdivision-names';
 import { beatDots, type DotState } from './metronome-view';
 import { playback } from './playback.svelte';
 
@@ -89,6 +91,7 @@ function beginSegment({ startBeat }: SegmentOptions): void {
     bpm: state.settings.bpm,
     beats: state.settings.beats,
     startBeat,
+    clicksPerBeat: state.settings.subdivision,
     run: generation,
     pressedAtMs: performance.now()
   });
@@ -99,7 +102,8 @@ function start(): void {
   state.beat = 0;
   state.announcement = m.metronome_announce_started({
     bpm: state.settings.bpm,
-    beats: state.settings.beats
+    beats: state.settings.beats,
+    subdivision: subdivisionName(state.settings.subdivision)
   });
   beginSegment({ startBeat: 1 });
 }
@@ -177,6 +181,12 @@ export const metronome = {
   stepBpm: (dir: 1 | -1): void => step('bpm', dir),
   setBeats: (v: number): void => setField('beats', v),
   stepBeats: (dir: 1 | -1): void => step('beats', dir),
+  /** Settings phase only; values that are not one of the eight subdivisions are ignored. */
+  setSubdivision: (v: unknown): void => {
+    if (state.phase !== 'settings') return;
+    const sub = toSubdivision(v);
+    if (sub !== null) state.settings = { ...state.settings, subdivision: sub };
+  },
 
   /** Gesture handler. settings → start, running → pause, paused → resume, starting → ignored. */
   toggle(): void {

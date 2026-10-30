@@ -61,6 +61,20 @@ async function startRun(): Promise<void> {
   await settle();
 }
 
+describe('MetronomePanel status line (032)', () => {
+  it('reads BEAT –/4 · SUB 3 before the first click, then BEAT 1/4 · SUB 3', async () => {
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
+    const position = (): string =>
+      container.querySelector('.position')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    expect(position()).toBe('BEAT –/4 · SUB 3');
+    await settle();
+    advance(0.2);
+    await settle();
+    expect(position()).toBe('BEAT 1/4 · SUB 3');
+  });
+});
+
 describe('MetronomePanel run controls', () => {
   it('shows Start in settings and Pause / Resume + Reset while a run exists', async () => {
     render(MetronomePanel);
@@ -244,6 +258,49 @@ describe('MetronomePanel settings rows (US3)', () => {
     expect(screen.queryByRole('slider')).toBeNull();
     metronome.setBpm(200);
     metronome.stepBeats(1);
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4 });
+    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
+  });
+});
+
+describe('MetronomePanel subdivision select (032)', () => {
+  const names = [
+    'Quarter notes (1)',
+    '8th notes (2)',
+    '8th Triplets (3)',
+    '16th notes (4)',
+    'Quintuplets (5)',
+    'Sextuplets (6)',
+    'Septuplets (7)',
+    '32nd notes (8)'
+  ];
+
+  it('lists eight options in order with 8th Triplets (3) selected', () => {
+    render(MetronomePanel);
+    const select = screen.getByRole('combobox', { name: 'Loop 1' }) as HTMLSelectElement;
+    expect([...select.options].map((o) => o.textContent?.trim())).toEqual(names);
+    expect(select.value).toBe('3');
+    expect(select.selectedOptions[0].textContent?.trim()).toBe('8th Triplets (3)');
+  });
+
+  it('sits after the # of Beats row and before Start Training', () => {
+    render(MetronomePanel);
+    const beats = screen.getByRole('slider', { name: '# of Beats' });
+    const select = screen.getByRole('combobox', { name: 'Loop 1' });
+    const start = screen.getByRole('button', { name: 'Start Training' });
+    expect(beats.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(select.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('choosing 5 then Start shows SUB 5; the select is gone while running and paused', async () => {
+    const { container } = render(MetronomePanel);
+    const select = screen.getByRole('combobox', { name: 'Loop 1' });
+    await fireEvent.change(select, { target: { value: '5' } });
+    expect(metronome.settings.subdivision).toBe(5);
+    await startRun();
+    expect(container.querySelector('.position')?.textContent).toContain('SUB 5');
+    expect(screen.queryByRole('combobox')).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(metronome.phase).toBe('paused');
+    expect(screen.queryByRole('combobox')).toBeNull();
   });
 });

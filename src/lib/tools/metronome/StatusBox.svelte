@@ -7,19 +7,24 @@
     beat,
     beats,
     bpm,
+    sub,
     dots
-  }: { beat: number; beats: number; bpm: number; dots: readonly DotState[] } = $props();
+  }: { beat: number; beats: number; bpm: number; sub: number; dots: readonly DotState[] } =
+    $props();
 
-  const status = $derived(statusParams(beat, beats));
+  const status = $derived(statusParams(beat, beats, sub));
 </script>
 
 <div class="status">
   <p class="position">
-    {#if status.kind === 'beat'}
-      {m.metronome_status_beat({ beat: status.beat, beats: status.beats })}
-    {:else}
-      {m.metronome_status_beat_none({ beats: status.beats })}
-    {/if}
+    <span class="part"
+      >{#if status.kind === 'beat'}{m.metronome_status_beat({
+          beat: status.beat,
+          beats: status.beats
+        })}{:else}{m.metronome_status_beat_none({ beats: status.beats })}{/if}</span
+    ><span class="sep">{m.summary_separator()}</span><span class="part"
+      >{m.metronome_status_sub({ count: status.sub })}</span
+    >
   </p>
   <p class="tempo">
     <span class="digits">{bpm}</span> <span class="unit">{m.metronome_bpm_unit()}</span>
@@ -49,6 +54,10 @@
   .position {
     font-variant-caps: all-small-caps;
     font-size: var(--font-size-lg);
+  }
+
+  .part {
+    white-space: nowrap;
   }
 
   .digits {

@@ -28,6 +28,30 @@ test.describe('metronome a11y: axe (SC-008)', () => {
   }
 });
 
+test.describe('metronome a11y: subdivision select (032)', () => {
+  test('settings view with the select is axe-clean', async ({ page }) => {
+    await page.goto('/metronome');
+    await expect(page.getByRole('combobox', { name: 'Loop 1' })).toBeVisible();
+    await runAxe(page);
+  });
+
+  test('settings view is axe-clean in forced colours', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' });
+    await page.goto('/metronome');
+    await expect(page.getByRole('combobox', { name: 'Loop 1' })).toBeVisible();
+    await runAxe(page);
+  });
+
+  test('settings and running views are axe-clean with more contrast', async ({ page }) => {
+    await page.emulateMedia({ contrast: 'more' });
+    await page.goto('/metronome');
+    await runAxe(page);
+    await page.getByRole('button', { name: 'Start Training' }).click();
+    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await runAxe(page);
+  });
+});
+
 test.describe('metronome a11y: keyboard only (SC-007)', () => {
   test('start, pause, resume and reset without a pointer', async ({ page }) => {
     await page.goto('/metronome');
@@ -73,7 +97,7 @@ test.describe('metronome a11y: live region', () => {
     await page.goto('/metronome');
     await page.getByRole('button', { name: 'Start Training' }).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
-    await expect(live(page)).toHaveText(/^Started, 85 BPM, 4 beats$/);
+    await expect(live(page)).toHaveText(/^Started, 85 BPM, 4 beats, 8th Triplets$/);
     // Observe the region across several beats: its text must not change.
     const seen = await page.evaluate(
       () =>

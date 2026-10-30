@@ -12,10 +12,10 @@ export function beatDots(beats: number, beat: number): readonly DotState[] {
 }
 
 export type StatusParams =
-  | { readonly kind: 'beat'; readonly beat: number; readonly beats: number }
-  | { readonly kind: 'none'; readonly beats: number };
+  | { readonly kind: 'beat'; readonly beat: number; readonly beats: number; readonly sub: number }
+  | { readonly kind: 'none'; readonly beats: number; readonly sub: number };
 
 /** Selects `metronome_status_beat` or, before the first click, `metronome_status_beat_none`. */
-export function statusParams(beat: number, beats: number): StatusParams {
-  return beat === 0 ? { kind: 'none', beats } : { kind: 'beat', beat, beats };
+export function statusParams(beat: number, beats: number, sub: number): StatusParams {
+  return beat === 0 ? { kind: 'none', beats, sub } : { kind: 'beat', beat, beats, sub };
 }

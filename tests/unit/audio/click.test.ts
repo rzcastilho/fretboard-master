@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLICK_S, renderClick } from '../../../src/lib/audio/click';
+import { CLICK_LENGTH_S, CLICK_S, renderClick } from '../../../src/lib/audio/click';
 
 const RATE = 48000;
 
@@ -64,4 +64,54 @@ describe('renderClick', () => {
       expect(() => renderClick('accent', rate)).not.toThrow();
     }
   });
+
+  describe('sub (032)', () => {
+    it('is 18 ms long, at most 20 ms', () => {
+      const s = renderClick('sub', RATE);
+      expect(s.length).toBe(Math.round(0.018 * RATE));
+      expect(s.length).toBeLessThanOrEqual(Math.round(0.02 * RATE));
+    });
+
+    it('peaks at no more than half the normal click', () => {
+      expect(peakOf(renderClick('sub', RATE))).toBeLessThanOrEqual(
+        0.5 * peakOf(renderClick('normal', RATE))
+      );
+      expect(peakOf(renderClick('sub', RATE))).toBeCloseTo(0.25, 2);
+    });
+
+    it('sits at 2400 Hz, apart from accent and normal', () => {
+      const hz = zeroCrossingHz(renderClick('sub', RATE), RATE);
+      expect(Math.abs(hz - 2400) / 2400).toBeLessThanOrEqual(0.05);
+      expect(Math.abs(hz - 1000)).toBeGreaterThan(200);
+      expect(Math.abs(hz - 1600)).toBeGreaterThan(200);
+    });
+
+    it('leaves accent and normal as in 031', () => {
+      expect(renderClick('accent', RATE).length).toBe(Math.round(0.03 * RATE));
+      expect(renderClick('normal', RATE).length).toBe(Math.round(0.03 * RATE));
+      expect(peakOf(renderClick('accent', RATE))).toBeCloseTo(0.9, 2);
+      expect(peakOf(renderClick('normal', RATE))).toBeCloseTo(0.55, 2);
+    });
+
+    it('falls back to 48 kHz for an invalid sample rate', () => {
+      expect(renderClick('sub', NaN).length).toBe(Math.round(0.018 * 48000));
+    });
+
+    it('exports the per-kind lengths', () => {
+      expect(CLICK_LENGTH_S).toEqual({ accent: 0.03, normal: 0.03, sub: 0.018 });
+      expect(CLICK_S).toBe(0.03);
+    });
+  });
 });
+
+/** Dominant frequency from upward zero crossings. */
+function zeroCrossingHz(s: Float32Array, rate: number): number {
+  const crossings: number[] = [];
+  for (let i = 1; i < s.length; i++) {
+    if (s[i - 1] < 0 && s[i] >= 0) {
+      crossings.push(i - 1 + -s[i - 1] / (s[i] - s[i - 1]));
+    }
+  }
+  if (crossings.length < 2) return 0;
+  return (rate * (crossings.length - 1)) / (crossings[crossings.length - 1] - crossings[0]);
+}

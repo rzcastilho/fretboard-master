@@ -59,7 +59,7 @@ describe('metronome store: start path', () => {
   it('M1: first open is the settings phase at 85 BPM / 4 beats', () => {
     rig();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4 });
+    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
     expect(metronome.beat).toBe(0);
     expect(metronome.soundNotice).toBe(false);
     expect(metronome.dots).toEqual([]);
@@ -109,6 +109,31 @@ describe('metronome store: start path', () => {
     advance(r, 3);
     expect(metronome.beat).toBeGreaterThan(0);
     expect(metronome.announcement).toBe(started);
+  });
+
+  it('032: start announces the subdivision and schedules clicksPerBeat clicks per beat', async () => {
+    const r = rig();
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets');
+    advance(r, 1);
+    const t = starts(r);
+    expect(t[1] - t[0]).toBeCloseTo(60 / 85 / 3, 6);
+    expect(t[3] - t[0]).toBeCloseTo(60 / 85, 6);
+  });
+
+  it('032: resume keeps the subdivision', async () => {
+    const r = rig();
+    metronome.toggle();
+    await settle();
+    advance(r, 1);
+    metronome.toggle();
+    const n = starts(r).length;
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    const t = starts(r).slice(n);
+    expect(t[1] - t[0]).toBeCloseTo(60 / 85 / 3, 6);
   });
 
   it('M8: hidden stop and a hidden visibilitychange leave the run going', async () => {
@@ -179,7 +204,7 @@ describe('metronome store: start path', () => {
     await settle();
     metronome.setBpm(120);
     metronome.stepBeats(1);
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4 });
+    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
   });
 
   it('M7: screenChanged halts the run and restores the defaults', async () => {
@@ -190,7 +215,7 @@ describe('metronome store: start path', () => {
     advance(r, 0.1);
     metronome.screenChanged();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4 });
+    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
     expect(metronome.beat).toBe(0);
     const before = starts(r).length;
     advance(r, 2);
@@ -261,7 +286,7 @@ describe('metronome store: pause, resume and reset', () => {
     advance(r, 0.1);
     metronome.reset();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ bpm: 120, beats: 6 });
+    expect(metronome.settings).toEqual({ bpm: 120, beats: 6, subdivision: 3 });
     expect(metronome.beat).toBe(0);
     const before = starts(r).length;
     advance(r, 2);
@@ -298,7 +323,7 @@ describe('metronome store: pause, resume and reset', () => {
     metronome.reset();
     expect(metronome.settings.bpm).toBe(200);
     metronome.screenChanged();
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4 });
+    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
   });
 
   it('M9: the announcement changes on Start, Pause, Resume and Reset only', async () => {
@@ -332,5 +357,52 @@ describe('metronome store: pause, resume and reset', () => {
     expect(metronome.phase).toBe('paused');
     expect(metronome.beat).toBe(2);
     expect(metronome.announcement).toContain('2');
+  });
+});
+
+describe('metronome store: setSubdivision (032)', () => {
+  it('accepts numbers and numeric strings in the settings phase', () => {
+    rig();
+    metronome.setSubdivision(5);
+    expect(metronome.settings.subdivision).toBe(5);
+    metronome.setSubdivision('7');
+    expect(metronome.settings.subdivision).toBe(7);
+  });
+
+  it('ignores invalid values', () => {
+    rig();
+    metronome.setSubdivision(9);
+    metronome.setSubdivision('x');
+    metronome.setSubdivision(2.5);
+    expect(metronome.settings.subdivision).toBe(3);
+  });
+
+  it('is a no-op in starting, running and paused', async () => {
+    const r = rig();
+    metronome.toggle();
+    expect(metronome.phase).toBe('starting');
+    metronome.setSubdivision(5);
+    expect(metronome.settings.subdivision).toBe(3);
+    await settle();
+    advance(r, 0.2);
+    expect(metronome.phase).toBe('running');
+    metronome.setSubdivision(5);
+    expect(metronome.settings.subdivision).toBe(3);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    metronome.setSubdivision(5);
+    expect(metronome.settings.subdivision).toBe(3);
+  });
+
+  it('Reset keeps the choice; screenChanged restores 3', async () => {
+    const r = rig();
+    metronome.setSubdivision(6);
+    metronome.toggle();
+    await settle();
+    advance(r, 0.2);
+    metronome.reset();
+    expect(metronome.settings.subdivision).toBe(6);
+    metronome.screenChanged();
+    expect(metronome.settings.subdivision).toBe(3);
   });
 });

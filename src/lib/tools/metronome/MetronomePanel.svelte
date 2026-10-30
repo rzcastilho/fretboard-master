@@ -8,6 +8,7 @@
   import { toShortcutEvent } from '$lib/state/shortcuts';
   import RunControls from './RunControls.svelte';
   import StatusBox from './StatusBox.svelte';
+  import SubdivisionSelect from './SubdivisionSelect.svelte';
   import ValueRow from './ValueRow.svelte';
 
   maybeFault('metronome');
@@ -87,6 +88,7 @@
       onset={(v) => metronome.setBeats(v)}
       onstep={(d) => metronome.stepBeats(d)}
     />
+    <SubdivisionSelect value={metronome.settings.subdivision} onchange={metronome.setSubdivision} />
     <button type="button" class="start" bind:this={startButton} onclick={start}>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"
         ><path d="M7 4l13 8-13 8z" /></svg
@@ -98,6 +100,7 @@
       beat={metronome.beat}
       beats={metronome.settings.beats}
       bpm={metronome.settings.bpm}
+      sub={metronome.settings.subdivision}
       dots={metronome.dots}
     />
     <RunControls
