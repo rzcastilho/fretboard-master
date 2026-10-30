@@ -107,4 +107,12 @@ describe('matchMetronomeKey', () => {
     expect(matchMetronomeKey(ev(' ', {}, select), settings)).toBeNull();
     expect(matchMetronomeKey(ev('Escape', {}, select), running)).toBeNull();
   });
+
+  it('Space on the Count In switch toggles the switch, never the run (033)', () => {
+    const button = { tagName: 'BUTTON' };
+    expect(matchMetronomeKey(ev(' ', { targetActivates: true }, button), settings)).toBeNull();
+    expect(
+      matchMetronomeKey(ev(' ', { targetActivates: true }, { tagName: 'DIV' }), settings)
+    ).toBeNull();
+  });
 });

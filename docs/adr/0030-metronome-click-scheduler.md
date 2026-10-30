@@ -64,3 +64,23 @@ no new architectural decision.
   The beat click stays lower and louder than the ticks.
 - **Consequence.** Up to about 60 sources can be pending at 300 BPM × 32nds within the 1.5 s
   horizon. Pause still stops each one exactly.
+
+## Revision (033 count-in)
+
+Source: spec 033-count-in (research R-12). This refines the scheduling decision above. It adds no
+new architectural decision, so there is no new ADR.
+
+- **Prefix on the integer grid.** The count-in is a run of whole-beat clicks placed before the loop
+  on the same grid: click _j_ is still `anchor + j × (60 / BPM) / n`, with the count-in clicks at
+  the negative multiples of _n_. The loop's first beat therefore lands exactly one beat after the
+  last count-in click, with no gap or flam, and the anchor is never re-derived.
+- **Signed slots.** The slot index is signed: count-in clicks have negative slots, the loop starts
+  at slot 0. Every count-in click is an accent and is never subdivided.
+- **`onCountIn`.** The scheduler reports each count-in click through a new `onCountIn(click)`
+  callback, parallel to `onBeat`, so the status line and dot follow the audible click. The
+  live region is not touched per click.
+- **`HaltedAt`.** Pause returns where the scheduler stopped, either a count-in click or a loop slot.
+  Resume continues from that position: the rest of an interrupted count-in plays, then the loop. A
+  pause inside the loop never replays a count-in, and Reset discards the position.
+- **Consequence.** At most 8 more sources can be pending within the 1.5 s horizon, since the
+  count-in is one click per beat. Pause still stops each one exactly.

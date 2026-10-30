@@ -6,6 +6,7 @@
   import { matchMetronomeKey } from '$lib/state/metronome-keys';
   import { metronome } from '$lib/state/metronome.svelte';
   import { toShortcutEvent } from '$lib/state/shortcuts';
+  import CountInSettings from './CountInSettings.svelte';
   import RunControls from './RunControls.svelte';
   import StatusBox from './StatusBox.svelte';
   import SubdivisionSelect from './SubdivisionSelect.svelte';
@@ -88,6 +89,14 @@
       onset={(v) => metronome.setBeats(v)}
       onstep={(d) => metronome.stepBeats(d)}
     />
+    <CountInSettings
+      settings={metronome.settings}
+      onswitch={(on) => metronome.setCountIn(on)}
+      oninitialset={(v) => metronome.setInitialCountIn(v)}
+      oninitialstep={(d) => metronome.stepInitialCountIn(d)}
+      onrepeatset={(v) => metronome.setRepeatCountIn(v)}
+      onrepeatstep={(d) => metronome.stepRepeatCountIn(d)}
+    />
     <SubdivisionSelect value={metronome.settings.subdivision} onchange={metronome.setSubdivision} />
     <button type="button" class="start" bind:this={startButton} onclick={start}>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"
@@ -102,6 +111,7 @@
       bpm={metronome.settings.bpm}
       sub={metronome.settings.subdivision}
       dots={metronome.dots}
+      countIn={metronome.countIn}
     />
     <RunControls
       phase={metronome.phase}

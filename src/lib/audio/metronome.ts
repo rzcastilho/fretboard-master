@@ -33,8 +33,17 @@ export interface SchedulerDeps {
 
 export interface SchedulerEvents {
   onBeat(beat: number): void;
+  /** A count-in click became audible; 1-based in the run's numbering (`from + 1 … total`). */
+  onCountIn(click: number): void;
   onSuspended(): void;
   onSoundUnavailable(): void;
+}
+
+export interface CountInSpan {
+  /** Clicks already played, 0…total. */
+  readonly from: number;
+  /** Clicks in the whole count-in, 0–8. */
+  readonly total: number;
 }
 
 export interface SegmentStart {
@@ -43,15 +52,22 @@ export interface SegmentStart {
   readonly startBeat: number;
   /** Clicks per beat, 1–8: the beat click plus n − 1 soft ones. Anything else counts as 1. */
   readonly clicksPerBeat: number;
+  /** Accented count-in clicks before the loop; absent or invalid means none. */
+  readonly countIn?: CountInSpan;
   readonly run: number;
   readonly pressedAtMs: number;
 }
 
 export type HaltReason = 'pause' | 'reset' | 'leave' | 'suspend';
 
+export type HaltedAt =
+  | { readonly kind: 'count-in'; readonly click: number }
+  | { readonly kind: 'beat'; readonly beat: number }
+  | { readonly kind: 'none' };
+
 export interface ClickScheduler {
   start(segment: SegmentStart): void;
-  halt(reason: HaltReason): number;
+  halt(reason: HaltReason): HaltedAt;
   readonly live: boolean;
 }
 
@@ -61,27 +77,52 @@ interface Grid {
   readonly perBeat: number;
   readonly startBeat: number;
   readonly beats: number;
+  /** Count-in clicks still to play at the segment start (r); absent = 0. */
+  readonly countInRemaining?: number;
+  /** Count-in clicks already played before this segment; absent = 0. */
+  readonly countInFrom?: number;
 }
 
 export interface GridClick {
   readonly index: number;
   readonly when: number;
+  /** `c − r` (negative) for count-in clicks, `floor(j / perBeat)` for loop clicks. */
   readonly slot: number;
+  /** 0 for count-in clicks. */
   readonly beat: number;
+  /** `from + c + 1` for count-in clicks, else null. */
+  readonly countIn: number | null;
   readonly kind: ClickKind;
   readonly accent: boolean;
 }
 
-/** Grid click `j` of a segment: `anchor + j × period / perBeat`, never accumulated. */
-export function clickAt(seg: Grid, j: number): GridClick {
+/**
+ * Combined grid click `c`: count-in clicks `c < r` at `anchor + c × period`, then loop click
+ * `j = c − r` at `anchor + r × period + j × period / perBeat`. Never accumulated.
+ */
+export function clickAt(seg: Grid, c: number): GridClick {
+  const r = seg.countInRemaining ?? 0;
+  if (c < r) {
+    return {
+      index: c,
+      when: seg.anchor + c * seg.period,
+      slot: c - r,
+      beat: 0,
+      countIn: (seg.countInFrom ?? 0) + c + 1,
+      kind: 'accent',
+      accent: true
+    };
+  }
+  const j = c - r;
   const slot = Math.floor(j / seg.perBeat);
   const beat = ((((seg.startBeat - 1 + slot) % seg.beats) + seg.beats) % seg.beats) + 1;
   const kind: ClickKind = j % seg.perBeat !== 0 ? 'sub' : beat === 1 ? 'accent' : 'normal';
   return {
-    index: j,
-    when: seg.anchor + (j * seg.period) / seg.perBeat,
+    index: c,
+    when: seg.anchor + r * seg.period + (j * seg.period) / seg.perBeat,
     slot,
     beat,
+    countIn: null,
     kind,
     accent: kind === 'accent'
   };
@@ -89,10 +130,30 @@ export function clickAt(seg: Grid, j: number): GridClick {
 
 /** First grid click worth scheduling at `now` (skip-forward, never a burst). */
 export function skipTo(
-  seg: { anchor: number; period: number; perBeat: number },
+  seg: { anchor: number; period: number; perBeat: number; countInRemaining?: number },
   now: number
 ): number {
-  return Math.max(0, Math.ceil(((now + START_LEAD_S - seg.anchor) * seg.perBeat) / seg.period));
+  const r = seg.countInRemaining ?? 0;
+  const u = now + START_LEAD_S - seg.anchor;
+  if (u <= 0) return 0;
+  if (u <= r * seg.period) return Math.ceil(u / seg.period);
+  return r + Math.ceil(((u - r * seg.period) * seg.perBeat) / seg.period);
+}
+
+/** Valid `countIn` → remaining and already-played counts; anything else → no count-in. */
+function toCountIn(c: CountInSpan | undefined): { remaining: number; from: number } {
+  if (
+    !c ||
+    !Number.isInteger(c.total) ||
+    !Number.isInteger(c.from) ||
+    c.total < 0 ||
+    c.total > 8 ||
+    c.from < 0 ||
+    c.from > c.total
+  ) {
+    return { remaining: 0, from: 0 };
+  }
+  return { remaining: c.total - c.from, from: c.from };
 }
 
 function toPerBeat(n: number): number {
@@ -130,7 +191,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   let seg: (Grid & { run: number; pressedAtMs: number }) | null = null;
   let visual = sink === null;
   let next = 0;
-  let reported = -1;
+  let reported = -Infinity;
   let timer: number | null = null;
   let frame: number | null = null;
   let resuming = false;
@@ -143,7 +204,12 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   /** Index of the latest grid click whose audible time has been reached, or -1. */
   function audibleIndex(): number {
     if (!seg) return -1;
-    const k = Math.floor(((now() - latency() - seg.anchor) * seg.perBeat) / seg.period + 1e-9);
+    const r = seg.countInRemaining ?? 0;
+    const t = now() - latency() - seg.anchor;
+    const k =
+      t < r * seg.period
+        ? Math.floor(t / seg.period + 1e-9)
+        : r + Math.floor(((t - r * seg.period) * seg.perBeat) / seg.period + 1e-9);
     return k < 0 ? -1 : Math.min(k, next - 1);
   }
 
@@ -163,6 +229,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       index: k,
       slot: c.slot,
       beat: c.beat,
+      countIn: c.countIn,
       kind: c.kind,
       accent: c.accent,
       when: c.when,
@@ -207,10 +274,13 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   function frameLoop(g: number): void {
     if (g !== gen || !seg) return;
     const k = audibleIndex();
-    const slot = k < 0 ? -1 : Math.floor(k / seg.perBeat);
-    if (slot > reported) {
-      reported = slot;
-      events.onBeat(clickAt(seg, slot * seg.perBeat).beat);
+    if (k >= 0) {
+      const c = clickAt(seg, k);
+      if (c.slot > reported) {
+        reported = c.slot;
+        if (c.countIn !== null) events.onCountIn(c.countIn);
+        else events.onBeat(clickAt(seg, (seg.countInRemaining ?? 0) + c.slot * seg.perBeat).beat);
+      }
     }
     frame = frames.request(() => frameLoop(g));
   }
@@ -218,7 +288,10 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   function anchorAndRun(g: number, segment: SegmentStart): void {
     if (g !== gen) return;
     const period = 60 / segment.bpm;
+    const ci = toCountIn(segment.countIn);
     seg = {
+      countInRemaining: ci.remaining,
+      countInFrom: ci.from,
       anchor: now() + START_LEAD_S,
       period,
       perBeat: toPerBeat(segment.clicksPerBeat),
@@ -228,7 +301,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       pressedAtMs: segment.pressedAtMs
     };
     next = 0;
-    reported = -1;
+    reported = -Infinity;
     pump(g);
     frame = frames.request(() => frameLoop(g));
   }
@@ -258,10 +331,20 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       });
     },
 
-    halt(reason): number {
-      if (!live) return 0;
+    halt(reason): HaltedAt {
+      if (!live) return { kind: 'none' };
       const k = audibleIndex();
-      const beat = seg && k >= 0 ? clickAt(seg, Math.floor(k / seg.perBeat) * seg.perBeat).beat : 0;
+      let halted: HaltedAt = { kind: 'none' };
+      if (seg && k >= 0) {
+        const c = clickAt(seg, k);
+        halted =
+          c.countIn !== null
+            ? { kind: 'count-in', click: c.countIn }
+            : {
+                kind: 'beat',
+                beat: clickAt(seg, (seg.countInRemaining ?? 0) + c.slot * seg.perBeat).beat
+              };
+      }
       const t = now();
       let count = 0;
       for (const p of pending) {
@@ -283,7 +366,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       gen++;
       live = false;
       seg = null;
-      return beat;
+      return halted;
     }
   };
   return scheduler;

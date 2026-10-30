@@ -64,6 +64,7 @@
   --pill-min-inline: 96px;
   --metronome-panel-max: 36rem;
   --metronome-dot-size: 1.5rem;
+  --metronome-pulse-scale: 1.25;
   --unit-px: 1px;
   --fb-stroke-hairline: 1px;
   --fb-label-halo-width: 3px;

@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { runAxe } from './support/helpers';
+import { countInOff, runAxe } from './support/helpers';
 
 const panel = (page: Page) => page.getByRole('region', { name: 'Ratios Training' });
 const live = (page: Page) => page.locator('[role="status"][aria-live="polite"].sr-only');
 
 async function toPaused(page: Page): Promise<void> {
+  await countInOff(page);
   await page.getByRole('button', { name: 'Start Training' }).click();
   await expect(panel(page)).toHaveAttribute('data-phase', 'running');
   await page.getByRole('button', { name: 'Pause' }).click();
@@ -18,6 +19,7 @@ test.describe('metronome a11y: axe (SC-008)', () => {
       await page.emulateMedia({ colorScheme });
       await page.goto('/metronome');
       await runAxe(page);
+      await countInOff(page);
       await page.getByRole('button', { name: 'Start Training' }).click();
       await expect(panel(page)).toHaveAttribute('data-phase', 'running');
       await runAxe(page);
@@ -95,6 +97,7 @@ test.describe('metronome a11y: keyboard only (SC-007)', () => {
 test.describe('metronome a11y: live region', () => {
   test('holds only run-state announcements, never a per-beat update', async ({ page }) => {
     await page.goto('/metronome');
+    await countInOff(page);
     await page.getByRole('button', { name: 'Start Training' }).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
     await expect(live(page)).toHaveText(/^Started, 85 BPM, 4 beats, 8th Triplets$/);
@@ -134,6 +137,7 @@ test.describe('metronome a11y: languages (US4-2)', () => {
       await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
       await expect(page.getByRole('heading', { level: 1, name: 'Metrônomo' })).toBeVisible();
       await expect(page.getByRole('slider', { name: 'Nº de tempos' })).toBeVisible();
+      await page.getByRole('switch', { name: 'Contagem' }).click();
       await page.getByRole('button', { name: 'Iniciar treino' }).click();
       await expect(page.locator('.position')).toHaveText(/TEMPO [1-4–]\/4/);
       await expect(page.getByRole('button', { name: 'Pausar' })).toBeVisible();
@@ -147,6 +151,7 @@ test.describe('metronome a11y: languages (US4-2)', () => {
       await page.goto('/metronome');
       await expect(page.locator('html')).toHaveAttribute('lang', 'es');
       await expect(page.getByRole('heading', { level: 1, name: 'Metrónomo' })).toBeVisible();
+      await page.getByRole('switch', { name: 'Cuenta previa' }).click();
       await page.getByRole('button', { name: /^Iniciar/ }).click();
       await expect(page.locator('.position')).not.toHaveText(/BEAT/);
       await expect(page.locator('.position')).toHaveText(/\d\/4|–\/4/);
@@ -174,6 +179,7 @@ test.describe('metronome a11y: contrast, forced colours and motion', () => {
   test('reduced motion: the dots have no transition', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/metronome');
+    await countInOff(page);
     await page.getByRole('button', { name: 'Start Training' }).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
     const durations = await page
@@ -182,4 +188,31 @@ test.describe('metronome a11y: contrast, forced colours and motion', () => {
     expect(durations).toHaveLength(4);
     for (const d of durations) expect(parseFloat(d)).toBe(0);
   });
+});
+
+test.describe('metronome a11y: count-in axe (033)', () => {
+  const modes = [
+    { name: 'light', media: { colorScheme: 'light' as const } },
+    { name: 'dark', media: { colorScheme: 'dark' as const } },
+    { name: 'more contrast', media: { contrast: 'more' as const } },
+    { name: 'forced colours', media: { forcedColors: 'active' as const } }
+  ];
+  for (const { name, media } of modes) {
+    test(`settings (switch on and off) and the count-in running view are axe-clean in ${name}`, async ({
+      page
+    }) => {
+      await page.emulateMedia(media);
+      await page.goto('/metronome');
+      const sw = page.getByRole('switch', { name: 'Count In' });
+      await expect(sw).toHaveAttribute('aria-checked', 'true');
+      await runAxe(page);
+      await sw.click();
+      await expect(sw).toHaveAttribute('aria-checked', 'false');
+      await runAxe(page);
+      await sw.click();
+      await page.getByRole('button', { name: 'Start Training' }).click();
+      await expect(page.locator('.position')).toContainText('COUNT IN');
+      await runAxe(page);
+    });
+  }
 });

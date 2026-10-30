@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClickSink } from '../../../src/lib/audio/metronome';
+import { DEFAULT_SETTINGS, type MetronomeSettings } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames, type FakeSource } from '../audio/support/fake-audio';
@@ -18,7 +19,10 @@ async function settle(): Promise<void> {
   for (let i = 0; i < 5; i++) await Promise.resolve();
 }
 
-function rig(running: boolean | 'null' = true): Rig {
+function rig(
+  running: boolean | 'null' = true,
+  settings: Partial<MetronomeSettings> = { countIn: false }
+): Rig {
   const port = new FakeAudioPort();
   port.state = 'running';
   const clock = new FakeClock();
@@ -31,7 +35,7 @@ function rig(running: boolean | 'null' = true): Rig {
   const clickSink = vi
     .spyOn(playback, 'clickSink')
     .mockReturnValue(running === 'null' ? null : sink);
-  resetMetronomeForTests({ clock, frames });
+  resetMetronomeForTests({ clock, frames }, settings);
   return { port, clock, frames, sink, clickSink };
 }
 
@@ -59,7 +63,7 @@ describe('metronome store: start path', () => {
   it('M1: first open is the settings phase at 85 BPM / 4 beats', () => {
     rig();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false });
     expect(metronome.beat).toBe(0);
     expect(metronome.soundNotice).toBe(false);
     expect(metronome.dots).toEqual([]);
@@ -204,7 +208,7 @@ describe('metronome store: start path', () => {
     await settle();
     metronome.setBpm(120);
     metronome.stepBeats(1);
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false });
   });
 
   it('M7: screenChanged halts the run and restores the defaults', async () => {
@@ -215,7 +219,7 @@ describe('metronome store: start path', () => {
     advance(r, 0.1);
     metronome.screenChanged();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS });
     expect(metronome.beat).toBe(0);
     const before = starts(r).length;
     advance(r, 2);
@@ -286,7 +290,7 @@ describe('metronome store: pause, resume and reset', () => {
     advance(r, 0.1);
     metronome.reset();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ bpm: 120, beats: 6, subdivision: 3 });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, bpm: 120, beats: 6, countIn: false });
     expect(metronome.beat).toBe(0);
     const before = starts(r).length;
     advance(r, 2);
@@ -323,7 +327,7 @@ describe('metronome store: pause, resume and reset', () => {
     metronome.reset();
     expect(metronome.settings.bpm).toBe(200);
     metronome.screenChanged();
-    expect(metronome.settings).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS });
   });
 
   it('M9: the announcement changes on Start, Pause, Resume and Reset only', async () => {
@@ -404,5 +408,237 @@ describe('metronome store: setSubdivision (032)', () => {
     expect(metronome.settings.subdivision).toBe(6);
     metronome.screenChanged();
     expect(metronome.settings.subdivision).toBe(3);
+  });
+});
+
+describe('metronome store: count-in (033)', () => {
+  const on = { countIn: true } as const;
+
+  it('S3: Start with k = 4 enters the count-in stage with no dots', async () => {
+    const r = rig(true, on);
+    metronome.toggle();
+    expect(metronome.countIn).toEqual({ click: 0, total: 4 });
+    expect(metronome.dots).toEqual([]);
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.phase).toBe('running');
+    expect(metronome.countIn).toEqual({ click: 1, total: 4 });
+    expect(metronome.beat).toBe(0);
+  });
+
+  it('S4: clicks count 1…4 then the first loop beat returns the dots', async () => {
+    const r = rig(true, on);
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    for (const n of [2, 3, 4]) {
+      advance(r, 60 / 85);
+      expect(metronome.countIn).toEqual({ click: n, total: 4 });
+    }
+    advance(r, 60 / 85);
+    expect(metronome.countIn).toBeNull();
+    expect(metronome.beat).toBe(1);
+    expect(metronome.dots).toEqual(['lit', 'upcoming', 'upcoming', 'upcoming']);
+  });
+
+  it('S5: k = 0 (switch off or Initial 0) has no count-in and the 032 announcement', async () => {
+    for (const s of [{ countIn: false }, { countIn: true, initialCountIn: 0 }]) {
+      const r = rig(true, s);
+      metronome.toggle();
+      await settle();
+      expect(metronome.countIn).toBeNull();
+      expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets');
+      advance(r, 0.1);
+      expect(metronome.beat).toBe(1);
+      metronome.screenChanged();
+    }
+  });
+
+  it('S6: the start announcement names the count-in', () => {
+    rig(true, on);
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets, count in 4');
+  });
+
+  it('plays four accent clicks then the loop one beat later', async () => {
+    const r = rig(true, on);
+    metronome.toggle();
+    await settle();
+    advance(r, 3);
+    const t = starts(r);
+    for (let i = 1; i < 4; i++) expect(t[i] - t[i - 1]).toBeCloseTo(60 / 85, 6);
+    expect(t[4] - t[3]).toBeCloseTo(60 / 85, 6);
+  });
+
+  it('S10: repeatCountIn never changes what Start schedules', async () => {
+    const a = rig(true, { ...on, repeatCountIn: 6 });
+    metronome.toggle();
+    await settle();
+    advance(a, 3);
+    const withSix = starts(a).map((x) => x - starts(a)[0]);
+    const b = rig(true, { ...on, repeatCountIn: 0 });
+    metronome.toggle();
+    await settle();
+    advance(b, 3);
+    expect(starts(b).map((x) => x - starts(b)[0])).toEqual(withSix);
+  });
+
+  it('S10: repeatCountIn 6 does not affect resume or the announcement, and survives reset', async () => {
+    const r = rig(true, { ...on, repeatCountIn: 6 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets, count in 4');
+    metronome.toggle();
+    expect(metronome.countIn).toEqual({ click: 1, total: 4 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.countIn).toEqual({ click: 2, total: 4 });
+    metronome.reset();
+    expect(metronome.settings.repeatCountIn).toBe(6);
+  });
+
+  it('a stale generation is ignored after Reset', async () => {
+    const r = rig(true, on);
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    metronome.reset();
+    advance(r, 2);
+    expect(metronome.countIn).toBeNull();
+    expect(metronome.phase).toBe('settings');
+  });
+});
+
+describe('metronome store: count-in settings (033 S1, S2)', () => {
+  it('S1: setters change the settings, clamped, and keep the counts when switched off', () => {
+    rig(true, {});
+    metronome.setInitialCountIn(6);
+    metronome.setRepeatCountIn(9);
+    expect(metronome.settings.initialCountIn).toBe(6);
+    expect(metronome.settings.repeatCountIn).toBe(8);
+    metronome.setInitialCountIn(-3);
+    expect(metronome.settings.initialCountIn).toBe(0);
+    metronome.setInitialCountIn(NaN);
+    expect(metronome.settings.initialCountIn).toBe(4);
+    metronome.setRepeatCountIn(NaN);
+    expect(metronome.settings.repeatCountIn).toBe(2);
+    metronome.setInitialCountIn(5);
+    metronome.setCountIn(false);
+    expect(metronome.settings.countIn).toBe(false);
+    expect(metronome.settings.initialCountIn).toBe(5);
+    metronome.setCountIn(true);
+    expect(metronome.settings.countIn).toBe(true);
+    metronome.setCountIn('no' as unknown as boolean);
+    expect(metronome.settings.countIn).toBe(true);
+  });
+
+  it('S1: steppers move by one and stop at the limits', () => {
+    rig(true, { initialCountIn: 8, repeatCountIn: 0 });
+    metronome.stepInitialCountIn(1);
+    metronome.stepRepeatCountIn(-1);
+    expect(metronome.settings.initialCountIn).toBe(8);
+    expect(metronome.settings.repeatCountIn).toBe(0);
+    metronome.stepInitialCountIn(-1);
+    metronome.stepRepeatCountIn(1);
+    expect(metronome.settings.initialCountIn).toBe(7);
+    expect(metronome.settings.repeatCountIn).toBe(1);
+  });
+
+  it('S2: setters are ignored outside the settings phase', async () => {
+    const r = rig(true, { countIn: true });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    metronome.setCountIn(false);
+    metronome.setInitialCountIn(1);
+    metronome.stepInitialCountIn(1);
+    metronome.setRepeatCountIn(7);
+    metronome.stepRepeatCountIn(1);
+    expect(metronome.settings.countIn).toBe(true);
+    expect(metronome.settings.initialCountIn).toBe(4);
+    expect(metronome.settings.repeatCountIn).toBe(2);
+  });
+});
+
+describe('metronome store: pause and resume in the count-in (033 S7-S9, S11)', () => {
+  const on = { countIn: true } as const;
+
+  async function pausedAfterClick(r: Rig, click: number): Promise<void> {
+    metronome.toggle();
+    await settle();
+    advance(r, (click - 1) * (60 / 85) + 0.1);
+    expect(metronome.countIn).toEqual({ click, total: 4 });
+    metronome.toggle();
+  }
+
+  it('S7: pause after click 2 freezes it and announces it', async () => {
+    const r = rig(true, on);
+    await pausedAfterClick(r, 2);
+    expect(metronome.phase).toBe('paused');
+    expect(metronome.countIn).toEqual({ click: 2, total: 4 });
+    expect(metronome.announcement).toBe('Paused on count-in click 2 of 4');
+    const frozen = starts(r).length;
+    advance(r, 2);
+    expect(starts(r).length).toBe(frozen);
+    expect(metronome.countIn).toEqual({ click: 2, total: 4 });
+  });
+
+  it('S8: resume continues with click 3 then 4 then the loop', async () => {
+    const r = rig(true, on);
+    await pausedAfterClick(r, 2);
+    const frozen = starts(r).length;
+    metronome.toggle();
+    expect(metronome.phase).toBe('starting');
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.countIn).toEqual({ click: 3, total: 4 });
+    advance(r, 60 / 85);
+    expect(metronome.countIn).toEqual({ click: 4, total: 4 });
+    advance(r, 60 / 85);
+    expect(metronome.countIn).toBeNull();
+    expect(metronome.beat).toBe(1);
+    expect(starts(r).length).toBeGreaterThan(frozen);
+  });
+
+  it('S9: pause in the loop announces the beat and resume plays no count-in', async () => {
+    const r = rig(true, on);
+    metronome.toggle();
+    await settle();
+    advance(r, 4 * (60 / 85) + 0.1);
+    expect(metronome.beat).toBe(1);
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Paused on beat 1 of 4');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.countIn).toBeNull();
+    expect(metronome.beat).toBe(2);
+  });
+
+  it('S11: a suspended context during the count-in freezes on the last click', async () => {
+    const r = rig(true, on);
+    metronome.toggle();
+    await settle();
+    advance(r, 60 / 85 + 0.1);
+    r.port.state = 'suspended';
+    r.port.resume = () => Promise.reject(new Error('blocked'));
+    advance(r, 0.1);
+    await settle();
+    expect(metronome.phase).toBe('paused');
+    expect(metronome.countIn?.click).toBe(2);
+    expect(metronome.announcement).toBe('Paused on count-in click 2 of 4');
+  });
+
+  it('S11: reset keeps every setting and clears the run; leaving restores defaults', async () => {
+    const r = rig(true, { ...on, repeatCountIn: 5 });
+    await pausedAfterClick(r, 2);
+    metronome.reset();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.countIn).toBeNull();
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, repeatCountIn: 5 });
+    metronome.screenChanged();
+    expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
   });
 });

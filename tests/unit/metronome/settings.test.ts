@@ -7,13 +7,22 @@ import {
   atLimit,
   clampBeats,
   clampBpm,
+  clampCount,
+  effectiveCountIn,
   stepSetting,
   type MetronomeSettings
 } from '../../../src/lib/state/metronome-settings';
 
 describe('metronome settings', () => {
   it('defaults to 85 BPM / 4 beats / 8th triplets, frozen', () => {
-    expect(DEFAULT_SETTINGS).toEqual({ bpm: 85, beats: 4, subdivision: 3 });
+    expect(DEFAULT_SETTINGS).toEqual({
+      bpm: 85,
+      beats: 4,
+      subdivision: 3,
+      countIn: true,
+      initialCountIn: 4,
+      repeatCountIn: 2
+    });
     expect(Object.isFrozen(DEFAULT_SETTINGS)).toBe(true);
   });
 
@@ -33,14 +42,10 @@ describe('metronome settings', () => {
   });
 
   it('stepSetting steps by one and returns the same object at a limit', () => {
-    expect(stepSetting(DEFAULT_SETTINGS, 'bpm', 1)).toEqual({ bpm: 86, beats: 4, subdivision: 3 });
-    expect(stepSetting(DEFAULT_SETTINGS, 'beats', -1)).toEqual({
-      bpm: 85,
-      beats: 3,
-      subdivision: 3
-    });
-    const lo: MetronomeSettings = { bpm: 30, beats: 1, subdivision: 3 };
-    const hi: MetronomeSettings = { bpm: 300, beats: 16, subdivision: 3 };
+    expect(stepSetting(DEFAULT_SETTINGS, 'bpm', 1)).toEqual({ ...DEFAULT_SETTINGS, bpm: 86 });
+    expect(stepSetting(DEFAULT_SETTINGS, 'beats', -1)).toEqual({ ...DEFAULT_SETTINGS, beats: 3 });
+    const lo: MetronomeSettings = { ...DEFAULT_SETTINGS, bpm: 30, beats: 1 };
+    const hi: MetronomeSettings = { ...DEFAULT_SETTINGS, bpm: 300, beats: 16 };
     expect(stepSetting(lo, 'bpm', -1)).toBe(lo);
     expect(stepSetting(lo, 'beats', -1)).toBe(lo);
     expect(stepSetting(hi, 'bpm', 1)).toBe(hi);
@@ -48,24 +53,56 @@ describe('metronome settings', () => {
   });
 
   it('atLimit covers both fields and both directions', () => {
-    expect(atLimit({ bpm: 30, beats: 1, subdivision: DEFAULT_SUBDIVISION }, 'bpm', -1)).toBe(true);
-    expect(atLimit({ bpm: 30, beats: 1, subdivision: DEFAULT_SUBDIVISION }, 'bpm', 1)).toBe(false);
-    expect(atLimit({ bpm: 300, beats: 16, subdivision: DEFAULT_SUBDIVISION }, 'bpm', 1)).toBe(true);
-    expect(atLimit({ bpm: 300, beats: 16, subdivision: DEFAULT_SUBDIVISION }, 'bpm', -1)).toBe(
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'bpm', -1)).toBe(true);
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'bpm', 1)).toBe(false);
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'bpm', 1)).toBe(true);
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'bpm', -1)).toBe(
       false
     );
-    expect(atLimit({ bpm: 30, beats: 1, subdivision: DEFAULT_SUBDIVISION }, 'beats', -1)).toBe(
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'beats', -1)).toBe(
       true
     );
-    expect(atLimit({ bpm: 30, beats: 1, subdivision: DEFAULT_SUBDIVISION }, 'beats', 1)).toBe(
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 30, beats: 1 }, 'beats', 1)).toBe(
       false
     );
-    expect(atLimit({ bpm: 300, beats: 16, subdivision: DEFAULT_SUBDIVISION }, 'beats', 1)).toBe(
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'beats', 1)).toBe(
       true
     );
-    expect(atLimit({ bpm: 300, beats: 16, subdivision: DEFAULT_SUBDIVISION }, 'beats', -1)).toBe(
+    expect(atLimit({ ...DEFAULT_SETTINGS, bpm: 300, beats: 16 }, 'beats', -1)).toBe(
       false
     );
+  });
+});
+
+describe('count in settings', () => {
+  it('clampCount clamps 0-8, rounds, NaN -> fallback', () => {
+    expect(clampCount(-1, 4)).toBe(0);
+    expect(clampCount(9, 4)).toBe(8);
+    expect(clampCount(2.6, 4)).toBe(3);
+    expect(clampCount(NaN, 4)).toBe(4);
+    expect(clampCount(NaN, 2)).toBe(2);
+  });
+
+  it('effectiveCountIn is the initial count when on, else 0', () => {
+    for (const n of [0, 4, 8]) {
+      expect(effectiveCountIn({ ...DEFAULT_SETTINGS, countIn: true, initialCountIn: n })).toBe(n);
+      expect(effectiveCountIn({ ...DEFAULT_SETTINGS, countIn: false, initialCountIn: n })).toBe(0);
+    }
+  });
+
+  it('atLimit and stepSetting cover both count fields', () => {
+    for (const field of ['initialCountIn', 'repeatCountIn'] as const) {
+      const lo = { ...DEFAULT_SETTINGS, [field]: 0 };
+      const hi = { ...DEFAULT_SETTINGS, [field]: 8 };
+      expect(atLimit(lo, field, -1)).toBe(true);
+      expect(atLimit(lo, field, 1)).toBe(false);
+      expect(atLimit(hi, field, 1)).toBe(true);
+      expect(atLimit(hi, field, -1)).toBe(false);
+      expect(stepSetting(lo, field, -1)).toBe(lo);
+      expect(stepSetting(hi, field, 1)).toBe(hi);
+      expect(stepSetting(lo, field, 1)[field]).toBe(1);
+      expect(stepSetting(hi, field, -1)[field]).toBe(7);
+    }
   });
 });
 

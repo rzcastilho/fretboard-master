@@ -66,6 +66,9 @@ The root interval label is the one exception: R / T / T.
 | Sextuplets | Sextinas | Seisillos | `metronome_subdivision_6` | draft |
 | Septuplets | Septinas | Septillos | `metronome_subdivision_7` | draft |
 | 32nd notes | Fusas | Fusas | `metronome_subdivision_8` | draft |
+| Count In | Contagem | Cuenta previa | `metronome_count_in_label` | draft |
+| Initial Count In | Contagem inicial | Cuenta inicial | `metronome_initial_count_in_label` | draft |
+| Repeat Count In | Contagem de repetição | Cuenta de repetición | `metronome_repeat_count_in_label` | draft |
 | sharps / flats / both | sustenidos / bemóis / ambos | sostenidos / bemoles / ambos | accidentals_sharps, accidentals_flats, accidentals_both (added by 021) | draft |
 | language and notation | idioma e notação | idioma y notación | language_panel_label (added by 021) | draft |
 <!-- prettier-ignore-end -->

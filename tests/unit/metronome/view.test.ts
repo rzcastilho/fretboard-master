@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { beatDots, statusParams } from '../../../src/lib/state/metronome-view';
+import { beatDots, countInDot, statusParams } from '../../../src/lib/state/metronome-view';
 
 describe('beatDots', () => {
   it('lights the current beat, dims earlier ones, leaves later ones upcoming', () => {
@@ -26,5 +26,27 @@ describe('statusParams', () => {
   });
   it('selects the beat message otherwise', () => {
     expect(statusParams(2, 4, 3)).toEqual({ kind: 'beat', beat: 2, beats: 4, sub: 3 });
+  });
+});
+
+describe('count-in status (033)', () => {
+  it('selects the count-in messages', () => {
+    expect(statusParams(0, 4, 3, { click: 2, total: 4 })).toEqual({
+      kind: 'count-in',
+      click: 2,
+      total: 4
+    });
+    expect(statusParams(0, 4, 3, { click: 0, total: 4 })).toEqual({
+      kind: 'count-in-none',
+      total: 4
+    });
+  });
+  it('a null or absent count-in equals the 032 output', () => {
+    expect(statusParams(2, 4, 3, null)).toEqual(statusParams(2, 4, 3));
+    expect(statusParams(0, 4, 3, null)).toEqual(statusParams(0, 4, 3));
+  });
+  it('countInDot is upcoming at 0 and lit afterwards', () => {
+    expect(countInDot(0)).toBe('upcoming');
+    for (const n of [1, 4, 8]) expect(countInDot(n)).toBe('lit');
   });
 });
