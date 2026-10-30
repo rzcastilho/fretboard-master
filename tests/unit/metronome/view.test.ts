@@ -22,9 +22,9 @@ describe('beatDots', () => {
 
 describe('statusParams', () => {
   it('selects the "none" message for beat 0', () => {
-    expect(statusParams(0, 4)).toEqual({ kind: 'none', beats: 4 });
+    expect(statusParams(0, 4, 3)).toEqual({ kind: 'none', beats: 4, sub: 3 });
   });
   it('selects the beat message otherwise', () => {
-    expect(statusParams(2, 4)).toEqual({ kind: 'beat', beat: 2, beats: 4 });
+    expect(statusParams(2, 4, 3)).toEqual({ kind: 'beat', beat: 2, beats: 4, sub: 3 });
   });
 });

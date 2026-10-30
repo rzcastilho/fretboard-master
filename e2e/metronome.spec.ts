@@ -36,18 +36,31 @@ test.describe('metronome: steady click (US1)', () => {
       )
       .toBeGreaterThanOrEqual(4);
     expect([...seen]).toEqual(
-      expect.arrayContaining(['BEAT 1/4', 'BEAT 2/4', 'BEAT 3/4', 'BEAT 4/4'])
+      expect.arrayContaining([
+        'BEAT 1/4 · SUB 3',
+        'BEAT 2/4 · SUB 3',
+        'BEAT 3/4 · SUB 3',
+        'BEAT 4/4 · SUB 3'
+      ])
     );
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThanOrEqual(5);
-    for (const c of await clicks(page)) expect(c.accent).toBe(c.beat === 1);
-    expect(new Set((await clicks(page)).slice(0, 4).map((c) => c.beat)).size).toBe(4);
+    for (const c of (await clicks(page)).filter((e) => e.kind !== 'sub'))
+      expect(c.accent).toBe(c.beat === 1);
+    expect(
+      new Set(
+        (await clicks(page))
+          .filter((c) => c.kind !== 'sub')
+          .slice(0, 4)
+          .map((c) => c.beat)
+      ).size
+    ).toBe(4);
   });
 
   test('US1-2: with 2 beats the status reads BEAT n/2', async ({ page }) => {
     await page.goto('/metronome');
     await page.getByRole('slider', { name: '# of Beats' }).fill('2');
     await start(page).click();
-    await expect(page.locator('.position')).toHaveText(/BEAT [12]\/2/);
+    await expect(page.locator('.position')).toHaveText(/BEAT [12]\/2 · SUB 3/);
   });
 
   test('US1-4: the first click carries the press time and never precedes the context time', async ({
@@ -107,7 +120,7 @@ test.describe('metronome: steady click (US1)', () => {
     const notice = page.getByText('Sound is unavailable; the beat is shown visually.');
     await expect(notice).toBeVisible();
     await expect(page.locator('.dot[data-state="lit"]')).toHaveCount(1);
-    await expect(page.locator('.position')).toHaveText(/BEAT [1-4]\/4/);
+    await expect(page.locator('.position')).toHaveText(/BEAT [1-4]\/4 · SUB 3/);
     await panel(page).getByRole('button', { name: 'Dismiss' }).click();
     await expect(notice).toHaveCount(0);
   });
@@ -146,7 +159,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
   }) => {
     await page.goto('/metronome');
     await start(page).click();
-    await expect(page.locator('.position')).toHaveText('BEAT 3/4', { timeout: 10_000 });
+    await expect(page.locator('.position')).toHaveText('BEAT 3/4 · SUB 3', { timeout: 10_000 });
     await pause(page).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
     const frozen = await shownBeat(page);
@@ -163,8 +176,10 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     const after = (await clicks(page)).slice(frozenCount);
     expect(after[0].beat).toBe((frozen % 4) + 1);
     expect(after[0].pressedAtMs).not.toBeNull();
-    await expect.poll(async () => (await clicks(page)).length).toBeGreaterThan(frozenCount + 1);
-    const next = (await clicks(page)).slice(frozenCount)[1];
+    const beatClicks = async () =>
+      (await clicks(page)).slice(frozenCount).filter((c) => c.kind !== 'sub');
+    await expect.poll(async () => (await beatClicks()).length).toBeGreaterThan(1);
+    const next = (await beatClicks())[1];
     expect(next.beat).toBe(((frozen + 1) % 4) + 1);
     expect(next.accent).toBe(next.beat === 1);
   });

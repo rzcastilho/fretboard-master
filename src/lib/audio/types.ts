@@ -1,4 +1,5 @@
 /** Audio data types (data-model §2–§4, §7, §8). No framework imports. */
+import type { ClickKind } from './click';
 import type { Position } from '../instrument/instrument';
 import type { Pitch } from '../theory/pitch';
 
@@ -80,7 +81,10 @@ export type AudioLogEntry =
       type: 'click';
       run: number;
       index: number;
+      /** Slot (beat position in the run) the click belongs to; soft clicks share their beat's slot. */
+      slot: number;
       beat: number;
+      kind: ClickKind;
       accent: boolean;
       when: number;
       contextTime: number;

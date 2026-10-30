@@ -41,6 +41,8 @@ export interface SegmentStart {
   readonly bpm: number;
   readonly beats: number;
   readonly startBeat: number;
+  /** Clicks per beat, 1–8: the beat click plus n − 1 soft ones. Anything else counts as 1. */
+  readonly clicksPerBeat: number;
   readonly run: number;
   readonly pressedAtMs: number;
 }
@@ -56,22 +58,45 @@ export interface ClickScheduler {
 interface Grid {
   readonly anchor: number;
   readonly period: number;
+  readonly perBeat: number;
   readonly startBeat: number;
   readonly beats: number;
 }
 
-/** Click `k` of a segment. */
-export function clickAt(
-  seg: Grid,
-  k: number
-): { index: number; when: number; beat: number; accent: boolean } {
-  const beat = ((((seg.startBeat - 1 + k) % seg.beats) + seg.beats) % seg.beats) + 1;
-  return { index: k, when: seg.anchor + k * seg.period, beat, accent: beat === 1 };
+export interface GridClick {
+  readonly index: number;
+  readonly when: number;
+  readonly slot: number;
+  readonly beat: number;
+  readonly kind: ClickKind;
+  readonly accent: boolean;
 }
 
-/** First click index worth scheduling at `now` (skip-forward, never a burst). */
-export function skipTo(seg: { anchor: number; period: number }, now: number): number {
-  return Math.max(0, Math.ceil((now + START_LEAD_S - seg.anchor) / seg.period));
+/** Grid click `j` of a segment: `anchor + j × period / perBeat`, never accumulated. */
+export function clickAt(seg: Grid, j: number): GridClick {
+  const slot = Math.floor(j / seg.perBeat);
+  const beat = ((((seg.startBeat - 1 + slot) % seg.beats) + seg.beats) % seg.beats) + 1;
+  const kind: ClickKind = j % seg.perBeat !== 0 ? 'sub' : beat === 1 ? 'accent' : 'normal';
+  return {
+    index: j,
+    when: seg.anchor + (j * seg.period) / seg.perBeat,
+    slot,
+    beat,
+    kind,
+    accent: kind === 'accent'
+  };
+}
+
+/** First grid click worth scheduling at `now` (skip-forward, never a burst). */
+export function skipTo(
+  seg: { anchor: number; period: number; perBeat: number },
+  now: number
+): number {
+  return Math.max(0, Math.ceil(((now + START_LEAD_S - seg.anchor) * seg.perBeat) / seg.period));
+}
+
+function toPerBeat(n: number): number {
+  return Number.isInteger(n) && n >= 1 && n <= 8 ? n : 1;
 }
 
 interface Pending {
@@ -91,7 +116,7 @@ function buffersFor(sink: ClickSink): Buffers {
       buffer.getChannelData(0).set(samples);
       return buffer;
     };
-    b = { accent: make('accent'), normal: make('normal') };
+    b = { accent: make('accent'), normal: make('normal'), sub: make('sub') };
     buffersBySink.set(sink, b);
   }
   return b;
@@ -115,10 +140,10 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   const latency = (): number =>
     visual || !sink ? 0 : (sink.port.outputLatency ?? sink.port.baseLatency ?? 0);
 
-  /** Index of the latest click whose audible time has been reached, or -1. */
+  /** Index of the latest grid click whose audible time has been reached, or -1. */
   function audibleIndex(): number {
     if (!seg) return -1;
-    const k = Math.floor((now() - latency() - seg.anchor) / seg.period + 1e-9);
+    const k = Math.floor(((now() - latency() - seg.anchor) * seg.perBeat) / seg.period + 1e-9);
     return k < 0 ? -1 : Math.min(k, next - 1);
   }
 
@@ -127,7 +152,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
     if (visual || !sink) return;
     const bufs = buffersFor(sink);
     const source = sink.port.createBufferSource();
-    source.buffer = bufs[c.accent ? 'accent' : 'normal'];
+    source.buffer = bufs[c.kind];
     source.connect(sink.destination);
     source.onended = () => source.disconnect();
     source.start(c.when);
@@ -136,7 +161,9 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       type: 'click',
       run: g.run,
       index: k,
+      slot: c.slot,
       beat: c.beat,
+      kind: c.kind,
       accent: c.accent,
       when: c.when,
       contextTime: sink.port.currentTime,
@@ -180,9 +207,10 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   function frameLoop(g: number): void {
     if (g !== gen || !seg) return;
     const k = audibleIndex();
-    if (k > reported) {
-      reported = k;
-      events.onBeat(clickAt(seg, k).beat);
+    const slot = k < 0 ? -1 : Math.floor(k / seg.perBeat);
+    if (slot > reported) {
+      reported = slot;
+      events.onBeat(clickAt(seg, slot * seg.perBeat).beat);
     }
     frame = frames.request(() => frameLoop(g));
   }
@@ -193,6 +221,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
     seg = {
       anchor: now() + START_LEAD_S,
       period,
+      perBeat: toPerBeat(segment.clicksPerBeat),
       startBeat: segment.startBeat,
       beats: segment.beats,
       run: segment.run,
@@ -232,7 +261,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
     halt(reason): number {
       if (!live) return 0;
       const k = audibleIndex();
-      const beat = seg && k >= 0 ? clickAt(seg, k).beat : 0;
+      const beat = seg && k >= 0 ? clickAt(seg, Math.floor(k / seg.perBeat) * seg.perBeat).beat : 0;
       const t = now();
       let count = 0;
       for (const p of pending) {

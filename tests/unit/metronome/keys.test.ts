@@ -101,4 +101,10 @@ describe('matchMetronomeKey', () => {
     expect(matchMetronomeKey(ev(' '), running)).toBe('toggle');
     expect(matchMetronomeKey.length).toBe(2);
   });
+
+  it('Space and Escape from a SELECT never start or reset (032)', () => {
+    const select = { tagName: 'SELECT' };
+    expect(matchMetronomeKey(ev(' ', {}, select), settings)).toBeNull();
+    expect(matchMetronomeKey(ev('Escape', {}, select), running)).toBeNull();
+  });
 });

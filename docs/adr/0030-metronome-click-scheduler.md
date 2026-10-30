@@ -45,3 +45,22 @@ The fretboard tools share `ToolId`, but the Metronome has no link format, share 
 - Click timing is independent of main-thread jitter, and the Metronome follows mute and volume.
 - Up to about 8 sources are pending at 300 BPM. Pause stops each one exactly.
 - Adding a tool without a fretboard means extending `ToolId` only, not `FretboardToolId`.
+
+## Revision (032 subdivisions)
+
+Source: spec 032-subdivisions (research R-11). This refines the scheduling decision above. It adds
+no new architectural decision.
+
+- **Integer click-index grid.** Click _j_ is at `anchor + j × (60 / BPM) / n`, where _n_ is the
+  subdivision count. The time is computed from the anchor and the integer index, never
+  accumulated, so the grid stays exact at any _n_.
+- **Per-slot `onBeat`.** Beat reporting is tied to the slot: the click at `j mod n = 0` is the
+  beat, and `onBeat` fires once per beat slot, not once per click.
+- **Halt of soft sources.** Pause and a subdivision change stop every pending source, soft ticks
+  included, so no stale tick sounds after the change.
+- **Skip-forward.** After a stall or a change, the scheduler skips to the next due grid click
+  rather than playing a burst of late clicks.
+- **Third click kind.** A `sub` click joins the beat and accent clicks: 2400 Hz, gain 0.25, 18 ms.
+  The beat click stays lower and louder than the ticks.
+- **Consequence.** Up to about 60 sources can be pending at 300 BPM × 32nds within the 1.5 s
+  horizon. Pause still stops each one exactly.
