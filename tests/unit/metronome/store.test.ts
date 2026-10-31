@@ -8,6 +8,7 @@ import {
 } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
+import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames, type FakeSource } from '../audio/support/fake-audio';
 
 interface Rig {
@@ -215,7 +216,7 @@ describe('metronome store: start path', () => {
     expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false, ratio: false });
   });
 
-  it('M7: screenChanged halts the run and restores the defaults', async () => {
+  it('M7: screenChanged halts the run and keeps the last settings', async () => {
     const r = rig();
     metronome.setBpm(120);
     metronome.toggle();
@@ -223,7 +224,12 @@ describe('metronome store: start path', () => {
     advance(r, 0.1);
     metronome.screenChanged();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS });
+    expect(metronome.settings).toEqual({
+      ...DEFAULT_SETTINGS,
+      bpm: 120,
+      countIn: false,
+      ratio: false
+    });
     expect(metronome.beat).toBe(0);
     const before = starts(r).length;
     advance(r, 2);
@@ -328,7 +334,7 @@ describe('metronome store: pause, resume and reset', () => {
     expect(new Set(times).size).toBe(times.length);
   });
 
-  it('M7: screenChanged after a reset restores the default settings', async () => {
+  it('M7: screenChanged after a reset keeps the settings', async () => {
     const r = rig();
     metronome.setBpm(200);
     metronome.toggle();
@@ -337,7 +343,7 @@ describe('metronome store: pause, resume and reset', () => {
     metronome.reset();
     expect(metronome.settings.bpm).toBe(200);
     metronome.screenChanged();
-    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS });
+    expect(metronome.settings.bpm).toBe(200);
   });
 
   it('M9: the announcement changes on Start, Pause, Resume and Reset only', async () => {
@@ -408,7 +414,7 @@ describe('metronome store: setSubdivision (032)', () => {
     expect(metronome.settings.subdivision).toBe(3);
   });
 
-  it('Reset keeps the choice; screenChanged restores 3', async () => {
+  it('Reset keeps the choice; screenChanged keeps it too', async () => {
     const r = rig();
     metronome.setSubdivision(6);
     metronome.toggle();
@@ -417,7 +423,7 @@ describe('metronome store: setSubdivision (032)', () => {
     metronome.reset();
     expect(metronome.settings.subdivision).toBe(6);
     metronome.screenChanged();
-    expect(metronome.settings.subdivision).toBe(3);
+    expect(metronome.settings.subdivision).toBe(6);
   });
 });
 
@@ -641,7 +647,7 @@ describe('metronome store: pause and resume in the count-in (033 S7-S9, S11)', (
     expect(metronome.announcement).toBe('Paused on count-in click 2 of 4');
   });
 
-  it('S11: reset keeps every setting and clears the run; leaving restores defaults', async () => {
+  it('S11: reset keeps every setting and clears the run; leaving keeps them too', async () => {
     const r = rig(true, { ...on, repeatCountIn: 5 });
     await pausedAfterClick(r, 2);
     metronome.reset();
@@ -649,7 +655,7 @@ describe('metronome store: pause and resume in the count-in (033 S7-S9, S11)', (
     expect(metronome.countIn).toBeNull();
     expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, repeatCountIn: 5, ratio: false });
     metronome.screenChanged();
-    expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, repeatCountIn: 5, ratio: false });
   });
 });
 
@@ -759,11 +765,11 @@ describe('metronome store: ratio cycle (034)', () => {
     expect(metronome.position).toMatchObject({ kind: 'count-in', repeat: true, click: 2, slot: 9 });
   });
 
-  it('screenChanged restores ratio on and Loop 2 Sextuplets', () => {
+  it('screenChanged keeps ratio off and Loop 2 as set', () => {
     rig(true, { ratio: false, loop2: 2 });
     metronome.screenChanged();
-    expect(metronome.settings.ratio).toBe(true);
-    expect(metronome.settings.loop2).toBe(6);
+    expect(metronome.settings.ratio).toBe(false);
+    expect(metronome.settings.loop2).toBe(2);
     expect(metronome.position).toBeNull();
   });
 });
@@ -859,5 +865,170 @@ describe('metronome store: ratio start announcements (034, FR-013)', () => {
     advance(r, 8);
     expect(metronome.position?.kind).toBeDefined();
     expect(metronome.announcement).toBe(started);
+  });
+});
+
+describe('035 remembered settings: store contract', () => {
+  it('M-R1/M-R2: restoreSettings applies values, halts a run, never remembers', async () => {
+    const r = rig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    expect(metronome.phase).not.toBe('settings');
+    const next: MetronomeSettings = {
+      bpm: 120,
+      beats: 2,
+      subdivision: 2,
+      countIn: false,
+      initialCountIn: 1,
+      repeatCountIn: 3,
+      ratio: false,
+      loop2: 5
+    };
+    metronome.restoreSettings(next);
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.position).toBeNull();
+    expect(metronome.settings).toEqual(next);
+    const seen = starts(r).length;
+    advance(r, 1);
+    expect(starts(r).length).toBe(seen);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it('M-W1: a stepper at its limit, an ignored value and a call outside settings do not remember', () => {
+    rig(true, { bpm: 300, beats: 1, initialCountIn: 0, repeatCountIn: 8 });
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.stepBpm(1);
+    metronome.stepBeats(-1);
+    metronome.stepInitialCountIn(-1);
+    metronome.stepRepeatCountIn(1);
+    metronome.setCountIn('nope');
+    metronome.setRatio('nope');
+    metronome.setLoop2(99);
+    metronome.setSubdivision('x');
+    metronome.setBpm(300);
+    expect(remember).not.toHaveBeenCalled();
+    metronome.toggle();
+    metronome.setBpm(100);
+    metronome.stepBeats(1);
+    metronome.setRatio(false);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it('M-W2: toggle and reset never remember', async () => {
+    const r = rig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    metronome.toggle();
+    metronome.toggle();
+    metronome.reset();
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it('M-W3: setters do not throw with no preferences session', () => {
+    rig();
+    resetPreferencesForTests();
+    expect(() => metronome.setBpm(100)).not.toThrow();
+    expect(metronome.settings.bpm).toBe(100);
+  });
+
+  it('every setter remembers the new settings once on a real change', () => {
+    rig(true, { countIn: true, ratio: true });
+    const remember = vi.spyOn(preferences, 'remember');
+    const cases: Array<[string, () => void]> = [
+      ['setBpm', () => metronome.setBpm(100)],
+      ['stepBpm', () => metronome.stepBpm(1)],
+      ['setBeats', () => metronome.setBeats(5)],
+      ['stepBeats', () => metronome.stepBeats(1)],
+      ['setCountIn', () => metronome.setCountIn(false)],
+      ['setInitialCountIn', () => metronome.setInitialCountIn(7)],
+      ['stepInitialCountIn', () => metronome.stepInitialCountIn(-1)],
+      ['setRepeatCountIn', () => metronome.setRepeatCountIn(5)],
+      ['stepRepeatCountIn', () => metronome.stepRepeatCountIn(1)],
+      ['setRatio', () => metronome.setRatio(false)],
+      ['setSubdivision', () => metronome.setSubdivision(5)],
+      ['setLoop2', () => metronome.setLoop2(2)]
+    ];
+    for (const [name, call] of cases) {
+      remember.mockClear();
+      call();
+      expect(remember, name).toHaveBeenCalledTimes(1);
+      expect(remember, name).toHaveBeenCalledWith({
+        metronome: { ratios: metronome.settings }
+      });
+    }
+  });
+});
+
+describe('035 US1: in-visit memory (FR-002)', () => {
+  it('screenChanged keeps the last values set and returns to the settings phase', () => {
+    rig(true, {});
+    metronome.setBpm(120);
+    metronome.setBeats(2);
+    metronome.setLoop2(5);
+    metronome.screenChanged();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.settings).toMatchObject({ bpm: 120, beats: 2, loop2: 5 });
+  });
+
+  it('keeps the values with no preferences session (storage unavailable)', () => {
+    resetPreferencesForTests();
+    rig(true, {});
+    metronome.setBpm(140);
+    metronome.screenChanged();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.settings.bpm).toBe(140);
+  });
+});
+
+describe('035 US2: Reset and running position (FR-003, FR-004)', () => {
+  it('Reset keeps the settings and never remembers', async () => {
+    const r = rig(true, {});
+    metronome.setBpm(120);
+    metronome.setBeats(2);
+    const kept = metronome.settings;
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    metronome.reset();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.settings).toEqual(kept);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it('the failure-view reset (screenChanged) keeps the values', async () => {
+    const r = rig(true, {});
+    metronome.setBpm(150);
+    metronome.setLoop2(4);
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    metronome.screenChanged();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.position).toBeNull();
+    expect(metronome.settings).toMatchObject({ bpm: 150, loop2: 4 });
+  });
+
+  it('position, initialTotal and generation are never passed to remember', async () => {
+    const r = rig(true, { countIn: true });
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.setBpm(100);
+    metronome.toggle();
+    await settle();
+    advance(r, 1);
+    metronome.toggle();
+    metronome.toggle();
+    metronome.reset();
+    metronome.setBeats(3);
+    expect(remember).toHaveBeenCalledTimes(2);
+    for (const [arg] of remember.mock.calls) {
+      expect(Object.keys(arg as object)).toEqual(['metronome']);
+      const ratios = (arg as { metronome: { ratios: object } }).metronome.ratios;
+      expect(Object.keys(ratios).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
+    }
   });
 });

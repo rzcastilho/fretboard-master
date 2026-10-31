@@ -471,8 +471,9 @@ test.describe('metronome ratios: responsive and languages (2.10)', () => {
           for (const el of [sw, selects.nth(0), selects.nth(1)]) {
             await expect(el).toBeVisible();
             const box = await el.boundingBox();
-            expect(box!.x).toBeGreaterThanOrEqual(0);
-            expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+            if (!box) throw new Error('no bounding box');
+            expect(box.x).toBeGreaterThanOrEqual(0);
+            expect(box.x + box.width).toBeLessThanOrEqual(320);
           }
           expect(await noScroll(page)).toBe(true);
           await expectNoTruncationOrOverlap(page);

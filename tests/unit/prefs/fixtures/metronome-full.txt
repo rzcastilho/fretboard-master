@@ -1,0 +1,1 @@
+{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"},"metronome":{"ratios":{"bpm":140,"beats":6,"countIn":false,"initialCountIn":2,"repeatCountIn":1,"ratio":false,"loop1":2,"loop2":4}}}

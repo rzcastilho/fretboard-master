@@ -181,7 +181,8 @@ test.describe('metronome count-in: pause, resume, reset (US3)', () => {
     expect(counted).toEqual([3, 4]);
     const loop = after.find((c) => c.countIn === null);
     const last = after.filter((c) => c.countIn !== null).pop();
-    expect(Math.abs(loop!.when - last!.when - T)).toBeLessThan(0.002);
+    if (!loop || !last) throw new Error('missing loop or last count-in click');
+    expect(Math.abs(loop.when - last.when - T)).toBeLessThan(0.002);
   });
 
   test('2.9: pause in the loop then resume plays no count-in', async ({ page }) => {
@@ -317,16 +318,18 @@ test.describe('metronome count-in: announcements, languages, reflow (polish)', (
       expect(await noScroll(page)).toBe(true);
       for (const el of [sw, page.getByRole('slider', { name: 'Initial Count In' })]) {
         const box = await el.boundingBox();
-        expect(box!.x).toBeGreaterThanOrEqual(0);
-        expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+        if (!box) throw new Error('no bounding box');
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(320);
       }
       await start(page).click();
       await expect(page.locator('.position')).toContainText('COUNT IN 1/8');
       await expect(page.locator('.position')).toContainText('COUNT IN 8/8', { timeout: 12_000 });
       expect(await noScroll(page)).toBe(true);
       const box = await page.locator('.position').boundingBox();
-      expect(box!.x).toBeGreaterThanOrEqual(0);
-      expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+      if (!box) throw new Error('no bounding box');
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(320);
     });
   }
 });
