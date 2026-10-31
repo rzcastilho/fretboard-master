@@ -332,3 +332,59 @@ describe('MetronomePanel subdivision select (032)', () => {
     expect(screen.queryByRole('combobox')).toBeNull();
   });
 });
+
+describe('MetronomePanel alternating ratios (034)', () => {
+  const position = (c: HTMLElement): string =>
+    c.querySelector('.position')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  const T = 60 / 85;
+
+  // Count In 0 initial, 2 repeat: Loop 1 (beats 1–4), repeat ×2, Loop 2 (beats 1–4).
+  beforeEach(() => {
+    resetMetronomeForTests(
+      { clock, frames },
+      { countIn: true, initialCountIn: 0, repeatCountIn: 2, subdivision: 3, loop2: 6 }
+    );
+  });
+
+  it('passes the playing loop sub to the status box', async () => {
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    expect(position(container)).toBe('BEAT 1/4 · SUB 3');
+    // Through the repeat count-in (2 clicks) into Loop 2 beat 1.
+    advance(6 * T);
+    await settle();
+    expect(position(container)).toBe('BEAT 1/4 · SUB 6');
+  });
+
+  it('shows the single pulsing dot and COUNT IN n/r during a repeat count-in', async () => {
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    advance(4 * T);
+    await settle();
+    expect(position(container)).toBe('COUNT IN 1/2');
+    const dots = container.querySelectorAll('.dot');
+    expect(dots).toHaveLength(1);
+    expect(container.querySelector('.dots.count-in')).toBeTruthy();
+    expect(dots[0].classList.contains('pulse')).toBe(true);
+  });
+
+  it('returns the full dot row with beat 1 lit at a loop start', async () => {
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    advance(6 * T);
+    await settle();
+    const dots = [...container.querySelectorAll('.dot')].map((d) => d.getAttribute('data-state'));
+    expect(dots).toHaveLength(4);
+    expect(dots[0]).toBe('lit');
+    expect(dots.slice(1).every((s) => s === 'upcoming')).toBe(true);
+  });
+});

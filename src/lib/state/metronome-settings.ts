@@ -1,10 +1,14 @@
 /** Metronome settings maths (031, data-model §1). Pure. */
+import type { SegmentStart } from '../audio/metronome';
 import { MAX_BPM, MIN_BPM } from '../audio/schedule';
+
+export type PlanFields = Pick<SegmentStart, 'clicksPerBeat' | 'initialCountIn' | 'alternate'>;
 
 export type Subdivision = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export const SUBDIVISIONS: readonly Subdivision[] = [1, 2, 3, 4, 5, 6, 7, 8];
 export const DEFAULT_SUBDIVISION: Subdivision = 3;
+export const DEFAULT_LOOP2: Subdivision = 6;
 
 export interface MetronomeSettings {
   readonly bpm: number;
@@ -14,8 +18,12 @@ export interface MetronomeSettings {
   readonly countIn: boolean;
   /** Clicks before the first loop, 0–8. */
   readonly initialCountIn: number;
-  /** Clicks before each repeat, 0–8. Stored only; no playback effect yet. */
+  /** Clicks before each loop switch, 0–8; played when the count-in and the ratio are on. */
   readonly repeatCountIn: number;
+  /** Subdivision ratio section switch (034); `subdivision` is Loop 1. */
+  readonly ratio: boolean;
+  /** Loop 2 clicks per beat (034); kept while the section is off. */
+  readonly loop2: Subdivision;
 }
 
 /** The numeric fields adjusted by steppers. */
@@ -35,7 +43,9 @@ export const DEFAULT_SETTINGS: Readonly<MetronomeSettings> = Object.freeze({
   subdivision: DEFAULT_SUBDIVISION,
   countIn: true,
   initialCountIn: DEFAULT_INITIAL_COUNT_IN,
-  repeatCountIn: DEFAULT_REPEAT_COUNT_IN
+  repeatCountIn: DEFAULT_REPEAT_COUNT_IN,
+  ratio: true,
+  loop2: DEFAULT_LOOP2
 });
 
 const LIMITS: Record<SettingField, readonly [number, number]> = {
@@ -65,6 +75,24 @@ export function clampCount(v: number, fallback: number): number {
 /** Clicks in the count-in of a run: the Initial Count In when the switch is on, else 0. */
 export const effectiveCountIn = (s: MetronomeSettings): number =>
   s.countIn ? s.initialCountIn : 0;
+
+/** Clicks before each loop switch: the Repeat Count In when the count-in and the ratio are on. */
+export const effectiveRepeatCountIn = (s: MetronomeSettings): number =>
+  s.countIn && s.ratio ? s.repeatCountIn : 0;
+
+/** Booleans as they are, anything else is the default (on). Never throws. */
+export const toRatio = (v: unknown): boolean => (typeof v === 'boolean' ? v : true);
+
+/** The plan fields of a scheduler segment for these settings. */
+export function runPlanFor(s: MetronomeSettings): PlanFields {
+  return {
+    clicksPerBeat: s.subdivision,
+    initialCountIn: effectiveCountIn(s),
+    ...(s.ratio
+      ? { alternate: { clicksPerBeat: s.loop2, repeatCountIn: effectiveRepeatCountIn(s) } }
+      : {})
+  };
+}
 
 /** A number or numeric string that is one of 1-8, otherwise null. Never throws. */
 export function toSubdivision(v: unknown): Subdivision | null {

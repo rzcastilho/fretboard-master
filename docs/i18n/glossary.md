@@ -69,6 +69,8 @@ The root interval label is the one exception: R / T / T.
 | Count In | Contagem | Cuenta previa | `metronome_count_in_label` | draft |
 | Initial Count In | Contagem inicial | Cuenta inicial | `metronome_initial_count_in_label` | draft |
 | Repeat Count In | Contagem de repetição | Cuenta de repetición | `metronome_repeat_count_in_label` | draft |
+| Subdivision ratio | Proporção de subdivisão | Proporción de subdivisión | `metronome_ratio_heading` | draft |
+| Loop 2 | Loop 2 | Bucle 2 | `metronome_loop2_label` | draft |
 | sharps / flats / both | sustenidos / bemóis / ambos | sostenidos / bemoles / ambos | accidentals_sharps, accidentals_flats, accidentals_both (added by 021) | draft |
 | language and notation | idioma e notação | idioma y notación | language_panel_label (added by 021) | draft |
 <!-- prettier-ignore-end -->

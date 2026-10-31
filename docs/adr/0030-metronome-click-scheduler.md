@@ -84,3 +84,27 @@ new architectural decision, so there is no new ADR.
   pause inside the loop never replays a count-in, and Reset discards the position.
 - **Consequence.** At most 8 more sources can be pending within the 1.5 s horizon, since the
   count-in is one click per beat. Pause still stops each one exactly.
+
+## Revision (034 alternating ratios)
+
+Source: spec 034-alternating-ratios (research R-12). This refines the scheduling decision above.
+It adds no new architectural decision, so there is no new ADR.
+
+- **Cyclic slot grid.** Slots are one per beat or count-in click and now repeat in a cycle: the
+  initial count-in once, then Loop 1, an optional repeat count-in, Loop 2 and a second repeat
+  count-in, over and over. Every slot start stays exactly one beat (_T_ = 60 / BPM) after the
+  previous one, across every boundary, so a switch never adds a gap or a flam. The subdivision
+  grid inside a slot follows the loop that owns it (`T / n1` or `T / n2`).
+- **`startSlot`.** A segment starts at `startSlot`, the run-global slot index, in place of the
+  earlier `startBeat` and count-in `from`. Start passes 0 and Resume passes the slot after the one
+  heard last. The time of a click is `anchor + (slot − startSlot) × T + j × T / n`, so the anchor
+  is still never re-derived.
+- **Run-global log `slot`.** The `slot` in the test audio log counts from the start of the run, not
+  from the start of a loop. The initial count-in occupies slots 0 to _k_ − 1 and Loop 1 beat 1 is
+  slot _k_, so assertions read `slot === k` instead of 0.
+- **Events carry `SlotPosition`.** `onBeat`, `onCountIn` and the value returned by `halt()` carry a
+  `SlotPosition` (a count-in click or a loop beat, with the loop and clicks per beat). The store
+  derives the status line, the dots and the resume slot from it, so Pause on any slot resumes on
+  the next one.
+- **Consequence.** Skip-forward after a stall lands on the right phase of the cycle without a
+  burst. The number of sources pending in the 1.5 s horizon is unchanged.

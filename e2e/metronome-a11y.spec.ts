@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { countInOff, runAxe } from './support/helpers';
+import { countInOff, ratioOff, runAxe } from './support/helpers';
 
 const panel = (page: Page) => page.getByRole('region', { name: 'Ratios Training' });
 const live = (page: Page) => page.locator('[role="status"][aria-live="polite"].sr-only');
@@ -98,6 +98,7 @@ test.describe('metronome a11y: live region', () => {
   test('holds only run-state announcements, never a per-beat update', async ({ page }) => {
     await page.goto('/metronome');
     await countInOff(page);
+    await ratioOff(page);
     await page.getByRole('button', { name: 'Start Training' }).click();
     await expect(panel(page)).toHaveAttribute('data-phase', 'running');
     await expect(live(page)).toHaveText(/^Started, 85 BPM, 4 beats, 8th Triplets$/);
@@ -212,6 +213,38 @@ test.describe('metronome a11y: count-in axe (033)', () => {
       await sw.click();
       await page.getByRole('button', { name: 'Start Training' }).click();
       await expect(page.locator('.position')).toContainText('COUNT IN');
+      await runAxe(page);
+    });
+  }
+});
+
+test.describe('metronome a11y: alternating ratios axe (034)', () => {
+  const modes = [
+    { name: 'light', media: { colorScheme: 'light' as const } },
+    { name: 'dark', media: { colorScheme: 'dark' as const } },
+    { name: 'more contrast', media: { contrast: 'more' as const } },
+    { name: 'forced colours', media: { forcedColors: 'active' as const } }
+  ];
+  for (const { name, media } of modes) {
+    test(`settings (section on and off), a running loop and a repeat count-in are axe-clean in ${name}`, async ({
+      page
+    }) => {
+      test.setTimeout(60_000);
+      await page.emulateMedia(media);
+      await page.goto('/metronome');
+      const sw = page.getByRole('switch', { name: 'Subdivision ratio' });
+      await expect(sw).toHaveAttribute('aria-checked', 'true');
+      await runAxe(page);
+      await sw.click();
+      await expect(sw).toHaveAttribute('aria-checked', 'false');
+      await runAxe(page);
+      await sw.click();
+      await page.getByRole('slider', { name: 'Initial Count In' }).fill('0');
+      await page.getByRole('slider', { name: 'BPM' }).fill('300');
+      await page.getByRole('button', { name: 'Start Training' }).click();
+      await expect(page.locator('.position')).toContainText('BEAT');
+      await runAxe(page);
+      await expect(page.locator('.position')).toContainText('COUNT IN', { timeout: 15_000 });
       await runAxe(page);
     });
   }

@@ -3,13 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   HORIZON_S,
   START_LEAD_S,
-  clickAt,
+  clickTime,
   createClickScheduler,
   skipTo,
+  type Grid,
   type ClickSink,
   type SchedulerEvents,
   type SegmentStart
 } from '../../../src/lib/audio/metronome';
+import { clickAt, slotStart, type RunPlan } from '../../../src/lib/audio/metronome-cycle';
 import { FakeAudioPort, FakeClock, FakeFrames, FakeSource } from './support/fake-audio';
 
 function setup(opts: { sink?: 'none' | 'ok' | 'unavailable' } = {}) {
@@ -28,13 +30,17 @@ function setup(opts: { sink?: 'none' | 'ok' | 'unavailable' } = {}) {
   const beats: number[] = [];
   const order: string[] = [];
   const countIns: number[] = [];
+  const beatAts: unknown[] = [];
+  const countInAts: unknown[] = [];
   const events: SchedulerEvents = {
-    onBeat: (b) => {
+    onBeat: (b, at) => {
       beats.push(b);
+      beatAts.push(at);
       order.push('beat');
     },
-    onCountIn: (c) => {
+    onCountIn: (c, at) => {
       countIns.push(c);
+      countInAts.push(at);
       order.push('count-in');
     },
     onSuspended: vi.fn(),
@@ -51,7 +57,6 @@ function setup(opts: { sink?: 'none' | 'ok' | 'unavailable' } = {}) {
   const seg = (over: Partial<SegmentStart> = {}): SegmentStart => ({
     bpm: 120,
     beats: 4,
-    startBeat: 1,
     clicksPerBeat: 1,
     run: 1,
     pressedAtMs: 0,
@@ -64,28 +69,56 @@ function setup(opts: { sink?: 'none' | 'ok' | 'unavailable' } = {}) {
   };
   const starts = (): number[] =>
     port.sources.flatMap((s) => (s as unknown as FakeSource).startCalls);
-  return { port, clock, frames, events, beats, countIns, order, scheduler, advance, begin, starts };
+  return {
+    port,
+    clock,
+    frames,
+    events,
+    beats,
+    countIns,
+    beatAts,
+    countInAts,
+    order,
+    scheduler,
+    advance,
+    begin,
+    starts
+  };
 }
 
+/** A grid over a plan with `perBeat` clicks per beat, 4 beats, no count-in, no alternation. */
+function gridOf(plan: Partial<RunPlan> = {}, over: Partial<Grid> = {}): Grid {
+  const full: RunPlan = { beats: 4, initial: 0, loops: [1], repeat: 0, ...plan };
+  const startSlot = over.startSlot ?? 0;
+  return {
+    plan: full,
+    anchor: 1.25,
+    period: 0.5,
+    startSlot,
+    startIndex: slotStart(full, startSlot),
+    ...over
+  };
+}
+const whenOf = (g: Grid, c: number): number => clickTime(g, clickAt(g.plan, c));
+
 describe('click grid maths', () => {
-  it('S1: when = anchor + k * 60/bpm within 1e-9 s', () => {
+  it('E1: when = anchor + (slot − startSlot) * 60/bpm + sub * T/n within 1e-9 s', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 30, max: 300 }),
         fc.integer({ min: 0, max: 3000 }),
         (bpm, k) => {
-          const period = 60 / bpm;
-          const c = clickAt({ anchor: 1.25, period, perBeat: 1, startBeat: 1, beats: 4 }, k);
-          expect(Math.abs(c.when - (1.25 + (k * 60) / bpm))).toBeLessThan(1e-9);
+          const g = gridOf({}, { period: 60 / bpm });
+          expect(Math.abs(whenOf(g, k) - (1.25 + (k * 60) / bpm))).toBeLessThan(1e-9);
         }
       )
     );
   });
 
   it('skipTo returns the first index not in the past', () => {
-    const seg = { anchor: 1, period: 0.5, perBeat: 1 };
-    const k = skipTo(seg, 31);
-    expect(clickAt({ ...seg, startBeat: 1, beats: 4 }, k).when).toBeGreaterThanOrEqual(31);
+    const g = gridOf({}, { anchor: 1 });
+    const k = skipTo(g, 31);
+    expect(whenOf(g, k)).toBeGreaterThanOrEqual(31);
   });
 });
 
@@ -153,10 +186,10 @@ describe('createClickScheduler', () => {
     frames.flush();
     expect(beats.at(-1)).toBe(3);
     const frozen = scheduler.halt('pause');
-    expect(frozen).toEqual({ kind: 'beat', beat: 3 });
+    expect(frozen).toMatchObject({ kind: 'beat', beat: 3, slot: 2 });
     const startsBefore = port.sources.length;
     beats.length = 0;
-    await begin({ startBeat: ((frozen.kind === 'beat' ? frozen.beat : 0) % 4) + 1 });
+    await begin({ startSlot: (frozen.kind === 'none' ? -1 : frozen.slot) + 1 });
     for (let i = 0; i < 100; i++) {
       advance(25);
       frames.flush();
@@ -205,7 +238,7 @@ describe('createClickScheduler', () => {
     const { port, scheduler, begin, advance, clock, frames } = setup();
     await begin();
     const n = port.sources.length;
-    scheduler.start({ bpm: 200, beats: 3, startBeat: 1, clicksPerBeat: 1, run: 2, pressedAtMs: 0 });
+    scheduler.start({ bpm: 200, beats: 3, clicksPerBeat: 1, run: 2, pressedAtMs: 0 });
     await Promise.resolve();
     expect(port.sources.length).toBe(n);
     scheduler.halt('reset');
@@ -248,11 +281,9 @@ describe('createClickScheduler', () => {
     const bufs = new Set((port.sources as unknown as FakeSource[]).map((s) => s.buffer));
     expect(bufs.size).toBe(1);
     for (let k = 0; k < 8; k++) {
-      expect(
-        clickAt({ anchor: 0, period: 0.5, perBeat: 1, startBeat: 1, beats: 1 }, k)
-      ).toMatchObject({
-        beat: 1,
-        accent: true
+      expect(clickAt({ beats: 1, initial: 0, loops: [1], repeat: 0 }, k)).toMatchObject({
+        position: { beat: 1 },
+        kind: 'accent'
       });
     }
     scheduler.halt('leave');
@@ -285,22 +316,17 @@ describe('createClickScheduler', () => {
 });
 
 describe('subdivisions (032)', () => {
-  const grid = (perBeat: number, over = {}) => ({
-    anchor: 2,
-    period: 0.5,
-    perBeat,
-    startBeat: 1,
-    beats: 4,
-    ...over
-  });
+  const grid = (perBeat: number, over: Partial<Grid> = {}): Grid =>
+    gridOf({ loops: [perBeat] }, { anchor: 2, ...over });
 
   it('clickAt with perBeat 3 places soft clicks at thirds of the period', () => {
-    const kinds = [0, 1, 2, 3, 4, 5, 6].map((j) => clickAt(grid(3), j));
-    kinds.forEach((c, j) => {
-      expect(c.when).toBeCloseTo(2 + (j * 0.5) / 3, 12);
+    const g = grid(3);
+    const cs = [0, 1, 2, 3, 4, 5, 6].map((j) => clickAt(g.plan, j));
+    cs.forEach((c, j) => {
+      expect(clickTime(g, c)).toBeCloseTo(2 + (j * 0.5) / 3, 12);
       expect(c.slot).toBe(Math.floor(j / 3));
     });
-    expect(kinds.map((c) => c.kind)).toEqual([
+    expect(cs.map((c) => c.kind)).toEqual([
       'accent',
       'sub',
       'sub',
@@ -309,27 +335,38 @@ describe('subdivisions (032)', () => {
       'sub',
       'normal'
     ]);
-    expect(kinds.map((c) => c.beat)).toEqual([1, 1, 1, 2, 2, 2, 3]);
+    expect(cs.map((c) => (c.position.kind === 'beat' ? c.position.beat : 0))).toEqual([
+      1, 1, 1, 2, 2, 2, 3
+    ]);
   });
 
-  it('beat wraps and honours startBeat', () => {
-    expect(clickAt(grid(2, { startBeat: 4 }), 2)).toMatchObject({ beat: 1, kind: 'accent' });
-    expect(clickAt(grid(2, { startBeat: 4 }), 1)).toMatchObject({ beat: 4, kind: 'sub' });
+  it('beat wraps and honours startSlot', () => {
+    const g = grid(2, { startSlot: 3, startIndex: slotStart(grid(2).plan, 3) });
+    expect(clickAt(g.plan, g.startIndex + 2)).toMatchObject({
+      position: { beat: 1 },
+      kind: 'accent'
+    });
+    expect(clickAt(g.plan, g.startIndex + 1)).toMatchObject({
+      position: { beat: 4 },
+      kind: 'sub'
+    });
+    expect(whenOf(g, g.startIndex)).toBeCloseTo(2, 12);
   });
 
   it('perBeat 1 gives the 031 sequence', () => {
+    const g = grid(1);
     for (let j = 0; j < 9; j++) {
-      const c = clickAt(grid(1), j);
-      expect(c.when).toBeCloseTo(2 + j * 0.5, 12);
-      expect(c.kind).toBe(c.beat === 1 ? 'accent' : 'normal');
+      const c = clickAt(g.plan, j);
+      expect(clickTime(g, c)).toBeCloseTo(2 + j * 0.5, 12);
+      expect(c.kind).toBe(j % 4 === 0 ? 'accent' : 'normal');
     }
   });
 
   it('skipTo counts grid clicks, not beats', () => {
     const g = grid(4);
     const k = skipTo(g, 10);
-    expect(clickAt(g, k).when).toBeGreaterThanOrEqual(10);
-    expect(clickAt(g, k - 1).when).toBeLessThan(10 + START_LEAD_S);
+    expect(whenOf(g, k)).toBeGreaterThanOrEqual(10);
+    expect(whenOf(g, k - 1)).toBeLessThan(10 + START_LEAD_S);
   });
 
   it('schedules three clicks per beat with the right buffers', async () => {
@@ -377,9 +414,8 @@ describe('high-speed exactness (032 US3)', () => {
         fc.integer({ min: 0, max: 600 * 40 }),
         (bpm, n, jRaw) => {
           const j = Math.min(jRaw, Math.floor((600 * bpm * n) / 60));
-          const g = { anchor: 3.5, period: 60 / bpm, perBeat: n, startBeat: 1, beats: 4 };
-          const c = clickAt(g, j);
-          expect(Math.abs(c.when - (3.5 + (j * 60) / (bpm * n)))).toBeLessThan(0.002);
+          const g = gridOf({ loops: [n] }, { anchor: 3.5, period: 60 / bpm });
+          expect(Math.abs(whenOf(g, j) - (3.5 + (j * 60) / (bpm * n)))).toBeLessThan(0.002);
         }
       )
     );
@@ -414,7 +450,7 @@ describe('high-speed exactness (032 US3)', () => {
       const future = (port.sources as unknown as FakeSource[]).filter((s) => s.startCalls[0] > t);
       expect(future.length).toBeGreaterThan(0);
       const beat = scheduler.halt('pause');
-      expect(beat).toEqual({ kind: 'beat', beat: 2 });
+      expect(beat).toMatchObject({ kind: 'beat', beat: 2, loop: 1, clicksPerBeat: n });
       for (const s of future) expect(s.stopCalls.length).toBe(1);
       const count = starts().length;
       advance(5000);
@@ -437,11 +473,11 @@ describe('high-speed exactness (032 US3)', () => {
     const a = setup();
     await a.begin({ bpm: 120, clicksPerBeat: 4 });
     a.advance(1030, 1); // beat 3 click at 1.02 only
-    expect(a.scheduler.halt('pause')).toEqual({ kind: 'beat', beat: 3 });
+    expect(a.scheduler.halt('pause')).toMatchObject({ kind: 'beat', beat: 3 });
     const b = setup();
     await b.begin({ bpm: 120, clicksPerBeat: 4 });
     b.advance(1020 + 130 + 10, 1); // beat 3 + two soft clicks
-    expect(b.scheduler.halt('pause')).toEqual({ kind: 'beat', beat: 3 });
+    expect(b.scheduler.halt('pause')).toMatchObject({ kind: 'beat', beat: 3 });
   });
 
   it('T031: resume begins with the next beat click ≤ 50 ms after the press, then its sub clicks', async () => {
@@ -449,10 +485,14 @@ describe('high-speed exactness (032 US3)', () => {
     await begin({ bpm: 120, clicksPerBeat: 3 });
     advance(1100, 1);
     const frozen = scheduler.halt('pause');
-    expect(frozen).toEqual({ kind: 'beat', beat: 3 });
+    expect(frozen).toMatchObject({ kind: 'beat', beat: 3 });
     const before = port.sources.length;
     const pressed = port.currentTime;
-    await begin({ startBeat: ((frozen.kind === 'beat' ? frozen.beat : 0) % 4) + 1, clicksPerBeat: 3, run: 2 });
+    await begin({
+      startSlot: (frozen.kind === 'none' ? -1 : frozen.slot) + 1,
+      clicksPerBeat: 3,
+      run: 2
+    });
     advance(400, 1);
     const fresh = (port.sources.slice(before) as unknown as FakeSource[]).map(
       (s) => [s.startCalls[0], s.buffer] as const
@@ -478,7 +518,7 @@ describe('high-speed exactness (032 US3)', () => {
     expect(added.length).toBeGreaterThan(0);
     expect(added.every((w) => w >= now)).toBe(true);
     expect(added[0]).toBeCloseTo(
-      anchor + (skipTo({ anchor, period: 0.5, perBeat: 3 }, now) * 0.5) / 3,
+      anchor + (skipTo(gridOf({ loops: [3] }, { anchor, period: 0.5 }), now) * 0.5) / 3,
       9
     );
     expect(added.length).toBeLessThanOrEqual(Math.ceil((HORIZON_S * 6) / 1) + 2);
@@ -490,7 +530,7 @@ describe('high-speed exactness (032 US3)', () => {
   });
 
   it.each([1, 3, 8])('T032: skipTo returns the first not-past grid index (n = %i)', (n) => {
-    const seg = { anchor: 2, period: 0.5, perBeat: n };
+    const seg = gridOf({ loops: [n] }, { anchor: 2, period: 0.5 });
     for (const now of [0, 2, 2.01, 7.3, 100.123]) {
       const k = skipTo(seg, now);
       const step = 0.5 / n;
@@ -501,21 +541,20 @@ describe('high-speed exactness (032 US3)', () => {
 });
 
 describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
-  it('E1: absent countIn, total = from and total 0 reproduce the 032 schedule', async () => {
+  it('E1: absent initialCountIn and 0 reproduce the 032 schedule', async () => {
     const runs: number[][] = [];
-    for (const countIn of [undefined, { from: 2, total: 2 }, { from: 0, total: 0 }]) {
+    for (const initialCountIn of [undefined, 0]) {
       const { scheduler, begin, advance, starts, port } = setup();
       port.currentTime = 5;
-      await begin({ bpm: 100, clicksPerBeat: 3, countIn });
+      await begin({ bpm: 100, clicksPerBeat: 3, initialCountIn });
       advance(4000);
       runs.push(starts());
       scheduler.halt('leave');
     }
     expect(runs[1]).toEqual(runs[0]);
-    expect(runs[2]).toEqual(runs[0]);
   });
 
-  it('E2: grid timing over BPM 30–300 × r 0–8 × n 1–8 and one beat between last count-in and first loop', () => {
+  it('E2: grid timing over BPM 30–300 × k 0–8 × n 1–8 and one beat between last count-in and first loop', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 30, max: 300 }),
@@ -523,26 +562,16 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
         fc.integer({ min: 1, max: 8 }),
         (bpm, r, n) => {
           const T = 60 / bpm;
-          const seg = {
-            anchor: 3.5,
-            period: T,
-            perBeat: n,
-            startBeat: 1,
-            beats: 4,
-            countInRemaining: r,
-            countInFrom: 0
-          };
+          const g = gridOf({ initial: r, loops: [n] }, { anchor: 3.5, period: T });
           for (let i = 0; i < r; i++) {
-            expect(Math.abs(clickAt(seg, i).when - (3.5 + i * T))).toBeLessThan(0.002);
+            expect(Math.abs(whenOf(g, i) - (3.5 + i * T))).toBeLessThan(0.002);
           }
           for (let j = 0; j < 20; j++) {
             const ideal = 3.5 + r * T + (j * T) / n;
-            expect(Math.abs(clickAt(seg, r + j).when - ideal)).toBeLessThan(0.002);
+            expect(Math.abs(whenOf(g, r + j) - ideal)).toBeLessThan(0.002);
           }
           if (r > 0) {
-            expect(
-              Math.abs(clickAt(seg, r).when - clickAt(seg, r - 1).when - T)
-            ).toBeLessThan(0.002);
+            expect(Math.abs(whenOf(g, r) - whenOf(g, r - 1) - T)).toBeLessThan(0.002);
           }
         }
       )
@@ -551,7 +580,7 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
 
   it('E3: count-in clicks are accented, no sub/normal precedes the first loop click', async () => {
     const { scheduler, begin, advance, starts, port } = setup();
-    await begin({ bpm: 120, clicksPerBeat: 3, countIn: { from: 0, total: 3 } });
+    await begin({ bpm: 120, clicksPerBeat: 3, initialCountIn: 3 });
     advance(3000);
     const sources = port.sources as unknown as FakeSource[];
     const accent = sources[0].buffer;
@@ -568,14 +597,14 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
   it('E4: the first click (count-in) is at anchor within START_LEAD_S', async () => {
     const { scheduler, begin, starts, port } = setup();
     port.currentTime = 10;
-    await begin({ countIn: { from: 0, total: 4 } });
+    await begin({ initialCountIn: 4 });
     expect(starts()[0]).toBeCloseTo(10 + START_LEAD_S, 9);
     scheduler.halt('leave');
   });
 
-  it('E5: onCountIn(from+c+1) once per count-in click, then onBeat; never interleaved', async () => {
+  it('E5: onCountIn(slot + 1) once per count-in click, then onBeat; never interleaved', async () => {
     const { scheduler, begin, advance, frames, countIns, beats, order } = setup();
-    await begin({ bpm: 120, countIn: { from: 1, total: 4 } });
+    await begin({ bpm: 120, initialCountIn: 4, startSlot: 1 });
     for (let i = 0; i < 160; i++) {
       advance(25);
       frames.flush();
@@ -587,31 +616,37 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
     scheduler.halt('leave');
   });
 
-  it('E6: halt returns the last audible slot and stops pending sources', async () => {
+  it('E6/H2: halt returns the last audible slot and stops pending sources', async () => {
     const mid = setup();
-    await mid.begin({ bpm: 60, countIn: { from: 0, total: 4 } });
+    await mid.begin({ bpm: 60, initialCountIn: 4 });
     mid.advance(1500); // clicks at .02, 1.02 sounded
     const pendingSources = (mid.port.sources as unknown as FakeSource[]).filter(
       (s) => s.startCalls[0] > mid.port.currentTime
     );
     expect(pendingSources.length).toBeGreaterThan(0);
-    expect(mid.scheduler.halt('pause')).toEqual({ kind: 'count-in', click: 2 });
+    expect(mid.scheduler.halt('pause')).toMatchObject({
+      kind: 'count-in',
+      click: 2,
+      total: 4,
+      repeat: false,
+      slot: 1
+    });
     for (const s of pendingSources) expect(s.stopCalls.length).toBe(1);
 
     const loop = setup();
-    await loop.begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    await loop.begin({ bpm: 120, initialCountIn: 2 });
     loop.advance(1600); // loop beat 2 at 1.52
-    expect(loop.scheduler.halt('pause')).toEqual({ kind: 'beat', beat: 2 });
+    expect(loop.scheduler.halt('pause')).toMatchObject({ kind: 'beat', beat: 2, slot: 3 });
 
     const none = setup();
-    await none.begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    await none.begin({ bpm: 120, initialCountIn: 2 });
     expect(none.scheduler.halt('pause')).toEqual({ kind: 'none' });
     expect(none.scheduler.halt('pause')).toEqual({ kind: 'none' });
   });
 
   it('E7: after a pump gap nothing in the past is scheduled; past the count-in reports onBeat', async () => {
     const { port, scheduler, begin, advance, frames, starts, countIns, beats } = setup();
-    await begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    await begin({ bpm: 120, initialCountIn: 2 });
     advance(25);
     frames.flush();
     countIns.length = 0;
@@ -630,14 +665,13 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
 
   it('E8: a second start() while live is ignored', async () => {
     const { port, scheduler, begin } = setup();
-    await begin({ countIn: { from: 0, total: 4 } });
+    await begin({ initialCountIn: 4 });
     const n = port.sources.length;
     scheduler.start({
       bpm: 200,
       beats: 3,
-      startBeat: 1,
       clicksPerBeat: 1,
-      countIn: { from: 0, total: 8 },
+      initialCountIn: 8,
       run: 2,
       pressedAtMs: 0
     });
@@ -648,7 +682,7 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
 
   it('E9: with no sink the same grid drives onCountIn then onBeat from the clock', async () => {
     const { scheduler, begin, advance, frames, countIns, beats } = setup({ sink: 'none' });
-    await begin({ bpm: 120, countIn: { from: 2, total: 4 } });
+    await begin({ bpm: 120, initialCountIn: 4, startSlot: 2 });
     for (let i = 0; i < 100; i++) {
       advance(25);
       frames.flush();
@@ -658,10 +692,10 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
     scheduler.halt('leave');
   });
 
-  it('plays clicks 3 and 4 then the loop for {from:2,total:4}; invalid specs fall back to none', async () => {
+  it('plays clicks 3 and 4 then the loop for k = 4 from slot 2; invalid inputs fall back', async () => {
     const ok = setup();
     ok.port.currentTime = 1;
-    await ok.begin({ bpm: 60, countIn: { from: 2, total: 4 } });
+    await ok.begin({ bpm: 60, initialCountIn: 4, startSlot: 2 });
     ok.advance(3000);
     const t = ok.starts();
     expect(t[1] - t[0]).toBeCloseTo(1, 9);
@@ -673,14 +707,16 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
     await plain.begin({ bpm: 60 });
     plain.advance(3000);
     for (const bad of [
-      { from: 0, total: 2.5 },
-      { from: 3, total: 2 },
-      { from: 0, total: 9 },
-      { from: -1, total: 2 }
+      { initialCountIn: 2.5 },
+      { initialCountIn: 9 },
+      { initialCountIn: -1 },
+      { startSlot: -1 },
+      { startSlot: 1.5 },
+      { startSlot: NaN }
     ]) {
       const bx = setup();
       bx.port.currentTime = 1;
-      await bx.begin({ bpm: 60, countIn: bad });
+      await bx.begin({ bpm: 60, ...bad });
       bx.advance(3000);
       expect(bx.starts()).toEqual(plain.starts());
       bx.scheduler.halt('leave');
@@ -688,37 +724,174 @@ describe('count-in (033, contracts/click-engine-api.md E1–E9)', () => {
     plain.scheduler.halt('leave');
   });
 
-  it('clickAt carries countIn and negative slots on the combined grid', () => {
-    const seg = {
-      anchor: 0,
-      period: 0.5,
-      perBeat: 2,
-      startBeat: 1,
-      beats: 4,
-      countInRemaining: 2,
-      countInFrom: 2
-    };
-    expect(clickAt(seg, 0)).toMatchObject({ slot: -2, beat: 0, countIn: 3, kind: 'accent' });
-    expect(clickAt(seg, 1)).toMatchObject({ slot: -1, countIn: 4 });
-    expect(clickAt(seg, 2)).toMatchObject({ slot: 0, beat: 1, countIn: null, kind: 'accent' });
-    expect(clickAt(seg, 3)).toMatchObject({ slot: 0, kind: 'sub', when: 1.25 });
-    expect(skipTo(seg, 0.6)).toBe(2);
-  });
-
-  it('log entries carry countIn and negative slot', async () => {
+  it('log entries carry run-global slot, beat 0 and countIn for count-in clicks, and the phase', async () => {
     globalThis.__fmAudioLog = [];
     const { scheduler, begin, advance } = setup();
-    await begin({ bpm: 120, countIn: { from: 0, total: 2 } });
+    await begin({ bpm: 120, initialCountIn: 2 });
     advance(2000);
     scheduler.halt('leave');
     const clicks = (globalThis.__fmAudioLog as unknown as { type: string }[]).filter(
       (e) => e.type === 'click'
-    ) as unknown as { index: number; slot: number; beat: number; countIn: number | null }[];
-    expect(clicks.slice(0, 3).map((c) => [c.index, c.slot, c.beat, c.countIn])).toEqual([
-      [0, -2, 0, 1],
-      [1, -1, 0, 2],
-      [2, 0, 1, null]
+    ) as unknown as {
+      index: number;
+      slot: number;
+      beat: number;
+      countIn: number | null;
+      phase: string;
+    }[];
+    expect(clicks.slice(0, 3).map((c) => [c.index, c.slot, c.beat, c.countIn, c.phase])).toEqual([
+      [0, 0, 0, 1, 'initial'],
+      [1, 1, 0, 2, 'initial'],
+      [2, 2, 1, null, 'loop1']
     ]);
     globalThis.__fmAudioLog = [];
+  });
+});
+
+describe('alternating cycle (034)', () => {
+  const alt = {
+    bpm: 120,
+    beats: 4,
+    clicksPerBeat: 3,
+    initialCountIn: 4,
+    alternate: { clicksPerBeat: 6, repeatCountIn: 2 }
+  } as const;
+
+  const clickLog = (): {
+    index: number;
+    slot: number;
+    beat: number;
+    countIn: number | null;
+    phase: string;
+    when: number;
+  }[] =>
+    (globalThis.__fmAudioLog as unknown as { type: string }[]).filter(
+      (e) => e.type === 'click'
+    ) as never;
+
+  it('E1/E2: logs the phases in order, one beat apart across every boundary', async () => {
+    globalThis.__fmAudioLog = [];
+    const { port, scheduler, begin, advance } = setup();
+    port.currentTime = 10;
+    await begin(alt);
+    advance(14000);
+    scheduler.halt('leave');
+    const log = clickLog();
+    expect(log[0].when).toBeCloseTo(10 + START_LEAD_S, 9);
+    const runs: [string, number][] = [];
+    for (const c of log) {
+      const last = runs.at(-1);
+      if (last && last[0] === c.phase) last[1]++;
+      else runs.push([c.phase, 1]);
+    }
+    expect(runs.slice(0, 6)).toEqual([
+      ['initial', 4],
+      ['loop1', 12],
+      ['repeat', 2],
+      ['loop2', 24],
+      ['repeat', 2],
+      ['loop1', 12]
+    ]);
+    // First click of every slot is one beat after the previous slot's first click.
+    const firsts = log.filter((c, i) => i === 0 || c.slot !== log[i - 1].slot);
+    firsts.slice(1).forEach((c, i) => {
+      expect(c.when - firsts[i].when).toBeCloseTo(0.5, 9);
+    });
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('E2: starting at a later slot begins with that slot, within 50 ms', async () => {
+    globalThis.__fmAudioLog = [];
+    const { port, scheduler, begin } = setup();
+    port.currentTime = 3;
+    const plan: RunPlan = { beats: 4, initial: 4, loops: [3, 6], repeat: 2 };
+    await begin({ ...alt, startSlot: 9 });
+    scheduler.halt('leave');
+    const first = clickLog()[0];
+    expect(first.index).toBe(slotStart(plan, 9));
+    expect(first.slot).toBe(9);
+    expect(first.phase).toBe('repeat');
+    expect(first.countIn).toBe(2);
+    expect(first.when - 3).toBeLessThanOrEqual(0.05);
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('E3: skip-forward over a switch lands on the right phase with no burst', async () => {
+    globalThis.__fmAudioLog = [];
+    const { port, scheduler, begin, advance, starts } = setup();
+    await begin(alt);
+    advance(100);
+    const n = starts().length;
+    port.currentTime += 4.3; // slot 8 starts at 4.02; now inside the first repeat count-in
+    const now = port.currentTime;
+    advance(25);
+    const fresh = clickLog().slice(n);
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(fresh.every((c) => c.when >= now)).toBe(true);
+    expect(fresh[0].phase).toBe('repeat');
+    expect(fresh[0].countIn).toBe(2); // slot 9 at 4.52
+    expect(fresh.length).toBeLessThanOrEqual(Math.ceil((HORIZON_S * 12) / 1) + 8);
+    scheduler.halt('leave');
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('E4/H1: without a sink the same grid drives one event per slot with its SlotPosition', async () => {
+    const { scheduler, begin, advance, frames, beatAts, countInAts } = setup({ sink: 'none' });
+    await begin(alt);
+    for (let i = 0; i < 300; i++) {
+      advance(25);
+      frames.flush();
+    }
+    expect(countInAts.slice(0, 4)).toMatchObject([
+      { slot: 0, click: 1, total: 4, repeat: false },
+      { slot: 1, click: 2 },
+      { slot: 2, click: 3 },
+      { slot: 3, click: 4 }
+    ]);
+    expect(beatAts.slice(0, 4)).toMatchObject([
+      { slot: 4, beat: 1, loop: 1, clicksPerBeat: 3 },
+      { slot: 5, beat: 2 },
+      { slot: 6, beat: 3 },
+      { slot: 7, beat: 4 }
+    ]);
+    expect(countInAts.slice(4, 6)).toMatchObject([
+      { slot: 8, click: 1, total: 2, repeat: true, next: 2 },
+      { slot: 9, click: 2 }
+    ]);
+    expect(beatAts[4]).toMatchObject({ slot: 10, beat: 1, loop: 2, clicksPerBeat: 6 });
+    scheduler.halt('leave');
+  });
+
+  it('H2: halt in a repeat count-in returns it and logs click-cancel', async () => {
+    globalThis.__fmAudioLog = [];
+    const { scheduler, begin, advance } = setup();
+    await begin(alt);
+    advance(4100); // slot 8 (repeat click 1) at 4.02
+    expect(scheduler.halt('pause')).toMatchObject({
+      kind: 'count-in',
+      slot: 8,
+      click: 1,
+      total: 2,
+      repeat: true,
+      next: 2
+    });
+    const cancel = (globalThis.__fmAudioLog as unknown as { type: string }[]).filter(
+      (e) => e.type === 'click-cancel'
+    );
+    expect(cancel).toHaveLength(1);
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('H3: events of a superseded segment are dropped', async () => {
+    const { scheduler, begin, advance, frames, beats, countIns } = setup({ sink: 'none' });
+    await begin(alt);
+    advance(100);
+    scheduler.halt('pause');
+    beats.length = 0;
+    countIns.length = 0;
+    advance(5000);
+    frames.flush();
+    expect(beats).toEqual([]);
+    expect(countIns).toEqual([]);
   });
 });

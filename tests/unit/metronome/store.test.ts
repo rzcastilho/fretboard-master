@@ -2,7 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClickSink } from '../../../src/lib/audio/metronome';
-import { DEFAULT_SETTINGS, type MetronomeSettings } from '../../../src/lib/state/metronome-settings';
+import {
+  DEFAULT_SETTINGS,
+  type MetronomeSettings
+} from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames, type FakeSource } from '../audio/support/fake-audio';
@@ -35,7 +38,8 @@ function rig(
   const clickSink = vi
     .spyOn(playback, 'clickSink')
     .mockReturnValue(running === 'null' ? null : sink);
-  resetMetronomeForTests({ clock, frames }, settings);
+  // 033-era cases assert wrap-around at beat N, so the ratio section is off unless asked for (R-11).
+  resetMetronomeForTests({ clock, frames }, { ratio: false, ...settings });
   return { port, clock, frames, sink, clickSink };
 }
 
@@ -63,7 +67,7 @@ describe('metronome store: start path', () => {
   it('M1: first open is the settings phase at 85 BPM / 4 beats', () => {
     rig();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false, ratio: false });
     expect(metronome.beat).toBe(0);
     expect(metronome.soundNotice).toBe(false);
     expect(metronome.dots).toEqual([]);
@@ -208,7 +212,7 @@ describe('metronome store: start path', () => {
     await settle();
     metronome.setBpm(120);
     metronome.stepBeats(1);
-    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, countIn: false, ratio: false });
   });
 
   it('M7: screenChanged halts the run and restores the defaults', async () => {
@@ -290,7 +294,13 @@ describe('metronome store: pause, resume and reset', () => {
     advance(r, 0.1);
     metronome.reset();
     expect(metronome.phase).toBe('settings');
-    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, bpm: 120, beats: 6, countIn: false });
+    expect(metronome.settings).toEqual({
+      ...DEFAULT_SETTINGS,
+      bpm: 120,
+      beats: 6,
+      countIn: false,
+      ratio: false
+    });
     expect(metronome.beat).toBe(0);
     const before = starts(r).length;
     advance(r, 2);
@@ -637,8 +647,217 @@ describe('metronome store: pause and resume in the count-in (033 S7-S9, S11)', (
     metronome.reset();
     expect(metronome.phase).toBe('settings');
     expect(metronome.countIn).toBeNull();
-    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, repeatCountIn: 5 });
+    expect(metronome.settings).toEqual({ ...DEFAULT_SETTINGS, repeatCountIn: 5, ratio: false });
     metronome.screenChanged();
     expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe('metronome store: ratio cycle (034)', () => {
+  const alt = { countIn: true, ratio: true } as const;
+  /** 85 BPM, slot n starts at 0.02 + n × 60/85 s (port time starts at 0). */
+  const toSlot = (r: Rig, slot: number): void => {
+    // Absolute: advance to just after the slot's first click.
+    advance(r, Math.max(0.025, 0.02 + slot * (60 / 85) + 0.06 - r.port.currentTime));
+  };
+
+  it('S1: setRatio ignores non-booleans, keeps loop2, and is a no-op while running', async () => {
+    const r = rig(true, alt);
+    metronome.setLoop2(4);
+    metronome.setRatio('no');
+    metronome.setRatio(1);
+    expect(metronome.settings.ratio).toBe(true);
+    metronome.setRatio(false);
+    expect(metronome.settings.ratio).toBe(false);
+    expect(metronome.settings.loop2).toBe(4);
+    metronome.setRatio(true);
+    metronome.toggle();
+    await settle();
+    metronome.setRatio(false);
+    metronome.setLoop2(2);
+    expect(metronome.settings.ratio).toBe(true);
+    expect(metronome.settings.loop2).toBe(4);
+    expect(r.clickSink).toHaveBeenCalled();
+  });
+
+  it('setLoop2 ignores invalid input', () => {
+    rig(true, alt);
+    for (const bad of [0, 9, 2.5, 'x', null, undefined, NaN]) metronome.setLoop2(bad);
+    expect(metronome.settings.loop2).toBe(6);
+    metronome.setLoop2('3');
+    expect(metronome.settings.loop2).toBe(3);
+  });
+
+  it('position, beat, sub, countIn and dots derive from one position', async () => {
+    const r = rig(true, alt);
+    expect(metronome.position).toBeNull();
+    expect(metronome.countIn).toBeNull();
+    metronome.toggle();
+    await settle();
+    // before the first click: COUNT IN –/4
+    expect(metronome.countIn).toEqual({ click: 0, total: 4 });
+    expect(metronome.beat).toBe(0);
+    expect(metronome.sub).toBe(3);
+    expect(metronome.dots).toEqual([]);
+    toSlot(r, 0);
+    expect(metronome.countIn).toEqual({ click: 1, total: 4 });
+    toSlot(r, 4); // Loop 1 beat 1
+    expect(metronome.position).toMatchObject({ kind: 'beat', loop: 1, beat: 1, slot: 4 });
+    expect(metronome.countIn).toBeNull();
+    expect(metronome.sub).toBe(3);
+    expect(metronome.dots).toEqual(['lit', 'upcoming', 'upcoming', 'upcoming']);
+    toSlot(r, 8); // repeat count-in 1 of 2
+    expect(metronome.countIn).toEqual({ click: 1, total: 2 });
+    expect(metronome.beat).toBe(0);
+    expect(metronome.dots).toEqual([]);
+    toSlot(r, 12); // Loop 2 beat 3
+    expect(metronome.position).toMatchObject({ kind: 'beat', loop: 2, beat: 3 });
+    expect(metronome.sub).toBe(6);
+    expect(metronome.dots).toEqual(['played', 'played', 'lit', 'upcoming']);
+  });
+
+  it('with no Count In, Start shows Loop 1 before the first beat', async () => {
+    rig(true, { countIn: false, ratio: true });
+    metronome.toggle();
+    await settle();
+    expect(metronome.countIn).toBeNull();
+    expect(metronome.sub).toBe(3);
+    expect(metronome.dots).toEqual(['upcoming', 'upcoming', 'upcoming', 'upcoming']);
+  });
+
+  it('pause on Loop 2 beat 3 resumes with beat 4; reset starts at slot 0', async () => {
+    const r = rig(true, alt);
+    metronome.toggle();
+    await settle();
+    toSlot(r, 12);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    expect(metronome.position).toMatchObject({ loop: 2, beat: 3, slot: 12 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.position).toMatchObject({ kind: 'beat', loop: 2, beat: 4, slot: 13 });
+    metronome.reset();
+    expect(metronome.position).toBeNull();
+    expect(metronome.settings.loop2).toBe(6);
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.position).toMatchObject({ kind: 'count-in', slot: 0, click: 1 });
+  });
+
+  it('pause inside a repeat count-in resumes on its next click', async () => {
+    const r = rig(true, alt);
+    metronome.toggle();
+    await settle();
+    toSlot(r, 8);
+    metronome.toggle();
+    expect(metronome.position).toMatchObject({ kind: 'count-in', repeat: true, click: 1 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.position).toMatchObject({ kind: 'count-in', repeat: true, click: 2, slot: 9 });
+  });
+
+  it('screenChanged restores ratio on and Loop 2 Sextuplets', () => {
+    rig(true, { ratio: false, loop2: 2 });
+    metronome.screenChanged();
+    expect(metronome.settings.ratio).toBe(true);
+    expect(metronome.settings.loop2).toBe(6);
+    expect(metronome.position).toBeNull();
+  });
+});
+
+describe('metronome store: pause and resume in the ratio cycle (034 US4)', () => {
+  const alt = { countIn: true, ratio: true } as const;
+  const toSlot = (r: Rig, slot: number): void => {
+    advance(r, Math.max(0.025, 0.02 + slot * (60 / 85) + 0.06 - r.port.currentTime));
+  };
+  async function resumeAfter(r: Rig, slot: number): Promise<void> {
+    metronome.toggle();
+    await settle();
+    toSlot(r, slot);
+    metronome.toggle();
+  }
+  async function resumed(r: Rig): Promise<void> {
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+  }
+
+  it('pause on the last loop beat resumes on repeat click 1', async () => {
+    const r = rig(true, alt);
+    await resumeAfter(r, 7);
+    expect(metronome.position).toMatchObject({ kind: 'beat', beat: 4, slot: 7 });
+    await resumed(r);
+    expect(metronome.position).toMatchObject({ kind: 'count-in', repeat: true, click: 1, slot: 8 });
+  });
+
+  it('pause on the last loop beat with r = 0 resumes on beat 1 of the next loop', async () => {
+    const r = rig(true, { ...alt, repeatCountIn: 0 });
+    await resumeAfter(r, 7);
+    await resumed(r);
+    expect(metronome.position).toMatchObject({ kind: 'beat', loop: 2, beat: 1, slot: 8 });
+  });
+
+  it('pause on the last repeat click resumes on beat 1 of the next loop', async () => {
+    const r = rig(true, alt);
+    await resumeAfter(r, 9);
+    expect(metronome.position).toMatchObject({ kind: 'count-in', repeat: true, click: 2 });
+    await resumed(r);
+    expect(metronome.position).toMatchObject({ kind: 'beat', loop: 2, beat: 1, slot: 10 });
+  });
+
+  it('announces a pause in a loop with its subdivision', async () => {
+    const r = rig(true, alt);
+    await resumeAfter(r, 12);
+    expect(metronome.announcement).toBe('Paused on beat 3 of 4, Sextuplets');
+  });
+
+  it('announces a pause in a repeat count-in with the count r', async () => {
+    const r = rig(true, alt);
+    await resumeAfter(r, 8);
+    expect(metronome.announcement).toBe('Paused on count-in click 1 of 2');
+  });
+
+  it('section off keeps the 033 pause text', async () => {
+    const r = rig(true, { countIn: false, ratio: false });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Paused on beat 1 of 4');
+  });
+});
+
+describe('metronome store: ratio start announcements (034, FR-013)', () => {
+  it('section on, k = 0: names Loop 1 then Loop 2', () => {
+    rig(true, { countIn: false, ratio: true });
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets then Sextuplets');
+  });
+
+  it('section on, k > 0: adds the count-in', () => {
+    rig(true, { countIn: true, ratio: true, loop2: 2 });
+    metronome.toggle();
+    expect(metronome.announcement).toBe(
+      'Started, 85 BPM, 4 beats, 8th Triplets then 8th notes, count in 4'
+    );
+  });
+
+  it('section off keeps the 033 texts', () => {
+    rig(true, { countIn: true, ratio: false });
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets, count in 4');
+  });
+
+  it('loop switches never change the announcement', async () => {
+    const r = rig(true, { countIn: false, ratio: true, beats: 1 });
+    metronome.toggle();
+    await settle();
+    const started = metronome.announcement;
+    advance(r, 8);
+    expect(metronome.position?.kind).toBeDefined();
+    expect(metronome.announcement).toBe(started);
   });
 });
