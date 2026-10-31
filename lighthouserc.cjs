@@ -10,7 +10,9 @@ module.exports = {
       // Host-like routing (clean URLs, 404.html); lhci's own static server has no clean URLs.
       startServerCommand: 'node scripts/serve-build.mjs build 4174',
       startServerReadyPattern: 'serve-build:',
-      url: ['/', '/notes', '/triads', '/about'].map((p) => `http://localhost:4174${p}`),
+      url: ['/', '/notes', '/triads', '/metronome', '/about'].map(
+        (p) => `http://localhost:4174${p}`
+      ),
       numberOfRuns: 3,
       // Desktop reference profile (constitution VI, 2.0.0).
       settings: { preset: 'desktop' }
@@ -24,7 +26,7 @@ module.exports = {
           assertions: { interactive: ['error', { maxNumericValue: 3000 }] }
         },
         {
-          matchingUrlPattern: ':4174/(notes|triads)$',
+          matchingUrlPattern: ':4174/(notes|triads|metronome)$',
           assertions: { interactive: ['error', { maxNumericValue: 3500 }] }
         }
       ]

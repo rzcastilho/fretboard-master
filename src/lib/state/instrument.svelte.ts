@@ -19,7 +19,7 @@ import { musicalOf, type LinkInstrument } from '$lib/link/types';
 import { measure } from '$lib/measure/measure.svelte';
 import type { SpelledPitch } from '$lib/theory/pitch';
 import type { ScreenId } from '$lib/shell/screens';
-import type { ToolId } from '$lib/shell/tools';
+import type { FretboardToolId, ToolId } from '$lib/shell/tools';
 import {
   CLOSED,
   DEFAULT_CONFIG,
@@ -155,7 +155,7 @@ export const instrument = {
     return overrideDismissed;
   },
   /** The instrument notice to show for `tool` now, else null. */
-  overrideNoticeFor(tool: ToolId): InstrumentOverride | null {
+  overrideNoticeFor(tool: FretboardToolId): InstrumentOverride | null {
     return override !== null && override.tool === tool && override.notice && !overrideDismissed
       ? override
       : null;

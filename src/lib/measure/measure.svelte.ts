@@ -5,7 +5,7 @@
  */
 import { instrument } from '$lib/state/instrument.svelte';
 import { language } from '$lib/state/language.svelte';
-import type { ToolId } from '$lib/shell/tools';
+import type { FretboardToolId } from '$lib/shell/tools';
 import { viewParams } from '$lib/link';
 import { currentSnapshot } from '$lib/state/share.svelte';
 import { readDeviceClass } from './device';
@@ -49,7 +49,7 @@ let started = false;
 /** Page listeners added by `start()` (only when enabled), kept so tests can remove them. */
 let teardown: (() => void) | null = null;
 /** `opening.start` runs before `measure.start`: hold its link-opened until the facade is ready. */
-let earlyLinkOpened: ToolId | null = null;
+let earlyLinkOpened: FretboardToolId | null = null;
 /** `language.start` also runs before `measure.start`: hold its missing-text keys the same way. */
 const earlyMissing: string[] = [];
 
@@ -200,7 +200,7 @@ export const measure = {
     if (early !== null) measure.linkOpened(early);
     for (const key of earlyMissing.splice(0)) measure.missingText(key);
   },
-  toolOpened(tool: ToolId): void {
+  toolOpened(tool: FretboardToolId): void {
     guarded(() => {
       page.currentTool = tool;
       if (seen.tools.has(tool)) return;
@@ -224,10 +224,10 @@ export const measure = {
       page.emit(usage('sound-played', page.currentTool));
     });
   },
-  linkShared(tool: ToolId): void {
+  linkShared(tool: FretboardToolId): void {
     guarded(() => page.emit(usage('link-shared', tool)));
   },
-  linkOpened(tool: ToolId): void {
+  linkOpened(tool: FretboardToolId): void {
     if (!started) {
       earlyLinkOpened = tool;
       return;
@@ -253,12 +253,12 @@ export const measure = {
     });
   },
   /** The tool on screen, for callers that report without knowing it (audio). */
-  activeTool(): ToolId | null {
+  activeTool(): FretboardToolId | null {
     return page.currentTool;
   },
   report(input: {
     kind: Exclude<FailureKind, 'missing-text'>;
-    tool: ToolId | null;
+    tool: FretboardToolId | null;
     error: unknown;
   }): void {
     guarded(() => {

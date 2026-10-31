@@ -243,4 +243,12 @@ describe('runShortcut: invariants', () => {
     shortcuts.start(false);
     expect(runShortcut('labels', 'notes')).toBe(true);
   });
+
+  it('Metronome: every character-key action is inert (FR-023)', () => {
+    const before = notation.effective;
+    for (const a of ['listen', 'next', 'previous', 'labels', 'notation'] as const) {
+      expect(runShortcut(a, 'metronome')).toBe(false);
+    }
+    expect(notation.effective).toBe(before);
+  });
 });

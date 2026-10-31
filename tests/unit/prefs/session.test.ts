@@ -5,6 +5,7 @@ import { DEFAULT_PREFERENCES, serializePreferences } from '../../../src/lib/pref
 import { PREFS_KEY, PROBE_KEY } from '../../../src/lib/prefs/storage';
 import { startSession } from '../../../src/lib/prefs/session';
 import { FIXTURE_BY_NAME } from './fixtures';
+import { DEFAULT_SETTINGS } from '../../../src/lib/state/metronome-settings';
 import { fakeStorage } from './support';
 
 describe('startSession', () => {
@@ -172,5 +173,40 @@ describe('two sessions, one storage (US4, FR-015)', () => {
       expect(src, f).not.toMatch(/addEventListener\s*\(\s*['"]storage['"]/);
       expect(src, f).not.toMatch(/onstorage/);
     }
+  });
+});
+
+describe('metronome (035)', () => {
+  const ratios = { ...DEFAULT_SETTINGS, bpm: 120, beats: 2 };
+
+  it('remember writes once, and is skipped when the record is unchanged', () => {
+    const s = fakeStorage();
+    const session = startSession(s);
+    session.remember({ metronome: { ratios } });
+    const writes = s.calls.set;
+    expect(s.data.get(PREFS_KEY)).toBe(serializePreferences(session.current));
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).metronome.ratios.bpm).toBe(120);
+    session.remember({ metronome: { ratios: { ...ratios } } });
+    expect(s.calls.set).toBe(writes);
+  });
+
+  it('leaves the other fields untouched (FR-009), and they leave it untouched', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-full'].raw });
+    const session = startSession(s);
+    session.remember({ metronome: { ratios } });
+    expect(session.current).toEqual({
+      ...FIXTURE_BY_NAME['v1-full'].expected,
+      metronome: { ratios }
+    });
+    session.remember({ muted: false });
+    expect(session.current.metronome.ratios).toEqual(ratios);
+  });
+
+  it('erase returns the metronome defaults', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-full'].raw });
+    const session = startSession(s);
+    expect(session.current.metronome.ratios.bpm).toBe(140);
+    session.erase();
+    expect(session.current.metronome.ratios).toEqual(DEFAULT_SETTINGS);
   });
 });

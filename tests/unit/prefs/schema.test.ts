@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PREFERENCES,
   MAX_RAW_LENGTH,
+  METRONOME_LIMITS,
+  METRONOME_RATIOS_DEFAULTS,
   PREFS_VERSION,
   PRIVACY_CATEGORIES,
   TOOL_IDS,
@@ -15,6 +17,17 @@ import { OFFSET_MAX, OFFSET_MIN, type Offsets } from '../../../src/lib/instrumen
 import { TOOLS } from '../../../src/lib/shell/tools';
 import { TUNING_PRESETS, tuningFromOffsets } from '../../../src/lib/instrument/tunings';
 import { DEFAULT_TEMPO, TEMPOS } from '../../../src/lib/state/listen';
+import { MAX_BPM, MIN_BPM } from '../../../src/lib/audio/schedule';
+import {
+  DEFAULT_SETTINGS,
+  MAX_BEATS,
+  MAX_COUNT_IN,
+  MIN_BEATS,
+  MIN_COUNT_IN,
+  SUBDIVISIONS,
+  type MetronomeSettings,
+  type Subdivision
+} from '../../../src/lib/state/metronome-settings';
 import { FIXTURES, FIXTURE_BY_NAME } from './fixtures';
 
 const rec = (o: unknown): string => JSON.stringify(o);
@@ -41,7 +54,8 @@ describe('constants and defaults (FR-018)', () => {
       accidentals: 'sharps',
       cagedNoteShown: false,
       theme: null,
-      shortcuts: true
+      shortcuts: true,
+      metronome: { ratios: DEFAULT_SETTINGS }
     });
   });
 
@@ -108,6 +122,8 @@ describe('per-field fallback (US2 scenario 6)', () => {
     expect(p({ lastTool: v }).lastTool).toBeNull()
   );
   it('lastTool caged → caged', () => expect(p({ lastTool: 'caged' }).lastTool).toBe('caged'));
+  it('lastTool metronome → metronome', () =>
+    expect(p({ lastTool: 'metronome' }).lastTool).toBe('metronome'));
   it('labels.triads octave → interval', () =>
     expect(p({ labels: { triads: 'octave' } }).labels.triads).toBe('interval'));
   it('custom-tuning object keeps frets', () => {
@@ -342,7 +358,8 @@ describe('serializePreferences', () => {
       accidentals: 'sharps',
       cagedNoteShown: false,
       theme: null,
-      shortcuts: true
+      shortcuts: true,
+      metronome: { ratios: DEFAULT_SETTINGS }
     };
     expect(serializePreferences(p)).toBe(
       '{"version":1,"tuning":"AF-3","frets":24,"muted":true,"volume":0.35,"lastTool":"triads","labels":{"notes":"octave","triads":"name"}}'
@@ -397,7 +414,8 @@ describe('seven strings: writer rules 1–4 (012)', () => {
       accidentals: 'sharps',
       cagedNoteShown: false,
       theme: null,
-      shortcuts: true
+      shortcuts: true,
+      metronome: { ratios: DEFAULT_SETTINGS }
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
       'version',
@@ -642,6 +660,18 @@ const arbOffsetsOf = (n: 6 | 7): fc.Arbitrary<Offsets> =>
 
 const arbOffsets: fc.Arbitrary<Offsets> = arbOffsetsOf(6);
 
+const arbSub = fc.constantFrom<Subdivision>(1, 2, 3, 4, 5, 6, 7, 8);
+const arbRatios: fc.Arbitrary<MetronomeSettings> = fc.record({
+  bpm: fc.integer({ min: 30, max: 300 }),
+  beats: fc.integer({ min: 1, max: 16 }),
+  subdivision: arbSub,
+  countIn: fc.boolean(),
+  initialCountIn: fc.integer({ min: 0, max: 8 }),
+  repeatCountIn: fc.integer({ min: 0, max: 8 }),
+  ratio: fc.boolean(),
+  loop2: arbSub
+});
+
 const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   stringCount: fc.constant(6 as const),
   tuningId: fc.constantFrom(
@@ -667,7 +697,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
   accidentals: fc.constantFrom('sharps', 'flats', 'both'),
   cagedNoteShown: fc.boolean(),
   theme: fc.constantFrom(null, 'light', 'dark'),
-  shortcuts: fc.boolean()
+  shortcuts: fc.boolean(),
+  metronome: fc.record({ ratios: arbRatios })
 });
 
 function isValid(p: Preferences): boolean {
@@ -840,7 +871,8 @@ describe('stored keys (027 FR-019(e))', () => {
     'accidentals',
     'cagedNote',
     'theme',
-    'shortcuts'
+    'shortcuts',
+    'metronome'
   ];
   const everything: Preferences = {
     stringCount: 7,
@@ -859,7 +891,8 @@ describe('stored keys (027 FR-019(e))', () => {
     accidentals: 'flats',
     cagedNoteShown: true,
     theme: 'dark',
-    shortcuts: false
+    shortcuts: false,
+    metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120 } }
   };
 
   it('writes only known keys, none that identify or time-stamp the visitor', () => {
@@ -872,5 +905,211 @@ describe('stored keys (027 FR-019(e))', () => {
         expect(word).not.toMatch(/^(id|uuid|time|date|stamp|session|user)/i);
       }
     }
+  });
+});
+
+describe('metronome.ratios (035)', () => {
+  const ORDER = [
+    'bpm',
+    'beats',
+    'countIn',
+    'initialCountIn',
+    'repeatCountIn',
+    'ratio',
+    'loop1',
+    'loop2'
+  ];
+  const nonDefault: MetronomeSettings = {
+    bpm: 140,
+    beats: 6,
+    subdivision: 2,
+    countIn: false,
+    initialCountIn: 2,
+    repeatCountIn: 1,
+    ratio: false,
+    loop2: 4
+  };
+  const withRatios = (ratios: unknown): string => rec({ version: 1, metronome: { ratios } });
+  const ratiosOf = (raw: string): MetronomeSettings => parsePreferences(raw).metronome.ratios;
+  const nonMetronome = (p: Preferences): Omit<Preferences, 'metronome'> => {
+    const rest: Record<string, unknown> = { ...p };
+    delete rest.metronome;
+    return rest as Omit<Preferences, 'metronome'>;
+  };
+
+  it('C1: a default record is byte-identical to 034 (no metronome key)', () => {
+    expect(serializePreferences(DEFAULT_PREFERENCES)).toBe(
+      '{"version":1,"tuning":"AF-1","frets":22,"muted":false,"volume":0.8,"labels":{"notes":"name","triads":"interval"}}'
+    );
+  });
+
+  it('W1: omitted when all eight are default, written when any differs', () => {
+    expect(
+      serializePreferences({
+        ...DEFAULT_PREFERENCES,
+        metronome: { ratios: { ...DEFAULT_SETTINGS } }
+      })
+    ).not.toContain('metronome');
+    for (const k of ORDER) {
+      const key = k === 'loop1' ? 'subdivision' : k;
+      const other = {
+        ...DEFAULT_SETTINGS,
+        [key]:
+          key === 'bpm'
+            ? 86
+            : typeof DEFAULT_SETTINGS[key as keyof MetronomeSettings] === 'boolean'
+              ? false
+              : 1
+      } as MetronomeSettings;
+      expect(
+        serializePreferences({ ...DEFAULT_PREFERENCES, metronome: { ratios: other } })
+      ).toContain('"metronome"');
+    }
+  });
+
+  it('W2/W3: all eight in fixed order, metronome last after shortcuts, Loop 1 stored as loop1', () => {
+    const raw = serializePreferences({
+      ...DEFAULT_PREFERENCES,
+      shortcuts: false,
+      metronome: { ratios: nonDefault }
+    });
+    const o = JSON.parse(raw) as Record<string, Record<string, Record<string, number | boolean>>>;
+    const keys = Object.keys(o);
+    expect(keys[keys.length - 1]).toBe('metronome');
+    expect(keys[keys.length - 2]).toBe('shortcuts');
+    expect(Object.keys(o.metronome)).toEqual(['ratios']);
+    expect(Object.keys(o.metronome.ratios)).toEqual(ORDER);
+    expect(o.metronome.ratios.loop1).toBe(2);
+    expect(o.metronome.ratios).not.toHaveProperty('subdivision');
+  });
+
+  it('C2: round-trips every valid set of the eight fields', () => {
+    fc.assert(
+      fc.property(arbRatios, (ratios) => {
+        const back = parsePreferences(
+          serializePreferences({ ...DEFAULT_PREFERENCES, metronome: { ratios } })
+        );
+        expect(back.metronome.ratios).toEqual(ratios);
+      })
+    );
+  });
+
+  it('C3: every existing fixture without a metronome entry has the default ratios', () => {
+    for (const f of FIXTURES.filter((x) => !x.name.startsWith('metronome-'))) {
+      expect(parsePreferences(f.raw).metronome.ratios).toEqual(DEFAULT_SETTINGS);
+    }
+  });
+
+  it('C3: a stored record is read as written', () => {
+    expect(ratiosOf(FIXTURE_BY_NAME['metronome-full'].raw)).toEqual(nonDefault);
+    expect(ratiosOf(FIXTURE_BY_NAME['metronome-ratios'].raw)).toEqual({
+      ...DEFAULT_SETTINGS,
+      bpm: 120,
+      beats: 2,
+      loop2: 5
+    });
+  });
+
+  const INVALID: Record<string, unknown[]> = {
+    bpm: [29, 301, 900, 85.5, '120', null, true, {}, []],
+    beats: [0, 17, 2.5, '4', null, false],
+    countIn: [1, 'yes', null, 0, []],
+    initialCountIn: [-1, 9, 2.5, '3', null],
+    repeatCountIn: [-1, 9, 1.5, '2', null],
+    ratio: ['yes', 0, null, []],
+    loop1: [0, 9, 2.5, '2', null, false],
+    loop2: [0, 9, 2.5, '6', null, {}]
+  };
+  const FIELD_OF: Record<string, keyof MetronomeSettings> = {
+    loop1: 'subdivision'
+  };
+  for (const [field, bads] of Object.entries(INVALID)) {
+    it(`C4: an invalid ${field} resets only that field`, () => {
+      for (const bad of bads) {
+        const stored = {
+          bpm: 140,
+          beats: 6,
+          countIn: false,
+          initialCountIn: 2,
+          repeatCountIn: 1,
+          ratio: false,
+          loop1: 2,
+          loop2: 4,
+          [field]: bad
+        };
+        const p = parsePreferences(
+          rec({ version: 1, volume: 0.35, metronome: { ratios: stored } })
+        );
+        const key = FIELD_OF[field] ?? (field as keyof MetronomeSettings);
+        expect(p.metronome.ratios[key]).toBe(DEFAULT_SETTINGS[key]);
+        expect(p.metronome.ratios).toEqual({ ...nonDefault, [key]: DEFAULT_SETTINGS[key] });
+        expect(nonMetronome(p)).toEqual({ ...nonMetronome(DEFAULT_PREFERENCES), volume: 35 });
+      }
+    });
+  }
+
+  it('C4: out-of-range values are reset, never clamped (900 → 85)', () => {
+    expect(ratiosOf(FIXTURE_BY_NAME['metronome-bad-bpm'].raw).bpm).toBe(85);
+    expect(ratiosOf(withRatios({ bpm: 29 })).bpm).toBe(85);
+  });
+
+  it('C4: wrong types in every field give the defaults', () => {
+    expect(ratiosOf(FIXTURE_BY_NAME['metronome-wrong-types'].raw)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('C5: a non-object metronome or ratios gives all defaults without throwing', () => {
+    for (const bad of [null, [], 'x', 5, true]) {
+      expect(
+        parsePreferences(rec({ version: 1, volume: 0.35, metronome: bad })).metronome.ratios
+      ).toEqual(DEFAULT_SETTINGS);
+      const p = parsePreferences(rec({ version: 1, volume: 0.35, metronome: { ratios: bad } }));
+      expect(p.metronome.ratios).toEqual(DEFAULT_SETTINGS);
+      expect(p.volume).toBe(35);
+    }
+    expect(ratiosOf(FIXTURE_BY_NAME['metronome-array'].raw)).toEqual(DEFAULT_SETTINGS);
+    expect(ratiosOf(FIXTURE_BY_NAME['metronome-null-ratios'].raw)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('C6: other modes are ignored and dropped on re-serialize', () => {
+    const p = parsePreferences(FIXTURE_BY_NAME['metronome-other-mode'].raw);
+    expect(p.metronome.ratios).toEqual({ ...DEFAULT_SETTINGS, bpm: 120, beats: 2, loop2: 5 });
+    expect(serializePreferences(p)).not.toContain('speed');
+  });
+
+  it('C7: the schema mirrors match the metronome modules', () => {
+    expect(METRONOME_RATIOS_DEFAULTS).toEqual(DEFAULT_SETTINGS);
+    expect(METRONOME_LIMITS.bpm).toEqual([MIN_BPM, MAX_BPM]);
+    expect(METRONOME_LIMITS.beats).toEqual([MIN_BEATS, MAX_BEATS]);
+    expect(METRONOME_LIMITS.count).toEqual([MIN_COUNT_IN, MAX_COUNT_IN]);
+    expect(METRONOME_LIMITS.loop).toEqual([SUBDIVISIONS[0], SUBDIVISIONS[SUBDIVISIONS.length - 1]]);
+  });
+
+  it('C8: the metronome field has a privacy category', () => {
+    expect(PRIVACY_CATEGORIES.metronome).toEqual(['metronome']);
+  });
+
+  it('R5: a record over 16,384 characters gives every preference its default, metronome included', () => {
+    const big = `${rec({ version: 1, volume: 0.35, metronome: { ratios: { bpm: 120 } } })}${' '.repeat(MAX_RAW_LENGTH)}`;
+    expect(big.length).toBeGreaterThan(MAX_RAW_LENGTH);
+    const p = parsePreferences(big);
+    expect(p).toEqual(DEFAULT_PREFERENCES);
+    expect(p.metronome.ratios).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('R6 / FR-009: metronome and other preferences never alter each other', () => {
+    const withBad = parsePreferences(
+      rec({ version: 1, volume: 0.35, metronome: { ratios: { bpm: 900, beats: 2 } } })
+    );
+    expect(nonMetronome(withBad)).toEqual({ ...nonMetronome(DEFAULT_PREFERENCES), volume: 35 });
+    const written = serializePreferences({
+      ...DEFAULT_PREFERENCES,
+      volume: 20,
+      muted: true,
+      metronome: { ratios: nonDefault }
+    });
+    const back = parsePreferences(written);
+    expect(back.metronome.ratios).toEqual(nonDefault);
+    expect(back.volume).toBe(20);
+    expect(back.muted).toBe(true);
   });
 });

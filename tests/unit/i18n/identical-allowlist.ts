@@ -31,7 +31,12 @@ const SHARED: readonly string[] = [
   'caged_key_name',
   'share_title_caged',
   'summary_separator',
-  'summary_note_separator'
+  'summary_note_separator',
+  'metronome_bpm_label',
+  'metronome_bpm_unit',
+  'metronome_subdivision_option',
+  'metronome_status_sub',
+  'shortcuts_key_escape'
 ];
 
 /** 021: syllables spelled the same as English (es: all seven; pt-BR: Mi, Sol, Si only). */
@@ -40,6 +45,12 @@ const SOLFEGE_PT = ['e', 'g', 'b'].map((l) => `note_name_solfege_${l}`);
 
 export const IDENTICAL_ALLOWLIST: Readonly<Record<'pt-BR' | 'es', readonly string[]>> = {
   // "Volume" is the same word in Brazilian Portuguese.
-  'pt-BR': [...SHARED, 'sound_volume', ...SOLFEGE_PT],
+  'pt-BR': [
+    ...SHARED,
+    'sound_volume',
+    'metronome_subdivision_label',
+    'metronome_loop2_label',
+    ...SOLFEGE_PT
+  ],
   es: [...SHARED, ...SOLFEGE_ES]
 };

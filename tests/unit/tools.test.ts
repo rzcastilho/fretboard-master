@@ -3,9 +3,9 @@ import { KNOWN_PATHS } from '../../src/lib/shell/screens';
 import { TOOLS } from '../../src/lib/shell/tools';
 
 describe('TOOLS', () => {
-  it('has exactly three tools in order notes, triads, caged', () => {
-    expect(TOOLS).toHaveLength(3);
-    expect(TOOLS.map((t) => t.id)).toEqual(['notes', 'triads', 'caged']);
+  it('has exactly four tools in order notes, triads, caged, metronome', () => {
+    expect(TOOLS).toHaveLength(4);
+    expect(TOOLS.map((t) => t.id)).toEqual(['notes', 'triads', 'caged', 'metronome']);
   });
 
   it('lists CAGED third with path /caged', () => {

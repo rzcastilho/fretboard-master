@@ -3,7 +3,7 @@ import { expect, type Page, type Request } from '@playwright/test';
 
 import type { AudioLogEntry } from '../../src/lib/audio/types';
 
-export type ToolId = 'notes' | 'triads';
+export type ToolId = 'notes' | 'triads' | 'metronome';
 
 /** Make the next `count` renders of a tool's zones B–E throw (test builds only). */
 export async function injectFault(page: Page, tool: ToolId, count: number): Promise<void> {
@@ -152,4 +152,16 @@ export async function expandDetails(page: Page): Promise<void> {
   if (!arranged) return;
   const show = page.getByRole('button', { name: 'Show details' });
   if ((await show.count()) > 0) await show.click();
+}
+
+/** Switch Count In off before Start (033), so tests of the loop itself begin on beat 1. */
+export async function countInOff(page: Page): Promise<void> {
+  const sw = page.getByRole('switch', { name: 'Count In' });
+  if ((await sw.getAttribute('aria-checked')) === 'true') await sw.click();
+}
+
+/** Switch Subdivision ratio off before Start (034), so the loop repeats without alternating. */
+export async function ratioOff(page: Page): Promise<void> {
+  const sw = page.getByRole('switch', { name: 'Subdivision ratio' });
+  if ((await sw.getAttribute('aria-checked')) === 'true') await sw.click();
 }

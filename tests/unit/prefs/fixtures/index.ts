@@ -9,6 +9,7 @@ import type { Tempo } from '$lib/state/listen';
 import type { LanguageTag } from '$lib/i18n/languages';
 import type { AccidentalPolicy, Notation } from '$lib/notation/policy';
 import type { Theme } from '$lib/prefs/schema';
+import { DEFAULT_SETTINGS, type MetronomeSettings } from '$lib/state/metronome-settings';
 
 /**
  * Seed fixtures from specs/010-remembered-preferences/contracts/storage-format.md.
@@ -50,6 +51,8 @@ export interface ExpectedPreferences {
   readonly theme: Theme | null;
   /** 027: absent or invalid in a record → true. */
   readonly shortcuts: boolean;
+  /** 035: set only by metronome fixtures; absent means every field at its default (DEFAULT_SETTINGS). */
+  readonly metronome?: { readonly ratios: MetronomeSettings };
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -98,7 +101,7 @@ function fixture(
   return {
     name,
     raw: load(name),
-    expected,
+    expected: { ...expected, metronome: expected.metronome ?? { ratios: DEFAULT_SETTINGS } },
     tuning: tuning ?? { kind: 'preset', id: expected.tuningId }
   };
 }
@@ -131,6 +134,7 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('future', { ...defaults, tuningId: 'AF-5', handedness: 'left', tempo: 'slow' }),
   fixture('wrong-types', { ...defaults, lastTool: 'caged' }),
   fixture('last-tool-caged', { ...defaults, lastTool: 'caged' }),
+  fixture('last-tool-metronome', { ...defaults, lastTool: 'metronome' }),
   fixture('markup', defaults),
   // 16 385 × 'a': one over MAX_RAW_LENGTH, so it is never parsed.
   fixture('oversize', defaults),
@@ -213,7 +217,51 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('bad-accidentals', { ...defaults, tuningId: 'AF-3', fretCount: 20, muted: true }),
   fixture('caged-note', { ...defaults, cagedNoteShown: true }),
   // 027 keyboard shortcuts switch: written only when false, last key
-  fixture('shortcuts-off', { ...defaults, theme: 'dark', shortcuts: false })
+  fixture('shortcuts-off', { ...defaults, theme: 'dark', shortcuts: false }),
+  // 035 remembered metronome settings: `metronome` is the last key, written only when non-default
+  fixture('metronome-ratios', {
+    ...defaults,
+    metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120, beats: 2, loop2: 5 } }
+  }),
+  fixture('metronome-full', {
+    ...defaults,
+    metronome: {
+      ratios: {
+        bpm: 140,
+        beats: 6,
+        subdivision: 2,
+        countIn: false,
+        initialCountIn: 2,
+        repeatCountIn: 1,
+        ratio: false,
+        loop2: 4
+      }
+    }
+  }),
+  // bpm 900 resets only bpm; the other seven fields keep their stored values
+  fixture('metronome-bad-bpm', {
+    ...defaults,
+    metronome: {
+      ratios: {
+        bpm: DEFAULT_SETTINGS.bpm,
+        beats: 6,
+        subdivision: 2,
+        countIn: false,
+        initialCountIn: 2,
+        repeatCountIn: 1,
+        ratio: false,
+        loop2: 4
+      }
+    }
+  }),
+  fixture('metronome-wrong-types', defaults),
+  fixture('metronome-array', defaults),
+  fixture('metronome-null-ratios', defaults),
+  // the unknown `speed` entry is ignored
+  fixture('metronome-other-mode', {
+    ...defaults,
+    metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120, beats: 2, loop2: 5 } }
+  })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

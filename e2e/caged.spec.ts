@@ -9,7 +9,7 @@ test.describe('caged US1: five linked shapes', () => {
   test('Q1: home card and nav order', async ({ page }) => {
     await page.goto('/');
     const cards = page.getByRole('list').getByRole('link');
-    await expect(cards).toHaveCount(3);
+    await expect(cards).toHaveCount(4);
     await expect(cards.nth(2)).toHaveAccessibleName('CAGED — How does the whole neck connect?');
     await cards.nth(2).click();
     await expect(page).toHaveURL(/\/caged(\?v=1&.*)?$/);
@@ -19,6 +19,7 @@ test.describe('caged US1: five linked shapes', () => {
       'Fretboard Notes',
       'Triads',
       'CAGED',
+      'Metronome',
       'About'
     ]);
     await expect(nav.locator('[aria-current="page"]')).toHaveText('CAGED');

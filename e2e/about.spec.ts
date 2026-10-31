@@ -63,6 +63,15 @@ test.describe('about screen', () => {
     ]);
   });
 
+  test('lists the Metronome keys Space and Esc under Keyboard shortcuts', async ({ page }) => {
+    await page.goto('/about');
+    const section = page.getByRole('region', { name: 'Keyboard shortcuts' });
+    await expect(section.getByRole('heading', { level: 3, name: 'Metronome' })).toBeVisible();
+    await expect(section.getByText('Start, pause or resume', { exact: true })).toBeVisible();
+    await expect(section.locator('kbd', { hasText: 'Space' })).toBeVisible();
+    await expect(section.locator('kbd', { hasText: 'Esc' })).toBeVisible();
+  });
+
   test('legend has exactly root, third and fifth with shape and name', async ({ page }) => {
     await page.goto('/about');
     const items = page.getByRole('region', { name: 'Marker legend' }).getByRole('listitem');

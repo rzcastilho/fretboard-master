@@ -6,11 +6,14 @@ const goto = vi.fn();
 vi.mock('$app/navigation', () => ({ goto: (...args: unknown[]) => goto(...args) }));
 
 import ErasePreferences from '../../src/lib/shell/ErasePreferences.svelte';
+import { DEFAULT_SETTINGS } from '../../src/lib/state/metronome-settings';
+import { metronome, resetMetronomeForTests } from '../../src/lib/state/metronome.svelte';
 import { preferences, resetPreferencesForTests } from '../../src/lib/state/preferences.svelte';
 
 beforeEach(() => {
   goto.mockReset();
   resetPreferencesForTests();
+  resetMetronomeForTests();
 });
 afterEach(() => {
   document.body.innerHTML = '';
@@ -87,5 +90,15 @@ describe('ErasePreferences', () => {
     expect(readFileSync('src/lib/styles/controls.css', 'utf8')).toMatch(
       /\.btn,\s*\.option \{[^}]*min-block-size: var\(--target-min\)/
     );
+  });
+});
+
+describe('Erase and the metronome settings (035)', () => {
+  it('Erase resets the in-memory metronome settings to the defaults', async () => {
+    metronome.setBpm(200);
+    render(ErasePreferences);
+    await fireEvent.click(opener());
+    await fireEvent.click(screen.getByRole('button', { name: 'Erase' }));
+    expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
   });
 });

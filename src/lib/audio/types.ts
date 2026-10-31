@@ -1,4 +1,5 @@
 /** Audio data types (data-model §2–§4, §7, §8). No framework imports. */
+import type { ClickKind } from './click';
 import type { Position } from '../instrument/instrument';
 import type { Pitch } from '../theory/pitch';
 
@@ -75,4 +76,29 @@ export type AudioLogEntry =
       requestId: number;
       reason: 'interrupt' | 'stop' | 'hidden' | 'navigate' | 'instrument' | 'view';
     }
-  | { type: 'unavailable'; cause: 'context' | 'resume' | 'synth' };
+  | { type: 'unavailable'; cause: 'context' | 'resume' | 'synth' }
+  | {
+      type: 'click';
+      run: number;
+      index: number;
+      /** Run-global slot (count-in slots are 0 … k − 1); soft clicks share their beat's slot. */
+      slot: number;
+      /** Beat within the current loop, 1…N; 0 for count-in clicks. */
+      beat: number;
+      /** Click number (1-based) within its own count-in (initial or repeat), else null. */
+      countIn: number | null;
+      phase: 'initial' | 'repeat' | 'loop1' | 'loop2';
+      kind: ClickKind;
+      accent: boolean;
+      when: number;
+      contextTime: number;
+      /** Set on the first click of a segment (the Start or Resume press), else null. */
+      pressedAtMs: number | null;
+      scheduledAtMs: number;
+    }
+  | {
+      type: 'click-cancel';
+      run: number;
+      count: number;
+      reason: 'pause' | 'reset' | 'leave' | 'suspend';
+    };

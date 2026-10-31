@@ -1,10 +1,11 @@
 import { m } from '$lib/paraglide/messages.js';
 
-export type ToolId = 'notes' | 'triads' | 'caged';
+export type FretboardToolId = 'notes' | 'triads' | 'caged';
+export type ToolId = FretboardToolId | 'metronome';
 
 export interface Tool {
   id: ToolId;
-  path: '/notes' | '/triads' | '/caged';
+  path: '/notes' | '/triads' | '/caged' | '/metronome';
   name: () => string;
   question: () => string;
 }
@@ -28,5 +29,11 @@ export const TOOLS: readonly Tool[] = [
     path: '/caged',
     name: () => m.tool_caged_name(),
     question: () => m.tool_caged_question()
+  },
+  {
+    id: 'metronome',
+    path: '/metronome',
+    name: () => m.tool_metronome_name(),
+    question: () => m.tool_metronome_question()
   }
 ];

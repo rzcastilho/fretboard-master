@@ -4,6 +4,7 @@
     | 'notes'
     | 'triads'
     | 'caged'
+    | 'metronome'
     | 'about'
     | 'share'
     | 'instrument'
@@ -19,6 +20,7 @@
     notes: 'M9 18V5l11-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm11-2a3 3 0 11-6 0 3 3 0 016 0z',
     triads: 'M12 3l9 17H3z',
     caged: 'M4 5h16v14H4zM4 10h16M4 14h16M10 5v14',
+    metronome: 'M8 21h8l2-16H6zM12 17l4-9M9 11h6',
     about: 'M12 11v6M12 7.5v.5M3 12a9 9 0 1018 0 9 9 0 10-18 0',
     share: 'M12 15V3m0 0L8 7m4-4l4 4M5 12v8h14v-8',
     instrument: 'M4 20L14 10m0 0l3-3 3 3-3 3zM5 13a4 4 0 014 4',

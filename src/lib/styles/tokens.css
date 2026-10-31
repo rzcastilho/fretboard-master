@@ -26,6 +26,9 @@
   --color-notice-surface: light-dark(#e8eef6, #1f2a38);
   --color-notice-text: light-dark(#1a1d21, #eef0f3);
   --color-notice-border: light-dark(#6b7f99, #7f93ad);
+  /* Metronome Reset only (031, R-14) */
+  --color-danger: light-dark(#a1262e, #ff94b8);
+  --color-danger-text: light-dark(#ffffff, #101317);
 
   /* Spacing scale */
   --space-1: 0.25rem;
@@ -42,6 +45,7 @@
   --font-size-md: 1rem;
   --font-size-lg: 1.25rem;
   --font-size-xl: 1.75rem;
+  --metronome-tempo-size: 4rem;
   --font-weight-normal: 400;
   --font-weight-medium: 600;
   --font-weight-bold: 700;
@@ -57,6 +61,10 @@
   --switch-track-block: 1.25rem;
   --switch-thumb-inset: 2px;
   --item-min-inline: 12rem;
+  --pill-min-inline: 96px;
+  --metronome-panel-max: 36rem;
+  --metronome-dot-size: 1.5rem;
+  --metronome-pulse-scale: 1.25;
   --unit-px: 1px;
   --fb-stroke-hairline: 1px;
   --fb-label-halo-width: 3px;
@@ -236,6 +244,7 @@
     --color-disabled-text: GrayText;
     --color-disabled-border: GrayText;
     --color-notice-border: var(--color-text);
+    --color-danger: light-dark(#7d1620, #ffc2ca);
     --color-sound-panel-border: var(--color-text);
     --border-width: 2px;
     --focus-ring-width: 4px;
@@ -315,6 +324,8 @@
     --fb-octave-tone-6: CanvasText;
     --fb-octave-tone-7: CanvasText;
     --fb-region-band: color-mix(in srgb, CanvasText 18%, transparent);
+    --color-danger: ButtonText;
+    --color-danger-text: ButtonFace;
   }
 }
 

@@ -7,6 +7,7 @@
   import PrefsNotice from '$lib/shell/PrefsNotice.svelte';
   import { cancelAddress } from '$lib/state/address.svelte';
   import { caged } from '$lib/state/caged.svelte';
+  import { metronome } from '$lib/state/metronome.svelte';
   import { instrument } from '$lib/state/instrument.svelte';
   import { opening } from '$lib/state/opening.svelte';
   import { playback } from '$lib/state/playback.svelte';
@@ -41,6 +42,7 @@
     instrument.screenChanged();
     opening.screenChanged();
     caged.screenChanged();
+    metronome.screenChanged();
     preferences.screenChanged();
   });
 

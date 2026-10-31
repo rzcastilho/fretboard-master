@@ -36,11 +36,11 @@ describe('HomeScreen', () => {
     expect(within(group).getAllByRole('radio')).toHaveLength(3);
   });
 
-  it('renders exactly three tool cards in order', () => {
+  it('renders exactly four tool cards in order', () => {
     render(HomeScreen);
     const list = screen.getByRole('list');
     const items = within(list).getAllByRole('listitem');
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(4);
     const first = within(items[0]).getByRole('link', {
       name: 'Fretboard Notes — Where is every note?'
     });
@@ -53,6 +53,8 @@ describe('HomeScreen', () => {
       name: 'CAGED — How does the whole neck connect?'
     });
     expect(third.getAttribute('href')).toBe('/caged');
+    const fourth = within(items[3]).getByRole('link', { name: /^Metronome/ });
+    expect(fourth.getAttribute('href')).toBe('/metronome');
   });
 
   it('bottom zone holds a single instrument summary button, no spinner or image', () => {
@@ -114,6 +116,14 @@ describe('HomeScreen', () => {
     expect(links.map((l) => l.getAttribute('href'))).toEqual(TOOLS.map((t) => t.path));
     expect(links[0].getAttribute('aria-label')).toBe('Fretboard Notes — Where is every note?');
     expect(links[1].getAttribute('aria-label')).toBe('Continue: Triads. What is a chord made of?');
+    expect(screen.getAllByText('Continue')).toHaveLength(1);
+  });
+
+  it('marks the Metronome card as Continue when it was the last tool', () => {
+    preferences.toolOpened('metronome');
+    render(HomeScreen);
+    const links = within(screen.getByRole('list')).getAllByRole('link');
+    expect(links[3].getAttribute('aria-label')).toMatch(/^Continue: Metronome/);
     expect(screen.getAllByText('Continue')).toHaveLength(1);
   });
 

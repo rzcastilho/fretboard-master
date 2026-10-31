@@ -1156,3 +1156,76 @@ test.describe('address sync under rapid change (SC-007)', () => {
     expect(errors).toEqual([]);
   });
 });
+
+for (const mode of MEASURE_MODES) {
+  test.describe(`metronome navigation latency (SC-008) with /m ${mode}`, () => {
+    test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+    test('home → Metronome and Notes → Metronome median ≤ 300 ms at 4× CPU throttle', async ({
+      page
+    }) => {
+      await stubMeasure(page, mode);
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+
+      const fromHome: number[] = [];
+      const fromNotes: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        await page.goto('/');
+        fromHome.push(
+          await timeClickToFocus(page, () =>
+            page.getByRole('link', { name: /^(Continue: )?Metronome/ }).click()
+          )
+        );
+        await page.goto('/notes');
+        fromNotes.push(
+          await timeClickToFocus(page, () =>
+            page
+              .getByRole('navigation', { name: 'Tools' })
+              .getByRole('link', { name: 'Metronome' })
+              .click()
+          )
+        );
+      }
+      expect(median(fromHome)).toBeLessThanOrEqual(300);
+      expect(median(fromNotes)).toBeLessThanOrEqual(300);
+    });
+  });
+
+  test.describe(`metronome tap-to-sound latency (SC-008) with /m ${mode}`, () => {
+    test.skip(({ browserName }) => browserName !== 'chromium', 'CDP throttling is Chromium-only');
+
+    test('median pointerdown on Start Training → first click scheduled ≤ 100 ms at 4× CPU throttle', async ({
+      page
+    }) => {
+      await stubMeasure(page, mode);
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await page.goto('/metronome');
+      const start = page.getByRole('button', { name: 'Start Training' });
+      await start.waitFor();
+      await page.evaluate(() => {
+        const w = globalThis as unknown as { __downAt: number };
+        document.addEventListener('pointerdown', (e) => (w.__downAt = e.timeStamp), true);
+      });
+
+      const latencies: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        await start.click();
+        const firstClicks = async () =>
+          (await readAudioLog(page)).flatMap((e) =>
+            e.type === 'click' && e.index === 0 ? [e] : []
+          );
+        await expect.poll(async () => (await firstClicks()).length).toBe(i + 1);
+        const downAt = await page.evaluate(
+          () => (globalThis as unknown as { __downAt: number }).__downAt
+        );
+        const first = (await firstClicks())[i];
+        latencies.push(first.scheduledAtMs - downAt);
+        await page.getByRole('button', { name: 'Reset', exact: true }).click();
+        await start.waitFor();
+      }
+      expect(median(latencies)).toBeLessThanOrEqual(100);
+    });
+  });
+}

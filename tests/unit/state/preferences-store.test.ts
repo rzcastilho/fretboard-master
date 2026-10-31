@@ -7,6 +7,8 @@ import { notation, resetNotationForTests } from '../../../src/lib/state/notation
 import { language } from '../../../src/lib/state/language.svelte';
 import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
+import { DEFAULT_SETTINGS } from '../../../src/lib/state/metronome-settings';
+import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import { resetShortcutsForTests, shortcuts } from '../../../src/lib/state/shortcuts.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
@@ -23,6 +25,7 @@ beforeEach(() => {
   resetNotationForTests();
   resetPreferencesForTests();
   resetShortcutsForTests();
+  resetMetronomeForTests();
 });
 
 const full = () => fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-full'].raw });
@@ -439,5 +442,45 @@ describe('keyboard shortcuts switch (027)', () => {
     expect(restore).toHaveBeenCalledWith(true);
     expect(shortcuts.enabled).toBe(true);
     expect(s.data.has(PREFS_KEY)).toBe(false);
+  });
+});
+
+describe('metronome settings (035)', () => {
+  it('start() restores stored values into the metronome store without writing', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-full'].raw });
+    const before = s.data.get(PREFS_KEY);
+    const remember = vi.spyOn(preferences, 'remember');
+    preferences.start(s);
+    expect(metronome.settings).toEqual(
+      FIXTURE_BY_NAME['metronome-full'].expected.metronome?.ratios
+    );
+    expect(metronome.settings.bpm).toBe(140);
+    expect(remember).not.toHaveBeenCalled();
+    expect(s.data.get(PREFS_KEY)).toBe(before);
+  });
+
+  it('start() with nothing stored leaves the defaults', () => {
+    preferences.start(fakeStorage());
+    expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('erase() resets the in-memory metronome settings to the defaults', () => {
+    preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-full'].raw }));
+    preferences.erase();
+    expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('erase() without a session resets the settings too', () => {
+    metronome.setBpm(200);
+    expect(metronome.settings.bpm).toBe(200);
+    preferences.erase();
+    expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('a change after start is written to the stored record', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    metronome.setBpm(120);
+    expect(JSON.parse(s.data.get(PREFS_KEY) as string).metronome.ratios.bpm).toBe(120);
   });
 });
