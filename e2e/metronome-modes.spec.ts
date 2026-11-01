@@ -397,3 +397,22 @@ test.describe('modes are axe-clean (036 #13)', () => {
     await runAxe(page);
   });
 });
+
+test.describe('tap tempo is plain-only (038 row 19)', () => {
+  for (const tab of ['Ratios Training', 'Speed Training'] as const) {
+    test(`${tab}: no tap button, the pill stays an <output>, T does nothing`, async ({ page }) => {
+      await page.clock.install();
+      await page.goto('/metronome');
+      await page.getByRole('tab', { name: tab, exact: true }).click();
+      await expect(page.locator('button.tap')).toHaveCount(0);
+      const output = page.locator('output[aria-live="off"]').first();
+      const before = await output.textContent();
+      for (let i = 0; i < 4; i++) {
+        if (i > 0) await page.clock.runFor(500);
+        await page.keyboard.press('t');
+      }
+      await expect(output).toHaveText(before ?? '');
+      await expect(page.locator('button.tap')).toHaveCount(0);
+    });
+  }
+});

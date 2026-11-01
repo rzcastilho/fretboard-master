@@ -100,5 +100,5 @@ export type AudioLogEntry =
       type: 'click-cancel';
       run: number;
       count: number;
-      reason: 'pause' | 'reset' | 'leave' | 'suspend' | 'end';
+      reason: 'pause' | 'reset' | 'leave' | 'suspend' | 'end' | 'retime';
     };

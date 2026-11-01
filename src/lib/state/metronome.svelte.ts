@@ -34,6 +34,7 @@ import {
   withTargetBpm,
   toRatio,
   toSubdivision,
+  toPlainSubdivision,
   type MetronomeMode,
   type MetronomeSettings,
   type PlainSettings,
@@ -44,6 +45,7 @@ import { subdivisionName } from './metronome-subdivision-names';
 import { beatDots, type CountInView, type DotState, type SpeedStatus } from './metronome-view';
 import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
+import { tap, type TapRun } from './tap-tempo';
 
 export type RunPhase = 'settings' | 'starting' | 'running' | 'paused';
 
@@ -199,10 +201,19 @@ function start(): void {
   }
   if (state.mode === 'plain') {
     const plainBase = { bpm: state.plain.bpm, beats: state.plain.beats };
+    const sub = state.plain.subdivision;
     state.announcement =
-      k > 0
-        ? m.metronome_announce_started_plain_count_in({ ...plainBase, count: k })
-        : m.metronome_announce_started_plain(plainBase);
+      sub === 1
+        ? k > 0
+          ? m.metronome_announce_started_plain_count_in({ ...plainBase, count: k })
+          : m.metronome_announce_started_plain(plainBase)
+        : k > 0
+          ? m.metronome_announce_started_count_in({
+              ...plainBase,
+              subdivision: subdivisionName(sub),
+              count: k
+            })
+          : m.metronome_announce_started({ ...plainBase, subdivision: subdivisionName(sub) });
     beginSegment(0);
     return;
   }
@@ -271,12 +282,19 @@ function resume(): void {
   beginSegment((state.position?.slot ?? -1) + 1);
 }
 
+/** Timestamps of the current tap run (038): never reactive, never persisted. */
+let tapRun: TapRun = [];
+
+const tapNow = (): number => overrides.clock?.now() ?? performance.now();
+
 function clearRun(): void {
+  tapRun = [];
   state.position = null;
   state.initialTotal = 0;
 }
 
 function reset(): void {
+  tapRun = [];
   if (state.phase === 'settings') return;
   scheduler?.halt('reset');
   scheduler = null;
@@ -328,6 +346,17 @@ function commitSpeed(next: SpeedSettings): void {
 function editSpeed(edit: (s: SpeedSettings) => SpeedSettings): void {
   if (state.phase !== 'settings' || state.mode !== 'speed') return;
   commitSpeed(edit(state.speed));
+}
+
+/** 038: plain mode, any phase. A tap that yields a new BPM commits it and retimes a live run. */
+function tapTempo(): void {
+  if (state.mode !== 'plain') return;
+  const result = tap(tapRun, tapNow());
+  tapRun = result.run;
+  if (result.bpm === null || result.bpm === state.plain.bpm) return;
+  commitPlain({ ...state.plain, bpm: result.bpm });
+  state.announcement = `${result.bpm} ${m.metronome_bpm_unit()}`;
+  if (state.phase === 'starting' || state.phase === 'running') scheduler?.retime(result.bpm);
 }
 
 function setField(field: 'bpm' | 'beats', v: number): void {
@@ -427,6 +456,9 @@ export const metronome = {
   },
   /** Clicks per beat of the loop playing (Loop 1 before the first beat). */
   get sub(): number | null {
+    if (state.mode === 'plain') {
+      return state.plain.subdivision > 1 ? state.plain.subdivision : null;
+    }
     if (state.mode !== 'ratios') return null;
     return state.position?.kind === 'beat'
       ? state.position.clicksPerBeat
@@ -507,6 +539,15 @@ export const metronome = {
     const sub = toSubdivision(v);
     if (sub !== null) commitRatios({ ...state.settings, subdivision: sub });
   },
+  /** Settings phase and plain mode only; values other than 1–4 are ignored (038). */
+  setPlainSubdivision: (v: unknown): void => {
+    if (state.phase !== 'settings' || state.mode !== 'plain') return;
+    const sub = toPlainSubdivision(v);
+    if (sub !== null) commitPlain({ ...state.plain, subdivision: sub });
+  },
+
+  /** Plain mode only (038): measure the tempo from taps; retimes a running loop in place. */
+  tapTempo,
 
   /** Gesture handler. settings → start, running → pause, paused → resume, starting → ignored. */
   toggle(): void {

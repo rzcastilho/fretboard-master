@@ -10,6 +10,11 @@ export const SUBDIVISIONS: readonly Subdivision[] = [1, 2, 3, 4, 5, 6, 7, 8];
 export const DEFAULT_SUBDIVISION: Subdivision = 3;
 export const DEFAULT_LOOP2: Subdivision = 6;
 
+/** Plain Metronome subdivisions (038): Quarter, 8ths, Triplets, 16ths. */
+export type PlainSubdivision = 1 | 2 | 3 | 4;
+export const PLAIN_SUBDIVISIONS: readonly PlainSubdivision[] = [1, 2, 3, 4];
+export const DEFAULT_PLAIN_SUBDIVISION: PlainSubdivision = 1;
+
 export interface MetronomeSettings {
   readonly bpm: number;
   readonly beats: number;
@@ -38,12 +43,14 @@ export type MetronomeMode = 'plain' | 'speed' | 'ratios';
 export const METRONOME_MODES: readonly MetronomeMode[] = ['plain', 'speed', 'ratios'];
 export const DEFAULT_MODE: MetronomeMode = 'ratios';
 
-/** Plain Metronome settings (036): one click per beat. `MetronomeSettings` is a superset. */
+/** Plain Metronome settings (036, 038). */
 export interface PlainSettings {
   readonly bpm: number;
   readonly beats: number;
   readonly countIn: boolean;
   readonly initialCountIn: number;
+  /** Clicks per beat, 1–4 (038). */
+  readonly subdivision: PlainSubdivision;
 }
 
 /** What a Speed Training run does after the last step (037). */
@@ -100,7 +107,8 @@ export const DEFAULT_PLAIN_SETTINGS: Readonly<PlainSettings> = Object.freeze({
   bpm: 85,
   beats: 4,
   countIn: true,
-  initialCountIn: DEFAULT_INITIAL_COUNT_IN
+  initialCountIn: DEFAULT_INITIAL_COUNT_IN,
+  subdivision: DEFAULT_PLAIN_SUBDIVISION
 });
 
 export const DEFAULT_SPEED_SETTINGS: Readonly<SpeedSettings> = Object.freeze({
@@ -193,9 +201,9 @@ export function runPlanFor(s: MetronomeSettings): PlanFields {
   };
 }
 
-/** The plan fields of a plain run: one click per beat, no alternation (036). */
+/** The plan fields of a plain run: the subdivision per beat, no alternation (036, 038). */
 export function plainRunPlan(p: PlainSettings): PlanFields {
-  return { clicksPerBeat: 1, initialCountIn: effectiveCountIn(p) };
+  return { clicksPerBeat: p.subdivision, initialCountIn: effectiveCountIn(p) };
 }
 
 /** The plan fields of a Speed Training run: one click per beat plus a tempo ramp (037). */
@@ -237,6 +245,12 @@ export function toSubdivision(v: unknown): Subdivision | null {
   if (typeof v === 'string' && v.trim() === '') return null;
   const n = Number(v);
   return (SUBDIVISIONS as readonly number[]).includes(n) ? (n as Subdivision) : null;
+}
+
+/** A number or numeric string that is one of 1-4, otherwise null. Never throws. */
+export function toPlainSubdivision(v: unknown): PlainSubdivision | null {
+  const n = toSubdivision(v);
+  return n !== null && n <= 4 ? (n as PlainSubdivision) : null;
 }
 
 /** True when a step in `dir` would not change the field. */

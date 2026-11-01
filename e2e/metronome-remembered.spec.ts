@@ -306,3 +306,28 @@ test.describe('remembered metronome settings: US5', () => {
     expect(await stored(page)).not.toContain('"speed"');
   });
 });
+
+test.describe('remembered plain subdivision and tapped tempo (038)', () => {
+  test('17: Triplets and a tapped BPM survive a reload; Ratios loops are untouched', async ({
+    page
+  }) => {
+    await page.goto('/metronome');
+    await page.getByRole('tab', { name: 'Metronome', exact: true }).click();
+    const sub = page.locator('#metronome-plain-subdivision');
+    await sub.selectOption('3');
+    await waitForMetronome(page, '"subdivision":3');
+    await page.getByRole('slider', { name: 'BPM' }).fill('120');
+    await waitForMetronome(page, '"bpm":120');
+    await page.reload();
+    await expect(page.getByRole('tab', { name: 'Metronome', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await expect(sub).toHaveValue('3');
+    await expect(sub.locator('option:checked')).toHaveText('8th Triplets (3)');
+    await expect(slider(page, 'BPM')).toHaveValue('120');
+    await page.getByRole('tab', { name: 'Ratios Training' }).click();
+    await expect(loop1(page)).toHaveValue('3');
+    await expect(loop2(page)).toHaveValue('6');
+  });
+});

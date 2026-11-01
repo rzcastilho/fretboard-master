@@ -492,8 +492,11 @@
   "metronome_status_beat": "TEMPO {beat}/{beats}",
   "metronome_status_beat_none": "TEMPO –/{beats}",
   "metronome_bpm_unit": "BPM",
+  "metronome_tap_name": "{bpm} BPM, marcar andamento",
+  "metronome_tap_title": "Marcar andamento",
   "metronome_announce_started": "Iniciado, {bpm} BPM, {beats} tempos, {subdivision}",
   "metronome_subdivision_label": "Loop 1",
+  "metronome_plain_subdivision_label": "Subdivisão",
   "metronome_subdivision_option": "{name} ({count})",
   "metronome_status_sub": "SUB {count}",
   "metronome_subdivision_1": "Semínimas",
@@ -556,6 +559,7 @@
   "shortcuts_metronome_heading": "Metrônomo",
   "shortcuts_metronome_toggle": "Iniciar, pausar ou retomar",
   "shortcuts_metronome_reset": "Reiniciar",
+  "shortcuts_metronome_tap": "Marcar andamento (modo Metrônomo)",
   "shortcuts_key_space": "Espaço",
   "shortcuts_key_escape": "Esc"
 }

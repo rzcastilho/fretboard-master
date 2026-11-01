@@ -1248,7 +1248,13 @@ describe('036 plain mode: store contract', () => {
     metronome.toggle();
     await settle();
     advance(r, 0.5);
-    const plain: PlainSettings = { bpm: 100, beats: 3, countIn: false, initialCountIn: 1 };
+    const plain: PlainSettings = {
+      bpm: 100,
+      beats: 3,
+      countIn: false,
+      initialCountIn: 1,
+      subdivision: 1
+    };
     metronome.restore({
       ratios: { ...DEFAULT_SETTINGS, bpm: 120 },
       plain,
@@ -1746,5 +1752,248 @@ describe('037 Speed Training pause, resume and reset (S10, S13)', () => {
     advance(r, 2);
     expect(starts(r).length).toBe(n);
     expect(metronome.speed).toBe(record);
+  });
+});
+
+describe('038 tap tempo (S15–S20)', () => {
+  /** Tap `n` times with `gapMs` between taps on the injected clock. */
+  function taps(r: Rig, n: number, gapMs = 500): void {
+    for (let i = 0; i < n; i++) {
+      if (i > 0) r.clock.advance(gapMs);
+      metronome.tapTempo();
+    }
+  }
+
+  it('S15: does nothing outside plain mode', () => {
+    for (const mode of ['ratios', 'speed'] as const) {
+      const r = rig(true, { bpm: 100 });
+      resetMetronomeForTests({ clock: r.clock, frames: r.frames }, { bpm: 100 }, {}, mode);
+      const remember = vi.spyOn(preferences, 'remember');
+      taps(r, 6);
+      expect(remember).not.toHaveBeenCalled();
+      expect(metronome.settings.bpm).toBe(100);
+      expect(metronome.announcement).toBe('');
+      vi.restoreAllMocks();
+      vi.spyOn(performance, 'now').mockReturnValue(1000);
+    }
+  });
+
+  it('S16/S17: taps 1–3 change nothing; tap 4 commits once and announces', () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    const remember = vi.spyOn(preferences, 'remember');
+    taps(r, 3);
+    expect(remember).not.toHaveBeenCalled();
+    expect(metronome.announcement).toBe('');
+    r.clock.advance(500);
+    metronome.tapTempo();
+    expect(metronome.plain.bpm).toBe(120);
+    expect(remember).toHaveBeenCalledTimes(1);
+    expect(metronome.announcement).toBe('120 BPM');
+    // An unchanged bpm neither writes nor announces.
+    metronome.dismissSoundNotice();
+    r.clock.advance(500);
+    metronome.tapTempo();
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it('S18: a tap while running retimes in place and keeps phase, position, generation', async () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.6);
+    const { generation, position } = metronome;
+    const stopped = r.port.sources.filter((s) => s.stopCalls.length > 0).length;
+    taps(r, 4, 400);
+    expect(metronome.plain.bpm).toBe(150);
+    expect(metronome.phase).toBe('running');
+    expect(metronome.generation).toBe(generation);
+    expect(metronome.position).toBe(position);
+    expect(r.port.sources.filter((s) => s.stopCalls.length > 0).length).toBeGreaterThan(stopped);
+    advance(r, 2);
+    expect(metronome.beat).toBeGreaterThan(0);
+    metronome.screenChanged();
+  });
+
+  it('S19: paused taps only commit; resume continues at slot + 1 with the new bpm', async () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    metronome.toggle();
+    await settle();
+    advance(r, 1.2);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    const slot = metronome.position?.slot ?? -1;
+    const before = starts(r).length;
+    taps(r, 4, 300);
+    expect(metronome.plain.bpm).toBe(200);
+    expect(starts(r).length).toBe(before);
+    metronome.toggle();
+    await settle();
+    advance(r, 1.5);
+    const fresh = starts(r).slice(before);
+    expect(fresh[1] - fresh[0]).toBeCloseTo(0.3, 6);
+    expect(metronome.position?.slot).toBeGreaterThan(slot);
+    metronome.screenChanged();
+  });
+
+  it('S20: reset, selectMode, screenChanged and restore clear the run; toggle does not', async () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    const clears: Array<() => void> = [
+      () => metronome.reset(),
+      () => {
+        metronome.selectMode('ratios');
+        metronome.selectMode('plain');
+      },
+      () => metronome.screenChanged(),
+      () =>
+        metronome.restore({
+          ratios: metronome.settings,
+          plain: metronome.plain,
+          speed: metronome.speed,
+          mode: 'plain'
+        })
+    ];
+    for (const [i, clear] of clears.entries()) {
+      metronome.setBpm(100);
+      r.clock.advance(5000);
+      taps(r, 3);
+      clear();
+      r.clock.advance(100);
+      const remember = vi.spyOn(preferences, 'remember');
+      taps(r, 3);
+      expect(remember).not.toHaveBeenCalled();
+      remember.mockRestore();
+      expect(metronome.plain.bpm, `case ${i}`).toBe(100);
+      metronome.selectMode('plain');
+    }
+    // toggle keeps the run: 3 taps, start, 1 more tap → 4 taps.
+    metronome.setBpm(100);
+    r.clock.advance(5000);
+    taps(r, 3);
+    metronome.toggle();
+    await settle();
+    r.clock.advance(500);
+    metronome.tapTempo();
+    expect(metronome.plain.bpm).toBe(120);
+    metronome.screenChanged();
+  });
+});
+
+describe('038 plain subdivision: store contract', () => {
+  function subRig(plain: Partial<PlainSettings> = {}): Rig {
+    const r = rig(true, { countIn: false });
+    resetMetronomeForTests(
+      { clock: r.clock, frames: r.frames },
+      {},
+      { countIn: false, ...plain },
+      'plain'
+    );
+    return r;
+  }
+
+  it('S21: setPlainSubdivision accepts 1-4 as numbers or numeric strings', () => {
+    subRig();
+    for (const v of [2, '3', 4, '1']) {
+      metronome.setPlainSubdivision(v);
+      expect(metronome.plain.subdivision).toBe(Number(v));
+    }
+  });
+
+  it('S21: it ignores anything else, other phases and other modes', async () => {
+    const r = subRig();
+    for (const bad of [0, 5, 8, 2.5, '', 'x', null, undefined, true, {}]) {
+      metronome.setPlainSubdivision(bad);
+      expect(metronome.plain.subdivision).toBe(1);
+    }
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    metronome.setPlainSubdivision(3);
+    expect(metronome.plain.subdivision).toBe(1);
+    metronome.screenChanged();
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'ratios');
+    metronome.setPlainSubdivision(3);
+    expect(metronome.plain.subdivision).toBe(1);
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'speed');
+    metronome.setPlainSubdivision(3);
+    expect(metronome.plain.subdivision).toBe(1);
+  });
+
+  it('S21: a change remembers once; the same value does not write', () => {
+    subRig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.setPlainSubdivision(3);
+    metronome.setPlainSubdivision(3);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it('S22: a plain run clicks subdivision times per beat (Triplets at 90 BPM)', async () => {
+    const r = subRig({ bpm: 90, subdivision: 3 });
+    metronome.toggle();
+    await settle();
+    advance(r, 1.5);
+    const t = starts(r).sort((a, b) => a - b);
+    expect(t.length).toBeGreaterThanOrEqual(6);
+    for (let i = 1; i < 6; i++) expect(t[i] - t[i - 1]).toBeCloseTo(60 / 90 / 3, 6);
+    metronome.screenChanged();
+  });
+
+  it('S22: the count-in is one click per slot, whatever the subdivision', async () => {
+    const r = subRig({ bpm: 90, subdivision: 3, countIn: true, initialCountIn: 4 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.countIn).toEqual({ click: 1, total: 4 });
+    const t = starts(r).sort((a, b) => a - b);
+    advance(r, 2.5);
+    const all = starts(r).sort((a, b) => a - b);
+    expect(all[1] - all[0]).toBeCloseTo(60 / 90, 6);
+    expect(t.length).toBeGreaterThan(0);
+    metronome.screenChanged();
+  });
+
+  it('S23: sub is null for Quarter and 2/3/4 otherwise', () => {
+    subRig();
+    expect(metronome.sub).toBeNull();
+    for (const n of [2, 3, 4]) {
+      metronome.setPlainSubdivision(n);
+      expect(metronome.sub).toBe(n);
+    }
+    metronome.setPlainSubdivision(1);
+    expect(metronome.sub).toBeNull();
+  });
+
+  it('S24: Start announces the subdivision name, with and without count in', async () => {
+    subRig({ bpm: 90, subdivision: 3 });
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 90 BPM, 4 beats, 8th Triplets');
+    metronome.screenChanged();
+    subRig({ bpm: 90, subdivision: 3, countIn: true, initialCountIn: 4 });
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 90 BPM, 4 beats, 8th Triplets, count in 4');
+    metronome.screenChanged();
+  });
+
+  it('S24: Quarter keeps the 036 announcements', async () => {
+    subRig({ bpm: 90 });
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 90 BPM, 4 beats');
+    metronome.screenChanged();
+  });
+
+  it('S25: Quarter plays the same clicks as before (every beat, no extra)', async () => {
+    const r = subRig({ bpm: 120 });
+    metronome.toggle();
+    await settle();
+    advance(r, 1.9);
+    const t = starts(r).sort((a, b) => a - b);
+    for (let i = 1; i < t.length; i++) expect(t[i] - t[i - 1]).toBeCloseTo(0.5, 6);
+    metronome.screenChanged();
   });
 });

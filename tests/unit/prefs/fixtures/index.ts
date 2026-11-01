@@ -291,7 +291,7 @@ export const FIXTURES: readonly PrefsFixture[] = [
     ...defaults,
     metronome: {
       ratios: { ...DEFAULT_SETTINGS, bpm: 120 },
-      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4 },
+      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4, subdivision: 1 },
       mode: 'plain'
     }
   }),
@@ -305,7 +305,28 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('metronome-plain-invalid', {
     ...defaults,
     metronome: {
-      plain: { bpm: DEFAULT_PLAIN_SETTINGS.bpm, beats: 3, countIn: false, initialCountIn: 2 },
+      plain: {
+        bpm: DEFAULT_PLAIN_SETTINGS.bpm,
+        beats: 3,
+        countIn: false,
+        initialCountIn: 2,
+        subdivision: 1
+      },
+      mode: 'plain'
+    }
+  }),
+  // 038: plain subdivision stored, and an invalid one falling back to 1
+  fixture('metronome-plain-subdivision', {
+    ...defaults,
+    metronome: {
+      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4, subdivision: 3 },
+      mode: 'plain'
+    }
+  }),
+  fixture('metronome-plain-subdivision-invalid', {
+    ...defaults,
+    metronome: {
+      plain: { bpm: 100, beats: 3, countIn: false, initialCountIn: 2, subdivision: 1 },
       mode: 'plain'
     }
   }),
@@ -345,7 +366,7 @@ export const FIXTURES: readonly PrefsFixture[] = [
     ...defaults,
     metronome: {
       ratios: { ...DEFAULT_SETTINGS, bpm: 120, beats: 2, loop2: 5 },
-      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4 },
+      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4, subdivision: 1 },
       speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 80, targetBpm: 120, atTarget: 'stop' },
       mode: 'speed'
     }

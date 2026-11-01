@@ -10,7 +10,8 @@
     sub,
     dots,
     countIn = null,
-    speed = null
+    speed = null,
+    tap
   }: {
     beat: number;
     beats: number;
@@ -19,6 +20,8 @@
     dots: readonly DotState[];
     countIn?: CountInView | null;
     speed?: SpeedStatus | null;
+    /** 038: plain mode only. When set, the tempo is a tap-tempo button. */
+    tap?: () => void;
   } = $props();
 
   const status = $derived(statusParams(beat, beats, sub, countIn, speed));
@@ -55,7 +58,19 @@
     {/if}
   </p>
   <p class="tempo">
-    <span class="digits">{bpm}</span> <span class="unit">{m.metronome_bpm_unit()}</span>
+    {#if tap}
+      <button
+        type="button"
+        class="tap"
+        aria-label={m.metronome_tap_name({ bpm })}
+        title={m.metronome_tap_title()}
+        onclick={() => tap()}
+        ><span class="digits">{bpm}</span>
+        <span class="unit">{m.metronome_bpm_unit()}</span></button
+      >
+    {:else}
+      <span class="digits">{bpm}</span> <span class="unit">{m.metronome_bpm_unit()}</span>
+    {/if}
   </p>
   {#if countIn}
     <ol class="dots count-in" aria-hidden="true">
@@ -94,6 +109,31 @@
 
   .part {
     white-space: nowrap;
+  }
+
+  /* 038: the tempo as a tap target. Visible text stays the number; the global ring applies. */
+  .tap {
+    box-sizing: border-box;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding: var(--space-1) var(--space-3);
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .tap:active {
+    background: var(--color-surface-raised);
+  }
+
+  @media (forced-colors: active) {
+    .tap:focus-visible {
+      outline: var(--focus-ring-width) solid ButtonText;
+    }
   }
 
   .digits {

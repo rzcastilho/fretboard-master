@@ -495,7 +495,13 @@ describe('metronome mode and plain settings (036)', () => {
     const remember = vi.spyOn(preferences, 'remember');
     preferences.start(s);
     expect(metronome.mode).toBe('plain');
-    expect(metronome.plain).toEqual({ bpm: 100, beats: 3, countIn: true, initialCountIn: 4 });
+    expect(metronome.plain).toEqual({
+      bpm: 100,
+      beats: 3,
+      countIn: true,
+      initialCountIn: 4,
+      subdivision: 1
+    });
     expect(metronome.settings.bpm).toBe(120);
     expect(remember).not.toHaveBeenCalled();
   });
@@ -513,7 +519,8 @@ describe('metronome mode and plain settings (036)', () => {
       bpm: DEFAULT_PLAIN_SETTINGS.bpm,
       beats: 3,
       countIn: false,
-      initialCountIn: 2
+      initialCountIn: 2,
+      subdivision: 1
     });
     expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
   });

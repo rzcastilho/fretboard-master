@@ -9,6 +9,7 @@ import { language, resetLanguageForTests } from '../../../src/lib/state/language
 import { DEFAULT_SETTINGS } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
+import { resetShortcutsForTests, shortcuts } from '../../../src/lib/state/shortcuts.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames } from '../audio/support/fake-audio';
 
 let port: FakeAudioPort;
@@ -592,5 +593,149 @@ describe('MetronomePanel Speed Training settings view (037 US3)', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Increase loops per step' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Increase increment' }));
     expect(metronome.speed).toMatchObject({ loops: 5, increment: 6 });
+  });
+});
+
+describe('SubdivisionSelect options (038)', () => {
+  it('renders all eight options by default and only the given ones with options', async () => {
+    const { default: SubdivisionSelect } =
+      await import('../../../src/lib/tools/metronome/SubdivisionSelect.svelte');
+    const all = render(SubdivisionSelect, { id: 'a', label: 'A', value: 1, onchange: () => {} });
+    expect(all.container.querySelectorAll('option')).toHaveLength(8);
+    all.unmount();
+    const some = render(SubdivisionSelect, {
+      id: 'b',
+      label: 'B',
+      value: 1,
+      onchange: () => {},
+      options: [1, 2, 3, 4]
+    });
+    expect(
+      [...some.container.querySelectorAll('option')].map((o) => (o as HTMLOptionElement).value)
+    ).toEqual(['1', '2', '3', '4']);
+  });
+});
+
+describe('MetronomePanel tap tempo (038)', () => {
+  const tapName = (bpm: number): string => `${bpm} BPM, tap tempo`;
+  const plain = (): void =>
+    resetMetronomeForTests({ clock, frames }, undefined, { countIn: false, bpm: 100 }, 'plain');
+
+  it('plain settings and running views render a tap button wired to tapTempo()', async () => {
+    plain();
+    const tapTempo = vi.spyOn(metronome, 'tapTempo');
+    render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: tapName(100) }));
+    expect(tapTempo).toHaveBeenCalledTimes(1);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    await fireEvent.click(screen.getByRole('button', { name: tapName(100) }));
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+  });
+
+  it('Enter and Space on the focused tap button tap without toggling', async () => {
+    plain();
+    const tapTempo = vi.spyOn(metronome, 'tapTempo');
+    const toggle = vi.spyOn(metronome, 'toggle');
+    render(MetronomePanel);
+    const button = screen.getByRole('button', { name: tapName(100) });
+    button.focus();
+    await key(' ', button);
+    await key('Enter', button);
+    expect(toggle).not.toHaveBeenCalled();
+    // jsdom does not synthesize click from key presses; the native click is what taps.
+    await fireEvent.click(button);
+    expect(tapTempo).toHaveBeenCalledTimes(1);
+  });
+
+  it('T taps only in plain mode with shortcuts on', async () => {
+    plain();
+    const tapTempo = vi.spyOn(metronome, 'tapTempo');
+    render(MetronomePanel);
+    await key('t');
+    await key('T');
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+    shortcuts.choose(false);
+    await key('t');
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+    resetShortcutsForTests();
+    resetMetronomeForTests({ clock, frames }, undefined, {}, 'speed');
+    await key('t');
+    resetMetronomeForTests({ clock, frames }, { countIn: false }, {}, 'ratios');
+    await key('t');
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+  });
+
+  it('Ratios and Speed render no tap button and keep the output pill', async () => {
+    for (const mode of ['ratios', 'speed'] as const) {
+      resetMetronomeForTests({ clock, frames }, { countIn: false }, {}, mode);
+      const { container, unmount } = render(MetronomePanel);
+      expect(container.querySelector('button.tap')).toBeNull();
+      if (mode === 'ratios') {
+        expect(container.querySelector('output[aria-live="off"]')).toBeTruthy();
+        await startRun();
+        expect(container.querySelector('button.tap')).toBeNull();
+        metronome.reset();
+      }
+      unmount();
+    }
+  });
+});
+
+describe('MetronomePanel plain subdivision (038)', () => {
+  const plain = (): void =>
+    resetMetronomeForTests({ clock, frames }, undefined, { countIn: false }, 'plain');
+
+  it('shows a Subdivision select after # of Beats with the four options', () => {
+    plain();
+    render(MetronomePanel);
+    const select = screen.getByRole('combobox', { name: 'Subdivision' }) as HTMLSelectElement;
+    expect(select.id).toBe('metronome-plain-subdivision');
+    expect([...select.options].map((o) => o.value)).toEqual(['1', '2', '3', '4']);
+    const beats = screen.getByRole('slider', { name: '# of Beats' });
+    expect(beats.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('changing it calls setPlainSubdivision', async () => {
+    plain();
+    render(MetronomePanel);
+    const select = screen.getByRole('combobox', { name: 'Subdivision' }) as HTMLSelectElement;
+    await fireEvent.change(select, { target: { value: '3' } });
+    expect(metronome.plain.subdivision).toBe(3);
+  });
+
+  it('is absent while running and in Ratios and Speed', async () => {
+    plain();
+    render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    expect(screen.queryByRole('combobox', { name: 'Subdivision' })).toBeNull();
+    document.body.innerHTML = '';
+    for (const mode of ['ratios', 'speed'] as const) {
+      metronome.screenChanged();
+      resetMetronomeForTests({ clock, frames }, { countIn: false }, {}, mode);
+      const { unmount } = render(MetronomePanel);
+      expect(screen.queryByRole('combobox', { name: 'Subdivision' })).toBeNull();
+      unmount();
+    }
+  });
+
+  it('the status line gains SUB k when subdividing, and not for Quarter', async () => {
+    resetMetronomeForTests(
+      { clock, frames },
+      undefined,
+      { countIn: false, subdivision: 3 },
+      'plain'
+    );
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    expect(container.querySelector('.position')?.textContent).toMatch(/BEAT \d\/4.*SUB 3/);
   });
 });

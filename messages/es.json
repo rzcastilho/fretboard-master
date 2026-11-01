@@ -492,8 +492,11 @@
   "metronome_status_beat": "TIEMPO {beat}/{beats}",
   "metronome_status_beat_none": "TIEMPO –/{beats}",
   "metronome_bpm_unit": "BPM",
+  "metronome_tap_name": "{bpm} BPM, marcar tempo",
+  "metronome_tap_title": "Marcar tempo",
   "metronome_announce_started": "Iniciado, {bpm} BPM, {beats} tiempos, {subdivision}",
   "metronome_subdivision_label": "Bucle 1",
+  "metronome_plain_subdivision_label": "Subdivisión",
   "metronome_subdivision_option": "{name} ({count})",
   "metronome_status_sub": "SUB {count}",
   "metronome_subdivision_1": "Negras",
@@ -556,6 +559,7 @@
   "shortcuts_metronome_heading": "Metrónomo",
   "shortcuts_metronome_toggle": "Iniciar, pausar o reanudar",
   "shortcuts_metronome_reset": "Reiniciar",
+  "shortcuts_metronome_tap": "Marcar tempo (modo Metrónomo)",
   "shortcuts_key_space": "Espacio",
   "shortcuts_key_escape": "Esc"
 }

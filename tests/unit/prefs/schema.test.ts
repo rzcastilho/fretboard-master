@@ -699,7 +699,8 @@ const arbPlain: fc.Arbitrary<PlainSettings> = fc.record({
   bpm: fc.integer({ min: 30, max: 300 }),
   beats: fc.integer({ min: 1, max: 16 }),
   countIn: fc.boolean(),
-  initialCountIn: fc.integer({ min: 0, max: 8 })
+  initialCountIn: fc.integer({ min: 0, max: 8 }),
+  subdivision: fc.constantFrom(1, 2, 3, 4)
 });
 
 const arbSpeed: fc.Arbitrary<SpeedSettings> = fc
@@ -1201,7 +1202,7 @@ describe('metronome.ratios (035)', () => {
 
 describe('metronome.plain and metronome.mode (036)', () => {
   const PLAIN_ORDER = ['bpm', 'beats', 'countIn', 'initialCountIn'];
-  const storedPlain = { bpm: 100, beats: 3, countIn: false, initialCountIn: 2 };
+  const storedPlain = { bpm: 100, beats: 3, countIn: false, initialCountIn: 2, subdivision: 1 };
   const withMetronome = (metronome: unknown): string =>
     rec({ version: 1, volume: 0.35, metronome });
   const metOf = (raw: string) => parsePreferences(raw).metronome;
@@ -1343,7 +1344,7 @@ describe('metronome.plain and metronome.mode (036)', () => {
     const m = metOf(FIXTURE_BY_NAME['metronome-plain'].raw);
     expect(m).toEqual({
       ratios: { ...DEFAULT_SETTINGS, bpm: 120 },
-      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4 },
+      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4, subdivision: 1 },
       speed: DEFAULT_SPEED_SETTINGS,
       mode: 'plain'
     });
@@ -1552,5 +1553,71 @@ describe('metronome.speed (037)', () => {
     expect([...METRONOME_MODES]).toEqual([...STATE_MODES]);
     expect(METRONOME_LIMITS.increment).toEqual([1, 20]);
     expect(METRONOME_LIMITS.loops).toEqual([1, 16]);
+  });
+});
+
+describe('metronome.plain.subdivision (038)', () => {
+  const rec2 = (plain: unknown): string =>
+    JSON.stringify({ version: 1, volume: 0.35, metronome: { plain, mode: 'plain' } });
+  const plainOf = (raw: string) => parsePreferences(raw).metronome.plain;
+  const four = { bpm: 100, beats: 3, countIn: true, initialCountIn: 4 };
+
+  it('C19: an absent subdivision parses to 1 and keeps the other fields', () => {
+    expect(plainOf(rec2(four))).toEqual({ ...four, subdivision: 1 });
+  });
+
+  it('C20: the integers 1-4 parse as-is', () => {
+    for (const n of [1, 2, 3, 4]) {
+      expect(plainOf(rec2({ ...four, subdivision: n })).subdivision).toBe(n);
+    }
+  });
+
+  it('C21: anything else parses to 1 and never throws', () => {
+    for (const bad of ['3', 2.5, 0, 5, -1, null, true, {}, []]) {
+      expect(plainOf(rec2({ ...four, subdivision: bad }))).toEqual({ ...four, subdivision: 1 });
+    }
+  });
+
+  it('C22: a subdivision-1 plain record serializes without subdivision (as 037)', () => {
+    const p = {
+      ...DEFAULT_PREFERENCES,
+      metronome: {
+        ...DEFAULT_PREFERENCES.metronome,
+        plain: { ...DEFAULT_PLAIN_SETTINGS, beats: 3 }
+      }
+    };
+    expect(JSON.parse(serializePreferences(p)).metronome.plain).toEqual({
+      bpm: 85,
+      beats: 3,
+      countIn: true,
+      initialCountIn: 4
+    });
+  });
+
+  it('C23: a record differing only in subdivision is written, after initialCountIn', () => {
+    const p = {
+      ...DEFAULT_PREFERENCES,
+      metronome: {
+        ...DEFAULT_PREFERENCES.metronome,
+        plain: { ...DEFAULT_PLAIN_SETTINGS, subdivision: 3 as const }
+      }
+    };
+    const o = JSON.parse(serializePreferences(p)).metronome.plain;
+    expect(Object.keys(o)).toEqual(['bpm', 'beats', 'countIn', 'initialCountIn', 'subdivision']);
+    expect(o.subdivision).toBe(3);
+  });
+
+  it('C24: the defaults mirror DEFAULT_PLAIN_SETTINGS', () => {
+    expect(METRONOME_PLAIN_DEFAULTS).toEqual(DEFAULT_PLAIN_SETTINGS);
+    expect(METRONOME_PLAIN_DEFAULTS.subdivision).toBe(1);
+  });
+
+  it('C25: the fixtures parse as expected', () => {
+    for (const name of ['metronome-plain-subdivision', 'metronome-plain-subdivision-invalid']) {
+      const f = FIXTURE_BY_NAME[name];
+      expect(parsePreferences(f.raw).metronome.plain).toEqual(f.expected.metronome?.plain);
+    }
+    const raw = FIXTURE_BY_NAME['metronome-plain-subdivision'].raw;
+    expect(serializePreferences(parsePreferences(raw))).toBe(raw);
   });
 });

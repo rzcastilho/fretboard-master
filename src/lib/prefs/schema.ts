@@ -122,7 +122,8 @@ export const METRONOME_PLAIN_DEFAULTS = Object.freeze({
   bpm: 85,
   beats: 4,
   countIn: true,
-  initialCountIn: 4
+  initialCountIn: 4,
+  subdivision: 1
 }) satisfies PlainSettings;
 
 /** 037: mirror of `DEFAULT_SPEED_SETTINGS` (unit-tested parity). */
@@ -256,7 +257,9 @@ const plainSchema = v.object({
   bpm: v.fallback(intIn(L.bpm), p0.bpm),
   beats: v.fallback(intIn(L.beats), p0.beats),
   countIn: v.fallback(v.boolean(), p0.countIn),
-  initialCountIn: v.fallback(intIn(L.count), p0.initialCountIn)
+  initialCountIn: v.fallback(intIn(L.count), p0.initialCountIn),
+  /** 038: only the integers 1–4; absent or anything else reads as 1. */
+  subdivision: v.fallback(v.picklist([1, 2, 3, 4] as const), p0.subdivision as 1 | 2 | 3 | 4)
 });
 
 function parsePlain(metronome: unknown): PlainSettings {
@@ -408,7 +411,8 @@ function metronomeRecord(x: Preferences['metronome']): { metronome?: object } {
             bpm: x.plain.bpm,
             beats: x.plain.beats,
             countIn: x.plain.countIn,
-            initialCountIn: x.plain.initialCountIn
+            initialCountIn: x.plain.initialCountIn,
+            ...(x.plain.subdivision === 1 ? {} : { subdivision: x.plain.subdivision })
           }
         }),
     ...(isDefaultSpeed(x.speed)

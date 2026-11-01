@@ -6,6 +6,7 @@ import {
   METRONOME_MODES,
   plainRunPlan,
   toMode,
+  toPlainSubdivision,
   type PlainSettings,
   DEFAULT_LOOP2,
   DEFAULT_SUBDIVISION,
@@ -175,7 +176,13 @@ describe('plain metronome settings (036)', () => {
   });
 
   it('DEFAULT_PLAIN_SETTINGS is frozen 85 / 4 / count in on / 4', () => {
-    expect(DEFAULT_PLAIN_SETTINGS).toEqual({ bpm: 85, beats: 4, countIn: true, initialCountIn: 4 });
+    expect(DEFAULT_PLAIN_SETTINGS).toEqual({
+      bpm: 85,
+      beats: 4,
+      countIn: true,
+      initialCountIn: 4,
+      subdivision: 1
+    });
     expect(Object.isFrozen(DEFAULT_PLAIN_SETTINGS)).toBe(true);
   });
 
@@ -184,6 +191,22 @@ describe('plain metronome settings (036)', () => {
     expect(plan).toEqual({ clicksPerBeat: 1, initialCountIn: 4 });
     expect('alternate' in plan).toBe(false);
     expect(plainRunPlan({ ...DEFAULT_PLAIN_SETTINGS, countIn: false }).initialCountIn).toBe(0);
+  });
+
+  it('plainRunPlan uses the subdivision as clicks per beat (038)', () => {
+    for (const n of [1, 2, 3, 4] as const) {
+      expect(plainRunPlan({ ...DEFAULT_PLAIN_SETTINGS, subdivision: n }).clicksPerBeat).toBe(n);
+    }
+  });
+
+  it('toPlainSubdivision accepts 1-4 and returns null otherwise (038)', () => {
+    for (const n of [1, 2, 3, 4]) {
+      expect(toPlainSubdivision(n)).toBe(n);
+      expect(toPlainSubdivision(String(n))).toBe(n);
+    }
+    for (const bad of [0, 5, 8, 2.5, -1, '', ' ', 'x', null, undefined, true, {}, []]) {
+      expect(toPlainSubdivision(bad)).toBeNull();
+    }
   });
 
   it('effectiveCountIn accepts a PlainSettings', () => {

@@ -46,6 +46,10 @@
     <dt><kbd>{m.shortcuts_key_escape()}</kbd></dt>
     <dd>{m.shortcuts_metronome_reset()}</dd>
   </div>
+  <div>
+    <dt><kbd>{'T'}</kbd></dt>
+    <dd>{m.shortcuts_metronome_tap()}</dd>
+  </div>
 </dl>
 
 <label class="toggle-row">

@@ -492,8 +492,11 @@
   "metronome_status_beat": "BEAT {beat}/{beats}",
   "metronome_status_beat_none": "BEAT –/{beats}",
   "metronome_bpm_unit": "BPM",
+  "metronome_tap_name": "{bpm} BPM, tap tempo",
+  "metronome_tap_title": "Tap tempo",
   "metronome_announce_started": "Started, {bpm} BPM, {beats} beats, {subdivision}",
   "metronome_subdivision_label": "Loop 1",
+  "metronome_plain_subdivision_label": "Subdivision",
   "metronome_subdivision_option": "{name} ({count})",
   "metronome_status_sub": "SUB {count}",
   "metronome_subdivision_1": "Quarter notes",
@@ -556,6 +559,7 @@
   "shortcuts_metronome_heading": "Metronome",
   "shortcuts_metronome_toggle": "Start, pause or resume",
   "shortcuts_metronome_reset": "Reset",
+  "shortcuts_metronome_tap": "Tap tempo (Metronome mode)",
   "shortcuts_key_space": "Space",
   "shortcuts_key_escape": "Esc"
 }

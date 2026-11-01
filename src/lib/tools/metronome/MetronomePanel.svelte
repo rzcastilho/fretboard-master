@@ -6,11 +6,13 @@
   import { matchMetronomeKey } from '$lib/state/metronome-keys';
   import { metronome } from '$lib/state/metronome.svelte';
   import { toShortcutEvent } from '$lib/state/shortcuts';
+  import { shortcuts } from '$lib/state/shortcuts.svelte';
   import AtTargetSelect from './AtTargetSelect.svelte';
   import ModeTabs from './ModeTabs.svelte';
   import CountInSettings from './CountInSettings.svelte';
   import RunControls from './RunControls.svelte';
   import StatusBox from './StatusBox.svelte';
+  import SubdivisionSelect from './SubdivisionSelect.svelte';
   import RatioSettings from './RatioSettings.svelte';
   import ValueRow from './ValueRow.svelte';
 
@@ -54,11 +56,17 @@
         targetActivates:
           target?.closest('button, a[href], summary, [role="button"], [role="switch"]') != null
       },
-      { phase: metronome.phase, disclosureOpen: disclosureOpen() }
+      {
+        phase: metronome.phase,
+        disclosureOpen: disclosureOpen(),
+        mode: metronome.mode,
+        shortcuts: shortcuts.enabled
+      }
     );
     if (action === null) return;
     event.preventDefault();
-    if (action === 'toggle') {
+    if (action === 'tap') metronome.tapTempo();
+    else if (action === 'toggle') {
       if (metronome.phase === 'settings') void start();
       else metronome.toggle();
     } else void reset();
@@ -89,6 +97,7 @@
           increaseLabel={m.metronome_bpm_increase()}
           onset={(v) => metronome.setBpm(v)}
           onstep={(d) => metronome.stepBpm(d)}
+          tap={metronome.mode === 'plain' ? () => metronome.tapTempo() : undefined}
         />
         <ValueRow
           id="metronome-beats"
@@ -102,6 +111,15 @@
           onset={(v) => metronome.setBeats(v)}
           onstep={(d) => metronome.stepBeats(d)}
         />
+        {#if metronome.mode === 'plain'}
+          <SubdivisionSelect
+            id="metronome-plain-subdivision"
+            label={m.metronome_plain_subdivision_label()}
+            value={metronome.plain.subdivision}
+            options={[1, 2, 3, 4]}
+            onchange={metronome.setPlainSubdivision}
+          />
+        {/if}
         <CountInSettings
           settings={metronome.current}
           repeat={metronome.mode === 'ratios'}
@@ -211,6 +229,7 @@
         dots={metronome.dots}
         countIn={metronome.countIn}
         speed={metronome.speedStatus}
+        tap={metronome.mode === 'plain' ? () => metronome.tapTempo() : undefined}
       />
       <RunControls
         phase={metronome.phase}

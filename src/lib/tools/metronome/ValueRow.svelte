@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { m } from '$lib/paraglide/messages.js';
+
   let {
     id,
     label,
@@ -10,7 +12,8 @@
     decreaseLabel,
     increaseLabel,
     onset,
-    onstep
+    onstep,
+    tap
   }: {
     id: string;
     label: string;
@@ -24,6 +27,8 @@
     increaseLabel: string;
     onset: (v: number) => void;
     onstep: (dir: 1 | -1) => void;
+    /** 038: plain-mode BPM only. When set, the value is a tap-tempo button. */
+    tap?: () => void;
   } = $props();
 
   const MINUS = '−';
@@ -68,7 +73,17 @@
       disabled={value <= (floor ?? min)}
       onclick={() => onstep(-1)}>{MINUS}</button
     >
-    <output aria-live="off" for={id}>{value}</output>
+    {#if tap}
+      <button
+        type="button"
+        class="tap"
+        aria-label={m.metronome_tap_name({ bpm: value })}
+        title={m.metronome_tap_title()}
+        onclick={() => tap()}>{value}</button
+      >
+    {:else}
+      <output aria-live="off" for={id}>{value}</output>
+    {/if}
     <button
       type="button"
       class="btn step"
@@ -124,6 +139,35 @@
   output {
     min-inline-size: 3ch;
     text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 038: the tempo as a tap target. Visible text stays the number; the global ring applies. */
+  .tap {
+    box-sizing: border-box;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding: 0 var(--space-1);
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .tap:active {
+    background: var(--color-surface-raised);
+  }
+
+  @media (forced-colors: active) {
+    .tap:focus-visible {
+      outline: var(--focus-ring-width) solid ButtonText;
+    }
+  }
+
+  .tap {
     font-variant-numeric: tabular-nums;
   }
 
