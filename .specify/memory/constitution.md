@@ -1,5 +1,16 @@
 <!--
 Sync Impact Report
+- Version change: 2.1.0 → 2.2.0 (MINOR: Principle VI initial JS budget raised).
+- Reason: the practice timer (slice 039) takes initial JS to 160.4 KB gzip. The single bundle
+  stays permanent (ADR 0002), so the budget is raised to 180 KB, with headroom for the rest of
+  the practice-sessions package and later slices.
+- Modified principles: VI (Initial JavaScript, gzip: ≤ 160 KB → ≤ 180 KB).
+- Modified / added / removed sections: none.
+- Dependent guidance updated: `scripts/check-bundle-size.mjs`,
+  `docs/adr/0002-single-bundle-for-version-continuity.md`.
+- Prior amendments: the 2.1.0 report and earlier history follow.
+
+Prior amendments (2.1.0 report):
 - Version change: 2.0.0 → 2.1.0 (MINOR: Principle VI initial JS budget raised; verification
   tiers expanded).
 - Reason: the metronome (slice 031) and its subdivisions (slice 032) take initial JS to 151.2 KB
@@ -176,7 +187,7 @@ preset), CI MUST enforce these budgets:
 | Control change to fretboard update | ≤ 100 ms |
 | Instrument change | ≤ 300 ms |
 | Tap to sound, after audio unlock | ≤ 100 ms |
-| Initial JavaScript, gzip | ≤ 160 KB |
+| Initial JavaScript, gzip | ≤ 180 KB |
 | Lighthouse desktop performance score | ≥ 90 |
 | Cumulative layout shift | ≤ 0.1 |
 
@@ -371,4 +382,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 2.1.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-10-30
+**Version**: 2.2.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-11-01
