@@ -69,3 +69,36 @@ describe('display model for positions (034, data-model §7)', () => {
     expect(beatDots(4, 1)).toEqual(['lit', 'upcoming', 'upcoming', 'upcoming']);
   });
 });
+
+describe('plain mode status (036)', () => {
+  it('a null sub yields no SUB part', () => {
+    expect(statusParams(2, 4, null)).toEqual({ kind: 'beat', beat: 2, beats: 4, sub: null });
+    expect(statusParams(0, 4, null)).toEqual({ kind: 'none', beats: 4, sub: null });
+  });
+  it('count-in branches ignore sub', () => {
+    expect(statusParams(0, 4, null, { click: 2, total: 4 })).toEqual({
+      kind: 'count-in',
+      click: 2,
+      total: 4
+    });
+  });
+});
+
+describe('Speed Training status (037)', () => {
+  const step = { kind: 'step', step: 2, steps: 9, loop: 3, loops: 4 } as const;
+  it('maps a step and the hold', () => {
+    expect(statusParams(1, 4, null, null, step)).toEqual(step);
+    expect(statusParams(1, 4, null, null, { kind: 'hold', steps: 9 })).toEqual({
+      kind: 'hold',
+      steps: 9
+    });
+  });
+  it('a count-in wins over the step, and null speed keeps the beat model', () => {
+    expect(statusParams(0, 4, null, { click: 2, total: 4 }, step)).toEqual({
+      kind: 'count-in',
+      click: 2,
+      total: 4
+    });
+    expect(statusParams(2, 4, 3, null, null)).toEqual(statusParams(2, 4, 3));
+  });
+});

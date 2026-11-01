@@ -22,6 +22,8 @@ export type SlotPosition =
       readonly total: number;
       readonly repeat: boolean;
       readonly next: 1 | 2;
+      /** Speed Training only (037): present on slots of a ramp run. */
+      readonly ramp?: { readonly step: number; readonly steps: number; readonly bpm: number };
     }
   | {
       readonly kind: 'beat';
@@ -29,6 +31,15 @@ export type SlotPosition =
       readonly beat: number;
       readonly loop: 1 | 2;
       readonly clicksPerBeat: number;
+      /** Speed Training only (037): present on slots of a ramp run. */
+      readonly ramp?: {
+        readonly step: number;
+        readonly steps: number;
+        readonly loop: number;
+        readonly loops: number;
+        readonly hold: boolean;
+        readonly bpm: number;
+      };
     };
 
 export interface CycleClick {

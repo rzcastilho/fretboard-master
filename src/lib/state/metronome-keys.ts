@@ -1,7 +1,10 @@
-/** Metronome page keys: Space toggles, Escape resets (031, research R-11). Pure and DOM-free. */
+/**
+ * Metronome page keys: Space toggles, Escape resets (031, research R-11), T taps the tempo in
+ * plain mode when shortcuts are on (038). Pure and DOM-free.
+ */
 import type { ShortcutEventLike } from './shortcuts';
 
-export type MetronomeKeyAction = 'toggle' | 'reset';
+export type MetronomeKeyAction = 'toggle' | 'reset' | 'tap';
 
 export type MetronomePhase = 'settings' | 'starting' | 'running' | 'paused';
 
@@ -42,7 +45,12 @@ function activatesNatively(t: NonNullable<ShortcutEventLike['target']>): boolean
 
 export function matchMetronomeKey(
   e: ShortcutEventLike & { readonly targetActivates?: boolean },
-  ctx: { readonly phase: MetronomePhase; readonly disclosureOpen: boolean }
+  ctx: {
+    readonly phase: MetronomePhase;
+    readonly disclosureOpen: boolean;
+    readonly mode: string;
+    readonly shortcuts: boolean;
+  }
 ): MetronomeKeyAction | null {
   if (e.ctrlKey || e.metaKey || e.altKey) return null;
   if (e.getModifierState?.('AltGraph')) return null;
@@ -55,6 +63,9 @@ export function matchMetronomeKey(
   }
   if (e.key === 'Escape') {
     return ctx.phase !== 'settings' && !ctx.disclosureOpen ? 'reset' : null;
+  }
+  if (e.key === 't' || e.key === 'T') {
+    return ctx.mode === 'plain' && ctx.shortcuts && !ctx.disclosureOpen ? 'tap' : null;
   }
   return null;
 }

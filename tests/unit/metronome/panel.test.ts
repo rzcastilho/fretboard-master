@@ -9,6 +9,7 @@ import { language, resetLanguageForTests } from '../../../src/lib/state/language
 import { DEFAULT_SETTINGS } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
+import { resetShortcutsForTests, shortcuts } from '../../../src/lib/state/shortcuts.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames } from '../audio/support/fake-audio';
 
 let port: FakeAudioPort;
@@ -182,6 +183,29 @@ describe('MetronomePanel run controls', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
     await settle();
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Start Training' }));
+  });
+
+  it('focus moves to Start Training when finished grows; mount never steals focus', async () => {
+    resetMetronomeForTests({ clock, frames }, {}, {}, 'speed', {
+      startBpm: 100,
+      targetBpm: 105,
+      increment: 5,
+      loops: 1,
+      beats: 1,
+      countIn: false,
+      atTarget: 'stop'
+    });
+    render(MetronomePanel);
+    await settle();
+    expect(document.activeElement).toBe(document.body);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
+    await settle();
+    advance(3);
+    await settle();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.finished).toBe(1);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Start Training' }));
+    expect(screen.getByRole('radio', { name: 'Stop' })).toBeTruthy();
   });
 
   it('focus stays on the main button across Pause ⇄ Resume', async () => {
@@ -386,5 +410,332 @@ describe('MetronomePanel alternating ratios (034)', () => {
     expect(dots).toHaveLength(4);
     expect(dots[0]).toBe('lit');
     expect(dots.slice(1).every((s) => s === 'upcoming')).toBe(true);
+  });
+});
+
+describe('MetronomePanel mode tabs (036)', () => {
+  it('renders the tab bar first, with no visible heading, and a labelled tabpanel', () => {
+    const { container } = render(MetronomePanel);
+    const section = container.querySelector('section.panel') as HTMLElement;
+    expect(section.firstElementChild?.getAttribute('role')).toBe('tablist');
+    expect(container.querySelector('h2')).toBeNull();
+    expect(section.getAttribute('data-mode')).toBe('ratios');
+    expect(section.getAttribute('data-phase')).toBe('settings');
+    const panel = screen.getByRole('tabpanel', { name: 'Ratios Training' });
+    expect(panel.id).toBe('metronome-mode-panel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('metronome-tab-ratios');
+  });
+
+  it('keeps the tab bar first while running and paused', async () => {
+    const { container } = render(MetronomePanel);
+    await startRun();
+    const section = container.querySelector('section.panel') as HTMLElement;
+    expect(section.firstElementChild?.getAttribute('role')).toBe('tablist');
+    expect(section.getAttribute('data-phase')).toBe('running');
+    await fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(section.firstElementChild?.getAttribute('role')).toBe('tablist');
+    expect(section.getAttribute('data-phase')).toBe('paused');
+  });
+
+  it('clicking the other tab calls selectMode', async () => {
+    render(MetronomePanel);
+    const select = vi.spyOn(metronome, 'selectMode');
+    await fireEvent.click(screen.getByRole('tab', { name: 'Metronome' }));
+    expect(select).toHaveBeenCalledWith('plain');
+    expect(metronome.mode).toBe('plain');
+  });
+});
+
+describe('MetronomePanel plain mode (036)', () => {
+  beforeEach(() => {
+    resetMetronomeForTests({ clock, frames }, undefined, { countIn: false }, 'plain');
+  });
+
+  it('shows BPM, beats, count in, initial count in and a Start button only', () => {
+    render(MetronomePanel);
+    const labels = [
+      ...document.querySelectorAll('[role="tabpanel"] label, [role="tabpanel"] button')
+    ].map((e) => e.textContent?.trim() ?? '');
+    expect(screen.getByRole('slider', { name: 'BPM' })).toBeTruthy();
+    expect(screen.getByRole('slider', { name: '# of Beats' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Count In' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start Training' })).toBeNull();
+    expect(screen.queryByRole('slider', { name: 'Repeat Count In' })).toBeNull();
+    expect(screen.queryByText(/Loop 1/)).toBeNull();
+    expect(labels.length).toBeGreaterThan(0);
+  });
+
+  it('shows Initial Count In after the Count In switch when on', () => {
+    metronome.setCountIn(true);
+    render(MetronomePanel);
+    expect(screen.getByRole('slider', { name: 'Initial Count In' })).toBeTruthy();
+    expect(screen.queryByRole('slider', { name: 'Repeat Count In' })).toBeNull();
+  });
+
+  it('keeps Start Training in Ratios mode', () => {
+    resetMetronomeForTests({ clock, frames }, { countIn: false });
+    render(MetronomePanel);
+    expect(screen.getByRole('button', { name: 'Start Training' })).toBeTruthy();
+  });
+
+  it('runs with BEAT n/N and no SUB part', async () => {
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    const pos = container.querySelector('.position')?.textContent ?? '';
+    expect(pos).toMatch(/BEAT \d\/4/);
+    expect(pos).not.toMatch(/SUB/);
+    expect(container.querySelectorAll('.dot')).toHaveLength(4);
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+  });
+});
+
+describe('MetronomePanel Speed Training run (037)', () => {
+  const position = (c: HTMLElement): string =>
+    c.querySelector('.position')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+  beforeEach(() => {
+    resetMetronomeForTests({ clock, frames }, {}, {}, 'speed', {
+      startBpm: 80,
+      targetBpm: 100,
+      beats: 3,
+      countIn: false
+    });
+  });
+
+  it('shows no BPM row, ratio section or Loop rows in the settings view', () => {
+    const { container } = render(MetronomePanel);
+    expect(container.querySelector('[data-mode="speed"]')).toBeTruthy();
+    expect(container.querySelector('#metronome-bpm')).toBeNull();
+    expect(screen.queryByText('Subdivision ratio')).toBeNull();
+    expect(screen.queryByText('Loop 1')).toBeNull();
+    expect(screen.queryByText('Loop 2')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Start Training' })).toBeTruthy();
+  });
+
+  it('reads STEP s/S · LOOP l/L, the speed tempo and the speed beats while running', async () => {
+    const { container } = render(MetronomePanel);
+    await startRun();
+    expect(position(container)).toBe('STEP 1/5 · LOOP 1/4');
+    expect(container.querySelector('.digits')?.textContent).toBe('80');
+    expect(container.querySelectorAll('.dot')).toHaveLength(3);
+    advance(3 * 4 * (60 / 80) + 0.1);
+    await settle();
+    expect(position(container)).toBe('STEP 2/5 · LOOP 1/4');
+    expect(container.querySelector('.digits')?.textContent).toBe('85');
+  });
+});
+
+describe('MetronomePanel Speed Training settings view (037 US3)', () => {
+  beforeEach(() => {
+    resetMetronomeForTests({ clock, frames }, {}, {}, 'speed');
+  });
+
+  it('lists the rows in order with the first-use defaults', () => {
+    const { container } = render(MetronomePanel);
+    const panel = container.querySelector('#metronome-mode-panel') as HTMLElement;
+    const order = [...panel.querySelectorAll('input[type="range"], legend, button.start')].map(
+      (e) =>
+        e instanceof HTMLInputElement
+          ? (e.labels?.[0]?.textContent?.trim() ?? e.id)
+          : (e.textContent?.trim() ?? '')
+    );
+    expect(order).toEqual([
+      'Start BPM',
+      'Target BPM',
+      'Increment',
+      'Loops per step',
+      '# of Beats',
+      'Initial Count In',
+      'Repeat Count In',
+      'At target',
+      'Start Training'
+    ]);
+    const value = (id: string) => (container.querySelector(`#${id}`) as HTMLInputElement).value;
+    expect(value('metronome-start-bpm')).toBe('85');
+    expect(value('metronome-target-bpm')).toBe('125');
+    expect(value('metronome-increment')).toBe('5');
+    expect(value('metronome-loops')).toBe('4');
+    expect(value('metronome-beats')).toBe('4');
+    expect(value('metronome-initial-count-in')).toBe('4');
+    expect(value('metronome-repeat-count-in')).toBe('2');
+    expect(screen.getByRole('switch', { name: /Count In/ }).getAttribute('aria-checked')).toBe(
+      'true'
+    );
+    expect((screen.getByRole('radio', { name: 'Hold' }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('hides Initial and Repeat Count In while the switch is off', () => {
+    metronome.setCountIn(false);
+    const { container } = render(MetronomePanel);
+    expect(container.querySelector('#metronome-initial-count-in')).toBeNull();
+    expect(container.querySelector('#metronome-repeat-count-in')).toBeNull();
+  });
+
+  it('disables Target − when Target equals Start, and snaps the slider back', async () => {
+    resetMetronomeForTests({ clock, frames }, {}, {}, 'speed', { startBpm: 100, targetBpm: 100 });
+    const { container } = render(MetronomePanel);
+    expect(
+      (screen.getByRole('button', { name: 'Decrease target BPM' }) as HTMLButtonElement).disabled
+    ).toBe(true);
+    const target = container.querySelector('#metronome-target-bpm') as HTMLInputElement;
+    await fireEvent.input(target, { target: { value: '60' } });
+    await settle();
+    expect(metronome.speed.targetBpm).toBe(100);
+    expect(target.value).toBe('100');
+  });
+
+  it('editing a row updates the store', async () => {
+    render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Increase loops per step' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Increase increment' }));
+    expect(metronome.speed).toMatchObject({ loops: 5, increment: 6 });
+  });
+});
+
+describe('SubdivisionSelect options (038)', () => {
+  it('renders all eight options by default and only the given ones with options', async () => {
+    const { default: SubdivisionSelect } =
+      await import('../../../src/lib/tools/metronome/SubdivisionSelect.svelte');
+    const all = render(SubdivisionSelect, { id: 'a', label: 'A', value: 1, onchange: () => {} });
+    expect(all.container.querySelectorAll('option')).toHaveLength(8);
+    all.unmount();
+    const some = render(SubdivisionSelect, {
+      id: 'b',
+      label: 'B',
+      value: 1,
+      onchange: () => {},
+      options: [1, 2, 3, 4]
+    });
+    expect(
+      [...some.container.querySelectorAll('option')].map((o) => (o as HTMLOptionElement).value)
+    ).toEqual(['1', '2', '3', '4']);
+  });
+});
+
+describe('MetronomePanel tap tempo (038)', () => {
+  const tapName = (bpm: number): string => `${bpm} BPM, tap tempo`;
+  const plain = (): void =>
+    resetMetronomeForTests({ clock, frames }, undefined, { countIn: false, bpm: 100 }, 'plain');
+
+  it('plain settings and running views render a tap button wired to tapTempo()', async () => {
+    plain();
+    const tapTempo = vi.spyOn(metronome, 'tapTempo');
+    render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: tapName(100) }));
+    expect(tapTempo).toHaveBeenCalledTimes(1);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    await fireEvent.click(screen.getByRole('button', { name: tapName(100) }));
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+  });
+
+  it('Enter and Space on the focused tap button tap without toggling', async () => {
+    plain();
+    const tapTempo = vi.spyOn(metronome, 'tapTempo');
+    const toggle = vi.spyOn(metronome, 'toggle');
+    render(MetronomePanel);
+    const button = screen.getByRole('button', { name: tapName(100) });
+    button.focus();
+    await key(' ', button);
+    await key('Enter', button);
+    expect(toggle).not.toHaveBeenCalled();
+    // jsdom does not synthesize click from key presses; the native click is what taps.
+    await fireEvent.click(button);
+    expect(tapTempo).toHaveBeenCalledTimes(1);
+  });
+
+  it('T taps only in plain mode with shortcuts on', async () => {
+    plain();
+    const tapTempo = vi.spyOn(metronome, 'tapTempo');
+    render(MetronomePanel);
+    await key('t');
+    await key('T');
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+    shortcuts.choose(false);
+    await key('t');
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+    resetShortcutsForTests();
+    resetMetronomeForTests({ clock, frames }, undefined, {}, 'speed');
+    await key('t');
+    resetMetronomeForTests({ clock, frames }, { countIn: false }, {}, 'ratios');
+    await key('t');
+    expect(tapTempo).toHaveBeenCalledTimes(2);
+  });
+
+  it('Ratios and Speed render no tap button and keep the output pill', async () => {
+    for (const mode of ['ratios', 'speed'] as const) {
+      resetMetronomeForTests({ clock, frames }, { countIn: false }, {}, mode);
+      const { container, unmount } = render(MetronomePanel);
+      expect(container.querySelector('button.tap')).toBeNull();
+      if (mode === 'ratios') {
+        expect(container.querySelector('output[aria-live="off"]')).toBeTruthy();
+        await startRun();
+        expect(container.querySelector('button.tap')).toBeNull();
+        metronome.reset();
+      }
+      unmount();
+    }
+  });
+});
+
+describe('MetronomePanel plain subdivision (038)', () => {
+  const plain = (): void =>
+    resetMetronomeForTests({ clock, frames }, undefined, { countIn: false }, 'plain');
+
+  it('shows a Subdivision select after # of Beats with the four options', () => {
+    plain();
+    render(MetronomePanel);
+    const select = screen.getByRole('combobox', { name: 'Subdivision' }) as HTMLSelectElement;
+    expect(select.id).toBe('metronome-plain-subdivision');
+    expect([...select.options].map((o) => o.value)).toEqual(['1', '2', '3', '4']);
+    const beats = screen.getByRole('slider', { name: '# of Beats' });
+    expect(beats.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('changing it calls setPlainSubdivision', async () => {
+    plain();
+    render(MetronomePanel);
+    const select = screen.getByRole('combobox', { name: 'Subdivision' }) as HTMLSelectElement;
+    await fireEvent.change(select, { target: { value: '3' } });
+    expect(metronome.plain.subdivision).toBe(3);
+  });
+
+  it('is absent while running and in Ratios and Speed', async () => {
+    plain();
+    render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    expect(screen.queryByRole('combobox', { name: 'Subdivision' })).toBeNull();
+    document.body.innerHTML = '';
+    for (const mode of ['ratios', 'speed'] as const) {
+      metronome.screenChanged();
+      resetMetronomeForTests({ clock, frames }, { countIn: false }, {}, mode);
+      const { unmount } = render(MetronomePanel);
+      expect(screen.queryByRole('combobox', { name: 'Subdivision' })).toBeNull();
+      unmount();
+    }
+  });
+
+  it('the status line gains SUB k when subdividing, and not for Quarter', async () => {
+    resetMetronomeForTests(
+      { clock, frames },
+      undefined,
+      { countIn: false, subdivision: 3 },
+      'plain'
+    );
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    expect(container.querySelector('.position')?.textContent).toMatch(/BEAT \d\/4.*SUB 3/);
   });
 });

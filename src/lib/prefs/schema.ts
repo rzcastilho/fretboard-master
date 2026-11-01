@@ -24,7 +24,13 @@ import type { CagedLabelType } from '$lib/state/caged-view';
 import type { TriadsLabelType } from '$lib/state/triads-view';
 import type { ToolId } from '$lib/shell/tools';
 import type { Tempo } from '$lib/state/listen';
-import type { MetronomeSettings, Subdivision } from '$lib/state/metronome-settings';
+import type {
+  MetronomeMode,
+  MetronomeSettings,
+  PlainSettings,
+  SpeedSettings,
+  Subdivision
+} from '$lib/state/metronome-settings';
 import { LANGUAGE_TAGS, type LanguageTag } from '$lib/i18n/languages';
 import {
   ACCIDENTAL_POLICIES,
@@ -73,8 +79,16 @@ export interface Preferences {
   readonly theme: Theme | null;
   /** 027; absent or invalid in a stored record → true. Stored only when false, last. */
   readonly shortcuts: boolean;
-  /** 035; absent or invalid in a stored record → the defaults, per field. Stored last, only when non-default. */
-  readonly metronome: { readonly ratios: MetronomeSettings };
+  /**
+   * 035/036; absent or invalid in a stored record → the defaults, per field. Stored last, only
+   * when non-default: `ratios`, then `plain`, then `speed` (037), then `mode` (`"plain"` or `"speed"`).
+   */
+  readonly metronome: {
+    readonly ratios: MetronomeSettings;
+    readonly plain: PlainSettings;
+    readonly speed: SpeedSettings;
+    readonly mode: MetronomeMode;
+  };
 }
 
 export const PREFS_VERSION = 1 as const;
@@ -103,11 +117,41 @@ export const METRONOME_RATIOS_DEFAULTS = Object.freeze({
   loop2: 6
 }) satisfies MetronomeSettings;
 
+/** 036: mirrors of `DEFAULT_PLAIN_SETTINGS` and `METRONOME_MODES` (unit-tested parity). */
+export const METRONOME_PLAIN_DEFAULTS = Object.freeze({
+  bpm: 85,
+  beats: 4,
+  countIn: true,
+  initialCountIn: 4,
+  subdivision: 1
+}) satisfies PlainSettings;
+
+/** 037: mirror of `DEFAULT_SPEED_SETTINGS` (unit-tested parity). */
+export const METRONOME_SPEED_DEFAULTS = Object.freeze({
+  startBpm: 85,
+  targetBpm: 125,
+  increment: 5,
+  loops: 4,
+  beats: 4,
+  countIn: true,
+  initialCountIn: 4,
+  repeatCountIn: 2,
+  atTarget: 'hold'
+}) satisfies SpeedSettings;
+
+export const METRONOME_MODES = [
+  'plain',
+  'speed',
+  'ratios'
+] as const satisfies readonly MetronomeMode[];
+
 export const METRONOME_LIMITS = Object.freeze({
   bpm: [30, 300],
   beats: [1, 16],
   count: [0, 8],
-  loop: [1, 8]
+  loop: [1, 8],
+  increment: [1, 20],
+  loops: [1, 16]
 } as const);
 
 export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
@@ -128,7 +172,12 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
   cagedNoteShown: false,
   theme: null,
   shortcuts: true,
-  metronome: Object.freeze({ ratios: METRONOME_RATIOS_DEFAULTS })
+  metronome: Object.freeze({
+    ratios: METRONOME_RATIOS_DEFAULTS,
+    plain: METRONOME_PLAIN_DEFAULTS,
+    speed: METRONOME_SPEED_DEFAULTS,
+    mode: 'ratios'
+  })
 });
 
 /**
@@ -201,6 +250,57 @@ function parseRatios(metronome: unknown): MetronomeSettings {
   };
 }
 
+const p0 = METRONOME_PLAIN_DEFAULTS;
+
+/** 036: same per-field rules as Ratios; unknown keys dropped. */
+const plainSchema = v.object({
+  bpm: v.fallback(intIn(L.bpm), p0.bpm),
+  beats: v.fallback(intIn(L.beats), p0.beats),
+  countIn: v.fallback(v.boolean(), p0.countIn),
+  initialCountIn: v.fallback(intIn(L.count), p0.initialCountIn),
+  /** 038: only the integers 1–4; absent or anything else reads as 1. */
+  subdivision: v.fallback(v.picklist([1, 2, 3, 4] as const), p0.subdivision as 1 | 2 | 3 | 4)
+});
+
+function parsePlain(metronome: unknown): PlainSettings {
+  if (!isPlainObject(metronome) || !isPlainObject(metronome.plain)) return p0;
+  return v.parse(plainSchema, metronome.plain);
+}
+
+const s0 = METRONOME_SPEED_DEFAULTS;
+
+/** 037: same per-field rules; integers only; unknown keys dropped; Target is lifted after. */
+const speedSchema = v.object({
+  startBpm: v.fallback(intIn(L.bpm), s0.startBpm),
+  targetBpm: v.fallback(intIn(L.bpm), s0.targetBpm),
+  increment: v.fallback(intIn(L.increment), s0.increment),
+  loops: v.fallback(intIn(L.loops), s0.loops),
+  beats: v.fallback(intIn(L.beats), s0.beats),
+  countIn: v.fallback(v.boolean(), s0.countIn),
+  initialCountIn: v.fallback(intIn(L.count), s0.initialCountIn),
+  repeatCountIn: v.fallback(intIn(L.count), s0.repeatCountIn),
+  atTarget: v.fallback(v.picklist(['hold', 'stop']), s0.atTarget)
+});
+
+function parseSpeed(metronome: unknown): SpeedSettings {
+  if (!isPlainObject(metronome) || !isPlainObject(metronome.speed)) return s0;
+  const x = v.parse(speedSchema, metronome.speed);
+  return { ...x, targetBpm: Math.max(x.targetBpm, x.startBpm) };
+}
+
+function parseMode(metronome: unknown): MetronomeMode {
+  if (!isPlainObject(metronome)) return 'ratios';
+  return metronome.mode === 'plain' || metronome.mode === 'speed' ? metronome.mode : 'ratios';
+}
+
+function isDefaultSpeed(x: SpeedSettings): boolean {
+  return (Object.keys(s0) as (keyof SpeedSettings)[]).every((k) => x[k] === s0[k]);
+}
+
+function isDefaultPlain(x: PlainSettings): boolean {
+  return (Object.keys(p0) as (keyof PlainSettings)[]).every((k) => x[k] === p0[k]);
+}
+
 function isDefaultRatios(x: MetronomeSettings): boolean {
   return (Object.keys(r0) as (keyof MetronomeSettings)[]).every((k) => x[k] === r0[k]);
 }
@@ -264,7 +364,12 @@ export function parsePreferences(raw: string | null): Preferences {
       cagedNoteShown: r.cagedNote,
       theme: r.theme,
       shortcuts: r.shortcuts,
-      metronome: { ratios: parseRatios(parsed.metronome) }
+      metronome: {
+        ratios: parseRatios(parsed.metronome),
+        plain: parsePlain(parsed.metronome),
+        speed: parseSpeed(parsed.metronome),
+        mode: parseMode(parsed.metronome)
+      }
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -295,13 +400,48 @@ function ratiosRecord(x: MetronomeSettings) {
   };
 }
 
+/** The `metronome` entry: `ratios`, `plain`, `speed`, `mode` in that order, each only when non-default. */
+function metronomeRecord(x: Preferences['metronome']): { metronome?: object } {
+  const entry = {
+    ...(isDefaultRatios(x.ratios) ? {} : { ratios: ratiosRecord(x.ratios) }),
+    ...(isDefaultPlain(x.plain)
+      ? {}
+      : {
+          plain: {
+            bpm: x.plain.bpm,
+            beats: x.plain.beats,
+            countIn: x.plain.countIn,
+            initialCountIn: x.plain.initialCountIn,
+            ...(x.plain.subdivision === 1 ? {} : { subdivision: x.plain.subdivision })
+          }
+        }),
+    ...(isDefaultSpeed(x.speed)
+      ? {}
+      : {
+          speed: {
+            startBpm: x.speed.startBpm,
+            targetBpm: x.speed.targetBpm,
+            increment: x.speed.increment,
+            loops: x.speed.loops,
+            beats: x.speed.beats,
+            countIn: x.speed.countIn,
+            initialCountIn: x.speed.initialCountIn,
+            repeatCountIn: x.speed.repeatCountIn,
+            atTarget: x.speed.atTarget
+          }
+        }),
+    ...(x.mode === 'ratios' ? {} : { mode: x.mode })
+  };
+  return Object.keys(entry).length === 0 ? {} : { metronome: entry };
+}
+
 /**
  * v1 record, stable key order; `strings` only for 7 strings (6 stays byte-identical to slice
  * 011), `customTuning` and `lastTool` omitted when null, `handedness`/`orientation` only when non-default (013),
  * `labels.caged` only when `'name'` (017),
  * `tempo` (after `orientation`) only when not `'medium'` (019), `language` (after `tempo`) only
  * when non-null (020), then `notation` (non-null), `accidentals` (not `'sharps'`) and
- * `cagedNote` (true only) (021), then `theme` (non-null) (026), then `shortcuts` (false only) (027), then `metronome.ratios` (any non-default) last (035).
+ * `cagedNote` (true only) (021), then `theme` (non-null) (026), then `shortcuts` (false only) (027), then `metronome` (`ratios`, `plain`, `speed`, `mode`; each only when non-default) last (035–037).
  */
 export function serializePreferences(p: Preferences): string {
   return JSON.stringify({
@@ -327,8 +467,6 @@ export function serializePreferences(p: Preferences): string {
     ...(p.cagedNoteShown ? { cagedNote: true } : {}),
     ...(p.theme === null ? {} : { theme: p.theme }),
     ...(p.shortcuts ? {} : { shortcuts: false }),
-    ...(isDefaultRatios(p.metronome.ratios)
-      ? {}
-      : { metronome: { ratios: ratiosRecord(p.metronome.ratios) } })
+    ...metronomeRecord(p.metronome)
   });
 }

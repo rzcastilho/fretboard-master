@@ -23,10 +23,21 @@ function ev(
   };
 }
 
-const running = { phase: 'running', disclosureOpen: false } as const;
-const settings = { phase: 'settings', disclosureOpen: false } as const;
+const running = {
+  phase: 'running',
+  disclosureOpen: false,
+  mode: 'ratios',
+  shortcuts: true
+} as const;
+const settings = { ...running, phase: 'settings' } as const;
+const plain = { ...settings, mode: 'plain' } as const;
 
 describe('matchMetronomeKey', () => {
+  it('Space on a role=tab button never toggles (036)', () => {
+    expect(matchMetronomeKey(ev(' ', {}, { tagName: 'BUTTON' }), running)).toBeNull();
+    expect(matchMetronomeKey(ev(' ', { targetActivates: true }), settings)).toBeNull();
+  });
+
   it('Space on the body toggles', () => {
     expect(matchMetronomeKey(ev(' '), settings)).toBe('toggle');
   });
@@ -54,13 +65,13 @@ describe('matchMetronomeKey', () => {
 
   it('Escape resets outside settings', () => {
     for (const phase of ['starting', 'running', 'paused'] as const) {
-      expect(matchMetronomeKey(ev('Escape'), { phase, disclosureOpen: false })).toBe('reset');
+      expect(matchMetronomeKey(ev('Escape'), { ...running, phase })).toBe('reset');
     }
   });
 
   it('Escape does nothing in settings or with a disclosure open', () => {
     expect(matchMetronomeKey(ev('Escape'), settings)).toBeNull();
-    expect(matchMetronomeKey(ev('Escape'), { phase: 'running', disclosureOpen: true })).toBeNull();
+    expect(matchMetronomeKey(ev('Escape'), { ...running, disclosureOpen: true })).toBeNull();
   });
 
   it.each([
@@ -114,5 +125,42 @@ describe('matchMetronomeKey', () => {
     expect(
       matchMetronomeKey(ev(' ', { targetActivates: true }, { tagName: 'DIV' }), settings)
     ).toBeNull();
+  });
+
+  describe('tap (038)', () => {
+    it.each(['t', 'T'])('%s taps in plain mode, in any phase', (key) => {
+      expect(matchMetronomeKey(ev(key), plain)).toBe('tap');
+      expect(matchMetronomeKey(ev(key, { shiftKey: true }), { ...plain, phase: 'running' })).toBe(
+        'tap'
+      );
+      expect(matchMetronomeKey(ev(key, {}, { tagName: 'BUTTON' }), plain)).toBe('tap');
+    });
+
+    it('is ignored in Ratios and Speed, with shortcuts off or a disclosure open', () => {
+      expect(matchMetronomeKey(ev('t'), settings)).toBeNull();
+      expect(matchMetronomeKey(ev('t'), { ...plain, mode: 'speed' })).toBeNull();
+      expect(matchMetronomeKey(ev('t'), { ...plain, shortcuts: false })).toBeNull();
+      expect(matchMetronomeKey(ev('t'), { ...plain, disclosureOpen: true })).toBeNull();
+    });
+
+    it.each([
+      ['repeat', { repeat: true }],
+      ['composing', { isComposing: true }],
+      ['ctrl', { ctrlKey: true }],
+      ['meta', { metaKey: true }],
+      ['alt', { altKey: true }],
+      ['AltGraph', { getModifierState: (k: string) => k === 'AltGraph' }]
+    ])('is ignored with %s', (_name, over) => {
+      expect(matchMetronomeKey(ev('t', over as Partial<Ev>), plain)).toBeNull();
+    });
+
+    it.each([
+      [{ tagName: 'INPUT', type: 'text' }],
+      [{ tagName: 'TEXTAREA' }],
+      [{ tagName: 'SELECT' }],
+      [{ tagName: 'DIV', isContentEditable: true }]
+    ])('is ignored with focus in %j', (target) => {
+      expect(matchMetronomeKey(ev('t', {}, target), plain)).toBeNull();
+    });
   });
 });

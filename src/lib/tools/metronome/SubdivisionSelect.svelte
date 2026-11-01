@@ -6,15 +6,22 @@
     id,
     label,
     value,
-    onchange
-  }: { id: string; label: string; value: Subdivision; onchange: (v: unknown) => void } = $props();
+    onchange,
+    options = SUBDIVISIONS
+  }: {
+    id: string;
+    label: string;
+    value: Subdivision;
+    onchange: (v: unknown) => void;
+    options?: readonly Subdivision[];
+  } = $props();
 </script>
 
 <div class="field">
   <label for={id}>{label}</label>
   <div class="control">
     <select {id} {value} onchange={(e) => onchange(e.currentTarget.value)}>
-      {#each SUBDIVISIONS as n (n)}
+      {#each options as n (n)}
         <option value={n} selected={n === value}>{subdivisionLabel(n)}</option>
       {/each}
     </select>

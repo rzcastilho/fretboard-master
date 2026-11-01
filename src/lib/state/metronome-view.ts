@@ -18,26 +18,46 @@ export interface CountInView {
 }
 
 export type StatusParams =
-  | { readonly kind: 'beat'; readonly beat: number; readonly beats: number; readonly sub: number }
-  | { readonly kind: 'none'; readonly beats: number; readonly sub: number }
+  | {
+      readonly kind: 'beat';
+      readonly beat: number;
+      readonly beats: number;
+      readonly sub: number | null;
+    }
+  | { readonly kind: 'none'; readonly beats: number; readonly sub: number | null }
   | { readonly kind: 'count-in'; readonly click: number; readonly total: number }
-  | { readonly kind: 'count-in-none'; readonly total: number };
+  | { readonly kind: 'count-in-none'; readonly total: number }
+  | SpeedStatus;
+
+/** Speed Training position (037): a step and loop, or the hold after the last step. */
+export type SpeedStatus =
+  | {
+      readonly kind: 'step';
+      readonly step: number;
+      readonly steps: number;
+      readonly loop: number;
+      readonly loops: number;
+    }
+  | { readonly kind: 'hold'; readonly steps: number };
 
 /**
+ * Speed Training (037) adds `step` and `hold`, chosen when `speed` is given and no count-in shows.
  * Selects `metronome_status_beat`, `metronome_status_beat_none` or, during the count-in,
  * `metronome_status_count_in` / `metronome_status_count_in_none`.
  */
 export function statusParams(
   beat: number,
   beats: number,
-  sub: number,
-  countIn: CountInView | null = null
+  sub: number | null,
+  countIn: CountInView | null = null,
+  speed: SpeedStatus | null = null
 ): StatusParams {
   if (countIn) {
     return countIn.click === 0
       ? { kind: 'count-in-none', total: countIn.total }
       : { kind: 'count-in', click: countIn.click, total: countIn.total };
   }
+  if (speed) return speed;
   return beat === 0 ? { kind: 'none', beats, sub } : { kind: 'beat', beat, beats, sub };
 }
 

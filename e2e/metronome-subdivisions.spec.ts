@@ -108,10 +108,7 @@ test.describe('metronome subdivisions: dropdown (US2)', () => {
     await page.keyboard.press('Space');
     await page.keyboard.press('Enter');
     await expect(select(page)).toHaveValue('4');
-    await expect(page.getByRole('region', { name: 'Ratios Training' })).toHaveAttribute(
-      'data-phase',
-      'settings'
-    );
+    await expect(page.locator('section.panel')).toHaveAttribute('data-phase', 'settings');
   });
 
   test('US2-9: Reset keeps the choice; leaving and returning keeps 8th Triplets (remembered)', async ({
@@ -201,10 +198,7 @@ test.describe('metronome subdivisions: exact at high speed (US3)', () => {
     await start(page).click();
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThanOrEqual(4);
     await page.getByRole('button', { name: 'Pause' }).click();
-    await expect(page.getByRole('region', { name: 'Ratios Training' })).toHaveAttribute(
-      'data-phase',
-      'paused'
-    );
+    await expect(page.locator('section.panel')).toHaveAttribute('data-phase', 'paused');
     const cancels = (await readAudioLog(page)).flatMap((e) =>
       e.type === 'click-cancel' ? [e] : []
     );

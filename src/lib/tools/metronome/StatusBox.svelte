@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import type { CountInView, DotState } from '$lib/state/metronome-view';
+  import type { CountInView, DotState, SpeedStatus } from '$lib/state/metronome-view';
   import { countInDot, statusParams } from '$lib/state/metronome-view';
 
   let {
@@ -9,17 +9,22 @@
     bpm,
     sub,
     dots,
-    countIn = null
+    countIn = null,
+    speed = null,
+    tap
   }: {
     beat: number;
     beats: number;
     bpm: number;
-    sub: number;
+    sub: number | null;
     dots: readonly DotState[];
     countIn?: CountInView | null;
+    speed?: SpeedStatus | null;
+    /** 038: plain mode only. When set, the tempo is a tap-tempo button. */
+    tap?: () => void;
   } = $props();
 
-  const status = $derived(statusParams(beat, beats, sub, countIn));
+  const status = $derived(statusParams(beat, beats, sub, countIn, speed));
 </script>
 
 <div class="status">
@@ -30,19 +35,42 @@
       >
     {:else if status.kind === 'count-in-none'}
       <span class="part">{m.metronome_status_count_in_none({ count: status.total })}</span>
+    {:else if status.kind === 'step'}
+      <span class="part">{m.metronome_status_step({ step: status.step, steps: status.steps })}</span
+      ><span class="sep">{m.summary_separator()}</span><span class="part"
+        >{m.metronome_status_loop({ loop: status.loop, loops: status.loops })}</span
+      >
+    {:else if status.kind === 'hold'}
+      <span class="part"
+        >{m.metronome_status_step({ step: status.steps, steps: status.steps })}</span
+      ><span class="sep">{m.summary_separator()}</span><span class="part"
+        >{m.metronome_status_hold()}</span
+      >
     {:else}
       <span class="part"
         >{#if status.kind === 'beat'}{m.metronome_status_beat({
             beat: status.beat,
             beats: status.beats
           })}{:else}{m.metronome_status_beat_none({ beats: status.beats })}{/if}</span
-      ><span class="sep">{m.summary_separator()}</span><span class="part"
-        >{m.metronome_status_sub({ count: status.sub })}</span
-      >
+      >{#if status.sub !== null}<span class="sep">{m.summary_separator()}</span><span class="part"
+          >{m.metronome_status_sub({ count: status.sub })}</span
+        >{/if}
     {/if}
   </p>
   <p class="tempo">
-    <span class="digits">{bpm}</span> <span class="unit">{m.metronome_bpm_unit()}</span>
+    {#if tap}
+      <button
+        type="button"
+        class="tap"
+        aria-label={m.metronome_tap_name({ bpm })}
+        title={m.metronome_tap_title()}
+        onclick={() => tap()}
+        ><span class="digits">{bpm}</span>
+        <span class="unit">{m.metronome_bpm_unit()}</span></button
+      >
+    {:else}
+      <span class="digits">{bpm}</span> <span class="unit">{m.metronome_bpm_unit()}</span>
+    {/if}
   </p>
   {#if countIn}
     <ol class="dots count-in" aria-hidden="true">
@@ -81,6 +109,31 @@
 
   .part {
     white-space: nowrap;
+  }
+
+  /* 038: the tempo as a tap target. Visible text stays the number; the global ring applies. */
+  .tap {
+    box-sizing: border-box;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding: var(--space-1) var(--space-3);
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .tap:active {
+    background: var(--color-surface-raised);
+  }
+
+  @media (forced-colors: active) {
+    .tap:focus-visible {
+      outline: var(--focus-ring-width) solid ButtonText;
+    }
   }
 
   .digits {

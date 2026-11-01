@@ -65,6 +65,8 @@
   --metronome-panel-max: 36rem;
   --metronome-dot-size: 1.5rem;
   --metronome-pulse-scale: 1.25;
+  /* Mode tab active underline thickness (FR-002) */
+  --metronome-tab-underline: 2px;
   --unit-px: 1px;
   --fb-stroke-hairline: 1px;
   --fb-label-halo-width: 3px;

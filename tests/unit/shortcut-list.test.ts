@@ -29,9 +29,14 @@ describe('ShortcutList', () => {
     const { container } = render(ShortcutList);
     expect(screen.getByRole('heading', { name: 'Metronome' })).toBeTruthy();
     const rows = [...container.querySelectorAll('dl.metronome-keys > div')];
-    expect(rows.map((r) => r.querySelector('dt')?.textContent?.trim())).toEqual(['Space', 'Esc']);
+    expect(rows.map((r) => r.querySelector('dt')?.textContent?.trim())).toEqual([
+      'Space',
+      'Esc',
+      'T'
+    ]);
     expect(rows[0]?.querySelector('dd')?.textContent).toBe('Start, pause or resume');
     expect(rows[1]?.querySelector('dd')?.textContent).toBe('Reset');
+    expect(rows[2]?.querySelector('dd')?.textContent).toBe('Tap tempo (Metronome mode)');
   });
 
   it('punctuation keys hide the glyph and speak the name', () => {
@@ -65,5 +70,16 @@ describe('ShortcutList', () => {
     expect(choose).toHaveBeenCalledWith(false);
     await fireEvent.click(sw);
     expect(choose).toHaveBeenLastCalledWith(true);
+  });
+});
+
+describe('Metronome tap row catalog (038)', () => {
+  it.each([
+    ['en', 'Tap tempo (Metronome mode)'],
+    ['pt-BR', 'Marcar andamento (modo Metrônomo)'],
+    ['es', 'Marcar tempo (modo Metrónomo)']
+  ])('%s has the localized text', async (tag, text) => {
+    const catalog = (await import(`../../messages/${tag}.json`)).default as Record<string, string>;
+    expect(catalog.shortcuts_metronome_tap).toBe(text);
   });
 });

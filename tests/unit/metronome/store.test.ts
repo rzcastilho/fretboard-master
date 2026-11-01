@@ -1,15 +1,104 @@
 // @vitest-environment jsdom
+import fc from 'fast-check';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClickSink } from '../../../src/lib/audio/metronome';
 import {
+  DEFAULT_PLAIN_SETTINGS,
+  DEFAULT_SPEED_SETTINGS,
   DEFAULT_SETTINGS,
-  type MetronomeSettings
+  type MetronomeSettings,
+  type PlainSettings,
+  type SpeedSettings
 } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames, type FakeSource } from '../audio/support/fake-audio';
+
+describe('036 persistence (T026)', () => {
+  it('selectMode remembers the full object, then not for the active tab or invalid input', () => {
+    rig(true, { bpm: 120 });
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.selectMode('plain');
+    expect(remember).toHaveBeenCalledTimes(1);
+    expect(remember).toHaveBeenCalledWith({
+      metronome: {
+        ratios: metronome.settings,
+        plain: metronome.plain,
+        speed: metronome.speed,
+        mode: 'plain'
+      }
+    });
+    remember.mockClear();
+    for (const v of ['plain', 'SPEED', null, 3]) metronome.selectMode(v);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it('plain and Ratios changes write the same full object; equal values do not write', () => {
+    rig(true, { countIn: true });
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.selectMode('plain');
+    remember.mockClear();
+    const plainCases: Array<[string, () => void]> = [
+      ['setBpm', () => metronome.setBpm(100)],
+      ['stepBeats', () => metronome.stepBeats(-1)],
+      ['setBeats', () => metronome.setBeats(5)],
+      ['setCountIn', () => metronome.setCountIn(false)],
+      ['setInitialCountIn', () => metronome.setInitialCountIn(2)]
+    ];
+    for (const [name, call] of plainCases) {
+      remember.mockClear();
+      call();
+      expect(remember, name).toHaveBeenCalledTimes(1);
+      expect(remember, name).toHaveBeenCalledWith({
+        metronome: {
+          ratios: metronome.settings,
+          plain: metronome.plain,
+          speed: metronome.speed,
+          mode: 'plain'
+        }
+      });
+    }
+    remember.mockClear();
+    metronome.setBpm(100);
+    metronome.setCountIn(false);
+    expect(remember).not.toHaveBeenCalled();
+    metronome.selectMode('ratios');
+    remember.mockClear();
+    metronome.setBpm(130);
+    expect(remember).toHaveBeenCalledWith({
+      metronome: {
+        ratios: expect.objectContaining({ bpm: 130 }),
+        plain: expect.objectContaining({ bpm: 100, beats: 5 }),
+        speed: metronome.speed,
+        mode: 'ratios'
+      }
+    });
+  });
+
+  it('a storage failure does not block the tool', () => {
+    rig();
+    resetPreferencesForTests();
+    expect(() => metronome.selectMode('plain')).not.toThrow();
+    expect(metronome.mode).toBe('plain');
+  });
+
+  it('reset() and screenChanged() keep the mode and both records', async () => {
+    rig(true, { bpm: 120 });
+    metronome.selectMode('plain');
+    metronome.setBpm(100);
+    metronome.toggle();
+    await settle();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.reset();
+    metronome.screenChanged();
+    expect(remember).not.toHaveBeenCalled();
+    expect(metronome.mode).toBe('plain');
+    expect(metronome.plain.bpm).toBe(100);
+    expect(metronome.settings.bpm).toBe(120);
+  });
+});
 
 interface Rig {
   port: FakeAudioPort;
@@ -869,7 +958,7 @@ describe('metronome store: ratio start announcements (034, FR-013)', () => {
 });
 
 describe('035 remembered settings: store contract', () => {
-  it('M-R1/M-R2: restoreSettings applies values, halts a run, never remembers', async () => {
+  it('M-R1/M-R2: restore applies values, halts a run, never remembers', async () => {
     const r = rig();
     const remember = vi.spyOn(preferences, 'remember');
     metronome.toggle();
@@ -886,7 +975,12 @@ describe('035 remembered settings: store contract', () => {
       ratio: false,
       loop2: 5
     };
-    metronome.restoreSettings(next);
+    metronome.restore({
+      ratios: next,
+      plain: DEFAULT_PLAIN_SETTINGS,
+      speed: DEFAULT_SPEED_SETTINGS,
+      mode: 'ratios'
+    });
     expect(metronome.phase).toBe('settings');
     expect(metronome.position).toBeNull();
     expect(metronome.settings).toEqual(next);
@@ -957,7 +1051,12 @@ describe('035 remembered settings: store contract', () => {
       call();
       expect(remember, name).toHaveBeenCalledTimes(1);
       expect(remember, name).toHaveBeenCalledWith({
-        metronome: { ratios: metronome.settings }
+        metronome: {
+          ratios: metronome.settings,
+          plain: metronome.plain,
+          speed: metronome.speed,
+          mode: 'ratios'
+        }
       });
     }
   });
@@ -1030,5 +1129,871 @@ describe('035 US2: Reset and running position (FR-003, FR-004)', () => {
       const ratios = (arg as { metronome: { ratios: object } }).metronome.ratios;
       expect(Object.keys(ratios).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
     }
+  });
+});
+
+describe('036 plain mode: store contract', () => {
+  function plainRig(
+    plain: Partial<PlainSettings> = {},
+    settings: Partial<MetronomeSettings> = {}
+  ): Rig {
+    const r = rig(true, settings);
+    resetMetronomeForTests(
+      { clock: r.clock, frames: r.frames },
+      { ratio: false, countIn: false, ...settings },
+      plain,
+      'plain'
+    );
+    return r;
+  }
+
+  it('defaults: mode ratios, current is the Ratios record, plain defaults', () => {
+    resetMetronomeForTests();
+    expect(metronome.mode).toBe('ratios');
+    expect(metronome.current).toBe(metronome.settings);
+    expect(metronome.plain).toEqual(DEFAULT_PLAIN_SETTINGS);
+  });
+
+  it('current is the plain record in plain mode; sub is null and dots follow its beats', async () => {
+    const r = plainRig({ beats: 3, countIn: false });
+    expect(metronome.mode).toBe('plain');
+    expect(metronome.current).toBe(metronome.plain);
+    expect(metronome.sub).toBeNull();
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.dots).toHaveLength(3);
+    expect(metronome.sub).toBeNull();
+  });
+
+  it('S3: plain setters never change settings and Ratios setters never change plain', () => {
+    const ops = fc.array(
+      fc.tuple(fc.integer({ min: 0, max: 6 }), fc.integer({ min: -400, max: 400 })),
+      { maxLength: 30 }
+    );
+    fc.assert(
+      fc.property(ops, ops, (plainOps, ratiosOps) => {
+        const apply = ([op, n]: [number, number]): void => {
+          const dir = n < 0 ? -1 : 1;
+          if (op === 0) metronome.setBpm(n);
+          else if (op === 1) metronome.stepBpm(dir);
+          else if (op === 2) metronome.setBeats(n);
+          else if (op === 3) metronome.stepBeats(dir);
+          else if (op === 4) metronome.setInitialCountIn(n);
+          else if (op === 5) metronome.stepInitialCountIn(dir);
+          else metronome.setCountIn(n > 0);
+        };
+        resetMetronomeForTests({}, {}, {}, 'plain');
+        const settings = { ...metronome.settings };
+        plainOps.forEach(apply);
+        expect(metronome.settings).toEqual(settings);
+        resetMetronomeForTests({}, {}, {}, 'ratios');
+        const plain = { ...metronome.plain };
+        ratiosOps.forEach(apply);
+        expect(metronome.plain).toEqual(plain);
+      })
+    );
+  });
+
+  it('S4: a plain Start schedules one click per beat at the plain bpm, after the count-in', async () => {
+    const r = plainRig({ bpm: 120, beats: 3, countIn: true, initialCountIn: 2 }, { bpm: 60 });
+    metronome.toggle();
+    await settle();
+    advance(r, 2.2);
+    const t = starts(r);
+    for (let i = 1; i < t.length; i++) expect(t[i] - t[i - 1]).toBeCloseTo(0.5, 6);
+    expect(t.length).toBeGreaterThanOrEqual(5);
+    expect(metronome.position?.kind).toBe('beat');
+  });
+
+  it('S5: Ratios start still announces and shows sub as before', async () => {
+    const r = rig(true, { countIn: false, ratio: false });
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets');
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.sub).toBe(3);
+  });
+
+  it('Ratios-only setters are no-ops in plain mode', () => {
+    plainRig();
+    const before = { settings: { ...metronome.settings }, plain: { ...metronome.plain } };
+    metronome.setRepeatCountIn(7);
+    metronome.stepRepeatCountIn(1);
+    metronome.setRatio(false);
+    metronome.setSubdivision(5);
+    metronome.setLoop2(2);
+    expect(metronome.settings).toEqual(before.settings);
+    expect(metronome.plain).toEqual(before.plain);
+  });
+
+  it('plain Start and Pause announce the plain variants', async () => {
+    const r = plainRig({ bpm: 100, beats: 3, countIn: true, initialCountIn: 4 });
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 100 BPM, 3 beats, count in 4');
+    await settle();
+    advance(r, 3);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    expect(metronome.announcement).toMatch(/^Paused on beat \d of 3$/);
+    metronome.reset();
+    metronome.setCountIn(false);
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 100 BPM, 3 beats');
+  });
+
+  it('restore applies ratios, plain and mode, halts a run and never remembers', async () => {
+    const r = rig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    const plain: PlainSettings = {
+      bpm: 100,
+      beats: 3,
+      countIn: false,
+      initialCountIn: 1,
+      subdivision: 1
+    };
+    metronome.restore({
+      ratios: { ...DEFAULT_SETTINGS, bpm: 120 },
+      plain,
+      speed: DEFAULT_SPEED_SETTINGS,
+      mode: 'plain'
+    });
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.position).toBeNull();
+    expect(metronome.settings.bpm).toBe(120);
+    expect(metronome.plain).toEqual(plain);
+    expect(metronome.mode).toBe('plain');
+    const seen = starts(r).length;
+    advance(r, 1);
+    expect(starts(r).length).toBe(seen);
+    expect(remember).not.toHaveBeenCalled();
+  });
+});
+
+describe('036 selectMode (S1, S2)', () => {
+  it.each(['starting', 'running', 'paused', 'count-in'] as const)(
+    'S1: from %s it halts once, returns to settings and goes silent',
+    async (from) => {
+      const r = rig(true, { countIn: from === 'count-in', initialCountIn: 4 });
+      metronome.toggle();
+      if (from === 'starting') {
+        expect(metronome.phase).toBe('starting');
+      } else {
+        await settle();
+        advance(r, from === 'count-in' ? 0.1 : 0.5);
+        if (from === 'paused') metronome.toggle();
+      }
+      metronome.selectMode('plain');
+      expect(metronome.mode).toBe('plain');
+      expect(metronome.phase).toBe('settings');
+      expect(metronome.position).toBeNull();
+      const seen = starts(r).length;
+      advance(r, 2);
+      expect(starts(r).length).toBe(seen);
+    }
+  );
+
+  it('S2: the active mode or an invalid value changes nothing and keeps the run', async () => {
+    const r = rig();
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    expect(metronome.phase).toBe('running');
+    for (const v of ['ratios', 'SPEED', null, 3, undefined, {}, 'PLAIN']) {
+      metronome.selectMode(v);
+      expect(metronome.mode).toBe('ratios');
+      expect(metronome.phase).toBe('running');
+    }
+    const before = starts(r).length;
+    advance(r, 0.5);
+    expect(starts(r).length).toBeGreaterThan(before);
+  });
+});
+
+describe('037 Speed Training run (S6, S7, S12, S14)', () => {
+  function speedRig(speed: Partial<SpeedSettings>, ratiosCountIn = false): Rig {
+    const r = rig(true, { countIn: ratiosCountIn });
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'speed', speed);
+    return r;
+  }
+
+  /** Sample the status line and tempo every 25 ms; keep consecutive changes only. */
+  function trace(r: Rig, seconds: number): { labels: string[]; bpms: number[] } {
+    const labels: string[] = [];
+    const bpms: number[] = [];
+    for (let i = 0; i < Math.round(seconds * 40); i++) {
+      advance(r, 0.025);
+      if (metronome.phase === 'settings') continue;
+      const c = metronome.countIn;
+      const s = metronome.speedStatus;
+      const label =
+        c !== null
+          ? c.click > 0
+            ? `COUNT IN ${c.click}/${c.total}`
+            : null
+          : s?.kind === 'step'
+            ? `STEP ${s.step}/${s.steps} · LOOP ${s.loop}/${s.loops}`
+            : s?.kind === 'hold'
+              ? `HOLD ${s.steps}`
+              : null;
+      if (label !== null && labels.at(-1) !== label) labels.push(label);
+      if (bpms.at(-1) !== metronome.bpm) {
+        bpms.push(metronome.bpm);
+      }
+    }
+    return { labels, bpms };
+  }
+
+  it('reads the start tempo and a first step before the first click', () => {
+    speedRig({ startBpm: 80, targetBpm: 120 });
+    expect(metronome.bpm).toBe(80);
+    expect(metronome.steps).toBe(9);
+    expect(metronome.speedStatus).toEqual({ kind: 'step', step: 1, steps: 9, loop: 1, loops: 4 });
+    expect(metronome.sub).toBeNull();
+    expect(metronome.current).toBe(metronome.speed);
+  });
+
+  it('S6: 80→120/5 plays 4 + 144 + 16 clicks and the statuses follow the run', async () => {
+    const r = speedRig({
+      startBpm: 80,
+      targetBpm: 120,
+      increment: 5,
+      loops: 4,
+      beats: 4,
+      countIn: true,
+      initialCountIn: 4,
+      repeatCountIn: 2,
+      atTarget: 'stop'
+    });
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 80 to 120 BPM, 4 beats, count in 4');
+    const { labels, bpms } = trace(r, 130);
+    const expected: string[] = [1, 2, 3, 4].map((c) => `COUNT IN ${c}/4`);
+    for (let s = 1; s <= 9; s++) {
+      for (let l = 1; l <= 4; l++) expected.push(`STEP ${s}/9 · LOOP ${l}/4`);
+      if (s < 9) expected.push('COUNT IN 1/2', 'COUNT IN 2/2');
+    }
+    expect(labels).toEqual(expected);
+    expect(starts(r).length).toBe(4 + 144 + 16);
+    // 80 through step 1 and its following count-in, then 85 from step 2's first loop click.
+    expect(bpms).toEqual([80, 85, 90, 95, 100, 105, 110, 115, 120]);
+  });
+
+  it('S7: 80→102/5 has 6 steps at 80, 85, 90, 95, 100, 102', async () => {
+    const r = speedRig({
+      startBpm: 80,
+      targetBpm: 102,
+      increment: 5,
+      loops: 1,
+      beats: 1,
+      countIn: false,
+      atTarget: 'stop'
+    });
+    expect(metronome.steps).toBe(6);
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 80 to 102 BPM, 1 beats');
+    const { bpms } = trace(r, 12);
+    expect(bpms).toEqual([80, 85, 90, 95, 100, 102]);
+  });
+
+  it('announces each step from step 2 once, at its first loop click, never loops or beats', async () => {
+    const r = speedRig({
+      startBpm: 100,
+      targetBpm: 115,
+      increment: 5,
+      loops: 2,
+      beats: 2,
+      countIn: false,
+      atTarget: 'stop'
+    });
+    metronome.toggle();
+    await settle();
+    const seen: string[] = [];
+    for (let i = 0; i < 40 * 10; i++) {
+      advance(r, 0.025);
+      if (seen.at(-1) !== metronome.announcement) seen.push(metronome.announcement);
+    }
+    expect(seen.slice(1)).toEqual([
+      'Step 2 of 4, 105 BPM',
+      'Step 3 of 4, 110 BPM',
+      'Step 4 of 4, 115 BPM',
+      'Finished at 115 BPM'
+    ]);
+  });
+
+  describe('At target (S8, S9)', () => {
+    const base = {
+      startBpm: 100,
+      targetBpm: 105,
+      increment: 5,
+      loops: 1,
+      beats: 2,
+      countIn: false
+    };
+
+    it('S8 Hold: enters hold once, keeps clicking with no count-in, pause/resume stays in hold', async () => {
+      const r = speedRig({ ...base, atTarget: 'hold' });
+      metronome.toggle();
+      await settle();
+      const seen: string[] = [];
+      for (let i = 0; i < 40 * 5; i++) {
+        advance(r, 0.025);
+        if (seen.at(-1) !== metronome.announcement) seen.push(metronome.announcement);
+      }
+      expect(metronome.speedStatus).toEqual({ kind: 'hold', steps: 2 });
+      expect(seen.filter((a) => a === 'Holding at 105 BPM')).toHaveLength(1);
+      expect(metronome.phase).toBe('running');
+      const before = starts(r).length;
+      advance(r, 2);
+      expect(starts(r).length).toBeGreaterThan(before + 2);
+      expect(metronome.countIn).toBeNull();
+      metronome.toggle();
+      expect(metronome.phase).toBe('paused');
+      expect(metronome.announcement).toMatch(/^Paused, holding at 105 BPM, beat \d of 2$/);
+      metronome.toggle();
+      await settle();
+      advance(r, 1);
+      expect(metronome.speedStatus?.kind).toBe('hold');
+      expect(metronome.countIn).toBeNull();
+      expect(metronome.announcement).toBe('Resumed');
+    });
+
+    it('S9 Stop: returns to settings once after the last beat, no later clicks, values kept', async () => {
+      const r = speedRig({ ...base, atTarget: 'stop' });
+      const record = metronome.speed;
+      metronome.toggle();
+      await settle();
+      advance(r, 3);
+      expect(metronome.phase).toBe('settings');
+      expect(metronome.finished).toBe(1);
+      expect(metronome.announcement).toBe('Finished at 105 BPM');
+      expect(metronome.speed).toBe(record);
+      expect(metronome.position).toBeNull();
+      const n = starts(r).length;
+      expect(n).toBe(4);
+      advance(r, 3);
+      expect(starts(r).length).toBe(n);
+      expect(metronome.finished).toBe(1);
+    });
+
+    it('a single step (Start = Target) is STEP 1/1 and then follows At target', async () => {
+      const r = speedRig({ ...base, startBpm: 300, targetBpm: 300, atTarget: 'hold' });
+      expect(metronome.steps).toBe(1);
+      metronome.toggle();
+      await settle();
+      advance(r, 0.1);
+      expect(metronome.speedStatus).toMatchObject({ kind: 'step', step: 1, steps: 1 });
+      advance(r, 2);
+      expect(metronome.speedStatus).toEqual({ kind: 'hold', steps: 1 });
+    });
+
+    it('setAtTarget accepts hold/stop in settings only and ignores anything else', async () => {
+      speedRig({ ...base, atTarget: 'hold' });
+      metronome.setAtTarget('stop');
+      expect(metronome.speed.atTarget).toBe('stop');
+      metronome.setAtTarget('loop');
+      metronome.setAtTarget(1);
+      expect(metronome.speed.atTarget).toBe('stop');
+      metronome.toggle();
+      await settle();
+      metronome.setAtTarget('hold');
+      expect(metronome.speed.atTarget).toBe('stop');
+    });
+  });
+
+  it('S12: speed edits leave the other records alone and shared rows edit speed', () => {
+    speedRig({});
+    const ratios = metronome.settings;
+    const plain = metronome.plain;
+    metronome.setBeats(6);
+    metronome.setCountIn(false);
+    metronome.setInitialCountIn(3);
+    metronome.setRepeatCountIn(1);
+    expect(metronome.speed).toMatchObject({
+      beats: 6,
+      countIn: false,
+      initialCountIn: 3,
+      repeatCountIn: 1
+    });
+    const speed = metronome.speed;
+    metronome.setBpm(200);
+    metronome.stepBpm(1);
+    metronome.setSubdivision(5);
+    metronome.setRatio(false);
+    metronome.setLoop2(2);
+    expect(metronome.speed).toBe(speed);
+    expect(metronome.settings).toBe(ratios);
+    expect(metronome.plain).toBe(plain);
+  });
+
+  it('S12: selecting Speed during a Ratios run halts it at once', async () => {
+    const r = rig(true, { countIn: false });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    expect(metronome.phase).toBe('running');
+    metronome.selectMode('speed');
+    expect(metronome.mode).toBe('speed');
+    expect(metronome.phase).toBe('settings');
+    const seen = starts(r).length;
+    advance(r, 2);
+    expect(starts(r).length).toBe(seen);
+  });
+
+  it('S14: remember() sends ratios, plain, speed and mode as one object', () => {
+    rig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.selectMode('speed');
+    expect(remember).toHaveBeenCalledWith({
+      metronome: {
+        ratios: metronome.settings,
+        plain: metronome.plain,
+        speed: metronome.speed,
+        mode: 'speed'
+      }
+    });
+    remember.mockClear();
+    metronome.setBeats(7);
+    expect(remember).toHaveBeenCalledTimes(1);
+    expect(remember).toHaveBeenCalledWith({
+      metronome: {
+        ratios: metronome.settings,
+        plain: metronome.plain,
+        speed: expect.objectContaining({ beats: 7 }),
+        mode: 'speed'
+      }
+    });
+  });
+});
+
+describe('037 Speed Training setters (S11)', () => {
+  function speedSettingsRig(speed: Partial<SpeedSettings> = {}) {
+    const r = rig(true, { countIn: false });
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'speed', speed);
+    return r;
+  }
+
+  it('S11: Target never goes below Start', () => {
+    speedSettingsRig({ startBpm: 100, targetBpm: 100 });
+    metronome.stepTargetBpm(-1);
+    expect(metronome.speed.targetBpm).toBe(100);
+    metronome.setTargetBpm(90);
+    expect(metronome.speed.targetBpm).toBe(100);
+    metronome.setTargetBpm(140);
+    expect(metronome.speed.targetBpm).toBe(140);
+    metronome.stepTargetBpm(-1);
+    expect(metronome.speed.targetBpm).toBe(139);
+  });
+
+  it('S11: raising Start lifts Target, lowering Start leaves it', () => {
+    speedSettingsRig({ startBpm: 85, targetBpm: 125 });
+    metronome.setStartBpm(130);
+    expect(metronome.speed).toMatchObject({ startBpm: 130, targetBpm: 130 });
+    metronome.setStartBpm(100);
+    expect(metronome.speed).toMatchObject({ startBpm: 100, targetBpm: 130 });
+    metronome.stepStartBpm(1);
+    expect(metronome.speed.startBpm).toBe(101);
+    metronome.stepStartBpm(-1);
+    expect(metronome.speed.startBpm).toBe(100);
+  });
+
+  it('clamps Increment to 1–20 and Loops to 1–16', () => {
+    speedSettingsRig();
+    metronome.setIncrement(99);
+    expect(metronome.speed.increment).toBe(20);
+    metronome.setIncrement(-3);
+    expect(metronome.speed.increment).toBe(1);
+    metronome.stepIncrement(-1);
+    expect(metronome.speed.increment).toBe(1);
+    metronome.stepIncrement(1);
+    expect(metronome.speed.increment).toBe(2);
+    metronome.setLoops(99);
+    expect(metronome.speed.loops).toBe(16);
+    metronome.setLoops(0);
+    expect(metronome.speed.loops).toBe(1);
+    metronome.stepLoops(1);
+    expect(metronome.speed.loops).toBe(2);
+    metronome.stepLoops(-1);
+    expect(metronome.speed.loops).toBe(1);
+  });
+
+  it('remembers once per change and writes nothing for an equal record', () => {
+    speedSettingsRig({ startBpm: 85, targetBpm: 125, increment: 5, loops: 4 });
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.setStartBpm(85);
+    metronome.setTargetBpm(125);
+    metronome.setIncrement(5);
+    metronome.setLoops(4);
+    metronome.stepTargetBpm(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+    remember.mockClear();
+    metronome.setTargetBpm(126);
+    expect(remember).not.toHaveBeenCalled();
+    metronome.setTargetBpm(90);
+    expect(remember).toHaveBeenCalledTimes(1);
+    expect(remember).toHaveBeenCalledWith({
+      metronome: expect.objectContaining({
+        speed: expect.objectContaining({ targetBpm: 90 }),
+        mode: 'speed'
+      })
+    });
+  });
+
+  it('are no-ops outside Speed mode and outside the settings phase', () => {
+    const r = speedSettingsRig();
+    const before = metronome.speed;
+    metronome.selectMode('plain');
+    metronome.setStartBpm(200);
+    metronome.setTargetBpm(250);
+    metronome.setIncrement(9);
+    metronome.setLoops(9);
+    metronome.stepLoops(1);
+    expect(metronome.speed).toBe(before);
+    metronome.selectMode('speed');
+    metronome.toggle();
+    expect(metronome.phase).not.toBe('settings');
+    metronome.setStartBpm(200);
+    metronome.stepIncrement(1);
+    metronome.setLoops(9);
+    expect(metronome.speed).toBe(before);
+    advance(r, 0.1);
+  });
+});
+
+describe('037 Speed Training pause, resume and reset (S10, S13)', () => {
+  const base = {
+    startBpm: 100,
+    targetBpm: 110,
+    increment: 5,
+    loops: 2,
+    beats: 3,
+    countIn: false,
+    atTarget: 'hold'
+  } as const;
+  function speedRig(speed: Partial<SpeedSettings>) {
+    const r = rig(true, { countIn: false });
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'speed', speed);
+    return r;
+  }
+  async function pauseAtSlot(r: Rig, slot: number, bpm = 100): Promise<void> {
+    metronome.toggle();
+    await settle();
+    advance(r, Math.max(0.025, 0.02 + slot * (60 / bpm) + 0.06 - r.port.currentTime));
+    metronome.toggle();
+  }
+
+  it('pause during loops announces step, loop and beat', async () => {
+    const r = speedRig(base);
+    await pauseAtSlot(r, 4); // loop 2, beat 2 of step 1
+    expect(metronome.phase).toBe('paused');
+    expect(metronome.announcement).toBe('Paused, step 1 of 3, loop 2 of 2, beat 2 of 3');
+  });
+
+  it('resume continues at the next slot with no new count-in', async () => {
+    const r = speedRig({ ...base, countIn: true, initialCountIn: 2, repeatCountIn: 2 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.025 * 60);
+    const pos = metronome.position;
+    metronome.toggle();
+    const at = metronome.position;
+    expect(at).not.toBeNull();
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.position?.slot).toBe((at?.slot ?? -2) + 1);
+    expect(pos).not.toBeNull();
+  });
+
+  it('pause in a count-in reuses the count-in strings', async () => {
+    const r = speedRig({ ...base, countIn: true, initialCountIn: 4, repeatCountIn: 2 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    metronome.toggle();
+    expect(metronome.announcement).toMatch(/^Paused on count-in click \d of 4$/);
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.phase).toBe('running');
+    expect(metronome.announcement).toBe('Resumed');
+  });
+
+  it('Reset stops with no further click, keeps values, and the next Start begins at step 1', async () => {
+    const r = speedRig(base);
+    const record = metronome.speed;
+    await pauseAtSlot(r, 8);
+    metronome.reset();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.speed).toBe(record);
+    const n = starts(r).length;
+    advance(r, 2);
+    expect(starts(r).length).toBe(n);
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.position).toMatchObject({ slot: 0, ramp: { step: 1 } });
+  });
+
+  it('selecting another mode while running stops at once and keeps the speed record', async () => {
+    const r = speedRig(base);
+    const record = metronome.speed;
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    metronome.selectMode('plain');
+    expect(metronome.phase).toBe('settings');
+    const n = starts(r).length;
+    advance(r, 2);
+    expect(starts(r).length).toBe(n);
+    expect(metronome.speed).toBe(record);
+  });
+});
+
+describe('038 tap tempo (S15–S20)', () => {
+  /** Tap `n` times with `gapMs` between taps on the injected clock. */
+  function taps(r: Rig, n: number, gapMs = 500): void {
+    for (let i = 0; i < n; i++) {
+      if (i > 0) r.clock.advance(gapMs);
+      metronome.tapTempo();
+    }
+  }
+
+  it('S15: does nothing outside plain mode', () => {
+    for (const mode of ['ratios', 'speed'] as const) {
+      const r = rig(true, { bpm: 100 });
+      resetMetronomeForTests({ clock: r.clock, frames: r.frames }, { bpm: 100 }, {}, mode);
+      const remember = vi.spyOn(preferences, 'remember');
+      taps(r, 6);
+      expect(remember).not.toHaveBeenCalled();
+      expect(metronome.settings.bpm).toBe(100);
+      expect(metronome.announcement).toBe('');
+      vi.restoreAllMocks();
+      vi.spyOn(performance, 'now').mockReturnValue(1000);
+    }
+  });
+
+  it('S16/S17: taps 1–3 change nothing; tap 4 commits once and announces', () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    const remember = vi.spyOn(preferences, 'remember');
+    taps(r, 3);
+    expect(remember).not.toHaveBeenCalled();
+    expect(metronome.announcement).toBe('');
+    r.clock.advance(500);
+    metronome.tapTempo();
+    expect(metronome.plain.bpm).toBe(120);
+    expect(remember).toHaveBeenCalledTimes(1);
+    expect(metronome.announcement).toBe('120 BPM');
+    // An unchanged bpm neither writes nor announces.
+    metronome.dismissSoundNotice();
+    r.clock.advance(500);
+    metronome.tapTempo();
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it('S18: a tap while running retimes in place and keeps phase, position, generation', async () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.6);
+    const { generation, position } = metronome;
+    const stopped = r.port.sources.filter((s) => s.stopCalls.length > 0).length;
+    taps(r, 4, 400);
+    expect(metronome.plain.bpm).toBe(150);
+    expect(metronome.phase).toBe('running');
+    expect(metronome.generation).toBe(generation);
+    expect(metronome.position).toBe(position);
+    expect(r.port.sources.filter((s) => s.stopCalls.length > 0).length).toBeGreaterThan(stopped);
+    advance(r, 2);
+    expect(metronome.beat).toBeGreaterThan(0);
+    metronome.screenChanged();
+  });
+
+  it('S19: paused taps only commit; resume continues at slot + 1 with the new bpm', async () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    metronome.toggle();
+    await settle();
+    advance(r, 1.2);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    const slot = metronome.position?.slot ?? -1;
+    const before = starts(r).length;
+    taps(r, 4, 300);
+    expect(metronome.plain.bpm).toBe(200);
+    expect(starts(r).length).toBe(before);
+    metronome.toggle();
+    await settle();
+    advance(r, 1.5);
+    const fresh = starts(r).slice(before);
+    expect(fresh[1] - fresh[0]).toBeCloseTo(0.3, 6);
+    expect(metronome.position?.slot).toBeGreaterThan(slot);
+    metronome.screenChanged();
+  });
+
+  it('S20: reset, selectMode, screenChanged and restore clear the run; toggle does not', async () => {
+    const r = rig();
+    metronome.selectMode('plain');
+    const clears: Array<() => void> = [
+      () => metronome.reset(),
+      () => {
+        metronome.selectMode('ratios');
+        metronome.selectMode('plain');
+      },
+      () => metronome.screenChanged(),
+      () =>
+        metronome.restore({
+          ratios: metronome.settings,
+          plain: metronome.plain,
+          speed: metronome.speed,
+          mode: 'plain'
+        })
+    ];
+    for (const [i, clear] of clears.entries()) {
+      metronome.setBpm(100);
+      r.clock.advance(5000);
+      taps(r, 3);
+      clear();
+      r.clock.advance(100);
+      const remember = vi.spyOn(preferences, 'remember');
+      taps(r, 3);
+      expect(remember).not.toHaveBeenCalled();
+      remember.mockRestore();
+      expect(metronome.plain.bpm, `case ${i}`).toBe(100);
+      metronome.selectMode('plain');
+    }
+    // toggle keeps the run: 3 taps, start, 1 more tap → 4 taps.
+    metronome.setBpm(100);
+    r.clock.advance(5000);
+    taps(r, 3);
+    metronome.toggle();
+    await settle();
+    r.clock.advance(500);
+    metronome.tapTempo();
+    expect(metronome.plain.bpm).toBe(120);
+    metronome.screenChanged();
+  });
+});
+
+describe('038 plain subdivision: store contract', () => {
+  function subRig(plain: Partial<PlainSettings> = {}): Rig {
+    const r = rig(true, { countIn: false });
+    resetMetronomeForTests(
+      { clock: r.clock, frames: r.frames },
+      {},
+      { countIn: false, ...plain },
+      'plain'
+    );
+    return r;
+  }
+
+  it('S21: setPlainSubdivision accepts 1-4 as numbers or numeric strings', () => {
+    subRig();
+    for (const v of [2, '3', 4, '1']) {
+      metronome.setPlainSubdivision(v);
+      expect(metronome.plain.subdivision).toBe(Number(v));
+    }
+  });
+
+  it('S21: it ignores anything else, other phases and other modes', async () => {
+    const r = subRig();
+    for (const bad of [0, 5, 8, 2.5, '', 'x', null, undefined, true, {}]) {
+      metronome.setPlainSubdivision(bad);
+      expect(metronome.plain.subdivision).toBe(1);
+    }
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    metronome.setPlainSubdivision(3);
+    expect(metronome.plain.subdivision).toBe(1);
+    metronome.screenChanged();
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'ratios');
+    metronome.setPlainSubdivision(3);
+    expect(metronome.plain.subdivision).toBe(1);
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'speed');
+    metronome.setPlainSubdivision(3);
+    expect(metronome.plain.subdivision).toBe(1);
+  });
+
+  it('S21: a change remembers once; the same value does not write', () => {
+    subRig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.setPlainSubdivision(3);
+    metronome.setPlainSubdivision(3);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it('S22: a plain run clicks subdivision times per beat (Triplets at 90 BPM)', async () => {
+    const r = subRig({ bpm: 90, subdivision: 3 });
+    metronome.toggle();
+    await settle();
+    advance(r, 1.5);
+    const t = starts(r).sort((a, b) => a - b);
+    expect(t.length).toBeGreaterThanOrEqual(6);
+    for (let i = 1; i < 6; i++) expect(t[i] - t[i - 1]).toBeCloseTo(60 / 90 / 3, 6);
+    metronome.screenChanged();
+  });
+
+  it('S22: the count-in is one click per slot, whatever the subdivision', async () => {
+    const r = subRig({ bpm: 90, subdivision: 3, countIn: true, initialCountIn: 4 });
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.countIn).toEqual({ click: 1, total: 4 });
+    const t = starts(r).sort((a, b) => a - b);
+    advance(r, 2.5);
+    const all = starts(r).sort((a, b) => a - b);
+    expect(all[1] - all[0]).toBeCloseTo(60 / 90, 6);
+    expect(t.length).toBeGreaterThan(0);
+    metronome.screenChanged();
+  });
+
+  it('S23: sub is null for Quarter and 2/3/4 otherwise', () => {
+    subRig();
+    expect(metronome.sub).toBeNull();
+    for (const n of [2, 3, 4]) {
+      metronome.setPlainSubdivision(n);
+      expect(metronome.sub).toBe(n);
+    }
+    metronome.setPlainSubdivision(1);
+    expect(metronome.sub).toBeNull();
+  });
+
+  it('S24: Start announces the subdivision name, with and without count in', async () => {
+    subRig({ bpm: 90, subdivision: 3 });
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 90 BPM, 4 beats, 8th Triplets');
+    metronome.screenChanged();
+    subRig({ bpm: 90, subdivision: 3, countIn: true, initialCountIn: 4 });
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 90 BPM, 4 beats, 8th Triplets, count in 4');
+    metronome.screenChanged();
+  });
+
+  it('S24: Quarter keeps the 036 announcements', async () => {
+    subRig({ bpm: 90 });
+    metronome.toggle();
+    await settle();
+    expect(metronome.announcement).toBe('Started, 90 BPM, 4 beats');
+    metronome.screenChanged();
+  });
+
+  it('S25: Quarter plays the same clicks as before (every beat, no extra)', async () => {
+    const r = subRig({ bpm: 120 });
+    metronome.toggle();
+    await settle();
+    advance(r, 1.9);
+    const t = starts(r).sort((a, b) => a - b);
+    for (let i = 1; i < t.length; i++) expect(t[i] - t[i - 1]).toBeCloseTo(0.5, 6);
+    metronome.screenChanged();
   });
 });
