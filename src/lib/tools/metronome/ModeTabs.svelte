@@ -5,7 +5,11 @@
   let { mode, onselect }: { mode: MetronomeMode; onselect: (m: MetronomeMode) => void } = $props();
 
   const label = (id: MetronomeMode): string =>
-    id === 'plain' ? m.metronome_mode_plain() : m.metronome_mode_ratios();
+    id === 'plain'
+      ? m.metronome_mode_plain()
+      : id === 'speed'
+        ? m.metronome_mode_speed()
+        : m.metronome_mode_ratios();
 
   let tabs: Partial<Record<MetronomeMode, HTMLButtonElement>> = $state({});
 
@@ -43,6 +47,9 @@
         {#if id === 'plain'}
           <!-- ♩ quarter note -->
           <path d="M14 3v11.3A3.5 3.5 0 1 0 16 17.5V7h3V3z" />
+        {:else if id === 'speed'}
+          <!-- ⚡ lightning bolt -->
+          <path d="M13 2L4 14h6l-1 8 9-12h-6z" />
         {:else}
           <!-- + -->
           <path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z" />

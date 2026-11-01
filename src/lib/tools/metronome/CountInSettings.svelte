@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import type { PlainSettings } from '$lib/state/metronome-settings';
+  import type { SharedSettings } from '$lib/state/metronome-settings';
   import ValueRow from './ValueRow.svelte';
 
   let {
@@ -12,7 +12,7 @@
     onrepeatstep,
     repeat = true
   }: {
-    settings: Readonly<PlainSettings & { repeatCountIn?: number }>;
+    settings: Readonly<SharedSettings & { repeatCountIn?: number }>;
     onswitch: (on: boolean) => void;
     oninitialset: (v: number) => void;
     oninitialstep: (dir: 1 | -1) => void;

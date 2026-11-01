@@ -12,9 +12,11 @@ import type { Theme } from '$lib/prefs/schema';
 import {
   DEFAULT_PLAIN_SETTINGS,
   DEFAULT_SETTINGS,
+  DEFAULT_SPEED_SETTINGS,
   type MetronomeMode,
   type MetronomeSettings,
-  type PlainSettings
+  type PlainSettings,
+  type SpeedSettings
 } from '$lib/state/metronome-settings';
 
 /**
@@ -63,6 +65,8 @@ export interface ExpectedPreferences {
     /** 036: absent means the plain defaults. */
     readonly plain?: PlainSettings;
     /** 036: absent means 'ratios'. */
+    /** 037: absent means the speed defaults. */
+    readonly speed?: SpeedSettings;
     readonly mode?: MetronomeMode;
   };
 }
@@ -118,6 +122,7 @@ function fixture(
       metronome: {
         ratios: expected.metronome?.ratios ?? DEFAULT_SETTINGS,
         plain: expected.metronome?.plain ?? DEFAULT_PLAIN_SETTINGS,
+        speed: expected.metronome?.speed ?? DEFAULT_SPEED_SETTINGS,
         mode: expected.metronome?.mode ?? 'ratios'
       }
     },
@@ -276,7 +281,7 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('metronome-wrong-types', defaults),
   fixture('metronome-array', defaults),
   fixture('metronome-null-ratios', defaults),
-  // the unknown `speed` entry is ignored
+  // the `speed` entry holds only an unknown key: speed defaults (R-12)
   fixture('metronome-other-mode', {
     ...defaults,
     metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120, beats: 2, loop2: 5 } }
@@ -291,10 +296,10 @@ export const FIXTURES: readonly PrefsFixture[] = [
     }
   }),
   fixture('metronome-mode-plain', { ...defaults, metronome: { mode: 'plain' } }),
-  // mode "speed" is not a mode: back to Ratios, the stored ratios intact
+  // 037: mode "speed" is a mode now (R-12); the stored ratios stay intact
   fixture('metronome-bad-mode', {
     ...defaults,
-    metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120 } }
+    metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120 }, mode: 'speed' }
   }),
   // bpm 999 resets only bpm; the other plain fields and the mode keep their stored values
   fixture('metronome-plain-invalid', {
@@ -304,7 +309,47 @@ export const FIXTURES: readonly PrefsFixture[] = [
       mode: 'plain'
     }
   }),
-  fixture('metronome-plain-array', { ...defaults, metronome: { mode: 'plain' } })
+  fixture('metronome-plain-array', { ...defaults, metronome: { mode: 'plain' } }),
+  // 037 Speed Training record and selected mode
+  fixture('metronome-speed', {
+    ...defaults,
+    metronome: {
+      speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 80, targetBpm: 120, atTarget: 'stop' },
+      mode: 'speed'
+    }
+  }),
+  fixture('metronome-mode-speed', { ...defaults, metronome: { mode: 'speed' } }),
+  // startBpm 999, "90", 0, 4.5 and "HOLD" reset only themselves
+  fixture('metronome-speed-invalid', {
+    ...defaults,
+    metronome: {
+      speed: {
+        ...DEFAULT_SPEED_SETTINGS,
+        beats: 3,
+        countIn: false,
+        initialCountIn: 2
+      },
+      mode: 'speed'
+    }
+  }),
+  // target 150 below start 200 is lifted to 200 (R15)
+  fixture('metronome-speed-target-below', {
+    ...defaults,
+    metronome: {
+      speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 200, targetBpm: 200 },
+      mode: 'speed'
+    }
+  }),
+  fixture('metronome-speed-array', { ...defaults, metronome: { mode: 'speed' } }),
+  fixture('metronome-all-modes', {
+    ...defaults,
+    metronome: {
+      ratios: { ...DEFAULT_SETTINGS, bpm: 120, beats: 2, loop2: 5 },
+      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4 },
+      speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 80, targetBpm: 120, atTarget: 'stop' },
+      mode: 'speed'
+    }
+  })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

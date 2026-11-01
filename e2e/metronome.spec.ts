@@ -390,4 +390,17 @@ test.describe('metronome: tempo and beats (US3)', () => {
       });
     }
   });
+
+  test('speed training settings', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop only');
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto('/metronome');
+      await page.getByRole('tab', { name: 'Speed Training', exact: true }).click();
+      await expect(card(page)).toHaveAttribute('data-mode', 'speed');
+      await expect(card(page)).toHaveScreenshot(`metronome-speed-settings-${scheme}.png`, {
+        animations: 'disabled'
+      });
+    }
+  });
 });

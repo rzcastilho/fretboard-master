@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import type { CountInView, DotState } from '$lib/state/metronome-view';
+  import type { CountInView, DotState, SpeedStatus } from '$lib/state/metronome-view';
   import { countInDot, statusParams } from '$lib/state/metronome-view';
 
   let {
@@ -9,7 +9,8 @@
     bpm,
     sub,
     dots,
-    countIn = null
+    countIn = null,
+    speed = null
   }: {
     beat: number;
     beats: number;
@@ -17,9 +18,10 @@
     sub: number | null;
     dots: readonly DotState[];
     countIn?: CountInView | null;
+    speed?: SpeedStatus | null;
   } = $props();
 
-  const status = $derived(statusParams(beat, beats, sub, countIn));
+  const status = $derived(statusParams(beat, beats, sub, countIn, speed));
 </script>
 
 <div class="status">
@@ -30,6 +32,17 @@
       >
     {:else if status.kind === 'count-in-none'}
       <span class="part">{m.metronome_status_count_in_none({ count: status.total })}</span>
+    {:else if status.kind === 'step'}
+      <span class="part">{m.metronome_status_step({ step: status.step, steps: status.steps })}</span
+      ><span class="sep">{m.summary_separator()}</span><span class="part"
+        >{m.metronome_status_loop({ loop: status.loop, loops: status.loops })}</span
+      >
+    {:else if status.kind === 'hold'}
+      <span class="part"
+        >{m.metronome_status_step({ step: status.steps, steps: status.steps })}</span
+      ><span class="sep">{m.summary_separator()}</span><span class="part"
+        >{m.metronome_status_hold()}</span
+      >
     {:else}
       <span class="part"
         >{#if status.kind === 'beat'}{m.metronome_status_beat({

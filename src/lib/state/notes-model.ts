@@ -201,8 +201,10 @@ function describe(
   const frets = fretsText(s.region.start, s.region.end);
   if (s.selection.length === 0) {
     if (s.background === 'none') return m.notes_desc_empty();
-    const key = `notes_desc_background_${s.background}` as const;
-    return m[key]({ strings, frets });
+    const args = { strings, frets };
+    return s.background === 'all'
+      ? m.notes_desc_background_all(args)
+      : m.notes_desc_background_naturals(args);
   }
   const notes = spokenMarkerList(s.selection);
   const summary =

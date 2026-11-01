@@ -170,7 +170,7 @@ describe('subdivision ratio settings (034)', () => {
 
 describe('plain metronome settings (036)', () => {
   it('lists the modes and defaults to ratios', () => {
-    expect([...METRONOME_MODES]).toEqual(['plain', 'ratios']);
+    expect([...METRONOME_MODES]).toEqual(['plain', 'speed', 'ratios']);
     expect(DEFAULT_MODE).toBe('ratios');
   });
 
@@ -210,6 +210,7 @@ describe('plain metronome settings (036)', () => {
   it('toMode accepts the two modes and returns null otherwise, never throwing', () => {
     expect(toMode('plain')).toBe('plain');
     expect(toMode('ratios')).toBe('ratios');
-    for (const v of ['speed', 'PLAIN', 1, null, {}, undefined]) expect(toMode(v)).toBeNull();
+    expect(toMode('speed')).toBe('speed');
+    for (const v of ['SPEED', 'PLAIN', 1, null, {}, undefined]) expect(toMode(v)).toBeNull();
   });
 });

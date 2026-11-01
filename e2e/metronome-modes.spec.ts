@@ -135,7 +135,7 @@ async function expectSilent(page: Page): Promise<void> {
 }
 
 test.describe('mode tabs: structure (036 US2)', () => {
-  test('1: tab bar first, equal widths, Ratios selected, no Speed Training', async ({ page }) => {
+  test('1: tab bar first, three equal-width tabs in order, Ratios selected', async ({ page }) => {
     await page.goto('/metronome');
     const tabs = page.getByRole('tablist');
     await expect(tabs).toBeVisible();
@@ -144,13 +144,19 @@ test.describe('mode tabs: structure (036 US2)', () => {
       .first()
       .evaluate((el) => el.getAttribute('role'));
     expect(first).toBe('tablist');
-    await expect(page.getByRole('tab')).toHaveText([/Metronome/, /Ratios Training/]);
+    await expect(page.getByRole('tab')).toHaveText([
+      /Metronome/,
+      /Speed Training/,
+      /Ratios Training/
+    ]);
     await expect(tab(page, 'Ratios Training')).toHaveAttribute('aria-selected', 'true');
     await expect(tab(page, 'Metronome')).toHaveAttribute('aria-selected', 'false');
-    await expect(page.getByRole('tab', { name: /Speed/ })).toHaveCount(0);
-    const a = await tab(page, 'Metronome').boundingBox();
-    const b = await tab(page, 'Ratios Training').boundingBox();
-    expect(Math.abs((a?.width ?? 0) - (b?.width ?? 1))).toBeLessThan(1.5);
+    const widths = await Promise.all(
+      ['Metronome', 'Speed Training', 'Ratios Training'].map(
+        async (n) => (await tab(page, n).boundingBox())?.width ?? 0
+      )
+    );
+    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1.5);
   });
 });
 
@@ -210,6 +216,8 @@ test.describe('switching stops playback (036 US3)', () => {
     await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await tab(page, 'Metronome').focus();
     await page.keyboard.press('ArrowRight');
+    await expect(tab(page, 'Speed Training')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
     await expect(tab(page, 'Ratios Training')).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(tab(page, 'Metronome')).toBeFocused();
@@ -265,7 +273,7 @@ test.describe('switching stops playback (036 US3)', () => {
       metronome: {
         ratios: { bpm: 120 },
         plain: { bpm: 999, beats: 3 },
-        mode: 'speed'
+        mode: 'bogus'
       }
     });
     await page.goto('/metronome');
@@ -316,8 +324,8 @@ test.describe('tab bar across widths and languages (036 #12)', () => {
           await page.goto('/metronome');
           await expect(page.locator('html')).toHaveAttribute('lang', tag);
           const tabs = page.getByRole('tab');
-          await expect(tabs).toHaveCount(2);
-          await expect(page.locator('.tab-icon')).toHaveCount(2);
+          await expect(tabs).toHaveCount(3);
+          await expect(page.locator('.tab-icon')).toHaveCount(3);
           for (const icon of await page.locator('.tab-icon').all()) {
             await expect(icon).not.toBeVisible();
           }
@@ -338,7 +346,8 @@ test.describe('tab bar across widths and languages (036 #12)', () => {
             boxes.push({ x: b?.x ?? 0, right: (b?.x ?? 0) + (b?.width ?? 0) });
           }
           expect(boxes[0].right).toBeLessThanOrEqual(boxes[1].x + 1);
-          expect(boxes[1].right).toBeLessThanOrEqual(width);
+          expect(boxes[1].right).toBeLessThanOrEqual(boxes[2].x + 1);
+          expect(boxes[2].right).toBeLessThanOrEqual(width);
           const overflow = await page.evaluate(
             () => (document.scrollingElement?.scrollWidth ?? 0) - window.innerWidth
           );

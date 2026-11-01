@@ -22,18 +22,28 @@ describe('ModeTabs', () => {
     const tabs = screen.getAllByRole('tab');
     expect(list).toBeTruthy();
     expect(tabs.map((t) => t.id)).toEqual(METRONOME_MODES.map((m) => `metronome-tab-${m}`));
-    expect(tabs.map((t) => t.textContent?.trim())).toEqual(['Metronome', 'Ratios Training']);
-    expect(screen.queryByRole('tab', { name: /speed/i })).toBeNull();
+    expect(tabs.map((t) => t.id)).toEqual([
+      'metronome-tab-plain',
+      'metronome-tab-speed',
+      'metronome-tab-ratios'
+    ]);
+    expect(tabs.map((t) => t.textContent?.trim())).toEqual([
+      'Metronome',
+      'Speed Training',
+      'Ratios Training'
+    ]);
   });
 
   it('marks the selected tab and uses a roving tabindex', () => {
     render(ModeTabs, { mode: 'ratios', onselect: () => {} });
-    const [plain, ratios] = screen.getAllByRole('tab');
+    const [plain, speed, ratios] = screen.getAllByRole('tab');
     expect(ratios.getAttribute('aria-selected')).toBe('true');
     expect(ratios.getAttribute('tabindex')).toBe('0');
-    expect(plain.getAttribute('aria-selected')).toBe('false');
-    expect(plain.getAttribute('tabindex')).toBe('-1');
-    for (const t of [plain, ratios]) {
+    for (const t of [plain, speed]) {
+      expect(t.getAttribute('aria-selected')).toBe('false');
+      expect(t.getAttribute('tabindex')).toBe('-1');
+    }
+    for (const t of [plain, speed, ratios]) {
       expect(t.getAttribute('aria-controls')).toBe('metronome-mode-panel');
     }
   });
@@ -46,15 +56,20 @@ describe('ModeTabs', () => {
       expect(svg?.getAttribute('focusable')).toBe('false');
     }
     expect(screen.getByRole('tab', { name: 'Metronome' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Speed Training' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Ratios Training' })).toBeTruthy();
   });
 
-  it('arrow keys wrap, Home/End jump, and none of them select', async () => {
+  it('arrow keys wrap across three tabs, Home/End jump, and none of them select', async () => {
     const onselect = vi.fn();
     render(ModeTabs, { mode: 'ratios', onselect });
-    const [plain, ratios] = screen.getAllByRole('tab');
+    const [plain, speed, ratios] = screen.getAllByRole('tab');
     ratios.focus();
     await fireEvent.keyDown(ratios, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(plain);
+    await fireEvent.keyDown(plain, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(speed);
+    await fireEvent.keyDown(speed, { key: 'ArrowLeft' });
     expect(document.activeElement).toBe(plain);
     await fireEvent.keyDown(plain, { key: 'ArrowLeft' });
     expect(document.activeElement).toBe(ratios);

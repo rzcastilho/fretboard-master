@@ -7,7 +7,8 @@ import { startSession } from '../../../src/lib/prefs/session';
 import { FIXTURE_BY_NAME } from './fixtures';
 import {
   DEFAULT_PLAIN_SETTINGS,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
+  DEFAULT_SPEED_SETTINGS
 } from '../../../src/lib/state/metronome-settings';
 import { fakeStorage } from './support';
 
@@ -181,7 +182,11 @@ describe('two sessions, one storage (US4, FR-015)', () => {
 
 describe('metronome (035)', () => {
   const ratios = { ...DEFAULT_SETTINGS, bpm: 120, beats: 2 };
-  const rest = { plain: DEFAULT_PLAIN_SETTINGS, mode: 'ratios' } as const;
+  const rest = {
+    plain: DEFAULT_PLAIN_SETTINGS,
+    speed: DEFAULT_SPEED_SETTINGS,
+    mode: 'ratios'
+  } as const;
 
   it('remember writes once, and is skipped when the record is unchanged', () => {
     const s = fakeStorage();

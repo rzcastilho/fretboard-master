@@ -6,6 +6,7 @@
   import { matchMetronomeKey } from '$lib/state/metronome-keys';
   import { metronome } from '$lib/state/metronome.svelte';
   import { toShortcutEvent } from '$lib/state/shortcuts';
+  import AtTargetSelect from './AtTargetSelect.svelte';
   import ModeTabs from './ModeTabs.svelte';
   import CountInSettings from './CountInSettings.svelte';
   import RunControls from './RunControls.svelte';
@@ -24,6 +25,15 @@
     await tick();
     mainButton?.focus();
   }
+
+  /** Focus Start Training when a Stop run ends, never on mount (plan.md note 5). */
+  let seenFinished = metronome.finished;
+  $effect(() => {
+    const n = metronome.finished;
+    if (n === seenFinished) return;
+    seenFinished = n;
+    void tick().then(() => startButton?.focus());
+  });
 
   async function reset(): Promise<void> {
     metronome.reset();
@@ -67,45 +77,123 @@
     aria-labelledby="metronome-tab-{metronome.mode}"
   >
     {#if metronome.phase === 'settings'}
-      <ValueRow
-        id="metronome-bpm"
-        label={m.metronome_bpm_label()}
-        min={30}
-        max={300}
-        value={metronome.current.bpm}
-        valuetext="{metronome.current.bpm} {m.metronome_bpm_unit()}"
-        decreaseLabel={m.metronome_bpm_decrease()}
-        increaseLabel={m.metronome_bpm_increase()}
-        onset={(v) => metronome.setBpm(v)}
-        onstep={(d) => metronome.stepBpm(d)}
-      />
-      <ValueRow
-        id="metronome-beats"
-        label={m.metronome_beats_label()}
-        min={1}
-        max={16}
-        value={metronome.current.beats}
-        valuetext={String(metronome.current.beats)}
-        decreaseLabel={m.metronome_beats_decrease()}
-        increaseLabel={m.metronome_beats_increase()}
-        onset={(v) => metronome.setBeats(v)}
-        onstep={(d) => metronome.stepBeats(d)}
-      />
-      <CountInSettings
-        settings={metronome.current}
-        repeat={metronome.mode === 'ratios'}
-        onswitch={(on) => metronome.setCountIn(on)}
-        oninitialset={(v) => metronome.setInitialCountIn(v)}
-        oninitialstep={(d) => metronome.stepInitialCountIn(d)}
-        onrepeatset={(v) => metronome.setRepeatCountIn(v)}
-        onrepeatstep={(d) => metronome.stepRepeatCountIn(d)}
-      />
-      {#if metronome.mode === 'ratios'}
-        <RatioSettings
-          settings={metronome.settings}
-          onswitch={(on) => metronome.setRatio(on)}
-          onloop1={metronome.setSubdivision}
-          onloop2={metronome.setLoop2}
+      {#if metronome.mode !== 'speed'}
+        <ValueRow
+          id="metronome-bpm"
+          label={m.metronome_bpm_label()}
+          min={30}
+          max={300}
+          value={metronome.bpm}
+          valuetext="{metronome.bpm} {m.metronome_bpm_unit()}"
+          decreaseLabel={m.metronome_bpm_decrease()}
+          increaseLabel={m.metronome_bpm_increase()}
+          onset={(v) => metronome.setBpm(v)}
+          onstep={(d) => metronome.stepBpm(d)}
+        />
+        <ValueRow
+          id="metronome-beats"
+          label={m.metronome_beats_label()}
+          min={1}
+          max={16}
+          value={metronome.current.beats}
+          valuetext={String(metronome.current.beats)}
+          decreaseLabel={m.metronome_beats_decrease()}
+          increaseLabel={m.metronome_beats_increase()}
+          onset={(v) => metronome.setBeats(v)}
+          onstep={(d) => metronome.stepBeats(d)}
+        />
+        <CountInSettings
+          settings={metronome.current}
+          repeat={metronome.mode === 'ratios'}
+          onswitch={(on) => metronome.setCountIn(on)}
+          oninitialset={(v) => metronome.setInitialCountIn(v)}
+          oninitialstep={(d) => metronome.stepInitialCountIn(d)}
+          onrepeatset={(v) => metronome.setRepeatCountIn(v)}
+          onrepeatstep={(d) => metronome.stepRepeatCountIn(d)}
+        />
+        {#if metronome.mode === 'ratios'}
+          <RatioSettings
+            settings={metronome.settings}
+            onswitch={(on) => metronome.setRatio(on)}
+            onloop1={metronome.setSubdivision}
+            onloop2={metronome.setLoop2}
+          />
+        {/if}
+      {/if}
+      {#if metronome.mode === 'speed'}
+        <ValueRow
+          id="metronome-start-bpm"
+          label={m.metronome_start_bpm_label()}
+          min={30}
+          max={300}
+          value={metronome.speed.startBpm}
+          valuetext="{metronome.speed.startBpm} {m.metronome_bpm_unit()}"
+          decreaseLabel={m.metronome_start_bpm_decrease()}
+          increaseLabel={m.metronome_start_bpm_increase()}
+          onset={(v) => metronome.setStartBpm(v)}
+          onstep={(d) => metronome.stepStartBpm(d)}
+        />
+        <ValueRow
+          id="metronome-target-bpm"
+          label={m.metronome_target_bpm_label()}
+          min={30}
+          max={300}
+          floor={metronome.speed.startBpm}
+          value={metronome.speed.targetBpm}
+          valuetext="{metronome.speed.targetBpm} {m.metronome_bpm_unit()}"
+          decreaseLabel={m.metronome_target_bpm_decrease()}
+          increaseLabel={m.metronome_target_bpm_increase()}
+          onset={(v) => metronome.setTargetBpm(v)}
+          onstep={(d) => metronome.stepTargetBpm(d)}
+        />
+        <ValueRow
+          id="metronome-increment"
+          label={m.metronome_increment_label()}
+          min={1}
+          max={20}
+          value={metronome.speed.increment}
+          valuetext="{metronome.speed.increment} {m.metronome_bpm_unit()}"
+          decreaseLabel={m.metronome_increment_decrease()}
+          increaseLabel={m.metronome_increment_increase()}
+          onset={(v) => metronome.setIncrement(v)}
+          onstep={(d) => metronome.stepIncrement(d)}
+        />
+        <ValueRow
+          id="metronome-loops"
+          label={m.metronome_loops_label()}
+          min={1}
+          max={16}
+          value={metronome.speed.loops}
+          valuetext={String(metronome.speed.loops)}
+          decreaseLabel={m.metronome_loops_decrease()}
+          increaseLabel={m.metronome_loops_increase()}
+          onset={(v) => metronome.setLoops(v)}
+          onstep={(d) => metronome.stepLoops(d)}
+        />
+        <ValueRow
+          id="metronome-beats"
+          label={m.metronome_beats_label()}
+          min={1}
+          max={16}
+          value={metronome.speed.beats}
+          valuetext={String(metronome.speed.beats)}
+          decreaseLabel={m.metronome_beats_decrease()}
+          increaseLabel={m.metronome_beats_increase()}
+          onset={(v) => metronome.setBeats(v)}
+          onstep={(d) => metronome.stepBeats(d)}
+        />
+        <CountInSettings
+          settings={metronome.speed}
+          repeat={true}
+          onswitch={(on) => metronome.setCountIn(on)}
+          oninitialset={(v) => metronome.setInitialCountIn(v)}
+          oninitialstep={(d) => metronome.stepInitialCountIn(d)}
+          onrepeatset={(v) => metronome.setRepeatCountIn(v)}
+          onrepeatstep={(d) => metronome.stepRepeatCountIn(d)}
+        />
+        <AtTargetSelect
+          value={metronome.speed.atTarget}
+          onchange={(v) => metronome.setAtTarget(v)}
         />
       {/if}
       <button type="button" class="start" bind:this={startButton} onclick={start}>
@@ -118,10 +206,11 @@
       <StatusBox
         beat={metronome.beat}
         beats={metronome.current.beats}
-        bpm={metronome.current.bpm}
+        bpm={metronome.bpm}
         sub={metronome.sub}
         dots={metronome.dots}
         countIn={metronome.countIn}
+        speed={metronome.speedStatus}
       />
       <RunControls
         phase={metronome.phase}

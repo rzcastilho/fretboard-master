@@ -9,7 +9,8 @@ import { notes, resetNotesForTests } from '../../../src/lib/state/notes.svelte';
 import { playback, resetPlaybackForTests } from '../../../src/lib/state/playback.svelte';
 import {
   DEFAULT_PLAIN_SETTINGS,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
+  DEFAULT_SPEED_SETTINGS
 } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
@@ -499,9 +500,10 @@ describe('metronome mode and plain settings (036)', () => {
     expect(remember).not.toHaveBeenCalled();
   });
 
-  it('an invalid mode opens on Ratios; an invalid plain value takes its default', () => {
+  it('a stored mode "speed" opens Speed Training; an invalid plain value takes its default', () => {
     preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-bad-mode'].raw }));
-    expect(metronome.mode).toBe('ratios');
+    expect(metronome.mode).toBe('speed');
+    expect(metronome.speed).toEqual(DEFAULT_SPEED_SETTINGS);
     expect(metronome.settings.bpm).toBe(120);
     resetMetronomeForTests();
     resetPreferencesForTests();
@@ -529,5 +531,29 @@ describe('metronome mode and plain settings (036)', () => {
     preferences.start(s);
     metronome.selectMode('plain');
     expect(JSON.parse(s.data.get(PREFS_KEY) as string).metronome.mode).toBe('plain');
+  });
+});
+
+describe('metronome speed settings (037)', () => {
+  it('start() restores the speed record and the mode without writing', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-speed'].raw });
+    const remember = vi.spyOn(preferences, 'remember');
+    preferences.start(s);
+    expect(metronome.mode).toBe('speed');
+    expect(metronome.speed).toEqual({
+      ...DEFAULT_SPEED_SETTINGS,
+      startBpm: 80,
+      targetBpm: 120,
+      atTarget: 'stop'
+    });
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it('erase() returns the speed record to the defaults and the mode to Ratios', () => {
+    preferences.start(fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-all-modes'].raw }));
+    expect(metronome.speed.startBpm).toBe(80);
+    preferences.erase();
+    expect(metronome.speed).toEqual(DEFAULT_SPEED_SETTINGS);
+    expect(metronome.mode).toBe('ratios');
   });
 });

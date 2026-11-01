@@ -6,7 +6,11 @@ const goto = vi.fn();
 vi.mock('$app/navigation', () => ({ goto: (...args: unknown[]) => goto(...args) }));
 
 import ErasePreferences from '../../src/lib/shell/ErasePreferences.svelte';
-import { DEFAULT_PLAIN_SETTINGS, DEFAULT_SETTINGS } from '../../src/lib/state/metronome-settings';
+import {
+  DEFAULT_PLAIN_SETTINGS,
+  DEFAULT_SETTINGS,
+  DEFAULT_SPEED_SETTINGS
+} from '../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../src/lib/state/metronome.svelte';
 import { preferences, resetPreferencesForTests } from '../../src/lib/state/preferences.svelte';
 
@@ -113,5 +117,21 @@ describe('Erase and the metronome mode (036)', () => {
     expect(metronome.mode).toBe('ratios');
     expect(metronome.plain).toEqual(DEFAULT_PLAIN_SETTINGS);
     expect(metronome.settings).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe('Erase and the Speed Training record (037)', () => {
+  it('Erase returns the speed record to the defaults and the mode to Ratios', async () => {
+    metronome.restore({
+      ratios: DEFAULT_SETTINGS,
+      plain: DEFAULT_PLAIN_SETTINGS,
+      speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 80, targetBpm: 120, atTarget: 'stop' },
+      mode: 'speed'
+    });
+    render(ErasePreferences);
+    await fireEvent.click(opener());
+    await fireEvent.click(screen.getByRole('button', { name: 'Erase' }));
+    expect(metronome.mode).toBe('ratios');
+    expect(metronome.speed).toEqual(DEFAULT_SPEED_SETTINGS);
   });
 });

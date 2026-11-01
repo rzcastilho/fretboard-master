@@ -15,6 +15,13 @@ import {
   type RunPlan,
   type SlotPosition
 } from './metronome-cycle';
+import {
+  rampClickAt,
+  rampOffset,
+  rampSlotFloor,
+  toRampPlan,
+  type RampPlan
+} from './metronome-ramp';
 
 export const START_LEAD_S = 0.02;
 export const HORIZON_S = 1.5;
@@ -46,6 +53,8 @@ export interface SchedulerEvents {
   onCountIn(click: number, at: SlotPosition & { readonly kind: 'count-in' }): void;
   onSuspended(): void;
   onSoundUnavailable(): void;
+  /** Stop ramps only: audible time reached the end of the run. Fired once, then not live. */
+  onEnd?(): void;
 }
 
 export interface SegmentStart {
@@ -60,13 +69,23 @@ export interface SegmentStart {
     readonly clicksPerBeat: number;
     readonly repeatCountIn: number;
   };
+  /**
+   * Speed Training (037): a tempo ramp. When present, `clicksPerBeat` and `alternate` are
+   * ignored (one click per beat) and `bpm` is only the fallback for an invalid `bpms`.
+   */
+  readonly ramp?: {
+    readonly bpms: readonly number[];
+    readonly loops: number;
+    readonly repeatCountIn: number;
+    readonly atTarget: 'hold' | 'stop';
+  };
   /** Run-global slot to begin at; absent or invalid means 0. */
   readonly startSlot?: number;
   readonly run: number;
   readonly pressedAtMs: number;
 }
 
-export type HaltReason = 'pause' | 'reset' | 'leave' | 'suspend';
+export type HaltReason = 'pause' | 'reset' | 'leave' | 'suspend' | 'end';
 
 export type HaltedAt = SlotPosition | { readonly kind: 'none' };
 
@@ -83,6 +102,8 @@ export interface Grid {
   readonly startSlot: number;
   /** Run-global index of the first click of `startSlot`. */
   readonly startIndex: number;
+  /** Speed Training: the tempo ramp; `period` is then unused. */
+  readonly ramp?: RampPlan;
 }
 
 /**
@@ -90,18 +111,24 @@ export interface Grid {
  * integer evaluated first, so nothing accumulates.
  */
 export function clickTime(g: Grid, c: CycleClick): number {
+  if (g.ramp) return g.anchor + (rampOffset(g.ramp, c.slot) - rampOffset(g.ramp, g.startSlot));
   const n = c.position.kind === 'beat' ? c.position.clicksPerBeat : 1;
   return g.anchor + (c.slot - g.startSlot) * g.period + (c.sub * g.period) / n;
 }
 
-const timeOf = (g: Grid, index: number): number => clickTime(g, clickAt(g.plan, index));
+const clickOf = (g: Grid, index: number): CycleClick =>
+  g.ramp ? rampClickAt(g.ramp, index) : clickAt(g.plan, index);
+
+const timeOf = (g: Grid, index: number): number => clickTime(g, clickOf(g, index));
 
 /** First click index worth scheduling at `now` (skip-forward, never a burst). */
 export function skipTo(g: Grid, now: number): number {
   const target = now + START_LEAD_S;
   const u = target - g.anchor;
   if (u <= 0) return g.startIndex;
-  let k = Math.max(g.startIndex, slotStart(g.plan, g.startSlot + Math.floor(u / g.period)));
+  let k = g.ramp
+    ? Math.max(g.startIndex, rampSlotFloor(g.ramp, u + rampOffset(g.ramp, g.startSlot)))
+    : Math.max(g.startIndex, slotStart(g.plan, g.startSlot + Math.floor(u / g.period)));
   while (k > g.startIndex && timeOf(g, k - 1) >= target) k--;
   while (timeOf(g, k) < target) k++;
   return k;
@@ -111,10 +138,12 @@ export function skipTo(g: Grid, now: number): number {
 export function indexAt(g: Grid, t: number): number {
   const u = t - g.anchor;
   if (u < -1e-9) return -1;
-  let k = Math.max(
-    g.startIndex,
-    slotStart(g.plan, g.startSlot + Math.max(0, Math.floor(u / g.period + 1e-9)))
-  );
+  let k = g.ramp
+    ? Math.max(g.startIndex, rampSlotFloor(g.ramp, u + rampOffset(g.ramp, g.startSlot) + 1e-9))
+    : Math.max(
+        g.startIndex,
+        slotStart(g.plan, g.startSlot + Math.max(0, Math.floor(u / g.period + 1e-9)))
+      );
   while (timeOf(g, k + 1) <= t + 1e-9) k++;
   return timeOf(g, k) <= t + 1e-9 ? k : -1;
 }
@@ -171,7 +200,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   }
 
   function schedule(g: Grid & { run: number; pressedAtMs: number }, k: number): void {
-    const c = clickAt(g.plan, k);
+    const c = clickOf(g, k);
     const when = clickTime(g, c);
     if (visual || !sink) return;
     const bufs = buffersFor(sink);
@@ -200,6 +229,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
 
   function pump(g: number): void {
     if (g !== gen || !seg) return;
+    if (endReached()) return finish();
     const t = now();
     if (sink && !visual && sink.port.state !== 'running' && !resuming) {
       resuming = true;
@@ -222,7 +252,8 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       if (seg.anchor < ct + START_LEAD_S / 2) seg = { ...seg, anchor: ct + START_LEAD_S };
     }
     if (timeOf(seg, next) < t) next = Math.max(next, skipTo(seg, t));
-    while (timeOf(seg, next) <= t + HORIZON_S) {
+    const endSlot = seg.ramp?.endSlot ?? Infinity;
+    while (next < endSlot && timeOf(seg, next) <= t + HORIZON_S) {
       schedule(seg, next);
       next++;
     }
@@ -230,17 +261,40 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
     timer = clock.setTimeout(() => pump(g), TICK_MS);
   }
 
+  /** Stop ramps: audible time has reached the end of the run. */
+  function endReached(): boolean {
+    const r = seg?.ramp;
+    if (!seg || !r || r.endSlot === null) return false;
+    const endAt = seg.anchor + (r.tailT0 - rampOffset(r, seg.startSlot));
+    return now() - latency() >= endAt;
+  }
+
+  /** The run ended by itself: tear down like `halt`, then tell the owner once. */
+  function finish(): void {
+    if (!live || !seg) return;
+    if (sink && !visual) log({ type: 'click-cancel', run: seg.run, count: 0, reason: 'end' });
+    pending = [];
+    if (timer !== null) clock.clearTimeout(timer);
+    if (frame !== null) frames.cancel(frame);
+    timer = frame = null;
+    gen++;
+    live = false;
+    seg = null;
+    events.onEnd?.();
+  }
+
   function frameLoop(g: number): void {
     if (g !== gen || !seg) return;
     const k = audibleIndex();
     if (k >= 0) {
-      const { slot, position } = clickAt(seg.plan, k);
+      const { slot, position } = clickOf(seg, k);
       if (slot > reported) {
         reported = slot;
         if (position.kind === 'count-in') events.onCountIn(position.click, position);
         else events.onBeat(position.beat, position);
       }
     }
+    if (endReached()) return finish();
     frame = frames.request(() => frameLoop(g));
   }
 
@@ -253,9 +307,13 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       alternate: segment.alternate
     });
     const startSlot = toStartSlot(segment.startSlot);
-    const startIndex = slotStart(plan, startSlot);
+    const ramp = segment.ramp
+      ? toRampPlan(segment.beats, segment.initialCountIn ?? 0, segment.bpm, segment.ramp)
+      : undefined;
+    const startIndex = ramp ? startSlot : slotStart(plan, startSlot);
     seg = {
       plan,
+      ...(ramp ? { ramp } : {}),
       anchor: now() + START_LEAD_S,
       period: 60 / segment.bpm,
       startSlot,
@@ -299,7 +357,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       const k = audibleIndex();
       let halted: HaltedAt = { kind: 'none' };
       if (seg && k >= 0) {
-        halted = clickAt(seg.plan, k).position;
+        halted = clickOf(seg, k).position;
       }
       const t = now();
       let count = 0;

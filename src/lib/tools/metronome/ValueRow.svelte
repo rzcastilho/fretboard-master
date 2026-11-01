@@ -4,6 +4,7 @@
     label,
     min,
     max,
+    floor,
     value,
     valuetext,
     decreaseLabel,
@@ -15,6 +16,8 @@
     label: string;
     min: number;
     max: number;
+    /** The − button is disabled at `value <= floor`; defaults to `min`. */
+    floor?: number;
     value: number;
     valuetext: string;
     decreaseLabel: string;
@@ -26,11 +29,19 @@
   const MINUS = '−';
   const PLUS = '+';
 
+  let input: HTMLInputElement | undefined = $state();
+
+  /** Commit, then snap the slider back to the prop when the store clamped the value (R-07). */
+  function commit(v: number): void {
+    onset(v);
+    if (input && Number(input.value) !== value) input.value = String(value);
+  }
+
   /** PageUp/PageDown move by 10 (clamped by the store); Home/End stay native. */
   function onKeydown(event: KeyboardEvent): void {
     if (event.key !== 'PageUp' && event.key !== 'PageDown') return;
     event.preventDefault();
-    onset(value + (event.key === 'PageUp' ? 10 : -10));
+    commit(value + (event.key === 'PageUp' ? 10 : -10));
   }
 </script>
 
@@ -38,13 +49,14 @@
   <label for={id}>{label}</label>
   <input
     {id}
+    bind:this={input}
     type="range"
     {min}
     {max}
     step="1"
     {value}
     aria-valuetext={valuetext}
-    oninput={(e: Event) => onset(Number((e.currentTarget as HTMLInputElement).value))}
+    oninput={(e: Event) => commit(Number((e.currentTarget as HTMLInputElement).value))}
     onkeydown={onKeydown}
   />
   <div class="pill">
@@ -53,7 +65,7 @@
       class="btn step"
       aria-label={decreaseLabel}
       title={decreaseLabel}
-      disabled={value <= min}
+      disabled={value <= (floor ?? min)}
       onclick={() => onstep(-1)}>{MINUS}</button
     >
     <output aria-live="off" for={id}>{value}</output>

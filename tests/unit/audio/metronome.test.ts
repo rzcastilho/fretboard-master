@@ -895,3 +895,140 @@ describe('alternating cycle (034)', () => {
     expect(countIns).toEqual([]);
   });
 });
+
+describe('tempo ramp (037, E6/E8/E10)', () => {
+  const rampOf = (atTarget: 'hold' | 'stop', bpms = [120, 240]) =>
+    ({ bpms, loops: 1, repeatCountIn: 1, atTarget }) as const;
+  // bpms 120→240, N=2, L=1, k=1, r=1: slots 0 (count-in), 1-2 (step 1), 3 (repeat), 4-5 (step 2)
+  // times: 0, .5, 1, 1.5, 2, 2.25 ; tailT0 = 2.5
+  const base = { beats: 2, initialCountIn: 1 } as const;
+  const clickLog = () =>
+    (globalThis.__fmAudioLog as unknown as { type: string }[]).filter(
+      (e) => e.type === 'click'
+    ) as unknown as { slot: number; when: number; beat: number; countIn: number | null }[];
+
+  it('E6: Stop never schedules an index >= endSlot and fires onEnd once', async () => {
+    globalThis.__fmAudioLog = [];
+    const { scheduler, begin, advance, port, events } = setup();
+    const onEnd = vi.fn();
+    (events as { onEnd?: () => void }).onEnd = onEnd;
+    await begin({ ...base, ramp: rampOf('stop') });
+    advance(500);
+    expect(onEnd).not.toHaveBeenCalled();
+    advance(5000);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(scheduler.live).toBe(false);
+    expect(Math.max(...clickLog().map((c) => c.slot))).toBe(5);
+    expect(clickLog()).toHaveLength(6);
+    expect(scheduler.halt('leave')).toEqual({ kind: 'none' });
+    expect(port.sources.length).toBe(6);
+    const cancel = (
+      globalThis.__fmAudioLog as unknown as { type: string; reason?: string; count?: number }[]
+    ).filter((e) => e.type === 'click-cancel');
+    expect(cancel).toEqual([expect.objectContaining({ reason: 'end', count: 0 })]);
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('E6: onEnd fires at anchor + tailT0 once audible, not before', async () => {
+    const { begin, advance, port, events, scheduler } = setup();
+    const onEnd = vi.fn();
+    (events as { onEnd?: () => void }).onEnd = onEnd;
+    const t0 = port.currentTime;
+    await begin({ ...base, ramp: rampOf('stop') });
+    advance(2400); // 2.4 s after start < 2.52 (anchor = t0 + lead, end at +2.5)
+    expect(onEnd).not.toHaveBeenCalled();
+    advance(200);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(port.currentTime - t0).toBeGreaterThan(2.5);
+    expect(scheduler.live).toBe(false);
+  });
+
+  it('E6: onEnd also fires from the pump timer when frames never run', async () => {
+    const { begin, advance, events, frames } = setup();
+    const onEnd = vi.fn();
+    (events as { onEnd?: () => void }).onEnd = onEnd;
+    await begin({ ...base, ramp: rampOf('stop') });
+    advance(4000);
+    expect(frames.pendingCount).toBeLessThanOrEqual(1);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('E6: onEnd also fires with no sink', async () => {
+    const { begin, advance, events } = setup({ sink: 'none' });
+    const onEnd = vi.fn();
+    (events as { onEnd?: () => void }).onEnd = onEnd;
+    await begin({ ...base, ramp: rampOf('stop') });
+    advance(4000);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('E7: Hold never ends and keeps scheduling at the target tempo', async () => {
+    globalThis.__fmAudioLog = [];
+    const { scheduler, begin, advance, events } = setup();
+    const onEnd = vi.fn();
+    (events as { onEnd?: () => void }).onEnd = onEnd;
+    await begin({ ...base, ramp: rampOf('hold') });
+    advance(10000);
+    expect(onEnd).not.toHaveBeenCalled();
+    expect(scheduler.live).toBe(true);
+    const c = clickLog();
+    expect(c.length).toBeGreaterThan(20);
+    const a = c.filter((x) => x.slot === 20)[0];
+    const b = c.filter((x) => x.slot === 21)[0];
+    expect(b.when - a.when).toBeCloseTo(0.25, 9);
+    scheduler.halt('leave');
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('E8: start at a later slot resumes inside a block, across a boundary, in the tail', async () => {
+    for (const startSlot of [2, 3, 5, 9]) {
+      globalThis.__fmAudioLog = [];
+      const { scheduler, begin, advance, port } = setup();
+      await begin({ ...base, ramp: rampOf('hold'), startSlot });
+      advance(1500);
+      const c = clickLog();
+      expect(c[0].slot).toBe(startSlot);
+      expect(c[0].when).toBeCloseTo(0.02, 9);
+      // times relative to the first scheduled slot follow the ramp offsets
+      const off = [0, 0.5, 1, 1.5, 2, 2.25];
+      for (const x of c.slice(1, 6)) {
+        const o = (s: number) => (s < 6 ? off[s] : 2.5 + (s - 6) * 0.25);
+        expect(x.when - c[0].when).toBeCloseTo(o(x.slot) - o(startSlot), 9);
+      }
+      scheduler.halt('leave');
+      expect(port.sources.length).toBeGreaterThan(0);
+    }
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('E10: click log entries for ramp runs: 1-based beat, countIn number or null', async () => {
+    globalThis.__fmAudioLog = [];
+    const { scheduler, begin, advance } = setup();
+    await begin({ ...base, ramp: rampOf('stop') });
+    advance(1200);
+    scheduler.halt('leave');
+    expect(
+      clickLog()
+        .slice(0, 4)
+        .map((c) => [c.slot, c.beat, c.countIn])
+    ).toEqual([
+      [0, 0, 1],
+      [1, 1, null],
+      [2, 2, null],
+      [3, 0, 1]
+    ]);
+    globalThis.__fmAudioLog = [];
+  });
+
+  it('visual-only ramp runs report positions with ramp fields', async () => {
+    const { begin, advance, frames, beatAts, scheduler } = setup({ sink: 'none' });
+    await begin({ ...base, ramp: rampOf('hold') });
+    for (let i = 0; i < 40; i++) {
+      advance(100);
+      frames.flush();
+    }
+    scheduler.halt('leave');
+    expect(beatAts.every((a) => (a as { ramp?: unknown }).ramp !== undefined)).toBe(true);
+    expect(beatAts.length).toBeGreaterThan(5);
+  });
+});
