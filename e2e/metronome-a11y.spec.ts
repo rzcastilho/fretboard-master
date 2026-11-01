@@ -2,15 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { countInOff, ratioOff, runAxe } from './support/helpers';
 
-const panel = (page: Page) => page.getByRole('region', { name: 'Ratios Training' });
+// The card (data-phase, data-mode) wraps the tab bar and the tabpanel.
+const card = (page: Page) => page.locator('section.panel');
 const live = (page: Page) => page.locator('[role="status"][aria-live="polite"].sr-only');
 
 async function toPaused(page: Page): Promise<void> {
   await countInOff(page);
   await page.getByRole('button', { name: 'Start Training' }).click();
-  await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+  await expect(card(page)).toHaveAttribute('data-phase', 'running');
   await page.getByRole('button', { name: 'Pause' }).click();
-  await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
+  await expect(card(page)).toHaveAttribute('data-phase', 'paused');
 }
 
 test.describe('metronome a11y: axe (SC-008)', () => {
@@ -21,10 +22,10 @@ test.describe('metronome a11y: axe (SC-008)', () => {
       await runAxe(page);
       await countInOff(page);
       await page.getByRole('button', { name: 'Start Training' }).click();
-      await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+      await expect(card(page)).toHaveAttribute('data-phase', 'running');
       await runAxe(page);
       await page.getByRole('button', { name: 'Pause' }).click();
-      await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
+      await expect(card(page)).toHaveAttribute('data-phase', 'paused');
       await runAxe(page);
     });
   }
@@ -49,7 +50,7 @@ test.describe('metronome a11y: subdivision select (032)', () => {
     await page.goto('/metronome');
     await runAxe(page);
     await page.getByRole('button', { name: 'Start Training' }).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await runAxe(page);
   });
 });
@@ -60,21 +61,21 @@ test.describe('metronome a11y: keyboard only (SC-007)', () => {
     const start = page.getByRole('button', { name: 'Start Training' });
     await start.focus();
     await page.keyboard.press('Enter');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     // Focus stays inside the panel, on the main button, which now reads Pause.
     const main = page.getByRole('button', { name: 'Pause' });
     await expect(main).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
+    await expect(card(page)).toHaveAttribute('data-phase', 'paused');
     await expect(page.getByRole('button', { name: 'Resume' })).toBeFocused();
     await page.keyboard.press('Space');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await page.keyboard.press('Space');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
+    await expect(card(page)).toHaveAttribute('data-phase', 'paused');
     const reset = page.getByRole('button', { name: 'Reset' });
     await reset.focus();
     await page.keyboard.press('Enter');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     await expect(page.getByRole('button', { name: 'Start Training' })).toBeFocused();
   });
 
@@ -100,7 +101,7 @@ test.describe('metronome a11y: live region', () => {
     await countInOff(page);
     await ratioOff(page);
     await page.getByRole('button', { name: 'Start Training' }).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await expect(live(page)).toHaveText(/^Started, 85 BPM, 4 beats, 8th Triplets$/);
     // Observe the region across several beats: its text must not change.
     const seen = await page.evaluate(
@@ -182,7 +183,7 @@ test.describe('metronome a11y: contrast, forced colours and motion', () => {
     await page.goto('/metronome');
     await countInOff(page);
     await page.getByRole('button', { name: 'Start Training' }).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     const durations = await page
       .locator('.dot')
       .evaluateAll((els) => els.map((e) => getComputedStyle(e).transitionDuration));

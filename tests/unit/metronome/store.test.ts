@@ -1,15 +1,91 @@
 // @vitest-environment jsdom
+import fc from 'fast-check';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClickSink } from '../../../src/lib/audio/metronome';
 import {
+  DEFAULT_PLAIN_SETTINGS,
   DEFAULT_SETTINGS,
-  type MetronomeSettings
+  type MetronomeSettings,
+  type PlainSettings
 } from '../../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames, type FakeSource } from '../audio/support/fake-audio';
+
+describe('036 persistence (T026)', () => {
+  it('selectMode remembers the full object, then not for the active tab or invalid input', () => {
+    rig(true, { bpm: 120 });
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.selectMode('plain');
+    expect(remember).toHaveBeenCalledTimes(1);
+    expect(remember).toHaveBeenCalledWith({
+      metronome: { ratios: metronome.settings, plain: metronome.plain, mode: 'plain' }
+    });
+    remember.mockClear();
+    for (const v of ['plain', 'speed', null, 3]) metronome.selectMode(v);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it('plain and Ratios changes write the same full object; equal values do not write', () => {
+    rig(true, { countIn: true });
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.selectMode('plain');
+    remember.mockClear();
+    const plainCases: Array<[string, () => void]> = [
+      ['setBpm', () => metronome.setBpm(100)],
+      ['stepBeats', () => metronome.stepBeats(-1)],
+      ['setBeats', () => metronome.setBeats(5)],
+      ['setCountIn', () => metronome.setCountIn(false)],
+      ['setInitialCountIn', () => metronome.setInitialCountIn(2)]
+    ];
+    for (const [name, call] of plainCases) {
+      remember.mockClear();
+      call();
+      expect(remember, name).toHaveBeenCalledTimes(1);
+      expect(remember, name).toHaveBeenCalledWith({
+        metronome: { ratios: metronome.settings, plain: metronome.plain, mode: 'plain' }
+      });
+    }
+    remember.mockClear();
+    metronome.setBpm(100);
+    metronome.setCountIn(false);
+    expect(remember).not.toHaveBeenCalled();
+    metronome.selectMode('ratios');
+    remember.mockClear();
+    metronome.setBpm(130);
+    expect(remember).toHaveBeenCalledWith({
+      metronome: {
+        ratios: expect.objectContaining({ bpm: 130 }),
+        plain: expect.objectContaining({ bpm: 100, beats: 5 }),
+        mode: 'ratios'
+      }
+    });
+  });
+
+  it('a storage failure does not block the tool', () => {
+    rig();
+    resetPreferencesForTests();
+    expect(() => metronome.selectMode('plain')).not.toThrow();
+    expect(metronome.mode).toBe('plain');
+  });
+
+  it('reset() and screenChanged() keep the mode and both records', async () => {
+    rig(true, { bpm: 120 });
+    metronome.selectMode('plain');
+    metronome.setBpm(100);
+    metronome.toggle();
+    await settle();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.reset();
+    metronome.screenChanged();
+    expect(remember).not.toHaveBeenCalled();
+    expect(metronome.mode).toBe('plain');
+    expect(metronome.plain.bpm).toBe(100);
+    expect(metronome.settings.bpm).toBe(120);
+  });
+});
 
 interface Rig {
   port: FakeAudioPort;
@@ -869,7 +945,7 @@ describe('metronome store: ratio start announcements (034, FR-013)', () => {
 });
 
 describe('035 remembered settings: store contract', () => {
-  it('M-R1/M-R2: restoreSettings applies values, halts a run, never remembers', async () => {
+  it('M-R1/M-R2: restore applies values, halts a run, never remembers', async () => {
     const r = rig();
     const remember = vi.spyOn(preferences, 'remember');
     metronome.toggle();
@@ -886,7 +962,7 @@ describe('035 remembered settings: store contract', () => {
       ratio: false,
       loop2: 5
     };
-    metronome.restoreSettings(next);
+    metronome.restore({ ratios: next, plain: DEFAULT_PLAIN_SETTINGS, mode: 'ratios' });
     expect(metronome.phase).toBe('settings');
     expect(metronome.position).toBeNull();
     expect(metronome.settings).toEqual(next);
@@ -957,7 +1033,7 @@ describe('035 remembered settings: store contract', () => {
       call();
       expect(remember, name).toHaveBeenCalledTimes(1);
       expect(remember, name).toHaveBeenCalledWith({
-        metronome: { ratios: metronome.settings }
+        metronome: { ratios: metronome.settings, plain: metronome.plain, mode: 'ratios' }
       });
     }
   });
@@ -1030,5 +1106,175 @@ describe('035 US2: Reset and running position (FR-003, FR-004)', () => {
       const ratios = (arg as { metronome: { ratios: object } }).metronome.ratios;
       expect(Object.keys(ratios).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
     }
+  });
+});
+
+describe('036 plain mode: store contract', () => {
+  function plainRig(
+    plain: Partial<PlainSettings> = {},
+    settings: Partial<MetronomeSettings> = {}
+  ): Rig {
+    const r = rig(true, settings);
+    resetMetronomeForTests(
+      { clock: r.clock, frames: r.frames },
+      { ratio: false, countIn: false, ...settings },
+      plain,
+      'plain'
+    );
+    return r;
+  }
+
+  it('defaults: mode ratios, current is the Ratios record, plain defaults', () => {
+    resetMetronomeForTests();
+    expect(metronome.mode).toBe('ratios');
+    expect(metronome.current).toBe(metronome.settings);
+    expect(metronome.plain).toEqual(DEFAULT_PLAIN_SETTINGS);
+  });
+
+  it('current is the plain record in plain mode; sub is null and dots follow its beats', async () => {
+    const r = plainRig({ beats: 3, countIn: false });
+    expect(metronome.mode).toBe('plain');
+    expect(metronome.current).toBe(metronome.plain);
+    expect(metronome.sub).toBeNull();
+    metronome.toggle();
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.dots).toHaveLength(3);
+    expect(metronome.sub).toBeNull();
+  });
+
+  it('S3: plain setters never change settings and Ratios setters never change plain', () => {
+    const ops = fc.array(
+      fc.tuple(fc.integer({ min: 0, max: 6 }), fc.integer({ min: -400, max: 400 })),
+      { maxLength: 30 }
+    );
+    fc.assert(
+      fc.property(ops, ops, (plainOps, ratiosOps) => {
+        const apply = ([op, n]: [number, number]): void => {
+          const dir = n < 0 ? -1 : 1;
+          if (op === 0) metronome.setBpm(n);
+          else if (op === 1) metronome.stepBpm(dir);
+          else if (op === 2) metronome.setBeats(n);
+          else if (op === 3) metronome.stepBeats(dir);
+          else if (op === 4) metronome.setInitialCountIn(n);
+          else if (op === 5) metronome.stepInitialCountIn(dir);
+          else metronome.setCountIn(n > 0);
+        };
+        resetMetronomeForTests({}, {}, {}, 'plain');
+        const settings = { ...metronome.settings };
+        plainOps.forEach(apply);
+        expect(metronome.settings).toEqual(settings);
+        resetMetronomeForTests({}, {}, {}, 'ratios');
+        const plain = { ...metronome.plain };
+        ratiosOps.forEach(apply);
+        expect(metronome.plain).toEqual(plain);
+      })
+    );
+  });
+
+  it('S4: a plain Start schedules one click per beat at the plain bpm, after the count-in', async () => {
+    const r = plainRig({ bpm: 120, beats: 3, countIn: true, initialCountIn: 2 }, { bpm: 60 });
+    metronome.toggle();
+    await settle();
+    advance(r, 2.2);
+    const t = starts(r);
+    for (let i = 1; i < t.length; i++) expect(t[i] - t[i - 1]).toBeCloseTo(0.5, 6);
+    expect(t.length).toBeGreaterThanOrEqual(5);
+    expect(metronome.position?.kind).toBe('beat');
+  });
+
+  it('S5: Ratios start still announces and shows sub as before', async () => {
+    const r = rig(true, { countIn: false, ratio: false });
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets');
+    await settle();
+    advance(r, 0.1);
+    expect(metronome.sub).toBe(3);
+  });
+
+  it('Ratios-only setters are no-ops in plain mode', () => {
+    plainRig();
+    const before = { settings: { ...metronome.settings }, plain: { ...metronome.plain } };
+    metronome.setRepeatCountIn(7);
+    metronome.stepRepeatCountIn(1);
+    metronome.setRatio(false);
+    metronome.setSubdivision(5);
+    metronome.setLoop2(2);
+    expect(metronome.settings).toEqual(before.settings);
+    expect(metronome.plain).toEqual(before.plain);
+  });
+
+  it('plain Start and Pause announce the plain variants', async () => {
+    const r = plainRig({ bpm: 100, beats: 3, countIn: true, initialCountIn: 4 });
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 100 BPM, 3 beats, count in 4');
+    await settle();
+    advance(r, 3);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    expect(metronome.announcement).toMatch(/^Paused on beat \d of 3$/);
+    metronome.reset();
+    metronome.setCountIn(false);
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 100 BPM, 3 beats');
+  });
+
+  it('restore applies ratios, plain and mode, halts a run and never remembers', async () => {
+    const r = rig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    const plain: PlainSettings = { bpm: 100, beats: 3, countIn: false, initialCountIn: 1 };
+    metronome.restore({ ratios: { ...DEFAULT_SETTINGS, bpm: 120 }, plain, mode: 'plain' });
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.position).toBeNull();
+    expect(metronome.settings.bpm).toBe(120);
+    expect(metronome.plain).toEqual(plain);
+    expect(metronome.mode).toBe('plain');
+    const seen = starts(r).length;
+    advance(r, 1);
+    expect(starts(r).length).toBe(seen);
+    expect(remember).not.toHaveBeenCalled();
+  });
+});
+
+describe('036 selectMode (S1, S2)', () => {
+  it.each(['starting', 'running', 'paused', 'count-in'] as const)(
+    'S1: from %s it halts once, returns to settings and goes silent',
+    async (from) => {
+      const r = rig(true, { countIn: from === 'count-in', initialCountIn: 4 });
+      metronome.toggle();
+      if (from === 'starting') {
+        expect(metronome.phase).toBe('starting');
+      } else {
+        await settle();
+        advance(r, from === 'count-in' ? 0.1 : 0.5);
+        if (from === 'paused') metronome.toggle();
+      }
+      metronome.selectMode('plain');
+      expect(metronome.mode).toBe('plain');
+      expect(metronome.phase).toBe('settings');
+      expect(metronome.position).toBeNull();
+      const seen = starts(r).length;
+      advance(r, 2);
+      expect(starts(r).length).toBe(seen);
+    }
+  );
+
+  it('S2: the active mode or an invalid value changes nothing and keeps the run', async () => {
+    const r = rig();
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    expect(metronome.phase).toBe('running');
+    for (const v of ['ratios', 'speed', null, 3, undefined, {}, 'PLAIN']) {
+      metronome.selectMode(v);
+      expect(metronome.mode).toBe('ratios');
+      expect(metronome.phase).toBe('running');
+    }
+    const before = starts(r).length;
+    advance(r, 0.5);
+    expect(starts(r).length).toBeGreaterThan(before);
   });
 });

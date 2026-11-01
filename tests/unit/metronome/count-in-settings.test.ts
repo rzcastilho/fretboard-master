@@ -6,6 +6,8 @@ import type { ClickSink } from '../../../src/lib/audio/metronome';
 import { language, resetLanguageForTests } from '../../../src/lib/state/language.svelte';
 import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metronome.svelte';
 import { playback } from '../../../src/lib/state/playback.svelte';
+import CountInSettings from '../../../src/lib/tools/metronome/CountInSettings.svelte';
+import { DEFAULT_SETTINGS } from '../../../src/lib/state/metronome-settings';
 import MetronomePanel from '../../../src/lib/tools/metronome/MetronomePanel.svelte';
 import { FakeAudioPort, FakeClock, FakeFrames } from '../audio/support/fake-audio';
 
@@ -81,5 +83,27 @@ describe('Count In settings', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Start Training' }));
     expect(screen.queryByRole('switch', { name: 'Count In' })).toBeNull();
     expect(screen.queryByRole('slider', { name: 'Initial Count In' })).toBeNull();
+  });
+});
+
+describe('CountInSettings repeat prop (036)', () => {
+  const baseProps = {
+    settings: { ...DEFAULT_SETTINGS },
+    onswitch: () => {},
+    oninitialset: () => {},
+    oninitialstep: () => {},
+    onrepeatset: () => {},
+    onrepeatstep: () => {}
+  };
+
+  it('hides the Repeat Count In row when repeat is false', () => {
+    render(CountInSettings, { ...baseProps, repeat: false });
+    expect(screen.getByRole('slider', { name: 'Initial Count In' })).toBeTruthy();
+    expect(screen.queryByRole('slider', { name: 'Repeat Count In' })).toBeNull();
+  });
+
+  it('shows the Repeat Count In row by default', () => {
+    render(CountInSettings, baseProps);
+    expect(screen.getByRole('slider', { name: 'Repeat Count In' })).toBeTruthy();
   });
 });

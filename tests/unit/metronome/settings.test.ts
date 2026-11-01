@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_MODE,
+  DEFAULT_PLAIN_SETTINGS,
+  METRONOME_MODES,
+  plainRunPlan,
+  toMode,
+  type PlainSettings,
   DEFAULT_LOOP2,
   DEFAULT_SUBDIVISION,
   SUBDIVISIONS,
@@ -159,5 +165,51 @@ describe('subdivision ratio settings (034)', () => {
       initialCountIn: 0,
       alternate: { clicksPerBeat: 6, repeatCountIn: 0 }
     });
+  });
+});
+
+describe('plain metronome settings (036)', () => {
+  it('lists the modes and defaults to ratios', () => {
+    expect([...METRONOME_MODES]).toEqual(['plain', 'ratios']);
+    expect(DEFAULT_MODE).toBe('ratios');
+  });
+
+  it('DEFAULT_PLAIN_SETTINGS is frozen 85 / 4 / count in on / 4', () => {
+    expect(DEFAULT_PLAIN_SETTINGS).toEqual({ bpm: 85, beats: 4, countIn: true, initialCountIn: 4 });
+    expect(Object.isFrozen(DEFAULT_PLAIN_SETTINGS)).toBe(true);
+  });
+
+  it('plainRunPlan is one click per beat, no alternation', () => {
+    const plan = plainRunPlan(DEFAULT_PLAIN_SETTINGS);
+    expect(plan).toEqual({ clicksPerBeat: 1, initialCountIn: 4 });
+    expect('alternate' in plan).toBe(false);
+    expect(plainRunPlan({ ...DEFAULT_PLAIN_SETTINGS, countIn: false }).initialCountIn).toBe(0);
+  });
+
+  it('effectiveCountIn accepts a PlainSettings', () => {
+    expect(effectiveCountIn({ ...DEFAULT_PLAIN_SETTINGS, initialCountIn: 6 })).toBe(6);
+    expect(effectiveCountIn({ ...DEFAULT_PLAIN_SETTINGS, countIn: false })).toBe(0);
+  });
+
+  it('stepSetting and atLimit work on PlainSettings', () => {
+    const limits = { bpm: [30, 300], beats: [1, 16], initialCountIn: [0, 8] } as const;
+    for (const field of ['bpm', 'beats', 'initialCountIn'] as const) {
+      const [min, max] = limits[field];
+      const lo: PlainSettings = { ...DEFAULT_PLAIN_SETTINGS, [field]: min };
+      const hi: PlainSettings = { ...DEFAULT_PLAIN_SETTINGS, [field]: max };
+      expect(atLimit(lo, field, -1)).toBe(true);
+      expect(atLimit(hi, field, 1)).toBe(true);
+      expect(atLimit(lo, field, 1)).toBe(false);
+      expect(stepSetting(lo, field, -1)).toBe(lo);
+      expect(stepSetting(hi, field, 1)).toBe(hi);
+      expect(stepSetting(lo, field, 1)[field]).toBe(min + 1);
+      expect(stepSetting(hi, field, -1)[field]).toBe(max - 1);
+    }
+  });
+
+  it('toMode accepts the two modes and returns null otherwise, never throwing', () => {
+    expect(toMode('plain')).toBe('plain');
+    expect(toMode('ratios')).toBe('ratios');
+    for (const v of ['speed', 'PLAIN', 1, null, {}, undefined]) expect(toMode(v)).toBeNull();
   });
 });

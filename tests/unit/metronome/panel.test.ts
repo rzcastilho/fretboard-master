@@ -388,3 +388,83 @@ describe('MetronomePanel alternating ratios (034)', () => {
     expect(dots.slice(1).every((s) => s === 'upcoming')).toBe(true);
   });
 });
+
+describe('MetronomePanel mode tabs (036)', () => {
+  it('renders the tab bar first, with no visible heading, and a labelled tabpanel', () => {
+    const { container } = render(MetronomePanel);
+    const section = container.querySelector('section.panel') as HTMLElement;
+    expect(section.firstElementChild?.getAttribute('role')).toBe('tablist');
+    expect(container.querySelector('h2')).toBeNull();
+    expect(section.getAttribute('data-mode')).toBe('ratios');
+    expect(section.getAttribute('data-phase')).toBe('settings');
+    const panel = screen.getByRole('tabpanel', { name: 'Ratios Training' });
+    expect(panel.id).toBe('metronome-mode-panel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('metronome-tab-ratios');
+  });
+
+  it('keeps the tab bar first while running and paused', async () => {
+    const { container } = render(MetronomePanel);
+    await startRun();
+    const section = container.querySelector('section.panel') as HTMLElement;
+    expect(section.firstElementChild?.getAttribute('role')).toBe('tablist');
+    expect(section.getAttribute('data-phase')).toBe('running');
+    await fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(section.firstElementChild?.getAttribute('role')).toBe('tablist');
+    expect(section.getAttribute('data-phase')).toBe('paused');
+  });
+
+  it('clicking the other tab calls selectMode', async () => {
+    render(MetronomePanel);
+    const select = vi.spyOn(metronome, 'selectMode');
+    await fireEvent.click(screen.getByRole('tab', { name: 'Metronome' }));
+    expect(select).toHaveBeenCalledWith('plain');
+    expect(metronome.mode).toBe('plain');
+  });
+});
+
+describe('MetronomePanel plain mode (036)', () => {
+  beforeEach(() => {
+    resetMetronomeForTests({ clock, frames }, undefined, { countIn: false }, 'plain');
+  });
+
+  it('shows BPM, beats, count in, initial count in and a Start button only', () => {
+    render(MetronomePanel);
+    const labels = [
+      ...document.querySelectorAll('[role="tabpanel"] label, [role="tabpanel"] button')
+    ].map((e) => e.textContent?.trim() ?? '');
+    expect(screen.getByRole('slider', { name: 'BPM' })).toBeTruthy();
+    expect(screen.getByRole('slider', { name: '# of Beats' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Count In' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start Training' })).toBeNull();
+    expect(screen.queryByRole('slider', { name: 'Repeat Count In' })).toBeNull();
+    expect(screen.queryByText(/Loop 1/)).toBeNull();
+    expect(labels.length).toBeGreaterThan(0);
+  });
+
+  it('shows Initial Count In after the Count In switch when on', () => {
+    metronome.setCountIn(true);
+    render(MetronomePanel);
+    expect(screen.getByRole('slider', { name: 'Initial Count In' })).toBeTruthy();
+    expect(screen.queryByRole('slider', { name: 'Repeat Count In' })).toBeNull();
+  });
+
+  it('keeps Start Training in Ratios mode', () => {
+    resetMetronomeForTests({ clock, frames }, { countIn: false });
+    render(MetronomePanel);
+    expect(screen.getByRole('button', { name: 'Start Training' })).toBeTruthy();
+  });
+
+  it('runs with BEAT n/N and no SUB part', async () => {
+    const { container } = render(MetronomePanel);
+    await fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await settle();
+    advance(0.1);
+    await settle();
+    const pos = container.querySelector('.position')?.textContent ?? '';
+    expect(pos).toMatch(/BEAT \d\/4/);
+    expect(pos).not.toMatch(/SUB/);
+    expect(container.querySelectorAll('.dot')).toHaveLength(4);
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+  });
+});

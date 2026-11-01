@@ -5,7 +5,10 @@ import { DEFAULT_PREFERENCES, serializePreferences } from '../../../src/lib/pref
 import { PREFS_KEY, PROBE_KEY } from '../../../src/lib/prefs/storage';
 import { startSession } from '../../../src/lib/prefs/session';
 import { FIXTURE_BY_NAME } from './fixtures';
-import { DEFAULT_SETTINGS } from '../../../src/lib/state/metronome-settings';
+import {
+  DEFAULT_PLAIN_SETTINGS,
+  DEFAULT_SETTINGS
+} from '../../../src/lib/state/metronome-settings';
 import { fakeStorage } from './support';
 
 describe('startSession', () => {
@@ -178,25 +181,26 @@ describe('two sessions, one storage (US4, FR-015)', () => {
 
 describe('metronome (035)', () => {
   const ratios = { ...DEFAULT_SETTINGS, bpm: 120, beats: 2 };
+  const rest = { plain: DEFAULT_PLAIN_SETTINGS, mode: 'ratios' } as const;
 
   it('remember writes once, and is skipped when the record is unchanged', () => {
     const s = fakeStorage();
     const session = startSession(s);
-    session.remember({ metronome: { ratios } });
+    session.remember({ metronome: { ratios, ...rest } });
     const writes = s.calls.set;
     expect(s.data.get(PREFS_KEY)).toBe(serializePreferences(session.current));
     expect(JSON.parse(s.data.get(PREFS_KEY) as string).metronome.ratios.bpm).toBe(120);
-    session.remember({ metronome: { ratios: { ...ratios } } });
+    session.remember({ metronome: { ratios: { ...ratios }, ...rest } });
     expect(s.calls.set).toBe(writes);
   });
 
   it('leaves the other fields untouched (FR-009), and they leave it untouched', () => {
     const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-full'].raw });
     const session = startSession(s);
-    session.remember({ metronome: { ratios } });
+    session.remember({ metronome: { ratios, ...rest } });
     expect(session.current).toEqual({
       ...FIXTURE_BY_NAME['v1-full'].expected,
-      metronome: { ratios }
+      metronome: { ratios, ...rest }
     });
     session.remember({ muted: false });
     expect(session.current.metronome.ratios).toEqual(ratios);

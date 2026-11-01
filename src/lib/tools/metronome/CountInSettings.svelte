@@ -1,6 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages.js';
-  import type { MetronomeSettings } from '$lib/state/metronome-settings';
+  import type { PlainSettings } from '$lib/state/metronome-settings';
   import ValueRow from './ValueRow.svelte';
 
   let {
@@ -9,14 +9,16 @@
     oninitialset,
     oninitialstep,
     onrepeatset,
-    onrepeatstep
+    onrepeatstep,
+    repeat = true
   }: {
-    settings: Readonly<MetronomeSettings>;
+    settings: Readonly<PlainSettings & { repeatCountIn?: number }>;
     onswitch: (on: boolean) => void;
     oninitialset: (v: number) => void;
     oninitialstep: (dir: 1 | -1) => void;
     onrepeatset: (v: number) => void;
     onrepeatstep: (dir: 1 | -1) => void;
+    repeat?: boolean;
   } = $props();
 </script>
 
@@ -47,18 +49,20 @@
       onset={oninitialset}
       onstep={oninitialstep}
     />
-    <ValueRow
-      id="metronome-repeat-count-in"
-      label={m.metronome_repeat_count_in_label()}
-      min={0}
-      max={8}
-      value={settings.repeatCountIn}
-      valuetext={String(settings.repeatCountIn)}
-      decreaseLabel={m.metronome_repeat_count_in_decrease()}
-      increaseLabel={m.metronome_repeat_count_in_increase()}
-      onset={onrepeatset}
-      onstep={onrepeatstep}
-    />
+    {#if repeat}
+      <ValueRow
+        id="metronome-repeat-count-in"
+        label={m.metronome_repeat_count_in_label()}
+        min={0}
+        max={8}
+        value={settings.repeatCountIn ?? 0}
+        valuetext={String(settings.repeatCountIn ?? 0)}
+        decreaseLabel={m.metronome_repeat_count_in_decrease()}
+        increaseLabel={m.metronome_repeat_count_in_increase()}
+        onset={onrepeatset}
+        onstep={onrepeatstep}
+      />
+    {/if}
   {/if}
 </div>
 

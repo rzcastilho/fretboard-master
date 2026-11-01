@@ -6,6 +6,7 @@
   import { matchMetronomeKey } from '$lib/state/metronome-keys';
   import { metronome } from '$lib/state/metronome.svelte';
   import { toShortcutEvent } from '$lib/state/shortcuts';
+  import ModeTabs from './ModeTabs.svelte';
   import CountInSettings from './CountInSettings.svelte';
   import RunControls from './RunControls.svelte';
   import StatusBox from './StatusBox.svelte';
@@ -56,75 +57,80 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<section
-  class="panel"
-  aria-labelledby="panel-heading"
-  data-phase={metronome.phase}
-  data-print="omit"
->
-  <h2 id="panel-heading">{m.metronome_panel_heading()}</h2>
+<section class="panel" data-mode={metronome.mode} data-phase={metronome.phase} data-print="omit">
+  <ModeTabs mode={metronome.mode} onselect={(mode) => metronome.selectMode(mode)} />
 
-  {#if metronome.phase === 'settings'}
-    <ValueRow
-      id="metronome-bpm"
-      label={m.metronome_bpm_label()}
-      min={30}
-      max={300}
-      value={metronome.settings.bpm}
-      valuetext="{metronome.settings.bpm} {m.metronome_bpm_unit()}"
-      decreaseLabel={m.metronome_bpm_decrease()}
-      increaseLabel={m.metronome_bpm_increase()}
-      onset={(v) => metronome.setBpm(v)}
-      onstep={(d) => metronome.stepBpm(d)}
-    />
-    <ValueRow
-      id="metronome-beats"
-      label={m.metronome_beats_label()}
-      min={1}
-      max={16}
-      value={metronome.settings.beats}
-      valuetext={String(metronome.settings.beats)}
-      decreaseLabel={m.metronome_beats_decrease()}
-      increaseLabel={m.metronome_beats_increase()}
-      onset={(v) => metronome.setBeats(v)}
-      onstep={(d) => metronome.stepBeats(d)}
-    />
-    <CountInSettings
-      settings={metronome.settings}
-      onswitch={(on) => metronome.setCountIn(on)}
-      oninitialset={(v) => metronome.setInitialCountIn(v)}
-      oninitialstep={(d) => metronome.stepInitialCountIn(d)}
-      onrepeatset={(v) => metronome.setRepeatCountIn(v)}
-      onrepeatstep={(d) => metronome.stepRepeatCountIn(d)}
-    />
-    <RatioSettings
-      settings={metronome.settings}
-      onswitch={(on) => metronome.setRatio(on)}
-      onloop1={metronome.setSubdivision}
-      onloop2={metronome.setLoop2}
-    />
-    <button type="button" class="start" bind:this={startButton} onclick={start}>
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"
-        ><path d="M7 4l13 8-13 8z" /></svg
-      >
-      {m.metronome_start()}
-    </button>
-  {:else}
-    <StatusBox
-      beat={metronome.beat}
-      beats={metronome.settings.beats}
-      bpm={metronome.settings.bpm}
-      sub={metronome.sub}
-      dots={metronome.dots}
-      countIn={metronome.countIn}
-    />
-    <RunControls
-      phase={metronome.phase}
-      ontoggle={() => metronome.toggle()}
-      onreset={reset}
-      bind:main={mainButton}
-    />
-  {/if}
+  <div
+    class="mode-panel"
+    role="tabpanel"
+    id="metronome-mode-panel"
+    aria-labelledby="metronome-tab-{metronome.mode}"
+  >
+    {#if metronome.phase === 'settings'}
+      <ValueRow
+        id="metronome-bpm"
+        label={m.metronome_bpm_label()}
+        min={30}
+        max={300}
+        value={metronome.current.bpm}
+        valuetext="{metronome.current.bpm} {m.metronome_bpm_unit()}"
+        decreaseLabel={m.metronome_bpm_decrease()}
+        increaseLabel={m.metronome_bpm_increase()}
+        onset={(v) => metronome.setBpm(v)}
+        onstep={(d) => metronome.stepBpm(d)}
+      />
+      <ValueRow
+        id="metronome-beats"
+        label={m.metronome_beats_label()}
+        min={1}
+        max={16}
+        value={metronome.current.beats}
+        valuetext={String(metronome.current.beats)}
+        decreaseLabel={m.metronome_beats_decrease()}
+        increaseLabel={m.metronome_beats_increase()}
+        onset={(v) => metronome.setBeats(v)}
+        onstep={(d) => metronome.stepBeats(d)}
+      />
+      <CountInSettings
+        settings={metronome.current}
+        repeat={metronome.mode === 'ratios'}
+        onswitch={(on) => metronome.setCountIn(on)}
+        oninitialset={(v) => metronome.setInitialCountIn(v)}
+        oninitialstep={(d) => metronome.stepInitialCountIn(d)}
+        onrepeatset={(v) => metronome.setRepeatCountIn(v)}
+        onrepeatstep={(d) => metronome.stepRepeatCountIn(d)}
+      />
+      {#if metronome.mode === 'ratios'}
+        <RatioSettings
+          settings={metronome.settings}
+          onswitch={(on) => metronome.setRatio(on)}
+          onloop1={metronome.setSubdivision}
+          onloop2={metronome.setLoop2}
+        />
+      {/if}
+      <button type="button" class="start" bind:this={startButton} onclick={start}>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"
+          ><path d="M7 4l13 8-13 8z" /></svg
+        >
+        {metronome.mode === 'plain' ? m.metronome_start_plain() : m.metronome_start()}
+      </button>
+    {:else}
+      <StatusBox
+        beat={metronome.beat}
+        beats={metronome.current.beats}
+        bpm={metronome.current.bpm}
+        sub={metronome.sub}
+        dots={metronome.dots}
+        countIn={metronome.countIn}
+      />
+      <RunControls
+        phase={metronome.phase}
+        ontoggle={() => metronome.toggle()}
+        onreset={reset}
+        bind:main={mainButton}
+      />
+    {/if}
+  </div>
 
   <div role="status" aria-live="polite" class="sr-only">{metronome.announcement}</div>
 
@@ -145,9 +151,10 @@
     margin-inline: auto;
   }
 
-  h2 {
-    margin: 0;
-    font-size: var(--font-size-lg);
+  .mode-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
   }
 
   .start {

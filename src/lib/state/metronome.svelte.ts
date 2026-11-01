@@ -15,14 +15,20 @@ import {
   clampBpm,
   clampCount,
   DEFAULT_INITIAL_COUNT_IN,
+  DEFAULT_MODE,
+  DEFAULT_PLAIN_SETTINGS,
   DEFAULT_REPEAT_COUNT_IN,
   DEFAULT_SETTINGS,
   effectiveCountIn,
+  plainRunPlan,
   runPlanFor,
   stepSetting,
+  toMode,
   toRatio,
   toSubdivision,
-  type MetronomeSettings
+  type MetronomeMode,
+  type MetronomeSettings,
+  type PlainSettings
 } from './metronome-settings';
 import { subdivisionName } from './metronome-subdivision-names';
 import { beatDots, type CountInView, type DotState } from './metronome-view';
@@ -34,6 +40,8 @@ export type RunPhase = 'settings' | 'starting' | 'running' | 'paused';
 const state = $state<{
   phase: RunPhase;
   settings: MetronomeSettings;
+  plain: PlainSettings;
+  mode: MetronomeMode;
   /** Last slot that sounded; null before the first click. */
   position: SlotPosition | null;
   /** Initial count-in of the current run (for `COUNT IN –/k` before click 1). */
@@ -44,6 +52,8 @@ const state = $state<{
 }>({
   phase: 'settings',
   settings: DEFAULT_SETTINGS,
+  plain: DEFAULT_PLAIN_SETTINGS,
+  mode: DEFAULT_MODE,
   position: null,
   initialTotal: 0,
   announcement: '',
@@ -53,6 +63,9 @@ const state = $state<{
 
 let scheduler: ClickScheduler | null = null;
 let overrides: Partial<SchedulerDeps> = {};
+
+/** The record the active mode edits and plays (036). */
+const activeRecord = (): PlainSettings => (state.mode === 'plain' ? state.plain : state.settings);
 
 function realClock(): SchedulerDeps['clock'] {
   return {
@@ -101,9 +114,9 @@ function beginSegment(startSlot: number): void {
   if (sink === null) state.soundNotice = true;
   state.phase = 'starting';
   live.start({
-    bpm: state.settings.bpm,
-    beats: state.settings.beats,
-    ...runPlanFor(state.settings),
+    bpm: activeRecord().bpm,
+    beats: activeRecord().beats,
+    ...(state.mode === 'plain' ? plainRunPlan(state.plain) : runPlanFor(state.settings)),
     startSlot,
     run: generation,
     pressedAtMs: performance.now()
@@ -111,10 +124,19 @@ function beginSegment(startSlot: number): void {
 }
 
 function start(): void {
-  const k = effectiveCountIn(state.settings);
+  const k = effectiveCountIn(activeRecord());
   state.soundNotice = false;
   state.position = null;
   state.initialTotal = k;
+  if (state.mode === 'plain') {
+    const plainBase = { bpm: state.plain.bpm, beats: state.plain.beats };
+    state.announcement =
+      k > 0
+        ? m.metronome_announce_started_plain_count_in({ ...plainBase, count: k })
+        : m.metronome_announce_started_plain(plainBase);
+    beginSegment(0);
+    return;
+  }
   const base = { bpm: state.settings.bpm, beats: state.settings.beats };
   const ratio = state.settings.ratio;
   const loops = {
@@ -137,7 +159,7 @@ function pauseState(): void {
   const at = state.position;
   state.announcement =
     at?.kind === 'beat'
-      ? state.settings.ratio
+      ? state.mode === 'ratios' && state.settings.ratio
         ? m.metronome_announce_paused_loop({
             beat: at.beat,
             beats: state.settings.beats,
@@ -145,12 +167,12 @@ function pauseState(): void {
               at.loop === 1 ? state.settings.subdivision : state.settings.loop2
             )
           })
-        : m.metronome_announce_paused({ beat: at.beat, beats: state.settings.beats })
+        : m.metronome_announce_paused({ beat: at.beat, beats: activeRecord().beats })
       : at?.kind === 'count-in'
         ? m.metronome_announce_paused_count_in({ click: at.click, count: at.total })
         : state.initialTotal > 0
           ? m.metronome_announce_paused_count_in_none({ count: state.initialTotal })
-          : m.metronome_announce_paused({ beat: 0, beats: state.settings.beats });
+          : m.metronome_announce_paused({ beat: 0, beats: activeRecord().beats });
 }
 
 function pause(): void {
@@ -181,40 +203,56 @@ function reset(): void {
   state.announcement = m.metronome_announce_reset();
 }
 
-function sameSettings(a: MetronomeSettings, b: MetronomeSettings): boolean {
-  return (Object.keys(a) as (keyof MetronomeSettings)[]).every((k) => a[k] === b[k]);
+function sameRecord<T extends object>(a: T, b: T): boolean {
+  return (Object.keys(a) as (keyof T)[]).every((k) => a[k] === b[k]);
 }
 
-/** The one place the settings change: assign, then remember (035). An equal value → nothing. */
-function commit(next: MetronomeSettings): void {
-  if (next === state.settings || sameSettings(next, state.settings)) return;
+/** Remember the whole `metronome` object: `session.remember` replaces top-level keys (036). */
+function remember(): void {
+  preferences.remember({
+    metronome: { ratios: state.settings, plain: state.plain, mode: state.mode }
+  });
+}
+
+/** The one place the Ratios record changes: assign, then remember (035). Equal → nothing. */
+function commitRatios(next: MetronomeSettings): void {
+  if (next === state.settings || sameRecord(next, state.settings)) return;
   state.settings = next;
-  preferences.remember({ metronome: { ratios: next } });
+  remember();
+}
+
+/** The one place the plain record changes (036). Equal → nothing. */
+function commitPlain(next: PlainSettings): void {
+  if (next === state.plain || sameRecord(next, state.plain)) return;
+  state.plain = next;
+  remember();
 }
 
 function setField(field: 'bpm' | 'beats', v: number): void {
   if (state.phase !== 'settings') return;
-  commit(
-    field === 'bpm'
-      ? { ...state.settings, bpm: clampBpm(v) }
-      : { ...state.settings, beats: clampBeats(v) }
-  );
+  const patch = field === 'bpm' ? { bpm: clampBpm(v) } : { beats: clampBeats(v) };
+  if (state.mode === 'plain') commitPlain({ ...state.plain, ...patch });
+  else commitRatios({ ...state.settings, ...patch });
 }
 
 function step(field: 'bpm' | 'beats', dir: 1 | -1): void {
   if (state.phase !== 'settings') return;
-  commit(stepSetting(state.settings, field, dir));
+  if (state.mode === 'plain') commitPlain(stepSetting(state.plain, field, dir));
+  else commitRatios(stepSetting(state.settings, field, dir));
 }
 
 function setCount(field: 'initialCountIn' | 'repeatCountIn', v: number): void {
   if (state.phase !== 'settings') return;
   const fallback = field === 'initialCountIn' ? DEFAULT_INITIAL_COUNT_IN : DEFAULT_REPEAT_COUNT_IN;
-  commit({ ...state.settings, [field]: clampCount(v, fallback) });
+  const n = clampCount(v, fallback);
+  if (state.mode === 'ratios') commitRatios({ ...state.settings, [field]: n });
+  else if (field === 'initialCountIn') commitPlain({ ...state.plain, initialCountIn: n });
 }
 
 function stepCount(field: 'initialCountIn' | 'repeatCountIn', dir: 1 | -1): void {
   if (state.phase !== 'settings') return;
-  commit(stepSetting(state.settings, field, dir));
+  if (state.mode === 'ratios') commitRatios(stepSetting(state.settings, field, dir));
+  else if (field === 'initialCountIn') commitPlain(stepSetting(state.plain, field, dir));
 }
 
 function halt(): void {
@@ -234,6 +272,16 @@ export const metronome = {
     return state.settings;
   },
   /** Last position that sounded, or null before the first click. */
+  get mode(): MetronomeMode {
+    return state.mode;
+  },
+  /** The active mode's record: what the shared rows edit and the run plays. */
+  get current(): Readonly<PlainSettings> {
+    return activeRecord();
+  },
+  get plain(): Readonly<PlainSettings> {
+    return state.plain;
+  },
   get position(): SlotPosition | null {
     return state.position;
   },
@@ -241,7 +289,8 @@ export const metronome = {
     return state.position?.kind === 'beat' ? state.position.beat : 0;
   },
   /** Clicks per beat of the loop playing (Loop 1 before the first beat). */
-  get sub(): number {
+  get sub(): number | null {
+    if (state.mode === 'plain') return null;
     return state.position?.kind === 'beat'
       ? state.position.clicksPerBeat
       : state.settings.subdivision;
@@ -257,7 +306,7 @@ export const metronome = {
   get dots(): readonly DotState[] {
     return state.phase === 'settings' || this.countIn !== null
       ? []
-      : beatDots(state.settings.beats, this.beat);
+      : beatDots(activeRecord().beats, this.beat);
   },
   get announcement(): string {
     return state.announcement;
@@ -276,7 +325,8 @@ export const metronome = {
   /** Settings phase only; non-booleans are ignored. Turning it off keeps both counts. */
   setCountIn: (v: unknown): void => {
     if (state.phase === 'settings' && typeof v === 'boolean') {
-      commit({ ...state.settings, countIn: v });
+      if (state.mode === 'plain') commitPlain({ ...state.plain, countIn: v });
+      else commitRatios({ ...state.settings, countIn: v });
     }
   },
   setInitialCountIn: (v: number): void => setCount('initialCountIn', v),
@@ -285,21 +335,21 @@ export const metronome = {
   stepRepeatCountIn: (dir: 1 | -1): void => stepCount('repeatCountIn', dir),
   /** Settings phase only; non-booleans are ignored. Turning it off keeps Loop 2. */
   setRatio: (v: unknown): void => {
-    if (state.phase === 'settings' && typeof v === 'boolean') {
-      commit({ ...state.settings, ratio: toRatio(v) });
+    if (state.phase === 'settings' && state.mode === 'ratios' && typeof v === 'boolean') {
+      commitRatios({ ...state.settings, ratio: toRatio(v) });
     }
   },
   /** Settings phase only; values that are not one of the eight subdivisions are ignored. */
   setLoop2: (v: unknown): void => {
-    if (state.phase !== 'settings') return;
+    if (state.phase !== 'settings' || state.mode !== 'ratios') return;
     const sub = toSubdivision(v);
-    if (sub !== null) commit({ ...state.settings, loop2: sub });
+    if (sub !== null) commitRatios({ ...state.settings, loop2: sub });
   },
   /** Settings phase only; values that are not one of the eight subdivisions are ignored. */
   setSubdivision: (v: unknown): void => {
-    if (state.phase !== 'settings') return;
+    if (state.phase !== 'settings' || state.mode !== 'ratios') return;
     const sub = toSubdivision(v);
-    if (sub !== null) commit({ ...state.settings, subdivision: sub });
+    if (sub !== null) commitRatios({ ...state.settings, subdivision: sub });
   },
 
   /** Gesture handler. settings → start, running → pause, paused → resume, starting → ignored. */
@@ -316,28 +366,46 @@ export const metronome = {
     state.soundNotice = false;
   },
 
+  /**
+   * Switch the active mode (036). Invalid or already-active values are ignored. Otherwise any run
+   * stops at once and the panel returns to settings; each mode keeps its own record.
+   */
+  selectMode(v: unknown): void {
+    const next = toMode(v);
+    if (next === null || next === state.mode) return;
+    halt();
+    state.mode = next;
+    remember();
+  },
+
   /** Route left: halt, back to the settings phase; the values are kept (035, FR-002). */
   screenChanged(): void {
     halt();
   },
 
   /** Apply stored or default values without writing: halts a run, back to the settings phase. */
-  restoreSettings(s: MetronomeSettings): void {
+  restore(r: { ratios: MetronomeSettings; plain: PlainSettings; mode: MetronomeMode }): void {
     halt();
-    state.settings = s;
+    state.settings = r.ratios;
+    state.plain = r.plain;
+    state.mode = r.mode;
   }
 };
 
 /** Test seam: inject scheduler deps (fake clock/frames/sink) and reset all state. Vitest only. */
 export function resetMetronomeForTests(
   deps: Partial<SchedulerDeps> = {},
-  settings: Partial<MetronomeSettings> = {}
+  settings: Partial<MetronomeSettings> = {},
+  plain: Partial<PlainSettings> = {},
+  mode: MetronomeMode = DEFAULT_MODE
 ): void {
   scheduler?.halt('leave');
   scheduler = null;
   overrides = deps;
   state.phase = 'settings';
   state.settings = { ...DEFAULT_SETTINGS, ...settings };
+  state.plain = { ...DEFAULT_PLAIN_SETTINGS, ...plain };
+  state.mode = mode;
   clearRun();
   state.announcement = '';
   state.soundNotice = false;

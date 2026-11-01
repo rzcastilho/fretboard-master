@@ -14,7 +14,7 @@
     beat: number;
     beats: number;
     bpm: number;
-    sub: number;
+    sub: number | null;
     dots: readonly DotState[];
     countIn?: CountInView | null;
   } = $props();
@@ -36,9 +36,9 @@
             beat: status.beat,
             beats: status.beats
           })}{:else}{m.metronome_status_beat_none({ beats: status.beats })}{/if}</span
-      ><span class="sep">{m.summary_separator()}</span><span class="part"
-        >{m.metronome_status_sub({ count: status.sub })}</span
-      >
+      >{#if status.sub !== null}<span class="sep">{m.summary_separator()}</span><span class="part"
+          >{m.metronome_status_sub({ count: status.sub })}</span
+        >{/if}
     {/if}
   </p>
   <p class="tempo">

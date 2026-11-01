@@ -69,3 +69,17 @@ describe('display model for positions (034, data-model §7)', () => {
     expect(beatDots(4, 1)).toEqual(['lit', 'upcoming', 'upcoming', 'upcoming']);
   });
 });
+
+describe('plain mode status (036)', () => {
+  it('a null sub yields no SUB part', () => {
+    expect(statusParams(2, 4, null)).toEqual({ kind: 'beat', beat: 2, beats: 4, sub: null });
+    expect(statusParams(0, 4, null)).toEqual({ kind: 'none', beats: 4, sub: null });
+  });
+  it('count-in branches ignore sub', () => {
+    expect(statusParams(0, 4, null, { click: 2, total: 4 })).toEqual({
+      kind: 'count-in',
+      click: 2,
+      total: 4
+    });
+  });
+});

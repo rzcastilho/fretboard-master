@@ -58,7 +58,7 @@ export const preferences = {
     notation.start({ notation: p.notation, accidentals: p.accidentals });
     theme.start(p.theme);
     shortcuts.start(p.shortcuts);
-    metronome.restoreSettings(p.metronome.ratios);
+    metronome.restore(p.metronome);
     lastTool = p.lastTool;
     cagedNoteShown = p.cagedNoteShown;
     if (!session.available && !noticeShown) {
@@ -112,9 +112,7 @@ export const preferences = {
     notation.restore(null, 'sharps');
     theme.restore(null);
     shortcuts.restore(true);
-    metronome.restoreSettings(
-      session ? session.current.metronome.ratios : DEFAULT_PREFERENCES.metronome.ratios
-    );
+    metronome.restore(session ? session.current.metronome : DEFAULT_PREFERENCES.metronome);
     lastTool = null;
     cagedNoteShown = false;
   },

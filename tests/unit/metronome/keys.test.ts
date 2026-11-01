@@ -27,6 +27,11 @@ const running = { phase: 'running', disclosureOpen: false } as const;
 const settings = { phase: 'settings', disclosureOpen: false } as const;
 
 describe('matchMetronomeKey', () => {
+  it('Space on a role=tab button never toggles (036)', () => {
+    expect(matchMetronomeKey(ev(' ', {}, { tagName: 'BUTTON' }), running)).toBeNull();
+    expect(matchMetronomeKey(ev(' ', { targetActivates: true }), settings)).toBeNull();
+  });
+
   it('Space on the body toggles', () => {
     expect(matchMetronomeKey(ev(' '), settings)).toBe('toggle');
   });

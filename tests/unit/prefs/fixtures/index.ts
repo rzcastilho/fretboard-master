@@ -9,7 +9,13 @@ import type { Tempo } from '$lib/state/listen';
 import type { LanguageTag } from '$lib/i18n/languages';
 import type { AccidentalPolicy, Notation } from '$lib/notation/policy';
 import type { Theme } from '$lib/prefs/schema';
-import { DEFAULT_SETTINGS, type MetronomeSettings } from '$lib/state/metronome-settings';
+import {
+  DEFAULT_PLAIN_SETTINGS,
+  DEFAULT_SETTINGS,
+  type MetronomeMode,
+  type MetronomeSettings,
+  type PlainSettings
+} from '$lib/state/metronome-settings';
 
 /**
  * Seed fixtures from specs/010-remembered-preferences/contracts/storage-format.md.
@@ -52,7 +58,13 @@ export interface ExpectedPreferences {
   /** 027: absent or invalid in a record → true. */
   readonly shortcuts: boolean;
   /** 035: set only by metronome fixtures; absent means every field at its default (DEFAULT_SETTINGS). */
-  readonly metronome?: { readonly ratios: MetronomeSettings };
+  readonly metronome?: {
+    readonly ratios?: MetronomeSettings;
+    /** 036: absent means the plain defaults. */
+    readonly plain?: PlainSettings;
+    /** 036: absent means 'ratios'. */
+    readonly mode?: MetronomeMode;
+  };
 }
 
 /** Tuning the record loads as (011): a preset, or custom pitches (offsets, strings 6 → 1). */
@@ -101,7 +113,14 @@ function fixture(
   return {
     name,
     raw: load(name),
-    expected: { ...expected, metronome: expected.metronome ?? { ratios: DEFAULT_SETTINGS } },
+    expected: {
+      ...expected,
+      metronome: {
+        ratios: expected.metronome?.ratios ?? DEFAULT_SETTINGS,
+        plain: expected.metronome?.plain ?? DEFAULT_PLAIN_SETTINGS,
+        mode: expected.metronome?.mode ?? 'ratios'
+      }
+    },
     tuning: tuning ?? { kind: 'preset', id: expected.tuningId }
   };
 }
@@ -261,7 +280,31 @@ export const FIXTURES: readonly PrefsFixture[] = [
   fixture('metronome-other-mode', {
     ...defaults,
     metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120, beats: 2, loop2: 5 } }
-  })
+  }),
+  // 036 plain Metronome record and selected mode
+  fixture('metronome-plain', {
+    ...defaults,
+    metronome: {
+      ratios: { ...DEFAULT_SETTINGS, bpm: 120 },
+      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4 },
+      mode: 'plain'
+    }
+  }),
+  fixture('metronome-mode-plain', { ...defaults, metronome: { mode: 'plain' } }),
+  // mode "speed" is not a mode: back to Ratios, the stored ratios intact
+  fixture('metronome-bad-mode', {
+    ...defaults,
+    metronome: { ratios: { ...DEFAULT_SETTINGS, bpm: 120 } }
+  }),
+  // bpm 999 resets only bpm; the other plain fields and the mode keep their stored values
+  fixture('metronome-plain-invalid', {
+    ...defaults,
+    metronome: {
+      plain: { bpm: DEFAULT_PLAIN_SETTINGS.bpm, beats: 3, countIn: false, initialCountIn: 2 },
+      mode: 'plain'
+    }
+  }),
+  fixture('metronome-plain-array', { ...defaults, metronome: { mode: 'plain' } })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

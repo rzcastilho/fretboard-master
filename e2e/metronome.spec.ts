@@ -6,7 +6,8 @@ async function clicks(page: Page) {
   return (await readAudioLog(page)).flatMap((e) => (e.type === 'click' ? [e] : []));
 }
 
-const panel = (page: Page) => page.getByRole('region', { name: 'Ratios Training' });
+// The card (data-phase, data-mode) wraps the tab bar and the tabpanel.
+const card = (page: Page) => page.locator('section.panel');
 const start = (page: Page) => page.getByRole('button', { name: 'Start Training' });
 
 test.describe('metronome: steady click (US1)', () => {
@@ -22,7 +23,7 @@ test.describe('metronome: steady click (US1)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Metronome' })).toBeVisible();
     await countInOff(page);
     await start(page).click(); // click 2 of 2 on the way to a running click (SC-005)
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await expect(page.locator('.dot')).toHaveCount(4);
     await expect(page.locator('.digits')).toHaveText('85');
     // The status steps through every beat.
@@ -96,7 +97,7 @@ test.describe('metronome: steady click (US1)', () => {
       .toBeGreaterThanOrEqual(before + 4);
     const idx = (await clicks(page)).map((c) => c.index);
     expect(idx).toEqual(idx.map((_, i) => i));
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     expect((await readAudioLog(page)).filter((e) => e.type === 'click-cancel')).toEqual([]);
   });
 
@@ -104,7 +105,7 @@ test.describe('metronome: steady click (US1)', () => {
     await page.goto('/metronome');
     await countInOff(page);
     await start(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await page.getByRole('button', { name: /Mute sound/ }).click();
     const first = (await page.locator('.position').textContent())?.trim();
     await expect
@@ -113,7 +114,7 @@ test.describe('metronome: steady click (US1)', () => {
         intervals: [50]
       })
       .not.toBe(first);
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
   });
 
   test('FR-027: with no audio the dots still step and a dismissible notice shows', async ({
@@ -127,7 +128,7 @@ test.describe('metronome: steady click (US1)', () => {
     await expect(notice).toBeVisible();
     await expect(page.locator('.dot[data-state="lit"]')).toHaveCount(1);
     await expect(page.locator('.position')).toHaveText(/BEAT [1-4]\/4 · SUB 3/);
-    await panel(page).getByRole('button', { name: 'Dismiss' }).click();
+    await card(page).getByRole('button', { name: 'Dismiss' }).click();
     await expect(notice).toHaveCount(0);
   });
 
@@ -146,7 +147,7 @@ test.describe('metronome: steady click (US1)', () => {
     expect(logs.length).toBeGreaterThan(0);
     await region.getByRole('button', { name: 'Reset tool' }).click();
     await expect(start(page)).toBeVisible();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
   });
 });
 
@@ -168,7 +169,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     await start(page).click();
     await expect(page.locator('.position')).toHaveText('BEAT 3/4 · SUB 3', { timeout: 10_000 });
     await pause(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
+    await expect(card(page)).toHaveAttribute('data-phase', 'paused');
     const frozen = await shownBeat(page);
     const frozenCount = (await clicks(page)).length;
     // The scheduled clicks were cancelled, and nothing new is scheduled while paused.
@@ -178,7 +179,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     expect((await readAudioLog(page)).some((e) => e.type === 'click-cancel')).toBe(true);
 
     await resume(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', /starting|running/);
+    await expect(card(page)).toHaveAttribute('data-phase', /starting|running/);
     await expect.poll(async () => (await clicks(page)).length).toBeGreaterThan(frozenCount);
     const after = (await clicks(page)).slice(frozenCount);
     expect(after[0].beat).toBe((frozen % 4) + 1);
@@ -195,9 +196,9 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     await page.goto('/metronome');
     await countInOff(page);
     await start(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await reset(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     await expect(start(page)).toBeFocused();
     await countInOff(page);
     await start(page).click();
@@ -210,19 +211,19 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
   }) => {
     await page.goto('/metronome');
     await page.keyboard.press('Escape');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     await page.keyboard.press('Space');
-    await expect(panel(page)).toHaveAttribute('data-phase', /starting|running/);
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', /starting|running/);
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     // Focus is on the main button: Space is exactly one toggle, not two.
     await expect(pause(page)).toBeFocused();
     await page.keyboard.press('Space');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
+    await expect(card(page)).toHaveAttribute('data-phase', 'paused');
     await expect(resume(page)).toBeFocused();
     await page.keyboard.press('Space');
-    await expect(panel(page)).toHaveAttribute('data-phase', /starting|running/);
+    await expect(card(page)).toHaveAttribute('data-phase', /starting|running/);
     await page.keyboard.press('Escape');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     await expect(start(page)).toBeFocused();
   });
 
@@ -232,11 +233,11 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     await page.goto('/metronome');
     await countInOff(page);
     await start(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     await page.getByRole('link', { name: 'Fretboard Notes', exact: true }).first().click();
     await expect(page).toHaveURL(/\/notes/);
     await page.getByRole('link', { name: 'Metronome', exact: true }).first().click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     expect(
       (await readAudioLog(page)).some((e) => e.type === 'click-cancel' && e.reason === 'leave')
     ).toBe(true);
@@ -255,7 +256,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     await expect(page.getByRole('button', { name: /instrument/i })).toHaveCount(0);
     await expect(page.locator('.tuning-badge, [data-tuning-badge]')).toHaveCount(0);
     for (const k of ['p', 'l', 'n', '.', ',']) await page.keyboard.press(k);
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     expect(await clicks(page)).toEqual([]);
   });
 
@@ -263,7 +264,7 @@ test.describe('metronome: pause, resume and reset (US2)', () => {
     await page.goto('/metronome');
     await page.waitForLoadState('networkidle'); // hydrated before the first key
     await page.keyboard.press('Space');
-    await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+    await expect(card(page)).toHaveAttribute('data-phase', 'running');
     for (let i = 0; i < 10; i++) await page.keyboard.press('Space');
     await page.waitForTimeout(500);
     const keys = (await clicks(page)).map((c) => `${c.run}:${c.index}`);
@@ -350,21 +351,42 @@ test.describe('metronome: tempo and beats (US3)', () => {
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto('/metronome');
-      await expect(panel(page)).toHaveScreenshot(`metronome-settings-${scheme}.png`, {
+      await expect(card(page)).toHaveScreenshot(`metronome-settings-${scheme}.png`, {
         animations: 'disabled'
       });
       await start(page).click();
-      await expect(panel(page)).toHaveAttribute('data-phase', 'running');
+      await expect(card(page)).toHaveAttribute('data-phase', 'running');
       const mask = [page.locator('.position'), page.locator('.dots')];
-      await expect(panel(page)).toHaveScreenshot(`metronome-running-${scheme}.png`, {
+      await expect(card(page)).toHaveScreenshot(`metronome-running-${scheme}.png`, {
         animations: 'disabled',
         mask
       });
       await pause(page).click();
-      await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
-      await expect(panel(page)).toHaveScreenshot(`metronome-paused-${scheme}.png`, {
+      await expect(card(page)).toHaveAttribute('data-phase', 'paused');
+      await expect(card(page)).toHaveScreenshot(`metronome-paused-${scheme}.png`, {
         animations: 'disabled',
         mask
+      });
+    }
+  });
+
+  test('metronome plain-mode views', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop only');
+    const plainPanel = page.getByRole('tabpanel', { name: 'Metronome' });
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto('/metronome');
+      await page.getByRole('tab', { name: 'Metronome', exact: true }).click();
+      await expect(card(page)).toHaveAttribute('data-mode', 'plain');
+      await expect(card(page)).toHaveScreenshot(`metronome-plain-settings-${scheme}.png`, {
+        animations: 'disabled'
+      });
+      await page.getByRole('button', { name: 'Start', exact: true }).click();
+      await expect(card(page)).toHaveAttribute('data-phase', 'running');
+      await expect(plainPanel).toBeVisible();
+      await expect(card(page)).toHaveScreenshot(`metronome-plain-running-${scheme}.png`, {
+        animations: 'disabled',
+        mask: [page.locator('.position'), page.locator('.dots')]
       });
     }
   });

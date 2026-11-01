@@ -117,7 +117,8 @@ test.describe('remembered metronome settings: US1', () => {
   });
 });
 
-const panel = (page: Page) => page.getByRole('region', { name: 'Ratios Training' });
+// The card (data-phase, data-mode) wraps the tab bar and the tabpanel.
+const card = (page: Page) => page.locator('section.panel');
 const startBtn = (page: Page) => page.getByRole('button', { name: 'Start Training' });
 const resetBtn = (page: Page) => page.getByRole('button', { name: 'Reset', exact: true });
 const pauseBtn = (page: Page) => page.getByRole('button', { name: 'Pause', exact: true });
@@ -130,18 +131,18 @@ test.describe('remembered metronome settings: US2', () => {
     await slider(page, '# of Beats').fill('2');
     await waitForMetronome(page, '"beats":2');
     await startBtn(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', /starting|running/);
+    await expect(card(page)).toHaveAttribute('data-phase', /starting|running/);
     await expect(pauseBtn(page)).toBeVisible();
     await pauseBtn(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'paused');
+    await expect(card(page)).toHaveAttribute('data-phase', 'paused');
     await resetBtn(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     await expect(slider(page, 'BPM')).toHaveValue('120');
     await expect(slider(page, '# of Beats')).toHaveValue('2');
 
     await page.reload();
 
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     await expect(slider(page, 'BPM')).toHaveValue('120');
     await expect(slider(page, '# of Beats')).toHaveValue('2');
   });
@@ -154,12 +155,12 @@ test.describe('remembered metronome settings: US2', () => {
     await slider(page, 'BPM').fill('120');
     await waitForMetronome(page, '"bpm":120');
     await startBtn(page).click();
-    await expect(panel(page)).toHaveAttribute('data-phase', /starting|running/);
+    await expect(card(page)).toHaveAttribute('data-phase', /starting|running/);
     await expect(page.locator('.position')).toContainText('COUNT IN');
 
     await page.reload();
 
-    await expect(panel(page)).toHaveAttribute('data-phase', 'settings');
+    await expect(card(page)).toHaveAttribute('data-phase', 'settings');
     await expect(slider(page, 'BPM')).toHaveValue('120');
     await startBtn(page).click();
     await expect(page.locator('.position')).toContainText('COUNT IN –/4');

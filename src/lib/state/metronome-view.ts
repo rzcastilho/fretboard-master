@@ -18,8 +18,13 @@ export interface CountInView {
 }
 
 export type StatusParams =
-  | { readonly kind: 'beat'; readonly beat: number; readonly beats: number; readonly sub: number }
-  | { readonly kind: 'none'; readonly beats: number; readonly sub: number }
+  | {
+      readonly kind: 'beat';
+      readonly beat: number;
+      readonly beats: number;
+      readonly sub: number | null;
+    }
+  | { readonly kind: 'none'; readonly beats: number; readonly sub: number | null }
   | { readonly kind: 'count-in'; readonly click: number; readonly total: number }
   | { readonly kind: 'count-in-none'; readonly total: number };
 
@@ -30,7 +35,7 @@ export type StatusParams =
 export function statusParams(
   beat: number,
   beats: number,
-  sub: number,
+  sub: number | null,
   countIn: CountInView | null = null
 ): StatusParams {
   if (countIn) {
