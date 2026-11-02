@@ -41,3 +41,6 @@ break or reload itself.
 
 - Default per-route chunks with `pollInterval` and forced reload on update: interrupts the user
   and loses in-progress state.
+
+See also: [ADR 0031](0031-offline-copy-service-worker.md). In-tab continuity is now backed by the
+worker across reloads.
