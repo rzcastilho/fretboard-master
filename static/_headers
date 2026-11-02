@@ -24,8 +24,24 @@
 /404.html
   Cache-Control: no-cache
 
+/caged
+  Cache-Control: no-cache
+
+/metronome
+  Cache-Control: no-cache
+
 /theme-boot.js
   Cache-Control: no-cache
+
+/service-worker.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+  Content-Type: application/manifest+json
+
+/icons/*
+  Cache-Control: public, max-age=86400
 
 /_app/immutable/*
   Cache-Control: public, max-age=31536000, immutable

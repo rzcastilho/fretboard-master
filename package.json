@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && node scripts/make-404.mjs",
-    "build:test": "vite build --mode test && node scripts/make-404.mjs",
+    "build": "vite build && node scripts/make-404.mjs && node scripts/stamp-service-worker.mjs",
+    "build:test": "vite build --mode test && node scripts/make-404.mjs && node scripts/stamp-service-worker.mjs",
     "build:test:skew": "node scripts/build-next-version.mjs",
     "preview": "vite preview",
     "check": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy baseLocale --silent && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",

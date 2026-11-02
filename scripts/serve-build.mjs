@@ -12,7 +12,10 @@ const TYPES = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.txt': 'text/plain; charset=utf-8'
+  '.txt': 'text/plain; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+  '.png': 'image/png',
+  '.woff2': 'font/woff2'
 };
 
 // Case-sensitive like the host (macOS filesystems are not).
@@ -45,7 +48,10 @@ createServer((req, res) => {
   const ext = extname(target);
   res.writeHead(found ? 200 : 404, {
     'content-type': TYPES[ext] ?? 'application/octet-stream',
-    'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable'
+    'cache-control':
+      ext === '.html' || /\/(service-worker\.js|manifest\.webmanifest)$/.test(target)
+        ? 'no-cache'
+        : 'public, max-age=31536000, immutable'
   });
   res.end(readFileSync(target));
 }).listen(port, () => console.log(`serve-build: ${dir} on http://localhost:${port}`));
