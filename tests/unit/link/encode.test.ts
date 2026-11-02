@@ -14,6 +14,7 @@ import { playback, resetPlaybackForTests } from '$lib/state/playback.svelte';
 import { caged as cagedStore, resetCagedForTests } from '$lib/state/caged.svelte';
 import { notes as notesStore, resetNotesForTests } from '$lib/state/notes.svelte';
 import { triads as triadsStore } from '$lib/state/triads.svelte';
+import { timer, resetTimerForTests } from '$lib/state/timer.svelte';
 
 const ORIGIN = 'https://fretboard.example';
 const INSTRUMENT = { stringCount: 6, tuning: STANDARD_TUNING, fretCount: 22 } as const;
@@ -248,6 +249,7 @@ describe('exclusion matrix (SC-003, E3)', () => {
     resetLanguageForTests();
     resetNotationForTests();
     resetPlaybackForTests();
+    resetTimerForTests();
     triadsStore.reset();
   });
   afterEach(() => {
@@ -269,6 +271,7 @@ describe('exclusion matrix (SC-003, E3)', () => {
     'theme dark': () => document.documentElement.setAttribute('data-theme', 'dark'),
     'sound muted': () => playback.restore({ muted: true, volume: 0.2 }),
     'tempo slow': () => cagedStore.restoreTempo('slow'),
+    'practice timer 10m (C35)': () => timer.restore(10),
     scroll: () => {
       document.documentElement.scrollTop = 120;
       window.dispatchEvent(new Event('scroll'));

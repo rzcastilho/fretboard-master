@@ -101,4 +101,5 @@ export type AudioLogEntry =
       run: number;
       count: number;
       reason: 'pause' | 'reset' | 'leave' | 'suspend' | 'end' | 'retime';
-    };
+    }
+  | { type: 'chime'; when: number; contextTime: number; lateMs: number };

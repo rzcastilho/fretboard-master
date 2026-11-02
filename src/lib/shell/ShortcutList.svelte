@@ -47,6 +47,8 @@
     <dd>{m.shortcuts_metronome_reset()}</dd>
   </div>
   <div>
+    <!-- A literal key name; the mustache keeps it out of the raw-text guard. -->
+    <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
     <dt><kbd>{'T'}</kbd></dt>
     <dd>{m.shortcuts_metronome_tap()}</dd>
   </div>
