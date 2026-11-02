@@ -561,5 +561,14 @@
   "shortcuts_metronome_reset": "Reset",
   "shortcuts_metronome_tap": "Tap tempo (Metronome mode)",
   "shortcuts_key_space": "Space",
-  "shortcuts_key_escape": "Esc"
+  "shortcuts_key_escape": "Esc",
+  "timer_heading": "Timer",
+  "timer_presets_label": "Timer length",
+  "timer_preset": "{minutes}m",
+  "timer_start": "Start timer",
+  "timer_pause": "Pause timer",
+  "timer_readout_label": "Time remaining",
+  "timer_announce_second": "1 second",
+  "timer_announce_seconds": "{count} seconds",
+  "timer_announce_finished": "Timer finished"
 }

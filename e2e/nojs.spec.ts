@@ -54,3 +54,15 @@ test.describe('theme without JavaScript', () => {
     expect(dark.equals(light)).toBe(false);
   });
 });
+
+test.describe('practice timer without JavaScript (U13)', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('2m is pressed and 02:00 is rendered', async ({ page }) => {
+    await page.goto('/metronome');
+    await expect(
+      page.getByRole('group', { name: 'Timer length' }).locator('[aria-pressed="true"]')
+    ).toHaveText('2m');
+    await expect(page.getByRole('timer', { name: 'Time remaining' })).toContainText('02:00');
+  });
+});

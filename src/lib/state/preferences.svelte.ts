@@ -16,6 +16,7 @@ import { notes } from './notes.svelte';
 import { playback } from './playback.svelte';
 import { shortcuts } from './shortcuts.svelte';
 import { theme } from './theme.svelte';
+import { timer } from './timer.svelte';
 import { triads } from './triads.svelte';
 
 let session: PrefsSession | null = null;
@@ -59,6 +60,7 @@ export const preferences = {
     theme.start(p.theme);
     shortcuts.start(p.shortcuts);
     metronome.restore(p.metronome);
+    timer.restore(p.metronome.timer);
     lastTool = p.lastTool;
     cagedNoteShown = p.cagedNoteShown;
     if (!session.available && !noticeShown) {
@@ -113,6 +115,7 @@ export const preferences = {
     theme.restore(null);
     shortcuts.restore(true);
     metronome.restore(session ? session.current.metronome : DEFAULT_PREFERENCES.metronome);
+    timer.restore(2);
     lastTool = null;
     cagedNoteShown = false;
   },

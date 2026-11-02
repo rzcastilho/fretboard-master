@@ -158,7 +158,7 @@ test.describe('metronome subdivisions: dropdown (US2)', () => {
       await page.goto('/metronome');
       await expect(page.getByRole('combobox', { name: 'Bucle 1' })).toBeVisible();
       await page.getByRole('slider', { name: /tiempos/i }).fill('2');
-      await page.getByRole('button', { name: /^Iniciar/ }).click();
+      await page.getByRole('button', { name: /^Iniciar(?! temporizador)/ }).click();
       await expect(page.locator('.position')).toHaveText('TIEMPO 2/2 · SUB 3', { timeout: 5000 });
     });
   });
