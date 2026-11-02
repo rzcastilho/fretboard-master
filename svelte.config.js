@@ -17,7 +17,8 @@ const config = {
       // 028: type-check the Cloudflare Pages Function (`functions/m.ts`) with `pnpm check`.
       config: (cfg) => ({ ...cfg, include: [...cfg.include, '../functions/**/*.ts'] })
     },
-    version: { name: version, pollInterval: 0 },
+    serviceWorker: { register: false, files: (file) => file !== '_headers' },
+    version: { name: process.env.FM_APP_VERSION ?? version, pollInterval: 0 },
     csp: {
       mode: 'hash',
       directives: {
