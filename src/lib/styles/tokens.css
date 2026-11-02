@@ -12,6 +12,8 @@
   --color-text-muted: light-dark(#4b5563, #b3bac4);
   --color-accent: light-dark(#13466a, #c2e0f8);
   --color-accent-text: light-dark(#ffffff, #101317);
+  /* Selected timer-pill outline (039); distinct from the reserved fifth green. */
+  --color-accent-secondary: light-dark(#1d6b45, #3fd99a);
   --color-border: light-dark(#9ca3af, #6b7480);
   --color-border-subtle: light-dark(#e3e6ea, #262c34);
   --color-surface-hover: light-dark(#e7eaee, #232931);
@@ -182,6 +184,13 @@
   /* Sizing */
   --target-min: 44px;
 
+  /* Practice timer (039) */
+  --timer-readout-size: 3.5rem;
+  --timer-play-size: 3rem;
+  --timer-ghost-opacity: 0.12;
+  --timer-flash-dim: 0.25;
+  --timer-flash-period: 1s;
+
   /* Print layout (026): nominal board width, one-page height cap, text floor */
   --print-board-inline: 190mm;
   --print-board-max-block: 55vh;
@@ -236,6 +245,7 @@
     --color-text: light-dark(#000000, #ffffff);
     --color-accent: light-dark(#0b3350, #d6ebfb);
     --color-accent-text: light-dark(#ffffff, #000000);
+    --color-accent-secondary: var(--color-text);
     --color-notice-surface: light-dark(#e1e9f3, #121a24);
     --color-notice-text: light-dark(#000000, #ffffff);
     --color-text-muted: var(--color-text);
@@ -308,6 +318,7 @@
     --fb-color-root: Canvas;
     --fb-color-third: Canvas;
     --fb-color-fifth: Canvas;
+    --color-accent-secondary: Highlight;
     --fb-color-label: CanvasText;
     --fb-color-elevation: Canvas;
     --fb-color-neutral: Canvas;
@@ -373,6 +384,7 @@
     --duration-base: 0s;
     --duration-short: 0s;
     --duration-medium: 0s;
+    --timer-flash-period: 0s;
   }
 }
 

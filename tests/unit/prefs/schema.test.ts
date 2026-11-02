@@ -8,6 +8,7 @@ import {
   METRONOME_PLAIN_DEFAULTS,
   METRONOME_RATIOS_DEFAULTS,
   METRONOME_SPEED_DEFAULTS,
+  METRONOME_TIMER_DEFAULT,
   PREFS_VERSION,
   PRIVACY_CATEGORIES,
   TOOL_IDS,
@@ -36,6 +37,7 @@ import {
   type SpeedSettings,
   type Subdivision
 } from '../../../src/lib/state/metronome-settings';
+import { DEFAULT_TIMER_MINUTES, TIMER_PRESETS } from '../../../src/lib/state/timer-model';
 import { FIXTURES, FIXTURE_BY_NAME } from './fixtures';
 
 const rec = (o: unknown): string => JSON.stringify(o);
@@ -67,7 +69,8 @@ describe('constants and defaults (FR-018)', () => {
         ratios: DEFAULT_SETTINGS,
         plain: DEFAULT_PLAIN_SETTINGS,
         speed: DEFAULT_SPEED_SETTINGS,
-        mode: 'ratios'
+        mode: 'ratios',
+        timer: 2
       }
     });
   });
@@ -376,7 +379,8 @@ describe('serializePreferences', () => {
         ratios: DEFAULT_SETTINGS,
         plain: DEFAULT_PLAIN_SETTINGS,
         speed: DEFAULT_SPEED_SETTINGS,
-        mode: 'ratios'
+        mode: 'ratios',
+        timer: 2
       }
     };
     expect(serializePreferences(p)).toBe(
@@ -437,7 +441,8 @@ describe('seven strings: writer rules 1–4 (012)', () => {
         ratios: DEFAULT_SETTINGS,
         plain: DEFAULT_PLAIN_SETTINGS,
         speed: DEFAULT_SPEED_SETTINGS,
-        mode: 'ratios'
+        mode: 'ratios',
+        timer: 2
       }
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
@@ -747,7 +752,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
     ratios: arbRatios,
     plain: arbPlain,
     speed: arbSpeed,
-    mode: fc.constantFrom('plain', 'speed', 'ratios')
+    mode: fc.constantFrom('plain', 'speed', 'ratios'),
+    timer: fc.integer({ min: 1, max: 10 })
   })
 });
 
@@ -946,7 +952,8 @@ describe('stored keys (027 FR-019(e))', () => {
       ratios: { ...DEFAULT_SETTINGS, bpm: 120 },
       plain: DEFAULT_PLAIN_SETTINGS,
       speed: DEFAULT_SPEED_SETTINGS,
-      mode: 'ratios'
+      mode: 'ratios',
+      timer: 2
     }
   };
 
@@ -1006,7 +1013,8 @@ describe('metronome.ratios (035)', () => {
           ratios: { ...DEFAULT_SETTINGS },
           plain: DEFAULT_PLAIN_SETTINGS,
           speed: DEFAULT_SPEED_SETTINGS,
-          mode: 'ratios'
+          mode: 'ratios',
+          timer: 2
         }
       })
     ).not.toContain('metronome');
@@ -1028,7 +1036,8 @@ describe('metronome.ratios (035)', () => {
             ratios: other,
             plain: DEFAULT_PLAIN_SETTINGS,
             speed: DEFAULT_SPEED_SETTINGS,
-            mode: 'ratios'
+            mode: 'ratios',
+            timer: 2
           }
         })
       ).toContain('"metronome"');
@@ -1043,7 +1052,8 @@ describe('metronome.ratios (035)', () => {
         ratios: nonDefault,
         plain: DEFAULT_PLAIN_SETTINGS,
         speed: DEFAULT_SPEED_SETTINGS,
-        mode: 'ratios'
+        mode: 'ratios',
+        timer: 2
       }
     });
     const o = JSON.parse(raw) as Record<string, Record<string, Record<string, number | boolean>>>;
@@ -1066,7 +1076,8 @@ describe('metronome.ratios (035)', () => {
               ratios,
               plain: DEFAULT_PLAIN_SETTINGS,
               speed: DEFAULT_SPEED_SETTINGS,
-              mode: 'ratios'
+              mode: 'ratios',
+              timer: 2
             }
           })
         );
@@ -1190,7 +1201,8 @@ describe('metronome.ratios (035)', () => {
         ratios: nonDefault,
         plain: DEFAULT_PLAIN_SETTINGS,
         speed: DEFAULT_SPEED_SETTINGS,
-        mode: 'ratios'
+        mode: 'ratios',
+        timer: 2
       }
     });
     const back = parsePreferences(written);
@@ -1206,15 +1218,16 @@ describe('metronome.plain and metronome.mode (036)', () => {
   const withMetronome = (metronome: unknown): string =>
     rec({ version: 1, volume: 0.35, metronome });
   const metOf = (raw: string) => parsePreferences(raw).metronome;
-  const prefs = (metronome: Preferences['metronome']): Preferences => ({
+  const prefs = (metronome: Partial<Preferences['metronome']>): Preferences => ({
     ...DEFAULT_PREFERENCES,
-    metronome
+    metronome: { ...DEFAULT_PREFERENCES.metronome, ...metronome }
   });
   const base = {
     ratios: DEFAULT_SETTINGS,
     plain: DEFAULT_PLAIN_SETTINGS,
     speed: DEFAULT_SPEED_SETTINGS,
-    mode: 'ratios'
+    mode: 'ratios',
+    timer: 2
   } as const;
 
   it('C1: the default record is byte-identical to 035', () => {
@@ -1346,7 +1359,8 @@ describe('metronome.plain and metronome.mode (036)', () => {
       ratios: { ...DEFAULT_SETTINGS, bpm: 120 },
       plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4, subdivision: 1 },
       speed: DEFAULT_SPEED_SETTINGS,
-      mode: 'plain'
+      mode: 'plain',
+      timer: 2
     });
   });
 });
@@ -1413,7 +1427,8 @@ describe('metronome.speed (037)', () => {
       ratios: DEFAULT_SETTINGS,
       plain: DEFAULT_PLAIN_SETTINGS,
       speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 80, targetBpm: 120, atTarget: 'stop' },
-      mode: 'speed'
+      mode: 'speed',
+      timer: 2
     });
   });
 
@@ -1619,5 +1634,99 @@ describe('metronome.plain.subdivision (038)', () => {
     }
     const raw = FIXTURE_BY_NAME['metronome-plain-subdivision'].raw;
     expect(serializePreferences(parsePreferences(raw))).toBe(raw);
+  });
+});
+
+describe('metronome timer (039)', () => {
+  const md = (metronome: unknown) =>
+    parsePreferences(rec({ version: 1, tuning: 'AF-1', frets: 22, metronome }));
+
+  it('C27: records without a timer (every earlier fixture) read as 2', () => {
+    for (const f of FIXTURES) {
+      if (f.name.startsWith('metronome-timer')) continue;
+      expect(parsePreferences(f.raw).metronome.timer, f.name).toBe(2);
+    }
+  });
+
+  it('C28: integers 1–10 parse to themselves', () => {
+    for (const n of TIMER_PRESETS) expect(md({ timer: n }).metronome.timer).toBe(n);
+  });
+
+  it.each(['5', 5.5, 0, 11, -1, null, true, {}])(
+    'C29: %j reads as 2 and keeps the other fields',
+    (bad) => {
+      const p = md({
+        ratios: {
+          bpm: 120,
+          beats: 2,
+          countIn: true,
+          initialCountIn: 4,
+          repeatCountIn: 2,
+          ratio: true,
+          loop1: 3,
+          loop2: 6
+        },
+        mode: 'speed',
+        timer: bad
+      });
+      expect(p.metronome.timer).toBe(2);
+      expect(p.metronome.mode).toBe('speed');
+      expect(p.metronome.ratios.bpm).toBe(120);
+    }
+  );
+
+  it('C29: a metronome entry that is not an object reads timer 2', () => {
+    for (const m of [null, [], 'x', 5]) expect(md(m).metronome.timer).toBe(2);
+  });
+
+  it('C30: timer is written only when not 2, as the last key', () => {
+    const base = DEFAULT_PREFERENCES;
+    const withTimer = (timer: number, extra = {}): Preferences => ({
+      ...base,
+      metronome: { ...base.metronome, ...extra, timer }
+    });
+    expect(serializePreferences(withTimer(2))).toBe(serializePreferences(base));
+    expect(JSON.parse(serializePreferences(withTimer(2))).metronome).toBeUndefined();
+    expect(serializePreferences(withTimer(5))).toContain('"metronome":{"timer":5}');
+    const keys = Object.keys(
+      JSON.parse(serializePreferences(withTimer(9, { mode: 'speed' }))).metronome
+    );
+    expect(keys).toEqual(['mode', 'timer']);
+  });
+
+  it('C31: parse(serialize(p)) round-trips with timer drawn from 1–10', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 10 }),
+        fc.constantFrom('ratios', 'plain', 'speed'),
+        (timer, mode) => {
+          const p: Preferences = {
+            ...DEFAULT_PREFERENCES,
+            metronome: { ...DEFAULT_PREFERENCES.metronome, mode, timer }
+          };
+          expect(parsePreferences(serializePreferences(p))).toEqual(p);
+        }
+      )
+    );
+  });
+
+  it('C33: the defaults and limits mirror the timer model', () => {
+    expect(METRONOME_TIMER_DEFAULT).toBe(DEFAULT_TIMER_MINUTES);
+    expect(METRONOME_LIMITS.timer).toEqual([
+      Math.min(...TIMER_PRESETS),
+      Math.max(...TIMER_PRESETS)
+    ]);
+  });
+
+  it('fixtures parse as expected and the valid ones round-trip', () => {
+    expect(parsePreferences(FIXTURE_BY_NAME['metronome-timer'].raw).metronome.timer).toBe(5);
+    const withPlain = parsePreferences(FIXTURE_BY_NAME['metronome-timer-with-plain'].raw);
+    expect(withPlain.metronome).toMatchObject({ mode: 'plain', timer: 10 });
+    const invalid = parsePreferences(FIXTURE_BY_NAME['metronome-timer-invalid'].raw);
+    expect(invalid.metronome).toMatchObject({ mode: 'speed', timer: 2 });
+    for (const name of ['metronome-timer', 'metronome-timer-with-plain']) {
+      const raw = FIXTURE_BY_NAME[name].raw;
+      expect(serializePreferences(parsePreferences(raw))).toBe(raw);
+    }
   });
 });

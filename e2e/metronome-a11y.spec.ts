@@ -4,7 +4,7 @@ import { countInOff, ratioOff, runAxe } from './support/helpers';
 
 // The card (data-phase, data-mode) wraps the tab bar and the tabpanel.
 const card = (page: Page) => page.locator('section.panel');
-const live = (page: Page) => page.locator('[role="status"][aria-live="polite"].sr-only');
+const live = (page: Page) => page.locator('.panel [role="status"][aria-live="polite"].sr-only');
 
 async function toPaused(page: Page): Promise<void> {
   await countInOff(page);
@@ -108,7 +108,7 @@ test.describe('metronome a11y: live region', () => {
       () =>
         new Promise<string[]>((resolve) => {
           const el = document.querySelector(
-            '[role="status"][aria-live="polite"].sr-only'
+            '.panel [role="status"][aria-live="polite"].sr-only'
           ) as HTMLElement;
           const texts = [el.textContent ?? ''];
           const mo = new MutationObserver(() => texts.push(el.textContent ?? ''));
@@ -154,7 +154,7 @@ test.describe('metronome a11y: languages (US4-2)', () => {
       await expect(page.locator('html')).toHaveAttribute('lang', 'es');
       await expect(page.getByRole('heading', { level: 1, name: 'Metrónomo' })).toBeVisible();
       await page.getByRole('switch', { name: 'Cuenta previa' }).click();
-      await page.getByRole('button', { name: /^Iniciar/ }).click();
+      await page.getByRole('button', { name: /^Iniciar(?! temporizador)/ }).click();
       await expect(page.locator('.position')).not.toHaveText(/BEAT/);
       await expect(page.locator('.position')).toHaveText(/\d\/4|–\/4/);
     });

@@ -561,5 +561,14 @@
   "shortcuts_metronome_reset": "Reiniciar",
   "shortcuts_metronome_tap": "Marcar tempo (modo Metrónomo)",
   "shortcuts_key_space": "Espacio",
-  "shortcuts_key_escape": "Esc"
+  "shortcuts_key_escape": "Esc",
+  "timer_heading": "Temporizador",
+  "timer_presets_label": "Duración del temporizador",
+  "timer_preset": "{minutes}m",
+  "timer_start": "Iniciar temporizador",
+  "timer_pause": "Pausar temporizador",
+  "timer_readout_label": "Tiempo restante",
+  "timer_announce_second": "1 segundo",
+  "timer_announce_seconds": "{count} segundos",
+  "timer_announce_finished": "Temporizador terminado"
 }

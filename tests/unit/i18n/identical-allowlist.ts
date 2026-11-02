@@ -36,7 +36,8 @@ const SHARED: readonly string[] = [
   'metronome_bpm_unit',
   'metronome_subdivision_option',
   'metronome_status_sub',
-  'shortcuts_key_escape'
+  'shortcuts_key_escape',
+  'timer_preset'
 ];
 
 /** 021: syllables spelled the same as English (es: all seven; pt-BR: Mi, Sol, Si only). */

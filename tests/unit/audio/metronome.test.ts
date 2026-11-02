@@ -385,7 +385,7 @@ describe('subdivisions (032)', () => {
   });
 
   it('onBeat fires once per slot and never for sub clicks', async () => {
-    const { scheduler, begin, advance, frames, beats } = setup();
+    const { scheduler, begin, advance, frames } = setup();
     await begin({ bpm: 120, clicksPerBeat: 4 });
     for (let i = 0; i < 100; i++) {
       advance(25);

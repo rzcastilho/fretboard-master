@@ -9,7 +9,9 @@
   import { screenTitle } from '$lib/shell/screens';
   import { TOOLS } from '$lib/shell/tools';
   import { metronome } from '$lib/state/metronome.svelte';
+  import { timer } from '$lib/state/timer.svelte';
   import MetronomePanel from './MetronomePanel.svelte';
+  import TimerCard from './TimerCard.svelte';
 
   const name = TOOLS.find((t) => t.id === 'metronome')?.name() ?? '';
 
@@ -30,6 +32,17 @@
 
 <main>
   <h1 tabindex="-1" data-print="show">{name}</h1>
+  <svelte:boundary onerror={(e) => recordFailure(null, e)}>
+    <TimerCard />
+    {#snippet failed(_error, boundaryReset)}
+      <FailureView
+        reset={() => {
+          timer.restore(timer.preset);
+          boundaryReset();
+        }}
+      />
+    {/snippet}
+  </svelte:boundary>
   <svelte:boundary onerror={(e) => recordFailure(null, e)}>
     <MetronomePanel />
     {#snippet failed(_error, boundaryReset)}

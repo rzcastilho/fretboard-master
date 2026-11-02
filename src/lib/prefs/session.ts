@@ -22,8 +22,10 @@ import {
  * `{ accidentals }` and `{ cagedNoteShown: true }`, which are covered by the partial. 026 adds
  * `{ theme }` (`Theme | null`; `null` clears the pin), covered the same way. 027 adds `{ shortcuts }` (boolean), covered the same way.
  */
-export type PreferencesPatch = Partial<Omit<Preferences, 'labels'>> & {
+export type PreferencesPatch = Partial<Omit<Preferences, 'labels' | 'metronome'>> & {
   labels?: Partial<Preferences['labels']>;
+  /** 039: merged one level deep, so `{ timer }` keeps the modes and the modes keep `timer`. */
+  metronome?: Partial<Preferences['metronome']>;
 };
 
 export interface PrefsSession {
@@ -52,8 +54,13 @@ export function startSession(storage: StorageLike | null = resolveStorage()): Pr
       return current;
     },
     remember(patch: PreferencesPatch): void {
-      const { labels, ...rest } = patch;
-      current = { ...current, ...rest, labels: { ...current.labels, ...labels } };
+      const { labels, metronome, ...rest } = patch;
+      current = {
+        ...current,
+        ...rest,
+        labels: { ...current.labels, ...labels },
+        metronome: { ...current.metronome, ...metronome }
+      };
       const serialized = serializePreferences(current);
       if (serialized === lastWritten) return;
       if (!store) return;

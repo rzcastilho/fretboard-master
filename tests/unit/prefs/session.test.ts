@@ -205,7 +205,7 @@ describe('metronome (035)', () => {
     session.remember({ metronome: { ratios, ...rest } });
     expect(session.current).toEqual({
       ...FIXTURE_BY_NAME['v1-full'].expected,
-      metronome: { ratios, ...rest }
+      metronome: { ratios, ...rest, timer: 2 }
     });
     session.remember({ muted: false });
     expect(session.current.metronome.ratios).toEqual(ratios);
@@ -217,5 +217,30 @@ describe('metronome (035)', () => {
     expect(session.current.metronome.ratios.bpm).toBe(140);
     session.erase();
     expect(session.current.metronome.ratios).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe('metronome timer (039)', () => {
+  const ratios = { ...DEFAULT_SETTINGS, bpm: 120, beats: 2 };
+  const modes = {
+    plain: { ...DEFAULT_PLAIN_SETTINGS, bpm: 100 },
+    speed: DEFAULT_SPEED_SETTINGS,
+    mode: 'plain'
+  } as const;
+
+  it('C32: { timer } keeps the stored modes, and the modes keep the stored timer', () => {
+    const session = startSession(fakeStorage());
+    session.remember({ metronome: { ratios, ...modes } });
+    session.remember({ metronome: { timer: 5 } });
+    expect(session.current.metronome).toEqual({ ratios, ...modes, timer: 5 });
+    session.remember({ metronome: { ratios, ...modes } });
+    expect(session.current.metronome.timer).toBe(5);
+  });
+
+  it('writes the timer as the last key of the metronome entry', () => {
+    const s = fakeStorage();
+    const session = startSession(s);
+    session.remember({ metronome: { timer: 7 } });
+    expect(s.data.get(PREFS_KEY)).toContain('"metronome":{"timer":7}');
   });
 });

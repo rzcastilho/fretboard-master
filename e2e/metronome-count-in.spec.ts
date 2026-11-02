@@ -248,7 +248,7 @@ test.describe('metronome count-in: repeat value (US4)', () => {
 test.describe('metronome count-in: announcements, languages, reflow (polish)', () => {
   test('2.12: live-region texts, no per-click announcements', async ({ page }) => {
     await page.goto('/metronome');
-    const live = page.locator('[role="status"][aria-live="polite"].sr-only');
+    const live = page.locator('.panel [role="status"][aria-live="polite"].sr-only');
     await ratioOff(page);
     await start(page).click();
     await expect(live).toHaveText('Started, 85 BPM, 4 beats, 8th Triplets, count in 4');
@@ -256,7 +256,7 @@ test.describe('metronome count-in: announcements, languages, reflow (polish)', (
       () =>
         new Promise<string[]>((resolve) => {
           const el = document.querySelector(
-            '[role="status"][aria-live="polite"].sr-only'
+            '.panel [role="status"][aria-live="polite"].sr-only'
           ) as HTMLElement;
           const texts = [el.textContent ?? ''];
           const mo = new MutationObserver(() => texts.push(el.textContent ?? ''));
@@ -288,7 +288,7 @@ test.describe('metronome count-in: announcements, languages, reflow (polish)', (
     test('2.13: switch and status line', async ({ page }) => {
       await page.goto('/metronome');
       await expect(page.getByRole('switch', { name: 'Cuenta previa' })).toBeVisible();
-      await page.getByRole('button', { name: /^Iniciar/ }).click();
+      await page.getByRole('button', { name: /^Iniciar(?! temporizador)/ }).click();
       await expect(page.locator('.position')).toContainText('CUENTA 1/4');
     });
   });

@@ -318,7 +318,7 @@ test.describe('metronome: tempo and beats (US3)', () => {
     test(`US3-3: layout at ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await page.goto('/metronome');
-      const pill = page.locator('.pill').first();
+      const pill = page.locator('div.pill').first();
       const box = await pill.boundingBox();
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(96);
       expect(
@@ -337,7 +337,7 @@ test.describe('metronome: tempo and beats (US3)', () => {
       document.documentElement.lang = 'pt-BR';
       document.documentElement.style.fontSize = '200%';
     });
-    const box = await page.locator('.pill').first().boundingBox();
+    const box = await page.locator('div.pill').first().boundingBox();
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(96);
     expect(
       await page.evaluate(
