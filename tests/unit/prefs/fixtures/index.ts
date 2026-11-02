@@ -68,6 +68,8 @@ export interface ExpectedPreferences {
     /** 037: absent means the speed defaults. */
     readonly speed?: SpeedSettings;
     readonly mode?: MetronomeMode;
+    /** 039: absent means 2. */
+    readonly timer?: number;
   };
 }
 
@@ -123,7 +125,8 @@ function fixture(
         ratios: expected.metronome?.ratios ?? DEFAULT_SETTINGS,
         plain: expected.metronome?.plain ?? DEFAULT_PLAIN_SETTINGS,
         speed: expected.metronome?.speed ?? DEFAULT_SPEED_SETTINGS,
-        mode: expected.metronome?.mode ?? 'ratios'
+        mode: expected.metronome?.mode ?? 'ratios',
+        timer: expected.metronome?.timer ?? 2
       }
     },
     tuning: tuning ?? { kind: 'preset', id: expected.tuningId }
@@ -370,7 +373,19 @@ export const FIXTURES: readonly PrefsFixture[] = [
       speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 80, targetBpm: 120, atTarget: 'stop' },
       mode: 'speed'
     }
-  })
+  }),
+  // 039: the practice timer preset (minutes) beside the other metronome parts
+  fixture('metronome-timer', { ...defaults, metronome: { timer: 5 } }),
+  fixture('metronome-timer-with-plain', {
+    ...defaults,
+    metronome: {
+      plain: { bpm: 100, beats: 3, countIn: true, initialCountIn: 4, subdivision: 3 },
+      mode: 'plain',
+      timer: 10
+    }
+  }),
+  // "7" is not an integer: timer → 2, the mode is kept
+  fixture('metronome-timer-invalid', { ...defaults, metronome: { mode: 'speed' } })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

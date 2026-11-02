@@ -25,12 +25,13 @@ break or reload itself.
 ## Consequences
 
 - The About screen keeps showing the loaded version until a reload.
-- Initial JS carries all screens; `scripts/check-bundle-size.mjs` caps it at 160 KB gzip
+- Initial JS carries all screens; `scripts/check-bundle-size.mjs` caps it at 180 KB gzip
   (80 KB until constitution 1.3.0, 85 KB until 1.4.0, 90 KB until 1.6.0, 92 KB until 1.7.0,
-  94 KB until 1.8.0, 120 KB until 1.9.0, 128 KB until 1.10.0, 136 KB until 1.11.0, 150 KB until 2.1.0; the 120 → 128 KB raise ships the link decoder, slice 023;
+  94 KB until 1.8.0, 120 KB until 1.9.0, 128 KB until 1.10.0, 136 KB until 1.11.0, 150 KB until 2.1.0, 160 KB until 2.2.0; the 120 → 128 KB raise ships the link decoder, slice 023;
   the 128 → 136 KB raise ships the minimap, fit mode and adaptive layout, slice 025;
   the 136 → 150 KB raise ships themes, motion and print, slice 026, with headroom for later slices;
-  the 150 → 160 KB raise ships the metronome and its subdivisions, slices 031–032).
+  the 150 → 160 KB raise ships the metronome and its subdivisions, slices 031–032;
+  the 160 → 180 KB raise ships the practice timer, slice 039, with headroom for later slices).
 - Every screen parses and hydrates the whole bundle, which costs time to interactive on the
   reference mobile profile. Constitution 1.12.0 (slice 031) keeps this decision permanently and
   sets the Lighthouse budgets to what it delivers (score ≥ 70, Home ≤ 4.5 s, tools ≤ 5 s)

@@ -12,7 +12,7 @@ const catalog = (tag: string): Record<string, string> =>
 
 const card = (page: Page) => page.locator('section.panel');
 const tapButton = (page: Page) => page.locator('button.tap');
-const live = (page: Page) => page.locator('[role="status"][aria-live="polite"].sr-only');
+const live = (page: Page) => page.locator('.panel [role="status"][aria-live="polite"].sr-only');
 const subSelect = (page: Page) => page.locator('#metronome-plain-subdivision');
 const position = async (page: Page): Promise<string> =>
   ((await page.locator('.position').textContent()) ?? '').trim().replace(/\s+/g, ' ');

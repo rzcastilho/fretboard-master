@@ -16,6 +16,7 @@ import { metronome, resetMetronomeForTests } from '../../../src/lib/state/metron
 import { preferences, resetPreferencesForTests } from '../../../src/lib/state/preferences.svelte';
 import { resetShortcutsForTests, shortcuts } from '../../../src/lib/state/shortcuts.svelte';
 import { resetTriadsForTests, triads } from '../../../src/lib/state/triads.svelte';
+import { timer, resetTimerForTests } from '../../../src/lib/state/timer.svelte';
 import { FIXTURE_BY_NAME } from '../prefs/fixtures';
 import { fakeStorage } from '../prefs/support';
 
@@ -30,6 +31,7 @@ beforeEach(() => {
   resetPreferencesForTests();
   resetShortcutsForTests();
   resetMetronomeForTests();
+  resetTimerForTests();
 });
 
 const full = () => fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['v1-full'].raw });
@@ -562,5 +564,51 @@ describe('metronome speed settings (037)', () => {
     preferences.erase();
     expect(metronome.speed).toEqual(DEFAULT_SPEED_SETTINGS);
     expect(metronome.mode).toBe('ratios');
+  });
+});
+
+describe('practice timer preset (039, C34)', () => {
+  it('start() applies the stored preset, stopped, without writing', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-timer'].raw });
+    const restore = vi.spyOn(timer, 'restore');
+    const before = s.data.get(PREFS_KEY);
+    preferences.start(s);
+    expect(restore).toHaveBeenCalledWith(5);
+    expect(timer.preset).toBe(5);
+    expect(timer.status).toBe('stopped');
+    expect(s.data.get(PREFS_KEY)).toBe(before);
+  });
+
+  it('start() with no stored preset leaves 2 minutes', () => {
+    preferences.start(fakeStorage());
+    expect(timer.preset).toBe(2);
+  });
+
+  it('erase() restores 2, stops a running countdown and removes the stored key', () => {
+    const s = fakeStorage({ [PREFS_KEY]: FIXTURE_BY_NAME['metronome-timer'].raw });
+    preferences.start(s);
+    const restore = vi.spyOn(timer, 'restore');
+    resetTimerForTests({
+      clock: { now: () => 0, setTimeout: () => 1, clearTimeout: () => {} },
+      sink: () => null
+    });
+    timer.restore(5);
+    timer.toggle();
+    expect(timer.status).toBe('running');
+    preferences.erase();
+    expect(restore).toHaveBeenCalledWith(2);
+    expect(timer.preset).toBe(2);
+    expect(timer.status).toBe('stopped');
+    expect(s.data.has(PREFS_KEY)).toBe(false);
+  });
+
+  it('selecting a preset keeps the mode, and a mode change keeps the preset', () => {
+    const s = fakeStorage();
+    preferences.start(s);
+    timer.selectPreset(7);
+    metronome.selectMode('plain');
+    const m = JSON.parse(s.data.get(PREFS_KEY) as string).metronome;
+    expect(m.timer).toBe(7);
+    expect(m.mode).toBe('plain');
   });
 });
