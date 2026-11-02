@@ -13,6 +13,7 @@ function run(cmd, args, env = {}) {
 console.log(`build-next-version: building ${next} -> build-next/`);
 run('pnpm', ['exec', 'vite', 'build', '--mode', 'test'], { FM_APP_VERSION: next });
 run('node', ['scripts/make-404.mjs']);
+run('node', ['scripts/stamp-service-worker.mjs']);
 rmSync('build-next', { recursive: true, force: true });
 renameSync('build', 'build-next');
 

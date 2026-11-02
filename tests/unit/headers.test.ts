@@ -74,4 +74,21 @@ describe('static/_headers', () => {
       expect(rules.get(path)?.get('cache-control')).toBe('no-cache');
     }
   );
+
+  it.each(['/service-worker.js', '/manifest.webmanifest', '/caged', '/metronome'])(
+    'revalidates %s (040)',
+    (path) => {
+      expect(rules.get(path)?.get('cache-control')).toBe('no-cache');
+    }
+  );
+
+  it('serves the manifest as application/manifest+json (040)', () => {
+    expect(rules.get('/manifest.webmanifest')?.get('content-type')).toBe(
+      'application/manifest+json'
+    );
+  });
+
+  it('caches icons for one day, not immutable (040)', () => {
+    expect(rules.get('/icons/*')?.get('cache-control')).toBe('public, max-age=86400');
+  });
 });

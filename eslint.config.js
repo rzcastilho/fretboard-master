@@ -285,6 +285,38 @@ export default tseslint.config(
     }
   },
   {
+    // 040: the precache module is pure so the worker and unit tests share it.
+    files: ['src/lib/offline/precache.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['svelte', 'svelte/*'] },
+            { group: ['$app/*'] },
+            { group: ['$lib', '$lib/*'], allowTypeImports: true }
+          ]
+        }
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'Precache code must be DOM-free.' },
+        { name: 'document', message: 'Precache code must be DOM-free.' },
+        { name: 'localStorage', message: 'Precache code must be storage-free.' },
+        { name: 'sessionStorage', message: 'Precache code must be storage-free.' },
+        { name: 'indexedDB', message: 'Precache code must be storage-free.' },
+        { name: 'navigator', message: 'Precache code must be DOM-free.' }
+      ]
+    }
+  },
+  {
+    // 040: the service worker runs in a worker scope, not a window.
+    files: ['src/service-worker.ts'],
+    languageOptions: {
+      globals: { ...globals.serviceworker }
+    }
+  },
+  {
     // 028: wire and sanitize are shared by the client and the `functions/m.ts` Pages Function,
     // so they import nothing from the app or framework (relative imports and valibot only).
     files: ['src/lib/measure/wire.ts', 'src/lib/measure/sanitize.ts'],
