@@ -70,6 +70,8 @@ export interface ExpectedPreferences {
     readonly mode?: MetronomeMode;
     /** 039: absent means 2. */
     readonly timer?: number;
+    /** 041: absent means false. */
+    readonly timerLink?: boolean;
   };
 }
 
@@ -126,7 +128,8 @@ function fixture(
         plain: expected.metronome?.plain ?? DEFAULT_PLAIN_SETTINGS,
         speed: expected.metronome?.speed ?? DEFAULT_SPEED_SETTINGS,
         mode: expected.metronome?.mode ?? 'ratios',
-        timer: expected.metronome?.timer ?? 2
+        timer: expected.metronome?.timer ?? 2,
+        timerLink: expected.metronome?.timerLink ?? false
       }
     },
     tuning: tuning ?? { kind: 'preset', id: expected.tuningId }
@@ -385,7 +388,11 @@ export const FIXTURES: readonly PrefsFixture[] = [
     }
   }),
   // "7" is not an integer: timer → 2, the mode is kept
-  fixture('metronome-timer-invalid', { ...defaults, metronome: { mode: 'speed' } })
+  fixture('metronome-timer-invalid', { ...defaults, metronome: { mode: 'speed' } }),
+  // 041: the timer link switch, beside the timer preset, alone, and invalid ("yes" → false)
+  fixture('metronome-timer-link', { ...defaults, metronome: { timer: 5, timerLink: true } }),
+  fixture('metronome-timer-link-only', { ...defaults, metronome: { timerLink: true } }),
+  fixture('metronome-timer-link-invalid', { ...defaults, metronome: { mode: 'speed' } })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

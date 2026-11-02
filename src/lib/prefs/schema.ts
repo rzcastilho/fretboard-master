@@ -90,6 +90,8 @@ export interface Preferences {
     readonly mode: MetronomeMode;
     /** 039; absent or invalid in a stored record → 2. Stored last, only when not 2. */
     readonly timer: number;
+    /** 041; absent or invalid in a stored record → false. Stored last, only when true. */
+    readonly timerLink: boolean;
   };
 }
 
@@ -184,7 +186,8 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
     plain: METRONOME_PLAIN_DEFAULTS,
     speed: METRONOME_SPEED_DEFAULTS,
     mode: 'ratios',
-    timer: METRONOME_TIMER_DEFAULT
+    timer: METRONOME_TIMER_DEFAULT,
+    timerLink: false
   })
 });
 
@@ -307,6 +310,12 @@ function parseTimer(metronome: unknown): number {
   return v.parse(v.fallback(intIn(L.timer), METRONOME_TIMER_DEFAULT), metronome.timer);
 }
 
+/** 041: `true` only for a stored boolean `true`; anything else (or a non-object entry) reads as false. */
+function parseTimerLink(metronome: unknown): boolean {
+  if (!isPlainObject(metronome)) return false;
+  return v.parse(v.fallback(v.boolean(), false), metronome.timerLink);
+}
+
 function isDefaultSpeed(x: SpeedSettings): boolean {
   return (Object.keys(s0) as (keyof SpeedSettings)[]).every((k) => x[k] === s0[k]);
 }
@@ -383,7 +392,8 @@ export function parsePreferences(raw: string | null): Preferences {
         plain: parsePlain(parsed.metronome),
         speed: parseSpeed(parsed.metronome),
         mode: parseMode(parsed.metronome),
-        timer: parseTimer(parsed.metronome)
+        timer: parseTimer(parsed.metronome),
+        timerLink: parseTimerLink(parsed.metronome)
       }
     };
   } catch {
@@ -415,7 +425,7 @@ function ratiosRecord(x: MetronomeSettings) {
   };
 }
 
-/** The `metronome` entry: `ratios`, `plain`, `speed`, `mode`, `timer` in that order, each only when non-default. */
+/** The `metronome` entry: `ratios`, `plain`, `speed`, `mode`, `timer`, `timerLink` in that order, each only when non-default. */
 function metronomeRecord(x: Preferences['metronome']): { metronome?: object } {
   const entry = {
     ...(isDefaultRatios(x.ratios) ? {} : { ratios: ratiosRecord(x.ratios) }),
@@ -446,7 +456,8 @@ function metronomeRecord(x: Preferences['metronome']): { metronome?: object } {
           }
         }),
     ...(x.mode === 'ratios' ? {} : { mode: x.mode }),
-    ...(x.timer === METRONOME_TIMER_DEFAULT ? {} : { timer: x.timer })
+    ...(x.timer === METRONOME_TIMER_DEFAULT ? {} : { timer: x.timer }),
+    ...(x.timerLink ? { timerLink: true } : {})
   };
   return Object.keys(entry).length === 0 ? {} : { metronome: entry };
 }
