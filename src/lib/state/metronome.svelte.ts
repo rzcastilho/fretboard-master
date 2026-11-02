@@ -49,6 +49,26 @@ import { tap, type TapRun } from './tap-tempo';
 
 export type RunPhase = 'settings' | 'starting' | 'running' | 'paused';
 
+/** Which click became audible (041). */
+export type RunClick = 'count-in' | 'beat';
+
+/**
+ * 041: a one-way report of the run to whoever attached (the timer link). The metronome never
+ * imports the timer or the link; with no observer nothing changes.
+ */
+export interface RunObserver {
+  /** settings → starting, inside the start gesture. */
+  started(): void;
+  /** A click became audible. */
+  clicked(kind: RunClick): void;
+  /** running → paused, by the user or by an audio suspend. */
+  paused(): void;
+  /** A non-settings phase returned to settings by reset, halt or onEnd. Not by stopForTimer. */
+  stopped(): void;
+}
+
+let observer: RunObserver | null = null;
+
 const state = $state<{
   phase: RunPhase;
   settings: MetronomeSettings;
@@ -131,11 +151,13 @@ function beginSegment(startSlot: number): void {
         state.position = at;
         announceStep(at);
         if (state.phase === 'starting') state.phase = 'running';
+        observer?.clicked('beat');
       },
       onCountIn(_click, at) {
         if (scheduler !== live || state.generation !== generation) return;
         state.position = at;
         if (state.phase === 'starting') state.phase = 'running';
+        observer?.clicked('count-in');
       },
       onEnd() {
         if (scheduler !== live || state.generation !== generation) return;
@@ -147,6 +169,7 @@ function beginSegment(startSlot: number): void {
         state.soundNotice = false;
         state.announcement = m.metronome_announce_finished({ bpm: bpms[bpms.length - 1] });
         state.finished++;
+        observer?.stopped();
       },
       onSuspended() {
         if (scheduler !== live || state.generation !== generation) return;
@@ -180,6 +203,11 @@ function beginSegment(startSlot: number): void {
 }
 
 function start(): void {
+  startRun();
+  observer?.started();
+}
+
+function startRun(): void {
   const k = effectiveCountIn(activeRecord());
   state.soundNotice = false;
   state.position = null;
@@ -236,6 +264,7 @@ function start(): void {
 function pauseState(): void {
   state.generation++;
   state.phase = 'paused';
+  observer?.paused();
   const at = state.position;
   state.announcement =
     at?.kind === 'beat' && at.ramp?.hold
@@ -303,6 +332,7 @@ function reset(): void {
   clearRun();
   state.soundNotice = false;
   state.announcement = m.metronome_announce_reset();
+  observer?.stopped();
 }
 
 function sameRecord<T extends object>(a: T, b: T): boolean {
@@ -397,6 +427,19 @@ function stepCount(field: 'initialCountIn' | 'repeatCountIn', dir: 1 | -1): void
 }
 
 function halt(): void {
+  const wasRun = state.phase !== 'settings';
+  scheduler?.halt('leave');
+  scheduler = null;
+  state.generation++;
+  state.phase = 'settings';
+  clearRun();
+  state.soundNotice = false;
+  if (wasRun) observer?.stopped();
+}
+
+/** 041: the timer reached zero. Same as halt, but silent and not reported back. */
+function stopForTimer(): void {
+  if (state.phase === 'settings') return;
   scheduler?.halt('leave');
   scheduler = null;
   state.generation++;
@@ -559,6 +602,14 @@ export const metronome = {
   /** Gesture handler. starting | running | paused → settings, values kept; no-op in settings. */
   reset,
 
+  /** 041: attach (or detach with null) the single run observer. */
+  observeRun(next: RunObserver | null): void {
+    observer = next;
+  },
+
+  /** 041: halt a starting, running or paused run to settings, silently. No-op in settings. */
+  stopForTimer,
+
   dismissSoundNotice(): void {
     state.soundNotice = false;
   },
@@ -605,6 +656,7 @@ export function resetMetronomeForTests(
 ): void {
   scheduler?.halt('leave');
   scheduler = null;
+  observer = null;
   overrides = deps;
   state.phase = 'settings';
   state.settings = { ...DEFAULT_SETTINGS, ...settings };

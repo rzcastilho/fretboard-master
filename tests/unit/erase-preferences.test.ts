@@ -13,6 +13,7 @@ import {
 } from '../../src/lib/state/metronome-settings';
 import { metronome, resetMetronomeForTests } from '../../src/lib/state/metronome.svelte';
 import { preferences, resetPreferencesForTests } from '../../src/lib/state/preferences.svelte';
+import { resetTimerLinkForTests, timerLink } from '../../src/lib/state/timer-link.svelte';
 
 beforeEach(() => {
   goto.mockReset();
@@ -133,5 +134,17 @@ describe('Erase and the Speed Training record (037)', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Erase' }));
     expect(metronome.mode).toBe('ratios');
     expect(metronome.speed).toEqual(DEFAULT_SPEED_SETTINGS);
+  });
+});
+
+describe('Erase and the timer link (041)', () => {
+  it('Erase turns the link off', async () => {
+    resetTimerLinkForTests();
+    timerLink.setEnabled(true);
+    expect(timerLink.enabled).toBe(true);
+    render(ErasePreferences);
+    await fireEvent.click(opener());
+    await fireEvent.click(screen.getByRole('button', { name: 'Erase' }));
+    expect(timerLink.enabled).toBe(false);
   });
 });

@@ -568,6 +568,7 @@
   "timer_start": "Iniciar temporizador",
   "timer_pause": "Pausar temporizador",
   "timer_readout_label": "Tempo restante",
+  "timer_link_label": "Iniciar e parar com o metrônomo",
   "timer_announce_second": "1 segundo",
   "timer_announce_seconds": "{count} segundos",
   "timer_announce_finished": "Temporizador concluído"

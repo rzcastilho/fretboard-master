@@ -2,6 +2,7 @@
   import { TIMER_PRESETS } from '$lib/state/timer-model';
   import { m } from '$lib/paraglide/messages.js';
   import { timer } from '$lib/state/timer.svelte';
+  import { timerLink } from '$lib/state/timer-link.svelte';
 
   /** Unlit seven-segment ghost behind the digits (decorative, aria-hidden). */
   const GHOST = '88:88';
@@ -53,6 +54,19 @@
       </button>
     {/each}
   </div>
+  <button
+    type="button"
+    class="switch"
+    role="switch"
+    aria-checked={timerLink.enabled}
+    onclick={() => timerLink.setEnabled(!timerLink.enabled)}
+  >
+    <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+    {m.timer_link_label()}
+    <span class="state" aria-hidden="true"
+      >{timerLink.enabled ? m.metronome_switch_on() : m.metronome_switch_off()}</span
+    >
+  </button>
   <div class="sr-only" role="status" aria-live="polite">{timer.announcement}</div>
 </section>
 
@@ -152,6 +166,12 @@
     font-weight: var(--font-weight-bold);
     border: calc(var(--border-width) * 2) solid var(--color-accent-secondary);
     outline: var(--border-width) solid var(--color-accent-secondary);
+  }
+
+  .switch {
+    align-self: flex-start;
+    text-align: start;
+    flex-wrap: wrap;
   }
 
   /* Finished: a static highlight that stays after the flash ends. */

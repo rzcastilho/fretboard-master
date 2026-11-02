@@ -65,6 +65,10 @@ const state = $state<{
 let deps: TimerDeps | null = null;
 let endsAt = 0;
 let sink: AudioSink | null = null;
+/** 041 session flags (never stored, not reactive): a countdown is armed / held by the link. */
+let armed = false;
+let held = false;
+let finishedListener: (() => void) | null = null;
 let displayTimer: number | null = null;
 let endTimer: number | null = null;
 let flashTimer: number | null = null;
@@ -123,6 +127,7 @@ function finish(): void {
       recordFailure(null, error, 'audio');
     }
   }
+  finishedListener?.();
 }
 
 function tick(): void {
@@ -138,6 +143,20 @@ function tick(): void {
   announce(state.seconds, next);
   state.seconds = next;
   displayTimer = clock.setTimeout(tick, nextTickDelay(remaining));
+}
+
+function clearFlags(): void {
+  armed = false;
+  held = false;
+}
+
+/** Pause a running countdown, keeping the reading (shared by toggle and hold). */
+function pauseRun(): void {
+  state.remainingMs = Math.max(0, endsAt - d().clock.now());
+  state.seconds = secondsLeft(state.remainingMs);
+  clearTimers();
+  state.announcement = '';
+  state.status = 'paused';
 }
 
 function play(): void {
@@ -175,12 +194,9 @@ export const timer = {
   },
   /** Gesture: play, pause, or restart from the full duration after a finish. */
   toggle(): void {
+    clearFlags();
     if (state.status === 'running') {
-      state.remainingMs = Math.max(0, endsAt - d().clock.now());
-      state.seconds = secondsLeft(state.remainingMs);
-      clearTimers();
-      state.announcement = '';
-      state.status = 'paused';
+      pauseRun();
       return;
     }
     // The unlock must happen in this call stack: it is the user's gesture.
@@ -193,12 +209,51 @@ export const timer = {
   selectPreset(minutes: unknown): void {
     const n = toPreset(minutes);
     if (n === null) return;
+    clearFlags();
     resetTo(n);
     preferences.remember({ metronome: { timer: n } });
   },
   /** Apply a remembered value: no write, invalid falls back to the default. */
   restore(minutes: unknown): void {
+    clearFlags();
     resetTo(toPreset(minutes) ?? DEFAULT_TIMER_MINUTES);
+  },
+
+  /** 041, in the start gesture: stopped at the full duration, countdown pending. */
+  arm(): void {
+    clearFlags();
+    sink = d().sink();
+    resetTo(state.preset);
+    armed = true;
+  },
+  /** 041: start the pending countdown from the full duration, if armed. */
+  startArmed(): void {
+    if (!armed) return;
+    armed = false;
+    clearTimers();
+    state.remainingMs = state.preset * 60_000;
+    play();
+  },
+  /** 041: cancel a pending countdown. */
+  disarm(): void {
+    armed = false;
+  },
+  /** 041: pause a running countdown on behalf of the metronome. */
+  hold(): void {
+    if (state.status !== 'running') return;
+    pauseRun();
+    held = true;
+  },
+  /** 041: resume a countdown the metronome paused. */
+  release(): void {
+    if (!held || state.status !== 'paused') return;
+    held = false;
+    clearTimers();
+    play();
+  },
+  /** 041: called once at the end of finish(). */
+  onFinished(listener: (() => void) | null): void {
+    finishedListener = listener;
   }
 };
 
@@ -207,6 +262,8 @@ export function resetTimerForTests(overrides: Partial<TimerDeps> = {}): void {
   if (deps) clearTimers();
   deps = { ...realDeps(), ...overrides };
   sink = null;
+  clearFlags();
+  finishedListener = null;
   endsAt = 0;
   resetTo(DEFAULT_TIMER_MINUTES);
 }

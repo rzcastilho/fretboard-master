@@ -1997,3 +1997,141 @@ describe('038 plain subdivision: store contract', () => {
     metronome.screenChanged();
   });
 });
+
+describe('041 run observer seam', () => {
+  function observe(): { events: string[]; announcements: string[] } {
+    const events: string[] = [];
+    const announcements: string[] = [];
+    metronome.observeRun({
+      started: () => events.push('started'),
+      clicked: (kind) => events.push(`clicked:${kind}`),
+      paused: () => events.push('paused'),
+      stopped: () => events.push('stopped')
+    });
+    return { events, announcements };
+  }
+
+  afterEach(() => metronome.observeRun(null));
+
+  it('reports started inside start(), then count-in and beat clicks', async () => {
+    const r = rig(true, { countIn: true, initialCountIn: 2 });
+    const { events } = observe();
+    metronome.toggle();
+    expect(events).toEqual(['started']);
+    await settle();
+    advance(r, 0.1);
+    for (let i = 0; i < 4; i++) advance(r, 60 / 85);
+    expect(events.slice(0, 3)).toEqual(['started', 'clicked:count-in', 'clicked:count-in']);
+    expect(events).toContain('clicked:beat');
+    expect(events.filter((e) => e === 'started')).toHaveLength(1);
+  });
+
+  it('reports paused for a user pause and for an audio suspend; resume reports nothing until a click', async () => {
+    const r = rig();
+    await runTo(r, 2);
+    const { events } = observe();
+    metronome.toggle();
+    expect(events).toEqual(['paused']);
+    metronome.toggle();
+    expect(events).toEqual(['paused']);
+    await settle();
+    advance(r, 0.2);
+    expect(events[1]).toMatch(/^clicked:/);
+    events.length = 0;
+    r.port.state = 'suspended';
+    r.port.resume = () => Promise.reject(new Error('blocked'));
+    advance(r, 0.1);
+    await settle();
+    expect(events).toEqual(['paused']);
+  });
+
+  it('reports stopped from reset, selectMode, screenChanged and restore, only after leaving settings', async () => {
+    const r = rig();
+    const { events } = observe();
+    metronome.reset();
+    metronome.screenChanged();
+    metronome.selectMode('plain');
+    expect(events).toEqual([]);
+    metronome.selectMode('ratios');
+    for (const stop of [
+      () => metronome.reset(),
+      () => metronome.selectMode('plain'),
+      () => metronome.screenChanged(),
+      () =>
+        metronome.restore({
+          ratios: metronome.settings,
+          plain: metronome.plain,
+          speed: metronome.speed,
+          mode: metronome.mode
+        })
+    ]) {
+      if (metronome.mode === 'plain') metronome.selectMode('ratios');
+      events.length = 0;
+      metronome.toggle();
+      await settle();
+      advance(r, 0.1);
+      events.length = 0;
+      stop();
+      expect(events).toEqual(['stopped']);
+      expect(metronome.phase).toBe('settings');
+    }
+  });
+
+  it('reports stopped when a Speed Training run ends by itself', async () => {
+    const r = rig();
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames }, {}, {}, 'speed', {
+      startBpm: 120,
+      targetBpm: 120,
+      loops: 1,
+      beats: 1,
+      countIn: false,
+      atTarget: 'stop'
+    });
+    const { events } = observe();
+    metronome.toggle();
+    await settle();
+    advance(r, 3);
+    expect(metronome.phase).toBe('settings');
+    expect(events.at(-1)).toBe('stopped');
+  });
+
+  it('stopForTimer halts to settings, keeps values, announces nothing and reports no stopped', async () => {
+    const r = rig();
+    metronome.setBpm(100);
+    await runTo(r, 2);
+    const { events } = observe();
+    const before = metronome.announcement;
+    metronome.stopForTimer();
+    expect(metronome.phase).toBe('settings');
+    expect(metronome.settings.bpm).toBe(100);
+    expect(metronome.announcement).toBe(before);
+    expect(events).toEqual([]);
+    metronome.stopForTimer();
+    expect(metronome.phase).toBe('settings');
+  });
+
+  it('stopForTimer also halts a paused and a starting run', async () => {
+    const r = rig();
+    const { events } = observe();
+    metronome.toggle();
+    expect(metronome.phase).toBe('starting');
+    metronome.stopForTimer();
+    expect(metronome.phase).toBe('settings');
+    await runTo(r, 1);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    metronome.stopForTimer();
+    expect(metronome.phase).toBe('settings');
+    expect(events).not.toContain('stopped');
+  });
+
+  it('without an observer the announcements are unchanged', async () => {
+    const r = rig();
+    metronome.toggle();
+    expect(metronome.announcement).toBe('Started, 85 BPM, 4 beats, 8th Triplets');
+    await settle();
+    advance(r, 0.1);
+    metronome.reset();
+    expect(metronome.announcement).toBe('Reset');
+  });
+});
