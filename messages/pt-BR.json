@@ -369,8 +369,6 @@
   "caged_previous_shape": "Forma anterior",
   "caged_next_shape": "Próxima forma",
   "caged_show_connections": "Mostrar conexões",
-  "caged_switch_on": "Ligado",
-  "caged_switch_off": "Desligado",
   "caged_reset": "Redefinir ferramenta",
   "caged_layers_heading": "Camadas",
   "caged_layer_chord": "Acorde",
@@ -512,8 +510,6 @@
   "metronome_announce_reset": "Reiniciado",
   "metronome_sound_unavailable": "O som não está disponível; o tempo é mostrado visualmente.",
   "metronome_count_in_label": "Contagem",
-  "metronome_switch_on": "Ligado",
-  "metronome_switch_off": "Desligado",
   "metronome_initial_count_in_label": "Contagem inicial",
   "metronome_repeat_count_in_label": "Contagem de repetição",
   "metronome_initial_count_in_decrease": "Menos cliques na contagem inicial",
@@ -568,7 +564,14 @@
   "timer_start": "Iniciar temporizador",
   "timer_pause": "Pausar temporizador",
   "timer_readout_label": "Tempo restante",
+  "timer_link_label": "Iniciar e parar com o metrônomo",
   "timer_announce_second": "1 segundo",
   "timer_announce_seconds": "{count} segundos",
-  "timer_announce_finished": "Temporizador concluído"
+  "timer_announce_finished": "Temporizador concluído",
+  "metronome_sound_label": "Som do clique",
+  "metronome_sound_click": "Clique",
+  "metronome_sound_wood": "Bloco de madeira",
+  "metronome_sound_beep": "Bipe",
+  "metronome_sound_rim": "Aro",
+  "metronome_sound_cowbell": "Cowbell"
 }

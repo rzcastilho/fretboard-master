@@ -464,11 +464,11 @@ test.describe('metronome ratios: responsive and languages (2.10)', () => {
           await setTextScale(page, 200);
           const sw = page.getByRole('switch').nth(1);
           const selects = page.getByRole('combobox');
-          await expect(selects).toHaveCount(2);
+          await expect(selects).toHaveCount(3);
           await expect(sw).toBeVisible();
           if (ratio) await expect(page.getByRole('switch', { name: ratio })).toBeVisible();
           await expect(page.getByRole('heading', { level: 3 }).last()).toBeVisible();
-          for (const el of [sw, selects.nth(0), selects.nth(1)]) {
+          for (const el of [sw, selects.nth(0), selects.nth(1), selects.nth(2)]) {
             await expect(el).toBeVisible();
             const box = await el.boundingBox();
             if (!box) throw new Error('no bounding box');

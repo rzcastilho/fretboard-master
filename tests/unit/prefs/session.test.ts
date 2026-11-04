@@ -205,7 +205,7 @@ describe('metronome (035)', () => {
     session.remember({ metronome: { ratios, ...rest } });
     expect(session.current).toEqual({
       ...FIXTURE_BY_NAME['v1-full'].expected,
-      metronome: { ratios, ...rest, timer: 2 }
+      metronome: { ratios, ...rest, timer: 2, timerLink: false, sound: 'click' }
     });
     session.remember({ muted: false });
     expect(session.current.metronome.ratios).toEqual(ratios);
@@ -232,7 +232,13 @@ describe('metronome timer (039)', () => {
     const session = startSession(fakeStorage());
     session.remember({ metronome: { ratios, ...modes } });
     session.remember({ metronome: { timer: 5 } });
-    expect(session.current.metronome).toEqual({ ratios, ...modes, timer: 5 });
+    expect(session.current.metronome).toEqual({
+      ratios,
+      ...modes,
+      timer: 5,
+      timerLink: false,
+      sound: 'click'
+    });
     session.remember({ metronome: { ratios, ...modes } });
     expect(session.current.metronome.timer).toBe(5);
   });

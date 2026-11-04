@@ -471,3 +471,60 @@ test.describe('practice timer: polish (layout, contrast, offline)', () => {
     });
   });
 });
+
+test.describe('timer digit font (042 US1)', () => {
+  const ghost = (page: Page) => page.locator('section.timer .ghost');
+  const box = (page: Page) => page.getByRole('timer', { name: 'Time remaining' });
+
+  test('a: readout and ghost use FM Timer Digits', async ({ page }) => {
+    await page.goto('/metronome');
+    await expect(readout(page)).toHaveCSS('font-family', /^"?FM Timer Digits"?/);
+    await expect(ghost(page)).toHaveCSS('font-family', /^"?FM Timer Digits"?/);
+    await expect
+      .poll(() => page.evaluate(() => document.fonts.check('1em "FM Timer Digits"')))
+      .toBe(true);
+  });
+
+  test('b: the readout width is constant across states', async ({ page }) => {
+    await page.goto('/metronome');
+    await page.getByRole('button', { name: '10m', exact: true }).click();
+    const width = async () => await box(page).evaluate((el) => el.getBoundingClientRect().width);
+    const idle = await width();
+    await play(page).click();
+    await page.clock.runFor(1000);
+    expect(await width()).toBe(idle);
+    await pause(page).click();
+    expect(await width()).toBe(idle);
+    await page.getByRole('button', { name: '1m', exact: true }).click();
+    await play(page).click();
+    await page.clock.runFor(66_000);
+    await expect(card(page)).toHaveAttribute('data-status', 'finished');
+    const finished = await width();
+    await page.getByRole('button', { name: '10m', exact: true }).click();
+    expect(finished).toBeGreaterThan(0);
+    expect(await width()).toBe(idle);
+  });
+
+  test('c: role and accessible name are unchanged', async ({ page }) => {
+    await page.goto('/metronome');
+    await expect(box(page)).toHaveAttribute('aria-label', 'Time remaining');
+    await expect(ghost(page)).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('d: with the font blocked the readout still shows text', async ({ page }) => {
+    await page.route('**/fonts/fm-timer-digits.woff2', (r) => r.abort());
+    await page.goto('/metronome');
+    await expect(readout(page)).toBeVisible();
+    await expect(readout(page)).toHaveText(/\d\d:\d\d/);
+  });
+
+  test('e: other pages never request the font', async ({ page }) => {
+    // Service workers are blocked by default (playwright.config.ts), so the worker's
+    // install-time precache fetch (FR-003) cannot show up here.
+    const urls: string[] = [];
+    page.on('request', (r) => urls.push(r.url()));
+    for (const path of ['/', '/notes']) await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    expect(urls.filter((u) => u.includes('fm-timer-digits.woff2'))).toEqual([]);
+  });
+});

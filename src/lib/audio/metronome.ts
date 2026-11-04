@@ -4,7 +4,14 @@
  * (never accumulated), scheduled ahead on the audio clock; the beat shown to the user follows
  * the audible time through animation frames.
  */
-import { CLICK_S, renderClick, type ClickKind } from './click';
+import {
+  CLICK_S,
+  CLICK_SOUNDS,
+  renderClick,
+  toClickSound,
+  type ClickKind,
+  type ClickSound
+} from './click';
 import type { AudioPort, TimerClock } from './engine';
 import { log } from './log';
 import {
@@ -81,6 +88,8 @@ export interface SegmentStart {
   };
   /** Run-global slot to begin at; absent or invalid means 0. */
   readonly startSlot?: number;
+  /** 042: click timbre; absent or invalid means `click`. */
+  readonly sound?: ClickSound;
   readonly run: number;
   readonly pressedAtMs: number;
 }
@@ -99,6 +108,11 @@ export interface ClickScheduler {
    * number in 30–300.
    */
   retime(bpm: number): boolean;
+  /**
+   * 042: change the timbre of clicks not yet scheduled. Already scheduled clicks play out; the
+   * grid, anchor and beat reporting are untouched. Invalid values are ignored.
+   */
+  setSound(sound: unknown): void;
   readonly live: boolean;
 }
 
@@ -155,6 +169,9 @@ export function indexAt(g: Grid, t: number): number {
   return timeOf(g, k) <= t + 1e-9 ? k : -1;
 }
 
+const isClickSound = (v: unknown): v is ClickSound =>
+  (CLICK_SOUNDS as readonly unknown[]).includes(v);
+
 function toStartSlot(v: number | undefined): number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : 0;
 }
@@ -165,19 +182,24 @@ interface Pending {
 }
 
 type Buffers = Record<ClickKind, AudioBuffer>;
-const buffersBySink = new WeakMap<ClickSink, Buffers>();
+const buffersBySink = new WeakMap<ClickSink, Map<ClickSound, Buffers>>();
 
-function buffersFor(sink: ClickSink): Buffers {
-  let b = buffersBySink.get(sink);
+function buffersFor(sink: ClickSink, sound: ClickSound): Buffers {
+  let bySound = buffersBySink.get(sink);
+  if (!bySound) {
+    bySound = new Map();
+    buffersBySink.set(sink, bySound);
+  }
+  let b = bySound.get(sound);
   if (!b) {
     const make = (kind: ClickKind): AudioBuffer => {
-      const samples = renderClick(kind, sink.port.sampleRate);
+      const samples = renderClick(kind, sink.port.sampleRate, sound);
       const buffer = sink.port.createBuffer(1, samples.length, sink.port.sampleRate);
       buffer.getChannelData(0).set(samples);
       return buffer;
     };
     b = { accent: make('accent'), normal: make('normal'), sub: make('sub') };
-    buffersBySink.set(sink, b);
+    bySound.set(sound, b);
   }
   return b;
 }
@@ -203,6 +225,8 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
   let earlier: Grid[] = [];
   /** Run-global index of the segment's first click (a retime moves `seg.startIndex`). */
   let originIndex = 0;
+  /** 042: timbre for clicks scheduled from now on. */
+  let sound: ClickSound = 'click';
 
   const now = (): number => (visual || !sink ? clock.now() / 1000 : sink.port.currentTime);
   const latency = (): number =>
@@ -232,7 +256,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
     const c = clickOf(g, k);
     const when = clickTime(g, c);
     if (visual || !sink) return;
-    const bufs = buffersFor(sink);
+    const bufs = buffersFor(sink, sound);
     const source = sink.port.createBufferSource();
     source.buffer = bufs[c.kind];
     source.connect(sink.destination);
@@ -248,6 +272,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       countIn: c.position.kind === 'count-in' ? c.position.click : null,
       phase: c.phase,
       kind: c.kind,
+      sound,
       accent: c.kind === 'accent',
       when,
       contextTime: sink.port.currentTime,
@@ -378,6 +403,7 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       if (live) return;
       live = true;
       seg = null;
+      sound = toClickSound(segment.sound);
       const g = ++gen;
       if (!sink) {
         visual = true;
@@ -439,6 +465,11 @@ export function createClickScheduler(events: SchedulerEvents, deps: SchedulerDep
       seg = { ...cur, anchor: at, period: 60 / bpm, startSlot: commit, startIndex };
       next = startIndex;
       return true;
+    },
+
+    setSound(value): void {
+      if (!isClickSound(value)) return;
+      sound = value;
     },
 
     halt(reason): HaltedAt {

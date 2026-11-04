@@ -51,6 +51,8 @@ export const IDENTICAL_ALLOWLIST: Readonly<Record<'pt-BR' | 'es', readonly strin
     'sound_volume',
     'metronome_subdivision_label',
     'metronome_loop2_label',
+    // "Cowbell" is the name Brazilian musicians use.
+    'metronome_sound_cowbell',
     ...SOLFEGE_PT
   ],
   es: [...SHARED, ...SOLFEGE_ES]

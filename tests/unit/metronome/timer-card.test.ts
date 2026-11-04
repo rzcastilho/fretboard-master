@@ -8,6 +8,7 @@ import type { AudioSink } from '../../../src/lib/audio/engine';
 import { language, resetLanguageForTests } from '../../../src/lib/state/language.svelte';
 import { preferences } from '../../../src/lib/state/preferences.svelte';
 import { resetTimerForTests, timer } from '../../../src/lib/state/timer.svelte';
+import { resetTimerLinkForTests, timerLink } from '../../../src/lib/state/timer-link.svelte';
 import TimerCard from '../../../src/lib/tools/metronome/TimerCard.svelte';
 import { FakeClock } from '../audio/support/fake-audio';
 
@@ -19,6 +20,7 @@ beforeEach(() => {
   language.start('en');
   clock = new FakeClock();
   resetTimerForTests({ clock, sink: () => SINK, chime: vi.fn(() => true) });
+  resetTimerLinkForTests();
 });
 
 afterEach(cleanup);
@@ -46,6 +48,21 @@ describe('TimerCard: play button, readout, state', () => {
     expect(readout.hasAttribute('aria-live')).toBe(false);
     const ghost = container.querySelector('.ghost');
     expect(ghost?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('US1: keeps role=timer, the aria-hidden ghost and the time, and preloads the digit font', () => {
+    const { container } = render(TimerCard);
+    const readout = container.querySelector('.readout');
+    expect(readout?.getAttribute('role')).toBe('timer');
+    expect(readout?.getAttribute('aria-label')).toBe('Time remaining');
+    expect(readout?.querySelector('.ghost')?.textContent).toBe('88:88');
+    expect(readout?.querySelector('.ghost')?.getAttribute('aria-hidden')).toBe('true');
+    expect(readout?.querySelector('.time')?.textContent).toBe('02:00');
+    const link = document.head.querySelector(
+      'link[rel="preload"][as="font"][type="font/woff2"][href="/fonts/fm-timer-digits.woff2"]'
+    );
+    expect(link).not.toBeNull();
+    expect(link?.hasAttribute('crossorigin')).toBe(true);
   });
 
   it('U5: the status region is polite and lives inside the card', () => {
@@ -107,5 +124,52 @@ describe('TimerCard: presets', () => {
     expect(src).toMatch(/aria-pressed='true'\][\s\S]*?calc\(var\(--border-width\) \* 2\)/);
     expect(src).toMatch(/\.pill[\s\S]*?--target-min/);
     expect(src).toMatch(/var\(--color-border\)/);
+  });
+});
+
+describe('TimerCard: link switch (041)', () => {
+  const sw = () => screen.getByRole('switch', { name: 'Start and stop with metronome' });
+
+  it('renders a switch whose aria-checked follows timerLink.enabled and click toggles it', async () => {
+    render(TimerCard);
+    expect(sw().getAttribute('aria-checked')).toBe('false');
+    await fireEvent.click(sw());
+    await tick();
+    expect(timerLink.enabled).toBe(true);
+    expect(sw().getAttribute('aria-checked')).toBe('true');
+    await fireEvent.click(sw());
+    await tick();
+    expect(sw().getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('is a native button, so Space and Enter activate it (click on keyboard activation)', () => {
+    render(TimerCard);
+    expect(sw().tagName).toBe('BUTTON');
+    expect(sw().getAttribute('type')).toBe('button');
+  });
+
+  it('is never disabled, whatever the timer status', async () => {
+    render(TimerCard);
+    expect((sw() as HTMLButtonElement).disabled).toBe(false);
+    timer.toggle();
+    await tick();
+    expect((sw() as HTMLButtonElement).disabled).toBe(false);
+    clock.advance(200_000);
+    await tick();
+    expect(timer.status).toBe('finished');
+    expect((sw() as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('shows no On/Off text, only the label, and toggles aria-checked', async () => {
+    render(TimerCard);
+    expect(sw().querySelector('.state')).toBeNull();
+    const label = sw().textContent?.trim();
+    expect(label).not.toMatch(/\b(On|Off)\b/);
+    expect(sw().getAttribute('aria-checked')).toBe('false');
+    await fireEvent.click(sw());
+    await tick();
+    expect(sw().getAttribute('aria-checked')).toBe('true');
+    expect(sw().querySelector('.state')).toBeNull();
+    expect(sw().textContent?.trim()).toBe(label);
   });
 });

@@ -9,6 +9,7 @@ import type { Tempo } from '$lib/state/listen';
 import type { LanguageTag } from '$lib/i18n/languages';
 import type { AccidentalPolicy, Notation } from '$lib/notation/policy';
 import type { Theme } from '$lib/prefs/schema';
+import type { ClickSound } from '$lib/audio/click';
 import {
   DEFAULT_PLAIN_SETTINGS,
   DEFAULT_SETTINGS,
@@ -70,6 +71,10 @@ export interface ExpectedPreferences {
     readonly mode?: MetronomeMode;
     /** 039: absent means 2. */
     readonly timer?: number;
+    /** 041: absent means false. */
+    readonly timerLink?: boolean;
+    /** 042: absent means 'click'. */
+    readonly sound?: ClickSound;
   };
 }
 
@@ -126,7 +131,9 @@ function fixture(
         plain: expected.metronome?.plain ?? DEFAULT_PLAIN_SETTINGS,
         speed: expected.metronome?.speed ?? DEFAULT_SPEED_SETTINGS,
         mode: expected.metronome?.mode ?? 'ratios',
-        timer: expected.metronome?.timer ?? 2
+        timer: expected.metronome?.timer ?? 2,
+        timerLink: expected.metronome?.timerLink ?? false,
+        sound: expected.metronome?.sound ?? 'click'
       }
     },
     tuning: tuning ?? { kind: 'preset', id: expected.tuningId }
@@ -385,7 +392,18 @@ export const FIXTURES: readonly PrefsFixture[] = [
     }
   }),
   // "7" is not an integer: timer → 2, the mode is kept
-  fixture('metronome-timer-invalid', { ...defaults, metronome: { mode: 'speed' } })
+  fixture('metronome-timer-invalid', { ...defaults, metronome: { mode: 'speed' } }),
+  // 041: the timer link switch, beside the timer preset, alone, and invalid ("yes" → false)
+  fixture('metronome-timer-link', { ...defaults, metronome: { timer: 5, timerLink: true } }),
+  fixture('metronome-timer-link-only', { ...defaults, metronome: { timerLink: true } }),
+  fixture('metronome-timer-link-invalid', { ...defaults, metronome: { mode: 'speed' } }),
+  // 042: the click sound, alone, with the timer settings, and invalid ("gong" → click)
+  fixture('metronome-sound', { ...defaults, metronome: { sound: 'wood' } }),
+  fixture('metronome-sound-full', {
+    ...defaults,
+    metronome: { timer: 5, timerLink: true, sound: 'cowbell' }
+  }),
+  fixture('metronome-sound-invalid', { ...defaults, metronome: { mode: 'speed' } })
 ];
 
 export const FIXTURE_BY_NAME: Readonly<Record<string, PrefsFixture>> = Object.fromEntries(

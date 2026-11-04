@@ -211,9 +211,6 @@
     >
       <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
       {m.caged_show_connections()}
-      <span class="state" aria-hidden="true"
-        >{caged.state.connections ? m.caged_switch_on() : m.caged_switch_off()}</span
-      >
     </button>
     <button type="button" class="btn" onclick={() => caged.reset()}>{m.caged_reset()}</button>
   </ContextZone>

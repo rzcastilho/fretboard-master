@@ -74,9 +74,6 @@
           <MarkerSample fn="degree" extra />
         {/if}
         <span class="name">{name(row.layer)}</span>
-        <span class="state" aria-hidden="true"
-          >{s.on ? m.caged_switch_on() : m.caged_switch_off()}</span
-        >
       </button>
       {#if why}
         <span class="sr-only" id="{uid}-{row.layer}-why">{why}</span>

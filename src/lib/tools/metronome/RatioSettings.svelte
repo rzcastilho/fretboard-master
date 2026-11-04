@@ -28,9 +28,6 @@
       onclick={() => onswitch(!settings.ratio)}
     >
       <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-      <span class="state" aria-hidden="true"
-        >{settings.ratio ? m.metronome_switch_on() : m.metronome_switch_off()}</span
-      >
     </button>
   </div>
   <SubdivisionSelect

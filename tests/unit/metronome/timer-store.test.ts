@@ -349,3 +349,123 @@ describe('timer store: independence (US3)', () => {
     expect(imports(read('metronome.svelte.ts')).join('\n')).not.toMatch(/timer/);
   });
 });
+
+describe('041 linked-run seam', () => {
+  it('arm() leaves the timer stopped at the full duration and captures the sink', () => {
+    const r = rig();
+    timer.selectPreset(5);
+    timer.toggle();
+    r.clock.advance(5000);
+    timer.arm();
+    expect(timer.status).toBe('stopped');
+    expect(timer.readout).toBe('05:00');
+    expect(r.sink).toHaveBeenCalledTimes(2);
+  });
+
+  it('startArmed() plays from the full duration only if armed, then clears the flag', () => {
+    const r = rig();
+    timer.startArmed();
+    expect(timer.status).toBe('stopped');
+    timer.arm();
+    timer.startArmed();
+    expect(timer.status).toBe('running');
+    timer.toggle();
+    timer.restore(2);
+    timer.startArmed();
+    expect(timer.status).toBe('stopped');
+    r.clock.advance(1);
+  });
+
+  it('disarm() clears armed', () => {
+    rig();
+    timer.arm();
+    timer.disarm();
+    timer.startArmed();
+    expect(timer.status).toBe('stopped');
+  });
+
+  it('hold() pauses a running timer; release() resumes only if held and paused', () => {
+    const r = rig();
+    timer.hold();
+    expect(timer.status).toBe('stopped');
+    timer.release();
+    expect(timer.status).toBe('stopped');
+    timer.toggle();
+    r.clock.advance(10_000);
+    timer.hold();
+    expect(timer.status).toBe('paused');
+    expect(timer.readout).toBe('01:50');
+    r.clock.advance(30_000);
+    timer.release();
+    expect(timer.status).toBe('running');
+    r.clock.advance(5000 + TICK_SLACK_MS);
+    expect(timer.readout).toBe('01:45');
+    timer.release();
+    expect(timer.status).toBe('running');
+  });
+
+  it('a hand-paused timer is not released', () => {
+    const r = rig();
+    timer.toggle();
+    r.clock.advance(1000);
+    timer.toggle();
+    timer.release();
+    expect(timer.status).toBe('paused');
+  });
+
+  it('toggle(), selectPreset() and restore() clear both flags', () => {
+    const r = rig();
+    const clears: Array<[string, () => void]> = [
+      ['toggle', () => timer.toggle()],
+      ['selectPreset', () => timer.selectPreset(5)],
+      ['restore', () => timer.restore(5)]
+    ];
+    for (const [name, clear] of clears) {
+      timer.restore(2);
+      timer.arm();
+      clear();
+      timer.toggle(); // leave running or stopped deterministically
+      timer.restore(2);
+      timer.startArmed();
+      expect(timer.status, `${name} armed`).toBe('stopped');
+
+      timer.restore(2);
+      timer.toggle();
+      r.clock.advance(1000);
+      timer.hold();
+      clear();
+      if (timer.status === 'running') timer.toggle();
+      timer.release();
+      expect(timer.status === 'running', `${name} held`).toBe(false);
+    }
+  });
+
+  it('onFinished is called once at the end of finish(), after the chime', () => {
+    const r = rig();
+    const order: string[] = [];
+    r.chime.mockImplementation(() => {
+      order.push('chime');
+      return true;
+    });
+    timer.onFinished(() => order.push(`finished:${timer.status}`));
+    timer.toggle();
+    r.clock.advance(120_000);
+    expect(order).toEqual(['chime', 'finished:finished']);
+    timer.onFinished(null);
+    timer.toggle();
+    r.clock.advance(120_000);
+    expect(order.filter((e) => e.startsWith('finished'))).toHaveLength(1);
+  });
+
+  it('armed and held are never both set', () => {
+    const r = rig();
+    timer.toggle();
+    r.clock.advance(1000);
+    timer.hold();
+    timer.arm();
+    timer.release();
+    expect(timer.status).toBe('stopped');
+    timer.startArmed();
+    expect(timer.status).toBe('running');
+  });
+});

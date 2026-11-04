@@ -391,3 +391,19 @@ test('FR-013, C-17: a rejected registration leaves the app working with only a c
     .poll(() => warnings.some((w) => w.includes('[fretboard-master] offline unavailable')))
     .toBe(true);
 });
+
+test('042 US1: the timer digit font renders offline with no outside request', async ({
+  page,
+  context
+}) => {
+  await goOffline(page, context);
+  const outside: string[] = [];
+  page.on('request', (r) => {
+    if (new URL(r.url()).origin !== new URL(page.url()).origin) outside.push(r.url());
+  });
+  await page.goto('/metronome');
+  await expect
+    .poll(() => page.evaluate(() => document.fonts.check('1em "FM Timer Digits"')))
+    .toBe(true);
+  expect(outside).toEqual([]);
+});

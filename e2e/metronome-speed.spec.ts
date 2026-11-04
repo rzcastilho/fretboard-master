@@ -368,7 +368,7 @@ test.describe('Speed Training accessibility and reflow (037 SC-006)', () => {
     await expect(row(page, 'start-bpm')).toHaveValue('291');
     await page.keyboard.press('Home');
     await expect(row(page, 'start-bpm')).not.toHaveValue('291');
-    const sw = page.getByRole('switch').first();
+    const sw = panel(page).getByRole('switch').first();
     await sw.focus();
     await page.keyboard.press('Space');
     await expect(sw).toHaveAttribute('aria-checked', 'false');

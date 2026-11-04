@@ -1,5 +1,5 @@
 /** Audio data types (data-model §2–§4, §7, §8). No framework imports. */
-import type { ClickKind } from './click';
+import type { ClickKind, ClickSound } from './click';
 import type { Position } from '../instrument/instrument';
 import type { Pitch } from '../theory/pitch';
 
@@ -89,6 +89,8 @@ export type AudioLogEntry =
       countIn: number | null;
       phase: 'initial' | 'repeat' | 'loop1' | 'loop2';
       kind: ClickKind;
+      /** 042: the timbre this click was scheduled with. */
+      sound: ClickSound;
       accent: boolean;
       when: number;
       contextTime: number;
@@ -102,4 +104,5 @@ export type AudioLogEntry =
       count: number;
       reason: 'pause' | 'reset' | 'leave' | 'suspend' | 'end' | 'retime';
     }
+  | { type: 'click-preview'; sound: ClickSound; when: number; contextTime: number }
   | { type: 'chime'; when: number; contextTime: number; lateMs: number };

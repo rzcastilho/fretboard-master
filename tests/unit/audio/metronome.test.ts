@@ -1223,3 +1223,87 @@ describe('live retime (038, E11–E20)', () => {
 function starts_of(port: FakeAudioPort): number[] {
   return port.sources.flatMap((s) => s.startCalls);
 }
+
+describe('click sound (042)', () => {
+  type Entry = { type: string; index: number; when: number; sound?: string };
+  const clickLog = (): Entry[] =>
+    (globalThis.__fmAudioLog as unknown as Entry[]).filter((e) => e.type === 'click');
+  const run = async (
+    change: ((s: ReturnType<typeof setup>['scheduler']) => void) | null,
+    segSound?: SegmentStart['sound']
+  ): Promise<Entry[]> => {
+    globalThis.__fmAudioLog = [];
+    const { port, scheduler, begin, advance } = setup();
+    port.currentTime = 10;
+    await begin({ bpm: 120, ...(segSound ? { sound: segSound } : {}) });
+    advance(2000);
+    change?.(scheduler);
+    advance(4000);
+    scheduler.halt('leave');
+    return clickLog();
+  };
+
+  it('uses SegmentStart.sound; absent or invalid means click', async () => {
+    expect((await run(null, 'cowbell')).every((c) => c.sound === 'cowbell')).toBe(true);
+    expect((await run(null)).every((c) => c.sound === 'click')).toBe(true);
+    expect((await run(null, 'gong' as never)).every((c) => c.sound === 'click')).toBe(true);
+  });
+
+  it('a mid-run change leaves every click time unchanged and only later clicks carry it', async () => {
+    const base = await run(null);
+    const changed = await run((s) => s.setSound('rim'));
+    expect(changed.map((c) => c.when)).toEqual(base.map((c) => c.when));
+    const firstRim = changed.findIndex((c) => c.sound === 'rim');
+    expect(firstRim).toBeGreaterThan(0);
+    changed.forEach((c, i) => expect(c.sound).toBe(i < firstRim ? 'click' : 'rim'));
+    // Clicks were scheduled up to HORIZON_S ahead before the change, so they keep their sound.
+    expect(changed.slice(0, firstRim).some((c) => c.when > 12)).toBe(true);
+  });
+
+  it('ignores invalid values', async () => {
+    const log = await run((s) => {
+      s.setSound('gong');
+      s.setSound(3);
+      s.setSound(undefined);
+    }, 'wood');
+    expect(log.every((c) => c.sound === 'wood')).toBe(true);
+  });
+
+  it('works before anchoring and when not live', async () => {
+    globalThis.__fmAudioLog = [];
+    const { port, scheduler, begin, advance } = setup();
+    scheduler.setSound('beep'); // not live: harmless, start() takes its own sound
+    port.currentTime = 10;
+    scheduler.start({
+      bpm: 120,
+      beats: 4,
+      clicksPerBeat: 1,
+      run: 1,
+      pressedAtMs: 0,
+      sound: 'wood'
+    });
+    scheduler.setSound('rim'); // live but not anchored yet
+    await Promise.resolve();
+    await Promise.resolve();
+    advance(500);
+    scheduler.halt('leave');
+    expect(clickLog().every((c) => c.sound === 'rim')).toBe(true);
+    void begin;
+  });
+
+  it('caches buffers per sink per sound', async () => {
+    globalThis.__fmAudioLog = [];
+    const { port, scheduler, begin, advance } = setup();
+    port.currentTime = 10;
+    await begin({ bpm: 120 });
+    advance(500);
+    scheduler.setSound('wood');
+    advance(2000);
+    scheduler.setSound('click');
+    advance(2000);
+    scheduler.setSound('wood');
+    advance(2000);
+    scheduler.halt('leave');
+    expect(port.buffers).toHaveLength(6); // click ×3 and wood ×3, rendered once each
+  });
+});

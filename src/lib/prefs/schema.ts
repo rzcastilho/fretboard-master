@@ -3,6 +3,7 @@
  * Pure: no DOM, Svelte or storage. `parsePreferences` is total; each field falls back on its own.
  */
 import * as v from 'valibot';
+import { CLICK_SOUNDS, DEFAULT_CLICK_SOUND, type ClickSound } from '$lib/audio/click';
 import type { Handedness, Orientation } from '$lib/instrument/instrument';
 import { isOffsets, type Offsets } from '$lib/instrument/custom-tuning';
 import {
@@ -90,6 +91,10 @@ export interface Preferences {
     readonly mode: MetronomeMode;
     /** 039; absent or invalid in a stored record → 2. Stored last, only when not 2. */
     readonly timer: number;
+    /** 041; absent or invalid in a stored record → false. Stored last, only when true. */
+    readonly timerLink: boolean;
+    /** 042; absent or invalid in a stored record → `click`. Stored last, only when not `click`. */
+    readonly sound: ClickSound;
   };
 }
 
@@ -184,7 +189,9 @@ export const DEFAULT_PREFERENCES: Preferences = Object.freeze({
     plain: METRONOME_PLAIN_DEFAULTS,
     speed: METRONOME_SPEED_DEFAULTS,
     mode: 'ratios',
-    timer: METRONOME_TIMER_DEFAULT
+    timer: METRONOME_TIMER_DEFAULT,
+    timerLink: false,
+    sound: DEFAULT_CLICK_SOUND
   })
 });
 
@@ -307,6 +314,18 @@ function parseTimer(metronome: unknown): number {
   return v.parse(v.fallback(intIn(L.timer), METRONOME_TIMER_DEFAULT), metronome.timer);
 }
 
+/** 041: `true` only for a stored boolean `true`; anything else (or a non-object entry) reads as false. */
+function parseTimerLink(metronome: unknown): boolean {
+  if (!isPlainObject(metronome)) return false;
+  return v.parse(v.fallback(v.boolean(), false), metronome.timerLink);
+}
+
+/** 042: one of the five click sounds; anything else (or a non-object entry) reads as `click`. */
+function parseSound(metronome: unknown): ClickSound {
+  if (!isPlainObject(metronome)) return DEFAULT_CLICK_SOUND;
+  return v.parse(v.fallback(v.picklist(CLICK_SOUNDS), DEFAULT_CLICK_SOUND), metronome.sound);
+}
+
 function isDefaultSpeed(x: SpeedSettings): boolean {
   return (Object.keys(s0) as (keyof SpeedSettings)[]).every((k) => x[k] === s0[k]);
 }
@@ -383,7 +402,9 @@ export function parsePreferences(raw: string | null): Preferences {
         plain: parsePlain(parsed.metronome),
         speed: parseSpeed(parsed.metronome),
         mode: parseMode(parsed.metronome),
-        timer: parseTimer(parsed.metronome)
+        timer: parseTimer(parsed.metronome),
+        timerLink: parseTimerLink(parsed.metronome),
+        sound: parseSound(parsed.metronome)
       }
     };
   } catch {
@@ -415,7 +436,7 @@ function ratiosRecord(x: MetronomeSettings) {
   };
 }
 
-/** The `metronome` entry: `ratios`, `plain`, `speed`, `mode`, `timer` in that order, each only when non-default. */
+/** The `metronome` entry: `ratios`, `plain`, `speed`, `mode`, `timer`, `timerLink`, `sound` in that order, each only when non-default. */
 function metronomeRecord(x: Preferences['metronome']): { metronome?: object } {
   const entry = {
     ...(isDefaultRatios(x.ratios) ? {} : { ratios: ratiosRecord(x.ratios) }),
@@ -446,7 +467,9 @@ function metronomeRecord(x: Preferences['metronome']): { metronome?: object } {
           }
         }),
     ...(x.mode === 'ratios' ? {} : { mode: x.mode }),
-    ...(x.timer === METRONOME_TIMER_DEFAULT ? {} : { timer: x.timer })
+    ...(x.timer === METRONOME_TIMER_DEFAULT ? {} : { timer: x.timer }),
+    ...(x.timerLink ? { timerLink: true } : {}),
+    ...(x.sound === DEFAULT_CLICK_SOUND ? {} : { sound: x.sound })
   };
   return Object.keys(entry).length === 0 ? {} : { metronome: entry };
 }
