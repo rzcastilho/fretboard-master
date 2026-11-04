@@ -18,7 +18,8 @@
     "test:e2e:fast": "playwright test -c pw.local.config.ts --project=desktop",
     "verify": "node scripts/verify.mjs",
     "lhci": "lhci autorun",
-    "fonts:accidentals": "node scripts/subset-accidentals-font.mjs"
+    "fonts:accidentals": "node scripts/subset-accidentals-font.mjs",
+    "fonts:timer-digits": "node scripts/subset-timer-digits-font.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -32,6 +33,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/svelte": "^5.4.2",
     "@vitest/coverage-v8": "^5.0.3",
+    "dseg": "^0.46.0",
     "eslint": "^10.11.0",
     "eslint-plugin-svelte": "^3.23.0",
     "fast-check": "^4.10.2",

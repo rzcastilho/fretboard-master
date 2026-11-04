@@ -148,3 +148,28 @@ describe('Erase and the timer link (041)', () => {
     expect(timerLink.enabled).toBe(false);
   });
 });
+
+describe('Erase and the click sound (042)', () => {
+  it('Erase restores the click sound', async () => {
+    metronome.restoreSound('cowbell');
+    expect(metronome.sound).toBe('cowbell');
+    render(ErasePreferences);
+    await fireEvent.click(opener());
+    await fireEvent.click(screen.getByRole('button', { name: 'Erase' }));
+    expect(metronome.sound).toBe('click');
+  });
+
+  it('start applies the stored sound without writing', () => {
+    const data = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+      removeItem: (k: string) => void data.delete(k)
+    };
+    storage.setItem('fretboard-master:prefs', '{"version":1,"metronome":{"sound":"wood"}}');
+    const before = data.get('fretboard-master:prefs');
+    preferences.start(storage as never);
+    expect(metronome.sound).toBe('wood');
+    expect(data.get('fretboard-master:prefs')).toBe(before);
+  });
+});

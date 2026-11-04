@@ -133,7 +133,8 @@ test.describe('caged triad US1: find the triad inside the shape I am holding', (
   }) => {
     await page.goto('/caged');
     await expandDetails(page);
-    await expect(layers(page).getByRole('switch').last()).toHaveText(/Triad\s*Off/);
+    await expect(layers(page).getByRole('switch').last()).toHaveText(/^\s*Triad\s*$/);
+    await expect(layers(page).getByRole('switch').last()).toHaveAttribute('aria-checked', 'false');
     await expect(sets(page)).toHaveCount(0);
     await shape(page, 'A').click();
     await expect(sets(page)).toHaveCount(0);

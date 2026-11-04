@@ -1,5 +1,15 @@
 <!--
 Sync Impact Report
+- Version change: 2.2.0 → 2.3.0 (MINOR: Technology Stack "Fonts" row allows a second subset).
+- Reason: the practice timer readout uses a self-hosted DSEG7 Classic Bold subset (digits and
+  colon) so the digits look like a digital display (spec 042).
+- Modified principles: none.
+- Modified sections: Technology Stack and Constraints ("Fonts" row).
+- Added / removed sections: none.
+- Dependent guidance updated: `docs/adr/0032-timer-readout-digit-font.md`.
+- Prior amendments: the 2.2.0 report and earlier history follow.
+
+Prior amendments (2.2.0 report):
 - Version change: 2.1.0 → 2.2.0 (MINOR: Principle VI initial JS budget raised).
 - Reason: the practice timer (slice 039) takes initial JS to 160.4 KB gzip. The single bundle
   stays permanent (ADR 0002), so the budget is raised to 180 KB, with headroom for the rest of
@@ -283,7 +293,7 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 | State | Svelte runes-based stores in `src/lib/state` |
 | Storage | `localStorage` behind `src/lib/prefs`. Every access wrapped, storage failures tolerated |
 | Styling | Plain CSS with custom-property design tokens. Media queries for theme, reduced motion, contrast, print |
-| Fonts | Self-hosted accidentals subset covering ♯ ♭ 𝄪 𝄫 (loaded via `unicode-range`); letters and digits use the system UI stack with tabular numerals (`font-variant-numeric: tabular-nums`). See ADR 0006 |
+| Fonts | Self-hosted accidentals subset covering ♯ ♭ 𝄪 𝄫 (loaded via `unicode-range`), plus a second self-hosted subset (DSEG7 digits and colon) used only by the practice timer readout and preloaded only on `/metronome` (ADR 0032); letters and digits use the system UI stack with tabular numerals (`font-variant-numeric: tabular-nums`). See ADR 0006 |
 | Unit and property tests | Vitest + fast-check |
 | E2E and accessibility | Playwright (desktop profile, plus Firefox and WebKit smoke and no-JS) + @axe-core/playwright |
 | Performance | Lighthouse CI with budgets, plus a bundle-size check |
@@ -382,4 +392,4 @@ Rationale: small, shippable increments keep feedback fast and the bundle small.
 - **Runtime guidance:** day-to-day development guidance for agents and humans lives in
   `CLAUDE.md` at the repository root. It MUST NOT contradict this constitution.
 
-**Version**: 2.2.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-11-01
+**Version**: 2.3.0 | **Ratified**: 2026-09-30 | **Last Amended**: 2026-11-01

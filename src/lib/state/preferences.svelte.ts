@@ -61,6 +61,7 @@ export const preferences = {
     theme.start(p.theme);
     shortcuts.start(p.shortcuts);
     metronome.restore(p.metronome);
+    metronome.restoreSound(p.metronome.sound);
     timer.restore(p.metronome.timer);
     timerLink.restore(p.metronome.timerLink);
     lastTool = p.lastTool;
@@ -117,6 +118,7 @@ export const preferences = {
     theme.restore(null);
     shortcuts.restore(true);
     metronome.restore(session ? session.current.metronome : DEFAULT_PREFERENCES.metronome);
+    metronome.restoreSound('click');
     timer.restore(2);
     timerLink.restore(false);
     lastTool = null;

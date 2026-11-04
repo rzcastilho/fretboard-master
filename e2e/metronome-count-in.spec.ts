@@ -95,7 +95,7 @@ test.describe('metronome count-in: switch and length (US2)', () => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('switch', { name: 'Subdivision ratio' })).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('combobox')).toBeFocused();
+    await expect(page.locator('#metronome-subdivision')).toBeFocused();
     await start(page).click();
     await expect(page.locator('.position')).toContainText('BEAT 1/4', { timeout: 5000 });
     const log = await clicks(page);

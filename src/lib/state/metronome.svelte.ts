@@ -8,6 +8,8 @@ import {
   type ClickScheduler,
   type SchedulerDeps
 } from '$lib/audio/metronome';
+import { playClickPreview } from '$lib/audio/click-preview';
+import { DEFAULT_CLICK_SOUND, toClickSound, CLICK_SOUNDS, type ClickSound } from '$lib/audio/click';
 import type { SlotPosition } from '$lib/audio/metronome-cycle';
 import { m } from '$lib/paraglide/messages.js';
 import {
@@ -47,6 +49,8 @@ import { playback } from './playback.svelte';
 import { preferences } from './preferences.svelte';
 import { tap, type TapRun } from './tap-tempo';
 
+type AudioSink = Parameters<typeof playClickPreview>[0];
+
 export type RunPhase = 'settings' | 'starting' | 'running' | 'paused';
 
 /** Which click became audible (041). */
@@ -84,6 +88,8 @@ const state = $state<{
   generation: number;
   /** Bumped once each time a Stop run ends by itself (037). */
   finished: number;
+  /** 042: the click timbre, one global value for all three modes. */
+  sound: ClickSound;
 }>({
   phase: 'settings',
   settings: DEFAULT_SETTINGS,
@@ -95,11 +101,16 @@ const state = $state<{
   announcement: '',
   soundNotice: false,
   generation: 0,
-  finished: 0
+  finished: 0,
+  sound: DEFAULT_CLICK_SOUND
 });
 
 let scheduler: ClickScheduler | null = null;
-let overrides: Partial<SchedulerDeps> = {};
+/** Test seam: scheduler deps plus the 042 preview player. */
+type Overrides = Partial<SchedulerDeps> & {
+  readonly preview?: (sink: AudioSink, sound: ClickSound) => boolean;
+};
+let overrides: Overrides = {};
 
 /** The record the active mode edits and plays (036). */
 const activeRecord = (): SharedSettings =>
@@ -197,6 +208,7 @@ function beginSegment(startSlot: number): void {
         ? speedRunPlan(state.speed)
         : runPlanFor(state.settings)),
     startSlot,
+    sound: state.sound,
     run: generation,
     pressedAtMs: performance.now()
   });
@@ -626,6 +638,39 @@ export const metronome = {
     remember();
   },
 
+  /** 042: the click timbre; drives the select's value. */
+  get sound(): ClickSound {
+    return state.sound;
+  },
+
+  /**
+   * 042: choose the click sound (a gesture). Invalid values are ignored. While a run is live the
+   * scheduler applies it to clicks not yet scheduled; in settings one accent preview plays.
+   */
+  setSound(v: unknown): void {
+    if (!(CLICK_SOUNDS as readonly unknown[]).includes(v)) return;
+    const sound = toClickSound(v);
+    state.sound = sound;
+    preferences.remember({ metronome: { sound } });
+    if (state.phase === 'settings') {
+      const sink = 'sink' in overrides ? (overrides.sink ?? null) : playback.clickSink();
+      if (!sink) return;
+      const play = overrides.preview ?? playClickPreview;
+      // The context may still be resuming after the first unlock: play once it runs.
+      void sink.running.then((ok) => {
+        if (ok && state.phase === 'settings' && state.sound === sound) play(sink, sound);
+      });
+    } else {
+      scheduler?.setSound(sound);
+    }
+  },
+
+  /** 042: apply a stored or default sound without writing or playing; reaches a live run too. */
+  restoreSound(v: unknown): void {
+    state.sound = toClickSound(v);
+    scheduler?.setSound(state.sound);
+  },
+
   /** Route left: halt, back to the settings phase; the values are kept (035, FR-002). */
   screenChanged(): void {
     halt();
@@ -648,7 +693,7 @@ export const metronome = {
 
 /** Test seam: inject scheduler deps (fake clock/frames/sink) and reset all state. Vitest only. */
 export function resetMetronomeForTests(
-  deps: Partial<SchedulerDeps> = {},
+  deps: Overrides = {},
   settings: Partial<MetronomeSettings> = {},
   plain: Partial<PlainSettings> = {},
   mode: MetronomeMode = DEFAULT_MODE,
@@ -668,4 +713,5 @@ export function resetMetronomeForTests(
   state.soundNotice = false;
   state.generation = 0;
   state.finished = 0;
+  state.sound = DEFAULT_CLICK_SOUND;
 }

@@ -390,12 +390,15 @@ describe('CagedTool: Show connections (016 US3)', () => {
     expect(container.querySelectorAll('.connection-ring').length).toBe(
       caged.display.connections.length
     );
-    // Position shown by text, not color alone.
+    // Position shown by the thumb and aria-checked; no On/Off text.
     expect(sw().querySelector('.switch-track')).toBeTruthy();
-    expect(sw().textContent).toMatch(/On/i);
+    expect(sw().querySelector('.state')).toBeNull();
+    expect(sw().textContent?.trim()).toBe('Show connections');
     await fireEvent.click(sw());
     await tick();
-    expect(sw().textContent).toMatch(/Off/i);
+    expect(sw().getAttribute('aria-checked')).toBe('false');
+    expect(sw().querySelector('.state')).toBeNull();
+    expect(sw().textContent?.trim()).toBe('Show connections');
   });
 
   it('is aria-disabled with its value kept for a non-compatible tuning', async () => {
@@ -438,12 +441,13 @@ describe('CagedLayerList (US2)', () => {
     render(CagedTool);
     const sw = layerSwitches();
     expect(sw.map((s) => s.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-      'Chord On',
-      'Arpeggio Off',
-      'Pentatonic Off',
-      'Scale Off',
-      'Triad Off'
+      'Chord',
+      'Arpeggio',
+      'Pentatonic',
+      'Scale',
+      'Triad'
     ]);
+    expect(sw.every((s) => s.querySelector('.state') === null)).toBe(true);
     expect(sw.map((s) => s.getAttribute('aria-checked'))).toEqual([
       'true',
       'false',

@@ -350,10 +350,10 @@ describe('MetronomePanel subdivision select (032)', () => {
     expect(metronome.settings.subdivision).toBe(5);
     await startRun();
     expect(container.querySelector('.position')?.textContent).toContain('SUB 5');
-    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByLabelText('Loop 1')).toBeNull();
     await fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
     expect(metronome.phase).toBe('paused');
-    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByLabelText('Loop 1')).toBeNull();
   });
 });
 
@@ -737,5 +737,43 @@ describe('MetronomePanel plain subdivision (038)', () => {
     advance(0.1);
     await settle();
     expect(container.querySelector('.position')?.textContent).toMatch(/BEAT \d\/4.*SUB 3/);
+  });
+});
+
+describe('MetronomePanel click sound select (042)', () => {
+  const inPanel = () => {
+    const panel = document.getElementById('metronome-mode-panel');
+    return panel ? panel.querySelectorAll('select#metronome-sound') : [];
+  };
+
+  it('is rendered once in the mode panel in every mode', async () => {
+    render(MetronomePanel);
+    for (const mode of ['ratios', 'plain', 'speed'] as const) {
+      metronome.selectMode(mode);
+      await settle();
+      expect(inPanel()).toHaveLength(1);
+      expect(screen.getAllByLabelText('Click sound')).toHaveLength(1);
+    }
+  });
+
+  it('stays while running and paused, and keeps its value', async () => {
+    render(MetronomePanel);
+    metronome.restoreSound('wood');
+    await startRun();
+    await settle();
+    expect(inPanel()).toHaveLength(1);
+    expect((inPanel()[0] as HTMLSelectElement).value).toBe('wood');
+    await fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    await settle();
+    expect(inPanel()).toHaveLength(1);
+  });
+
+  it('metronome shortcuts are inert while the select has focus', async () => {
+    render(MetronomePanel);
+    await settle();
+    const select = inPanel()[0] as HTMLSelectElement;
+    select.focus();
+    await key(' ', select);
+    expect(metronome.phase).toBe('settings');
   });
 });

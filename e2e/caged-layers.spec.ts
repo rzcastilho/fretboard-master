@@ -15,12 +15,13 @@ test.describe('caged layers US2: layer switches double as the legend', () => {
     await page.goto('/caged');
     await expandDetails(page);
     await expect(layers(page).getByRole('switch')).toHaveText([
-      /Chord\s*On/,
-      /Arpeggio\s*Off/,
-      /Pentatonic\s*Off/,
-      /Scale\s*Off/,
-      /Triad\s*Off/
+      /^\s*Chord\s*$/,
+      /^\s*Arpeggio\s*$/,
+      /^\s*Pentatonic\s*$/,
+      /^\s*Scale\s*$/,
+      /^\s*Triad\s*$/
     ]);
+    await expect(page.locator('.switch .state')).toHaveCount(0);
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-checked', 'true');
     await expect(layerSwitch(page, 'Chord')).toHaveAttribute('aria-disabled', 'true');
     await expect(layerSwitch(page, 'Chord')).toHaveAccessibleDescription(

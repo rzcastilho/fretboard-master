@@ -86,6 +86,6 @@ describe('Subdivision ratio settings', () => {
     await vi.waitFor(() => expect(metronome.phase).not.toBe('settings'));
     expect(screen.queryByRole('switch', { name: 'Subdivision ratio' })).toBeNull();
     expect(screen.queryByRole('heading', { level: 3 })).toBeNull();
-    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /Loop/ })).toBeNull();
   });
 });

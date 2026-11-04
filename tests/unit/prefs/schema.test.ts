@@ -22,6 +22,7 @@ import { TOOLS } from '../../../src/lib/shell/tools';
 import { TUNING_PRESETS, tuningFromOffsets } from '../../../src/lib/instrument/tunings';
 import { DEFAULT_TEMPO, TEMPOS } from '../../../src/lib/state/listen';
 import { MAX_BPM, MIN_BPM } from '../../../src/lib/audio/schedule';
+import { CLICK_SOUNDS } from '../../../src/lib/audio/click';
 import {
   DEFAULT_PLAIN_SETTINGS,
   DEFAULT_SETTINGS,
@@ -71,7 +72,8 @@ describe('constants and defaults (FR-018)', () => {
         speed: DEFAULT_SPEED_SETTINGS,
         mode: 'ratios',
         timer: 2,
-        timerLink: false
+        timerLink: false,
+        sound: 'click'
       }
     });
   });
@@ -382,7 +384,8 @@ describe('serializePreferences', () => {
         speed: DEFAULT_SPEED_SETTINGS,
         mode: 'ratios',
         timer: 2,
-        timerLink: false
+        timerLink: false,
+        sound: 'click'
       }
     };
     expect(serializePreferences(p)).toBe(
@@ -445,7 +448,8 @@ describe('seven strings: writer rules 1–4 (012)', () => {
         speed: DEFAULT_SPEED_SETTINGS,
         mode: 'ratios',
         timer: 2,
-        timerLink: false
+        timerLink: false,
+        sound: 'click'
       }
     };
     expect(Object.keys(JSON.parse(serializePreferences(p)))).toEqual([
@@ -757,7 +761,8 @@ const arbPrefs: fc.Arbitrary<Preferences> = fc.record({
     speed: arbSpeed,
     mode: fc.constantFrom('plain', 'speed', 'ratios'),
     timer: fc.integer({ min: 1, max: 10 }),
-    timerLink: fc.boolean()
+    timerLink: fc.boolean(),
+    sound: fc.constantFrom(...CLICK_SOUNDS)
   })
 });
 
@@ -958,7 +963,8 @@ describe('stored keys (027 FR-019(e))', () => {
       speed: DEFAULT_SPEED_SETTINGS,
       mode: 'ratios',
       timer: 2,
-      timerLink: false
+      timerLink: false,
+      sound: 'click'
     }
   };
 
@@ -1020,7 +1026,8 @@ describe('metronome.ratios (035)', () => {
           speed: DEFAULT_SPEED_SETTINGS,
           mode: 'ratios',
           timer: 2,
-          timerLink: false
+          timerLink: false,
+          sound: 'click'
         }
       })
     ).not.toContain('metronome');
@@ -1044,7 +1051,8 @@ describe('metronome.ratios (035)', () => {
             speed: DEFAULT_SPEED_SETTINGS,
             mode: 'ratios',
             timer: 2,
-            timerLink: false
+            timerLink: false,
+            sound: 'click'
           }
         })
       ).toContain('"metronome"');
@@ -1061,7 +1069,8 @@ describe('metronome.ratios (035)', () => {
         speed: DEFAULT_SPEED_SETTINGS,
         mode: 'ratios',
         timer: 2,
-        timerLink: false
+        timerLink: false,
+        sound: 'click'
       }
     });
     const o = JSON.parse(raw) as Record<string, Record<string, Record<string, number | boolean>>>;
@@ -1086,7 +1095,8 @@ describe('metronome.ratios (035)', () => {
               speed: DEFAULT_SPEED_SETTINGS,
               mode: 'ratios',
               timer: 2,
-              timerLink: false
+              timerLink: false,
+              sound: 'click'
             }
           })
         );
@@ -1212,7 +1222,8 @@ describe('metronome.ratios (035)', () => {
         speed: DEFAULT_SPEED_SETTINGS,
         mode: 'ratios',
         timer: 2,
-        timerLink: false
+        timerLink: false,
+        sound: 'click'
       }
     });
     const back = parsePreferences(written);
@@ -1238,7 +1249,8 @@ describe('metronome.plain and metronome.mode (036)', () => {
     speed: DEFAULT_SPEED_SETTINGS,
     mode: 'ratios',
     timer: 2,
-    timerLink: false
+    timerLink: false,
+    sound: 'click'
   } as const;
 
   it('C1: the default record is byte-identical to 035', () => {
@@ -1372,7 +1384,8 @@ describe('metronome.plain and metronome.mode (036)', () => {
       speed: DEFAULT_SPEED_SETTINGS,
       mode: 'plain',
       timer: 2,
-      timerLink: false
+      timerLink: false,
+      sound: 'click'
     });
   });
 });
@@ -1441,7 +1454,8 @@ describe('metronome.speed (037)', () => {
       speed: { ...DEFAULT_SPEED_SETTINGS, startBpm: 80, targetBpm: 120, atTarget: 'stop' },
       mode: 'speed',
       timer: 2,
-      timerLink: false
+      timerLink: false,
+      sound: 'click'
     });
   });
 
@@ -1656,7 +1670,7 @@ describe('metronome timer (039)', () => {
 
   it('C27: records without a timer (every earlier fixture) read as 2', () => {
     for (const f of FIXTURES) {
-      if (f.name.startsWith('metronome-timer')) continue;
+      if (f.name.startsWith('metronome-timer') || f.name === 'metronome-sound-full') continue;
       expect(parsePreferences(f.raw).metronome.timer, f.name).toBe(2);
     }
   });
@@ -1802,7 +1816,69 @@ describe('metronome timer link (041)', () => {
       parsePreferences(FIXTURE_BY_NAME['metronome-timer-link-invalid'].raw).metronome
     ).toMatchObject({
       mode: 'speed',
-      timerLink: false
+      timerLink: false,
+      sound: 'click'
     });
+  });
+});
+
+describe('metronome click sound (042)', () => {
+  const ms = (metronome: unknown) =>
+    parsePreferences(rec({ version: 1, tuning: 'AF-1', frets: 22, metronome }));
+
+  it('defaults to click, with no metronome key serialized', () => {
+    expect(DEFAULT_PREFERENCES.metronome.sound).toBe('click');
+    expect(parsePreferences(rec({ version: 1, tuning: 'AF-1', frets: 22 })).metronome.sound).toBe(
+      'click'
+    );
+    expect(serializePreferences(DEFAULT_PREFERENCES)).not.toContain('metronome');
+    expect(PREFS_VERSION).toBe(1);
+  });
+
+  it.each([
+    [{ timer: 5 }, 'click', 5, false],
+    [{ sound: 'wood' }, 'wood', 2, false],
+    [{ timer: 5, timerLink: true, sound: 'cowbell' }, 'cowbell', 5, true],
+    [{ mode: 'speed', sound: 'gong' }, 'click', 2, false],
+    [{ mode: 'plain', sound: 3 }, 'click', 2, false],
+    ['x', 'click', 2, false]
+  ])('%j parses as sound %s, timer %j, link %j', (metronome, sound, timer, link) => {
+    const p = ms(metronome);
+    expect(p.metronome.sound).toBe(sound);
+    expect(p.metronome.timer).toBe(timer);
+    expect(p.metronome.timerLink).toBe(link);
+  });
+
+  it('keeps the other fields when the sound is invalid', () => {
+    expect(ms({ mode: 'speed', sound: 'gong' }).metronome.mode).toBe('speed');
+    expect(ms({ mode: 'plain', sound: 3 }).metronome.mode).toBe('plain');
+  });
+
+  it('writes sound last and only when not click', () => {
+    const p = parsePreferences(FIXTURE_BY_NAME['metronome-sound-full'].raw);
+    const raw = serializePreferences({ ...p, metronome: { ...p.metronome, mode: 'plain' } });
+    expect(Object.keys(JSON.parse(raw).metronome)).toEqual(['mode', 'timer', 'timerLink', 'sound']);
+    const click = serializePreferences({ ...p, metronome: { ...p.metronome, sound: 'click' } });
+    expect(JSON.parse(click).metronome).toEqual({ timer: 5, timerLink: true });
+  });
+
+  it('an all-default record serializes with no metronome key, byte-identical to 041', () => {
+    const raw = serializePreferences({
+      ...DEFAULT_PREFERENCES,
+      metronome: { ...DEFAULT_PREFERENCES.metronome, sound: 'click' }
+    });
+    expect(raw).toBe(serializePreferences(DEFAULT_PREFERENCES));
+    expect(JSON.parse(raw).metronome).toBeUndefined();
+  });
+
+  it('fixtures parse as expected and the valid ones round-trip', () => {
+    expect(parsePreferences(FIXTURE_BY_NAME['metronome-sound'].raw).metronome.sound).toBe('wood');
+    for (const name of ['metronome-sound', 'metronome-sound-full']) {
+      const raw = FIXTURE_BY_NAME[name].raw;
+      expect(serializePreferences(parsePreferences(raw))).toBe(raw);
+    }
+    expect(
+      parsePreferences(FIXTURE_BY_NAME['metronome-sound-invalid'].raw).metronome
+    ).toMatchObject({ mode: 'speed', sound: 'click' });
   });
 });

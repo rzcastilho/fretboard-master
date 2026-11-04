@@ -50,6 +50,21 @@ describe('TimerCard: play button, readout, state', () => {
     expect(ghost?.getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('US1: keeps role=timer, the aria-hidden ghost and the time, and preloads the digit font', () => {
+    const { container } = render(TimerCard);
+    const readout = container.querySelector('.readout');
+    expect(readout?.getAttribute('role')).toBe('timer');
+    expect(readout?.getAttribute('aria-label')).toBe('Time remaining');
+    expect(readout?.querySelector('.ghost')?.textContent).toBe('88:88');
+    expect(readout?.querySelector('.ghost')?.getAttribute('aria-hidden')).toBe('true');
+    expect(readout?.querySelector('.time')?.textContent).toBe('02:00');
+    const link = document.head.querySelector(
+      'link[rel="preload"][as="font"][type="font/woff2"][href="/fonts/fm-timer-digits.woff2"]'
+    );
+    expect(link).not.toBeNull();
+    expect(link?.hasAttribute('crossorigin')).toBe(true);
+  });
+
   it('U5: the status region is polite and lives inside the card', () => {
     const { container } = render(TimerCard);
     const status = screen.getByRole('status');
@@ -145,13 +160,16 @@ describe('TimerCard: link switch (041)', () => {
     expect((sw() as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('hides the On/Off word from assistive technology', async () => {
+  it('shows no On/Off text, only the label, and toggles aria-checked', async () => {
     render(TimerCard);
-    const word = sw().querySelector('.state');
-    expect(word?.getAttribute('aria-hidden')).toBe('true');
-    expect(word?.textContent).toBe('Off');
+    expect(sw().querySelector('.state')).toBeNull();
+    const label = sw().textContent?.trim();
+    expect(label).not.toMatch(/\b(On|Off)\b/);
+    expect(sw().getAttribute('aria-checked')).toBe('false');
     await fireEvent.click(sw());
     await tick();
-    expect(sw().querySelector('.state')?.textContent).toBe('On');
+    expect(sw().getAttribute('aria-checked')).toBe('true');
+    expect(sw().querySelector('.state')).toBeNull();
+    expect(sw().textContent?.trim()).toBe(label);
   });
 });

@@ -369,8 +369,6 @@
   "caged_previous_shape": "Forma anterior",
   "caged_next_shape": "Forma siguiente",
   "caged_show_connections": "Mostrar conexiones",
-  "caged_switch_on": "Activado",
-  "caged_switch_off": "Desactivado",
   "caged_reset": "Restablecer herramienta",
   "caged_layers_heading": "Capas",
   "caged_layer_chord": "Acorde",
@@ -512,8 +510,6 @@
   "metronome_announce_reset": "Reiniciado",
   "metronome_sound_unavailable": "El sonido no está disponible; el tiempo se muestra visualmente.",
   "metronome_count_in_label": "Cuenta previa",
-  "metronome_switch_on": "Activado",
-  "metronome_switch_off": "Desactivado",
   "metronome_initial_count_in_label": "Cuenta inicial",
   "metronome_repeat_count_in_label": "Cuenta de repetición",
   "metronome_initial_count_in_decrease": "Menos clics en la cuenta inicial",
@@ -571,5 +567,11 @@
   "timer_link_label": "Iniciar y detener con el metrónomo",
   "timer_announce_second": "1 segundo",
   "timer_announce_seconds": "{count} segundos",
-  "timer_announce_finished": "Temporizador terminado"
+  "timer_announce_finished": "Temporizador terminado",
+  "metronome_sound_label": "Sonido del clic",
+  "metronome_sound_click": "Clic",
+  "metronome_sound_wood": "Bloque de madera",
+  "metronome_sound_beep": "Pitido",
+  "metronome_sound_rim": "Aro",
+  "metronome_sound_cowbell": "Cencerro"
 }

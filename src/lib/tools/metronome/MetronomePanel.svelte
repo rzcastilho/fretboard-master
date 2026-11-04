@@ -8,6 +8,7 @@
   import { toShortcutEvent } from '$lib/state/shortcuts';
   import { shortcuts } from '$lib/state/shortcuts.svelte';
   import AtTargetSelect from './AtTargetSelect.svelte';
+  import ClickSoundSelect from './ClickSoundSelect.svelte';
   import ModeTabs from './ModeTabs.svelte';
   import CountInSettings from './CountInSettings.svelte';
   import RunControls from './RunControls.svelte';
@@ -238,6 +239,7 @@
         bind:main={mainButton}
       />
     {/if}
+    <ClickSoundSelect />
   </div>
 
   <div role="status" aria-live="polite" class="sr-only">{metronome.announcement}</div>

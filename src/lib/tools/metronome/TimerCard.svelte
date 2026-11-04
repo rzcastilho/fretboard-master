@@ -9,6 +9,16 @@
   const running = $derived(timer.status === 'running');
 </script>
 
+<svelte:head>
+  <link
+    rel="preload"
+    as="font"
+    type="font/woff2"
+    href="/fonts/fm-timer-digits.woff2"
+    crossorigin="anonymous"
+  />
+</svelte:head>
+
 <section
   class="timer"
   aria-labelledby="timer-heading"
@@ -63,9 +73,6 @@
   >
     <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
     {m.timer_link_label()}
-    <span class="state" aria-hidden="true"
-      >{timerLink.enabled ? m.metronome_switch_on() : m.metronome_switch_off()}</span
-    >
   </button>
   <div class="sr-only" role="status" aria-live="polite">{timer.announcement}</div>
 </section>
@@ -107,6 +114,7 @@
   .readout {
     position: relative;
     display: inline-block;
+    font-family: var(--font-family-timer);
     font-size: var(--timer-readout-size);
     font-variant-numeric: tabular-nums;
     font-weight: var(--font-weight-bold);

@@ -369,8 +369,6 @@
   "caged_previous_shape": "Previous shape",
   "caged_next_shape": "Next shape",
   "caged_show_connections": "Show connections",
-  "caged_switch_on": "On",
-  "caged_switch_off": "Off",
   "caged_reset": "Reset tool",
   "caged_layers_heading": "Layers",
   "caged_layer_chord": "Chord",
@@ -512,8 +510,6 @@
   "metronome_announce_reset": "Reset",
   "metronome_sound_unavailable": "Sound is unavailable; the beat is shown visually.",
   "metronome_count_in_label": "Count In",
-  "metronome_switch_on": "On",
-  "metronome_switch_off": "Off",
   "metronome_initial_count_in_label": "Initial Count In",
   "metronome_repeat_count_in_label": "Repeat Count In",
   "metronome_initial_count_in_decrease": "Fewer initial count-in clicks",
@@ -571,5 +567,11 @@
   "timer_link_label": "Start and stop with metronome",
   "timer_announce_second": "1 second",
   "timer_announce_seconds": "{count} seconds",
-  "timer_announce_finished": "Timer finished"
+  "timer_announce_finished": "Timer finished",
+  "metronome_sound_label": "Click sound",
+  "metronome_sound_click": "Click",
+  "metronome_sound_wood": "Wood block",
+  "metronome_sound_beep": "Beep",
+  "metronome_sound_rim": "Rim",
+  "metronome_sound_cowbell": "Cowbell"
 }

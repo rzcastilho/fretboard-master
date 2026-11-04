@@ -2135,3 +2135,137 @@ describe('041 run observer seam', () => {
     expect(metronome.announcement).toBe('Reset');
   });
 });
+
+describe('click sound (042)', () => {
+  type Entry = { type: string; sound?: string };
+  const clicks = (): Entry[] =>
+    (globalThis.__fmAudioLog as unknown as Entry[]).filter((e) => e.type === 'click');
+  const soundRig = (running: boolean | 'null' = true) => {
+    const r = rig(running);
+    const preview = vi.fn(() => true);
+    resetMetronomeForTests({ clock: r.clock, frames: r.frames, preview });
+    resetPreferencesForTests();
+    globalThis.__fmAudioLog = [];
+    return { r, preview };
+  };
+  afterEach(() => {
+    globalThis.__fmAudioLog = undefined;
+  });
+
+  it('defaults to click', () => {
+    soundRig();
+    expect(metronome.sound).toBe('click');
+  });
+
+  it('settings: sets state, remembers, plays one preview through the sink', async () => {
+    const { r, preview } = soundRig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.setSound('wood');
+    await settle();
+    expect(metronome.sound).toBe('wood');
+    expect(remember).toHaveBeenCalledWith({ metronome: { sound: 'wood' } });
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(preview).toHaveBeenCalledWith(r.sink, 'wood');
+    expect(metronome.phase).toBe('settings');
+  });
+
+  it('settings: nothing plays when audio is unavailable, but the choice is kept', async () => {
+    const { preview } = soundRig('null');
+    metronome.setSound('beep');
+    await settle();
+    expect(metronome.sound).toBe('beep');
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it('settings: a sink that cannot run plays nothing', async () => {
+    const { preview } = soundRig(false);
+    metronome.setSound('rim');
+    await settle();
+    expect(metronome.sound).toBe('rim');
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it('settings: re-selecting the current sound still previews and re-remembers', async () => {
+    const { preview } = soundRig();
+    metronome.setSound('click');
+    await settle();
+    expect(preview).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['gong', 3, null, undefined, 'CLICK'])('ignores %j', async (bad) => {
+    const { preview } = soundRig();
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.setSound('wood');
+    await settle();
+    remember.mockClear();
+    preview.mockClear();
+    metronome.setSound(bad);
+    await settle();
+    expect(metronome.sound).toBe('wood');
+    expect(remember).not.toHaveBeenCalled();
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it('running: reaches the scheduler, no preview, run state untouched', async () => {
+    const { r, preview } = soundRig();
+    metronome.toggle();
+    await settle();
+    advance(r, 1);
+    const generation = metronome.generation;
+    const beat = metronome.beat;
+    const bpm = metronome.bpm;
+    metronome.setSound('rim');
+    expect(preview).not.toHaveBeenCalled();
+    expect(metronome.phase).toBe('running');
+    expect(metronome.generation).toBe(generation);
+    expect(metronome.beat).toBe(beat);
+    expect(metronome.bpm).toBe(bpm);
+    advance(r, 4);
+    const log = clicks();
+    expect(log[0].sound).toBe('click');
+    expect(log[log.length - 1].sound).toBe('rim');
+  });
+
+  it('paused: remembers, no preview, applies to the next resume', async () => {
+    const { r, preview } = soundRig();
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    metronome.toggle();
+    expect(metronome.phase).toBe('paused');
+    metronome.setSound('cowbell');
+    expect(preview).not.toHaveBeenCalled();
+    expect(metronome.sound).toBe('cowbell');
+    metronome.toggle();
+    await settle();
+    advance(r, 1);
+    expect(clicks().pop()?.sound).toBe('cowbell');
+  });
+
+  it('beginSegment passes the sound and selectMode keeps it', async () => {
+    const { r } = soundRig();
+    metronome.setSound('beep');
+    metronome.selectMode('plain');
+    expect(metronome.sound).toBe('beep');
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    expect(clicks().every((c) => c.sound === 'beep')).toBe(true);
+  });
+
+  it('restoreSound has no write and no sound, and reaches a live run', async () => {
+    const { r, preview } = soundRig();
+    metronome.toggle();
+    await settle();
+    advance(r, 0.5);
+    const remember = vi.spyOn(preferences, 'remember');
+    metronome.restoreSound('wood');
+    expect(metronome.sound).toBe('wood');
+    expect(remember).not.toHaveBeenCalled();
+    expect(preview).not.toHaveBeenCalled();
+    advance(r, 4);
+    expect(clicks().pop()?.sound).toBe('wood');
+    metronome.restoreSound('gong');
+    expect(metronome.sound).toBe('click');
+  });
+});

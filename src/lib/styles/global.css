@@ -1,4 +1,11 @@
 @font-face {
+  font-family: 'FM Timer Digits';
+  src: url('/fonts/fm-timer-digits.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'FM Accidentals';
   src: url('/fonts/fm-accidentals.woff2') format('woff2');
   unicode-range: U+266D-266F, U+1D12A, U+1D12B;

@@ -43,11 +43,10 @@ describe('Count In settings', () => {
     expect(repeat().getAttribute('aria-valuetext')).toBe('2');
   });
 
-  it('keeps the accessible name "Count In" with an aria-hidden state word', () => {
+  it('keeps the accessible name "Count In" with no state text', () => {
     render(MetronomePanel);
-    const state = sw().querySelector('.state');
-    expect(state?.getAttribute('aria-hidden')).toBe('true');
-    expect(state?.textContent?.trim()).toBe('On');
+    expect(sw().querySelector('.state')).toBeNull();
+    expect(sw().textContent?.trim()).toBe('Count In');
   });
 
   it('names the − and + buttons and disables them at the limits', async () => {
@@ -70,7 +69,8 @@ describe('Count In settings', () => {
     await fireEvent.input(repeat(), { target: { value: '3' } });
     await fireEvent.click(sw());
     expect(sw().getAttribute('aria-checked')).toBe('false');
-    expect(sw().querySelector('.state')?.textContent?.trim()).toBe('Off');
+    expect(sw().querySelector('.state')).toBeNull();
+    expect(sw().textContent?.trim()).toBe('Count In');
     expect(screen.queryByRole('slider', { name: 'Initial Count In' })).toBeNull();
     expect(screen.queryByRole('slider', { name: 'Repeat Count In' })).toBeNull();
     await fireEvent.click(sw());

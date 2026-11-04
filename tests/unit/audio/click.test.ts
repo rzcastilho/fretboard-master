@@ -1,5 +1,14 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { CLICK_LENGTH_S, CLICK_S, renderClick } from '../../../src/lib/audio/click';
+import {
+  CLICK_LENGTH_S,
+  CLICK_S,
+  CLICK_SOUNDS,
+  DEFAULT_CLICK_SOUND,
+  renderClick,
+  toClickSound,
+  type ClickKind
+} from '../../../src/lib/audio/click';
 
 const RATE = 48000;
 
@@ -115,3 +124,69 @@ function zeroCrossingHz(s: Float32Array, rate: number): number {
   if (crossings.length < 2) return 0;
   return (rate * (crossings.length - 1)) / (crossings[crossings.length - 1] - crossings[0]);
 }
+
+describe('click sounds (042)', () => {
+  const KINDS: readonly ClickKind[] = ['accent', 'normal', 'sub'];
+  const PEAK: Record<ClickKind, number> = { accent: 0.9, normal: 0.55, sub: 0.25 };
+  const sha = (s: Float32Array): string =>
+    createHash('sha256').update(Buffer.from(s.buffer)).digest('hex').slice(0, 16);
+
+  it('lists the five sounds in select order, default click', () => {
+    expect(CLICK_SOUNDS).toEqual(['click', 'wood', 'beep', 'rim', 'cowbell']);
+    expect(DEFAULT_CLICK_SOUND).toBe('click');
+  });
+
+  it.each(CLICK_SOUNDS.flatMap((s) => KINDS.map((k) => [s, k] as const)))(
+    '%s/%s: length, peak, finite, deterministic, soft edges',
+    (sound, kind) => {
+      for (const rate of [44100, 48000]) {
+        const x = renderClick(kind, rate, sound);
+        expect(x.length).toBe(Math.max(1, Math.round(CLICK_LENGTH_S[kind] * rate)));
+        expect(x.length).toBeLessThanOrEqual(Math.round(CLICK_S * rate));
+        expect(peakOf(x)).toBeCloseTo(PEAK[kind], 2);
+        expect(x.every(Number.isFinite)).toBe(true);
+        expect(renderClick(kind, rate, sound)).toEqual(x);
+        expect(Math.abs(x[0])).toBeLessThanOrEqual(0.01);
+        expect(Math.abs(x[x.length - 1])).toBeLessThanOrEqual(0.01 * peakOf(x));
+      }
+    }
+  );
+
+  it.each(CLICK_SOUNDS)('%s: accent > normal > sub peak', (sound) => {
+    const [a, n, s] = KINDS.map((k) => peakOf(renderClick(k, RATE, sound)));
+    expect(a).toBeGreaterThan(n);
+    expect(n).toBeGreaterThan(s);
+  });
+
+  it('sounds differ from each other', () => {
+    const hashes = CLICK_SOUNDS.map((s) => sha(renderClick('accent', RATE, s)));
+    expect(new Set(hashes).size).toBe(CLICK_SOUNDS.length);
+  });
+
+  it('click output equals the pre-042 render, sample for sample', () => {
+    const golden = {
+      accent: '751513fd85c9d99a',
+      normal: 'e5c16b1d3af628d9',
+      sub: '6cd766aa3e8edc20'
+    };
+    for (const k of KINDS) {
+      expect(sha(renderClick(k, RATE))).toBe(golden[k]);
+      expect(sha(renderClick(k, RATE, 'click'))).toBe(golden[k]);
+    }
+  });
+
+  it('an unknown sound falls back to click', () => {
+    expect(renderClick('accent', RATE, 'gong' as never)).toEqual(renderClick('accent', RATE));
+  });
+
+  it('toClickSound maps non-members to click', () => {
+    for (const s of CLICK_SOUNDS) expect(toClickSound(s)).toBe(s);
+    for (const v of ['gong', '', 3, null, undefined, {}]) expect(toClickSound(v)).toBe('click');
+  });
+
+  it.each(CLICK_SOUNDS)('%s: invalid sample rate falls back to 48 000', (sound) => {
+    for (const bad of [0, -1, NaN, Infinity]) {
+      expect(renderClick('accent', bad, sound).length).toBe(Math.round(0.03 * 48000));
+    }
+  });
+});

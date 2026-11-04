@@ -32,9 +32,6 @@
   >
     <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
     {m.metronome_count_in_label()}
-    <span class="state" aria-hidden="true"
-      >{settings.countIn ? m.metronome_switch_on() : m.metronome_switch_off()}</span
-    >
   </button>
   {#if settings.countIn}
     <ValueRow
